@@ -161,6 +161,7 @@ Base URL: `/api/v1`
 #### Wait for Process
 
 - **Endpoint**: `POST /api/v1/shell/wait`
+- **Timeout behavior**: A timeout is a successful response with `status: "running"` and `returncode: null`; it is not an HTTP error.
 - **Description**: Wait for the process in the specified session to complete
 - **Request Body**:
   ```json
@@ -521,4 +522,4 @@ The sandbox container includes the following environments:
 ### Browser Debugging
 
 1. Connect to `localhost:5900` using a VNC client
-2. Access `http://localhost:9222/devtools/inspector.html` in your browser 
+2. Access `http://localhost:9222/devtools/inspector.html` in your browser

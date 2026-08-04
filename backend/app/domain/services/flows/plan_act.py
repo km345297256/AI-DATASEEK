@@ -212,6 +212,7 @@ class PlanActFlow(BaseFlow):
                     continue
                 # Execute step
                 logger.info(f"Agent {self._agent_id} started executing step {step.id}: {step.description[:50]}...")
+                complete_after_vision_step = False
                 if step.agent not in self.enabled_subagents:
                     step.status = ExecutionStatus.FAILED
                     step.success = False
@@ -224,16 +225,30 @@ class PlanActFlow(BaseFlow):
                 if handler_type == "vision":
                     async for event in self.vision.analyze_step(self.plan, step, message, sandbox=self._sandbox):
                         yield event
-                    if self._should_complete_after_vision_step():
-                        self.status = AgentStatus.COMPLETED
-                        continue
+                    complete_after_vision_step = self._should_complete_after_vision_step()
                 else:
                     async for event in self.executor.execute_step(self.plan, step, message):
                         yield event
-                logger.info(f"Agent {self._agent_id} completed step {step.id}, state changed from {AgentStatus.EXECUTING} to {AgentStatus.UPDATING}")
+                logger.info(f"Agent {self._agent_id} completed step {step.id}")
+                # StepEvent carries only one step. Persist the complete updated
+                # plan before moving on so task/process recovery cannot repeat a
+                # successful side-effecting step from an older PlanEvent.
+                yield PlanEvent(status=PlanStatus.UPDATED, plan=self.plan, step=step)
+                if complete_after_vision_step:
+                    self.status = AgentStatus.COMPLETED
+                    continue
                 await self.executor.compact_memory()
                 logger.debug(f"Agent {self._agent_id} compacted memory")
-                self.status = AgentStatus.UPDATING
+                # A successful step does not invalidate the original plan. Replanning
+                # after every success adds an LLM round trip and can also make a later
+                # step repeat work that has already finished. Replan only on failure.
+                self.status = self._status_after_execution_step(step)
+                logger.info(
+                    "Agent %s state changed from %s to %s",
+                    self._agent_id,
+                    AgentStatus.EXECUTING,
+                    self.status,
+                )
             elif self.status == AgentStatus.UPDATING:
                 # Update plan
                 logger.info(f"Agent {self._agent_id} started updating plan")
@@ -263,6 +278,12 @@ class PlanActFlow(BaseFlow):
     
     def is_done(self) -> bool:
         return self.status == AgentStatus.IDLE
+
+    @staticmethod
+    def _status_after_execution_step(step: Step) -> AgentStatus:
+        if step.status == ExecutionStatus.COMPLETED and step.success:
+            return AgentStatus.EXECUTING
+        return AgentStatus.UPDATING
 
     def _dynamic_system_prompt(self) -> str:
         parts = [

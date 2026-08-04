@@ -59,6 +59,14 @@ class SessionRepository(Protocol):
         """Add an event to a session"""
         ...
 
+    async def claim_client_message_id(self, session_id: str, client_message_id: str) -> bool:
+        """Atomically claim a client message ID; return false when already claimed."""
+        ...
+
+    async def release_client_message_id(self, session_id: str, client_message_id: str) -> None:
+        """Release a claim when a message failed before it reached the task queue."""
+        ...
+
     async def get_events(self, session_id: str) -> List[AgentEvent]:
         """Get all events for a session"""
         ...

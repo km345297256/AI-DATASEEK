@@ -2,6 +2,8 @@ from typing import Optional, AsyncGenerator, List
 import asyncio
 import io
 import logging
+import uuid
+import weakref
 from datetime import datetime
 from app.domain.models.session import Session, SessionStatus
 from app.domain.external.sandbox import Sandbox
@@ -48,6 +50,9 @@ class AgentDomainService:
         self._mcp_repository = mcp_repository
         self._sandbox_runtime = sandbox_runtime or get_default_sandbox_runtime(sandbox_cls)
         self._chat_bootstrap_tasks: set[asyncio.Task] = set()
+        self._chat_bootstrap_locks: weakref.WeakValueDictionary[str, asyncio.Lock] = (
+            weakref.WeakValueDictionary()
+        )
         logger.info("AgentDomainService initialization completed")
             
     async def shutdown(self) -> None:
@@ -238,6 +243,27 @@ class AgentDomainService:
         except Exception:
             logger.exception("Failed to persist chat bootstrap error for session %s", session_id)
 
+    async def _resume_claimed_chat_task(self, session_id: str, task: Optional[Task]) -> None:
+        """Restart a claimed task when its queued message has not started yet."""
+        if task is None or not task.done:
+            return
+        is_empty = getattr(task.input_stream, "is_empty", None)
+        if not callable(is_empty) or await is_empty():
+            return
+        logger.info("Restarting task %s with a previously claimed queued message", task.id)
+        await self._session_repository.update_status(session_id, SessionStatus.RUNNING)
+        await task.run()
+
+    @staticmethod
+    def _client_message_event_id(session_id: str, client_message_id: str) -> str:
+        """Return a stable event ID so bootstrap retries upsert one user event."""
+        return str(
+            uuid.uuid5(
+                uuid.NAMESPACE_URL,
+                f"ai-dataseek:{session_id}:{client_message_id}",
+            )
+        )
+
     async def _bootstrap_chat_task(
         self,
         session: Session,
@@ -249,8 +275,87 @@ class AgentDomainService:
         mcp_servers: Optional[List[str]],
         dataset_ids: Optional[List[str]],
         mcp_access_all: bool,
-    ) -> Task:
+        client_message_id: Optional[str],
+    ) -> Optional[Task]:
+        """Serialize one session's bootstrap and refresh state inside the lock."""
+        lock = self._chat_bootstrap_locks.get(session.id)
+        if lock is None:
+            lock = asyncio.Lock()
+            self._chat_bootstrap_locks[session.id] = lock
+        async with lock:
+            latest_session = await self._session_repository.find_by_id_and_user_id(
+                session.id,
+                user_id,
+            )
+            if not latest_session:
+                raise RuntimeError("Session not found")
+            return await self._bootstrap_chat_task_locked(
+                session=latest_session,
+                user_id=user_id,
+                message=message,
+                timestamp=timestamp,
+                attachments=attachments,
+                skills=skills,
+                mcp_servers=mcp_servers,
+                dataset_ids=dataset_ids,
+                mcp_access_all=mcp_access_all,
+                client_message_id=client_message_id,
+            )
+
+    async def _bootstrap_chat_task_locked(
+        self,
+        session: Session,
+        user_id: str,
+        message: str,
+        timestamp: Optional[datetime],
+        attachments: Optional[List[dict]],
+        skills: Optional[List[str]],
+        mcp_servers: Optional[List[str]],
+        dataset_ids: Optional[List[str]],
+        mcp_access_all: bool,
+        client_message_id: Optional[str],
+    ) -> Optional[Task]:
+        client_message_claimed = False
+        queued_event_id: Optional[str] = None
+        task: Optional[Task] = None
         try:
+            task = await self._get_task(session)
+            if client_message_id:
+                client_message_claimed = await self._session_repository.claim_client_message_id(
+                    session.id,
+                    client_message_id,
+                )
+                if not client_message_claimed:
+                    logger.info(
+                        "Ignoring duplicate client message %s for session %s",
+                        client_message_id,
+                        session.id,
+                    )
+                    if task is not None or session.status != SessionStatus.RUNNING:
+                        await self._resume_claimed_chat_task(session.id, task)
+                        return task
+
+                    # Claims survive a backend restart, while Task instances do
+                    # not. Under the per-session bootstrap lock, a missing task
+                    # for a still-running session is no longer an in-flight local
+                    # creation, so the retry may safely take over the orphaned
+                    # claim and create a replacement task/queue.
+                    logger.warning(
+                        "Reclaiming client message %s for session %s after task registry loss",
+                        client_message_id,
+                        session.id,
+                    )
+                    await self._session_repository.release_client_message_id(
+                        session.id,
+                        client_message_id,
+                    )
+                    client_message_claimed = await self._session_repository.claim_client_message_id(
+                        session.id,
+                        client_message_id,
+                    )
+                    if not client_message_claimed:
+                        return None
+
             await self._session_repository.update_status(session.id, SessionStatus.RUNNING)
 
             effective_dataset_ids = list(dict.fromkeys(dataset_ids or session.dataset_ids or []))
@@ -268,7 +373,6 @@ class AgentDomainService:
                 session.dataset_ids = effective_dataset_ids
                 await self._session_repository.save(session)
 
-            task = await self._get_task(session)
             if task is None or task.done:
                 if session.task_id and task is None:
                     logger.warning(
@@ -286,26 +390,70 @@ class AgentDomainService:
 
             await self._session_repository.update_latest_message(session.id, message, timestamp or datetime.now())
 
+            metadata = {
+                "skills": skills or [],
+                "mcp_servers": mcp_servers or [],
+                "dataset_ids": effective_dataset_ids,
+                "mcp_access_all": mcp_access_all,
+            }
+            if client_message_id:
+                metadata["client_message_id"] = client_message_id
+
             message_event = MessageEvent(
                 message=message,
                 role="user",
                 attachments=await self._resolve_message_attachments(attachments, user_id),
-                metadata={
-                    "skills": skills or [],
-                    "mcp_servers": mcp_servers or [],
-                    "dataset_ids": effective_dataset_ids,
-                    "mcp_access_all": mcp_access_all,
-                },
+                metadata=metadata,
             )
+            if client_message_id:
+                message_event.id = self._client_message_event_id(
+                    session.id,
+                    client_message_id,
+                )
 
-            event_id = await task.input_stream.put(message_event.model_dump_json())
-            message_event.id = event_id
-            await self._session_repository.add_event(session.id, message_event)
+            if client_message_id:
+                # Persist the idempotent user event before making it executable.
+                # If queueing fails, a retry upserts this same event ID instead of
+                # adding a duplicate history entry.
+                await self._session_repository.add_event(session.id, message_event)
+                queued_event_id = await task.input_stream.put(message_event.model_dump_json())
+            else:
+                # Preserve the legacy event-ID contract for callers that do not
+                # provide an idempotency key.
+                queued_event_id = await task.input_stream.put(message_event.model_dump_json())
+                message_event.id = queued_event_id
+                await self._session_repository.add_event(session.id, message_event)
 
             await task.run()
             logger.debug("Put message into Session %s's event queue: %s...", session.id, message[:50])
             return task
         except Exception as exc:
+            release_claim = queued_event_id is None
+            if queued_event_id is not None and task is not None:
+                try:
+                    release_claim = bool(
+                        await task.input_stream.delete_message(queued_event_id)
+                    )
+                except Exception:
+                    # Keep the claim when queue cleanup is uncertain. A duplicate
+                    # request can restart this same task without enqueueing again.
+                    logger.exception(
+                        "Failed to remove queued client message %s from task %s",
+                        client_message_id,
+                        task.id,
+                    )
+            if client_message_claimed and release_claim and client_message_id:
+                try:
+                    await self._session_repository.release_client_message_id(
+                        session.id,
+                        client_message_id,
+                    )
+                except Exception:
+                    logger.exception(
+                        "Failed to release client message %s for session %s",
+                        client_message_id,
+                        session.id,
+                    )
             await self._handle_chat_bootstrap_error(session.id, exc)
             raise
 
@@ -322,6 +470,7 @@ class AgentDomainService:
         dataset_ids: Optional[List[str]] = None,
         mcp_access_all: bool = False,
         llm_overrides: Optional[dict] = None,
+        client_message_id: Optional[str] = None,
     ) -> AsyncGenerator[BaseEvent, None]:
         """
         Chat with an agent
@@ -352,6 +501,7 @@ class AgentDomainService:
                             mcp_servers=mcp_servers,
                             dataset_ids=dataset_ids,
                             mcp_access_all=mcp_access_all,
+                            client_message_id=client_message_id,
                         )
                     ),
                     session_id,

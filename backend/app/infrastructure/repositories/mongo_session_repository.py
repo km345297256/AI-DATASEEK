@@ -14,6 +14,7 @@ logger = logging.getLogger(__name__)
 
 SESSION_EVENT_WRITE_ATTEMPTS = 3
 SESSION_EVENT_RETRY_DELAYS = (0.1, 0.3)
+CLIENT_MESSAGE_ID_HISTORY_LIMIT = 512
 
 SESSION_LIST_PROJECTION = {
     "session_id": 1,
@@ -222,6 +223,47 @@ class MongoSessionRepository(SessionRepository):
                     SESSION_EVENT_WRITE_ATTEMPTS,
                 )
                 await asyncio.sleep(delay)
+
+    async def claim_client_message_id(self, session_id: str, client_message_id: str) -> bool:
+        """Atomically reserve a message ID within a session."""
+        collection = SessionDocument.get_pymongo_collection()
+        result = await collection.update_one(
+            {
+                "session_id": session_id,
+                "client_message_ids": {"$ne": client_message_id},
+            },
+            {
+                "$push": {
+                    "client_message_ids": {
+                        "$each": [client_message_id],
+                        "$slice": -CLIENT_MESSAGE_ID_HISTORY_LIMIT,
+                    }
+                },
+                "$set": {"updated_at": datetime.now(UTC)},
+            },
+        )
+        if result.matched_count:
+            return True
+        session_exists = await collection.count_documents(
+            {"session_id": session_id},
+            limit=1,
+        )
+        if not session_exists:
+            raise ValueError(f"Session {session_id} not found")
+        return False
+
+    async def release_client_message_id(self, session_id: str, client_message_id: str) -> None:
+        """Release an unqueued message ID so a caller can safely retry it."""
+        collection = SessionDocument.get_pymongo_collection()
+        result = await collection.update_one(
+            {"session_id": session_id},
+            {
+                "$pull": {"client_message_ids": client_message_id},
+                "$set": {"updated_at": datetime.now(UTC)},
+            },
+        )
+        if not result.matched_count:
+            raise ValueError(f"Session {session_id} not found")
 
     async def get_events(self, session_id: str) -> List[AgentEvent]:
         """Get all events for a session ordered by creation time"""

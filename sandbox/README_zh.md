@@ -165,6 +165,7 @@ LOG_LEVEL=DEBUG
 #### 等待进程
 
 - **接口**: `POST /api/v1/shell/wait`
+- **超时行为**: 等待超时会正常返回 `status: "running"` 和 `returncode: null`，不会作为 HTTP 错误处理。
 - **描述**: 等待指定会话中的进程完成
 - **请求体**:
   ```json

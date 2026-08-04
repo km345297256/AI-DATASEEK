@@ -18,9 +18,17 @@ from app.domain.models.event import (
     WaitEvent,
 )
 from app.domain.services.tools.base import BaseToolkit
+from app.core.config import get_settings
 import logging
 
 logger = logging.getLogger(__name__)
+
+
+class _PromptVariables(dict[str, str]):
+    """Leave literal brace expressions (for example MathText) unchanged."""
+
+    def __missing__(self, key: str) -> str:
+        return "{" + key + "}"
 
 
 class ExecutionAgent(BaseAgent):
@@ -41,22 +49,31 @@ class ExecutionAgent(BaseAgent):
         llm_overrides: Optional[dict] = None,
         usage_context: Optional[dict] = None,
     ):
+        runtime_overrides = dict(llm_overrides or {})
+        settings = get_settings()
+        configured_max_tokens = runtime_overrides.get("max_tokens")
+        if not isinstance(configured_max_tokens, int):
+            configured_max_tokens = settings.max_tokens
+        runtime_overrides["max_tokens"] = max(
+            configured_max_tokens,
+            settings.execution_max_tokens,
+        )
         super().__init__(
             agent_id=agent_id,
             agent_repository=agent_repository,
             tools=tools,
             dynamic_system_prompt_provider=dynamic_system_prompt_provider,
-            llm_overrides=llm_overrides,
+            llm_overrides=runtime_overrides,
             usage_context=usage_context,
         )
     
     async def execute_step(self, plan: Plan, step: Step, message: Message) -> AsyncGenerator[BaseEvent, None]:
-        message = EXECUTION_PROMPT.format(
-            step=step.description, 
+        message = EXECUTION_PROMPT.format_map(_PromptVariables(
+            step=step.description,
             message=message.message,
             attachments="\n".join(message.attachments),
-            language=plan.language
-        )
+            language=plan.language,
+        ))
         step.status = ExecutionStatus.RUNNING
         yield StepEvent(status=StepStatus.STARTED, step=step)
         async for event in self.execute(message):

@@ -1,7 +1,7 @@
 """
 Shell business model definitions
 """
-from typing import Optional, List
+from typing import Literal, Optional, List
 from pydantic import BaseModel, Field
 
 
@@ -39,7 +39,14 @@ class ShellViewResult(BaseModel):
 
 class ShellWaitResult(BaseModel):
     """Process wait result model"""
-    returncode: int = Field(..., description="Process return code")
+    status: Literal["running", "completed"] = Field(
+        ...,
+        description="Process state after waiting",
+    )
+    returncode: Optional[int] = Field(
+        None,
+        description="Process return code when status is completed",
+    )
 
 
 class ShellWriteResult(BaseModel):
@@ -50,4 +57,4 @@ class ShellWriteResult(BaseModel):
 class ShellKillResult(BaseModel):
     """Process termination result model"""
     status: str = Field(..., description="Process status")
-    returncode: int = Field(..., description="Process return code") 
+    returncode: int = Field(..., description="Process return code")

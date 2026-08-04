@@ -405,6 +405,47 @@ class DataCenterDatasetDocument(Document):
         ]
 
 
+class TemporaryDatasetDocument(Document):
+    """Owner-scoped setup submission kept outside the public catalog."""
+
+    dataset_id: str
+    owner_id: str
+    dataset: DataCenterDataset
+    # Optional only for a rolling upgrade from documents created before the
+    # bounded-slot indexes existed. New submissions always populate both.
+    owner_slot: Optional[int] = None
+    global_slot: Optional[int] = None
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    expires_at: datetime
+
+    def to_domain(self) -> DataCenterDataset:
+        return self.dataset.model_copy(deep=True)
+
+    class Settings:
+        name = "temporary_data_center_datasets"
+        indexes = [
+            IndexModel([("dataset_id", ASCENDING)], unique=True),
+            IndexModel(
+                [("owner_id", ASCENDING), ("owner_slot", ASCENDING)],
+                unique=True,
+                name="temporary_dataset_owner_slot_unique",
+                partialFilterExpression={"owner_slot": {"$type": "int"}},
+            ),
+            IndexModel(
+                [("global_slot", ASCENDING)],
+                unique=True,
+                name="temporary_dataset_global_slot_unique",
+                partialFilterExpression={"global_slot": {"$type": "int"}},
+            ),
+            IndexModel([("owner_id", ASCENDING), ("created_at", DESCENDING)]),
+            IndexModel(
+                [("expires_at", ASCENDING)],
+                expireAfterSeconds=0,
+                name="temporary_dataset_expiration_ttl",
+            ),
+        ]
+
+
 class NodeCredentialDocument(Document):
     credential_ref: str
     secret_value: str
@@ -491,6 +532,7 @@ class SessionDocument(BaseDocument[Session], id_field="session_id", domain_model
     files: List[FileInfo] = []
     is_shared: Optional[bool] = False
     collaborator_user_ids: List[str] = Field(default_factory=list)
+    client_message_ids: List[str] = Field(default_factory=list)
     class Settings:
         name = "sessions"
         indexes = [
@@ -694,4 +736,3 @@ class RendererDocument(BaseDocument[Renderer], id_field="renderer_id", domain_mo
             IndexModel([("user_id", ASCENDING), ("name", ASCENDING)]),
             IndexModel([("workspace_id", ASCENDING), ("name", ASCENDING)]),
         ]
-

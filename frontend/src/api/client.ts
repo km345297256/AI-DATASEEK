@@ -106,6 +106,8 @@ export interface SSEOptions {
   method?: 'GET' | 'POST' | 'PUT' | 'DELETE';
   body?: any;
   headers?: Record<string, string>;
+  /** Enable transport retries only when replaying the request is known to be safe. */
+  retryOnError?: boolean;
 }
 
 /**
@@ -124,8 +126,10 @@ export const createSSEConnection = async <T = any>(
   const { 
     method = 'GET', 
     body, 
-    headers = {}
+    headers = {},
+    retryOnError,
   } = options;
+  const shouldRetryOnError = retryOnError ?? method === 'GET';
   
   // Create AbortController for cancellation
   const abortController = new AbortController();
@@ -143,7 +147,7 @@ export const createSSEConnection = async <T = any>(
   
   // 创建SSE连接
   const createConnection = async (): Promise<void> => {
-    return new Promise((_resolve, reject) => {
+    return new Promise((resolve, reject) => {
       if (abortController.signal.aborted) {
         reject(new Error('Connection aborted'));
         return;
@@ -186,11 +190,17 @@ export const createSSEConnection = async <T = any>(
           if (onError) {
             onError(error);
           }
-          reject(error);
+
+          // fetchEventSource retries when onerror returns normally. Requests
+          // fail closed unless the caller explicitly marks their replay safe
+          // (GET is safe by default).
+          if (!shouldRetryOnError) {
+            throw error;
+          }
         },
       });
 
-      ssePromise.catch(reject);
+      ssePromise.then(resolve).catch(reject);
     });
   };
 

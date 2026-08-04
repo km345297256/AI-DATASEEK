@@ -55,12 +55,18 @@ RUN add-apt-repository ppa:deadsnakes/ppa && \
 RUN pip3 install --no-cache-dir \
     --index-url https://mirrors.aliyun.com/pypi/simple/ uv
 
-# Configure uv to use Aliyun mirror
-ENV UV_INDEX_URL=https://mirrors.aliyun.com/pypi/simple/
+# Keep application services and user analysis commands on the same uv-managed
+# interpreter. Including pip in the locked project dependencies ensures that
+# `python`, `python3`, `pip`, and `pip3` all resolve inside this environment.
+ENV UV_INDEX_URL=https://mirrors.aliyun.com/pypi/simple/ \
+    PIP_INDEX_URL=https://mirrors.aliyun.com/pypi/simple/ \
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    VIRTUAL_ENV=/app/.venv \
+    PATH=/app/.venv/bin:${PATH}
 
-# Scientific task scripts run from the uv-managed venv. Keep the distro's
-# binary-compatible NumPy/GDAL packages visible there without per-task installs.
-ENV PYTHONPATH=/usr/lib/python3/dist-packages
+# Keep the distro GDAL binding available while preferring the locked NumPy and
+# visualization stack from the virtual environment.
+ENV PYTHONPATH=/app/.venv/lib/python3.10/site-packages:/usr/lib/python3/dist-packages
 
 # Install Node.js 20.18.0
 RUN mkdir -p /etc/apt/keyrings && \
@@ -99,23 +105,46 @@ ENV LANG=zh_CN.UTF-8 \
     LC_ALL=zh_CN.UTF-8 \
     PYTHONUTF8=1 \
     PYTHONIOENCODING=UTF-8 \
-    MATPLOTLIBRC=/etc/matplotlibrc
+    MATPLOTLIBRC=/etc/matplotlibrc \
+    MPLBACKEND=Agg
 #
 ## Make matplotlib render Chinese text by default instead of falling back to DejaVu Sans.
 RUN printf '%s\n' \
     'font.family: sans-serif' \
     'font.sans-serif: Noto Sans CJK SC, Noto Sans CJK JP, Noto Sans CJK TC, Noto Sans CJK KR, DejaVu Sans' \
     'axes.unicode_minus: False' \
-    > /etc/matplotlibrc
+    > /etc/matplotlibrc && \
+    chmod 0644 /etc/matplotlibrc
 
 # Set working directory
 WORKDIR /app
 
-# Copy project files (copy dependency files first to leverage cache)
-COPY pyproject.toml ./
+# Copy dependency files first to leverage the Docker layer cache.
+COPY pyproject.toml uv.lock ./
+COPY scripts/install_noto_cjk_sc.py scripts/verify_matplotlib_cjk.py /usr/local/lib/ai-dataseek/
 
-# Install Python dependencies
-RUN uv sync --no-dev
+# Install the exact locked runtime, including the common Excel and plotting
+# stack. Avoid retaining uv's download cache in the final image layer.
+RUN uv sync --frozen --no-dev --no-install-project --no-cache
+
+# Debian/Ubuntu ships Noto CJK as a TTC. Matplotlib only indexes the first TTC
+# face, which is JP, even though fontconfig can resolve the SC face. Extract
+# standalone SC Regular/Bold OTF files with Matplotlib's locked fontTools
+# dependency so findfont can select the configured family without fallback.
+RUN python /usr/local/lib/ai-dataseek/install_noto_cjk_sc.py && \
+    fc-cache -f && \
+    fc-match -f '%{family}\n' 'Noto Sans CJK SC' | grep -F 'Noto Sans CJK SC'
+
+# Fail the image build if task commands would see a different Python/pip pair
+# or if the preinstalled scientific stack is incomplete.
+RUN python -m pip --version && \
+    python -c "import matplotlib, numpy, openpyxl, pandas, seaborn, xlrd; from PIL import Image; from osgeo import gdal; print('scientific stack ready')" && \
+    python /usr/local/lib/ai-dataseek/verify_matplotlib_cjk.py && \
+    install -d -o ubuntu -g ubuntu /home/ubuntu/.cache/matplotlib && \
+    sudo -u ubuntu -H env \
+        MATPLOTLIBRC=/etc/matplotlibrc \
+        MPLBACKEND=Agg \
+        /app/.venv/bin/python /usr/local/lib/ai-dataseek/verify_matplotlib_cjk.py
 
 # Copy remaining project files
 COPY . .

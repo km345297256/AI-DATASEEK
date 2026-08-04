@@ -32,6 +32,9 @@ class Settings(BaseSettings):
     model_provider: str = "openai"
     temperature: float = 0.7
     max_tokens: int = 2000
+    # Execution responses often contain a complete script or structured result.
+    # Keep a larger floor than planner responses so valid output is not cut off.
+    execution_max_tokens: int = 4096
     # Direct one-shot model calls may use the client's small built-in retry
     # budget. BaseAgent disables that inner loop and owns its bounded policy.
     llm_client_max_retries: int = 2

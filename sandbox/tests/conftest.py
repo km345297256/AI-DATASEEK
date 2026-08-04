@@ -18,6 +18,7 @@ from fastapi.exceptions import RequestValidationError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.api.v1.file import router as file_router
+from app.api.v1.shell import router as shell_router
 from app.core.exceptions import (
     AppException,
     app_exception_handler,
@@ -32,6 +33,7 @@ app.add_exception_handler(StarletteHTTPException, http_exception_handler)
 app.add_exception_handler(RequestValidationError, validation_exception_handler)
 app.add_exception_handler(Exception, general_exception_handler)
 app.include_router(file_router, prefix="/api/v1/file")
+app.include_router(shell_router, prefix="/api/v1/shell")
 
 with socket.socket() as port_socket:
     port_socket.bind(("127.0.0.1", 0))

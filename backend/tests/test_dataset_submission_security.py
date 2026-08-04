@@ -1,20 +1,23 @@
+import asyncio
+from datetime import UTC, datetime, timedelta
 from pathlib import PurePosixPath
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, Mock
 
 import pytest
 from pydantic import ValidationError
+from pymongo.errors import DuplicateKeyError
 
 import app.application.services.data_center_dataset_service as dataset_service_module
 from app.application.errors.exceptions import NotFoundError
 from app.application.services.data_center_dataset_service import DataCenterDatasetService
-from app.application.services.temporary_dataset_registry import TemporaryDatasetRegistry
 from app.domain.models.dataset import (
     DataCenterDataset,
     DatasetFile,
     DatasetLocation,
     DatasetStorageType,
 )
+from app.infrastructure.models.documents import DataCenterDatasetDocument, TemporaryDatasetDocument
 from app.infrastructure.external.sandbox.dataset_mount_validator import (
     DatasetDirectoryFile,
     DatasetDirectoryInventory,
@@ -56,7 +59,6 @@ def _directory_inventory() -> DatasetDirectoryInventory:
 
 
 def _install_submission_dependencies(monkeypatch):
-    registry = TemporaryDatasetRegistry()
     inventory = _directory_inventory()
     inspect_directory = Mock(return_value=inventory)
     ensure_node = AsyncMock(
@@ -64,25 +66,88 @@ def _install_submission_dependencies(monkeypatch):
             runtime_config={"dataset_allowed_roots": ["/srv/datasets"]},
         )
     )
-    forbidden_insert = AsyncMock(
-        side_effect=AssertionError("temporary submissions must never be inserted into MongoDB"),
-    )
+    stored_documents = {}
+    inserted_documents = []
+    clock = [datetime(2026, 8, 4, 12, 0, tzinfo=UTC)]
 
-    monkeypatch.setattr(
-        dataset_service_module,
-        "get_temporary_dataset_registry",
-        lambda: registry,
-    )
+    class FakeTemporaryDatasetQuery:
+        def __init__(self, query):
+            self._query = query
+            self._sort_field = None
+
+        def sort(self, field):
+            self._sort_field = field.lstrip("+-")
+            return self
+
+        async def to_list(self):
+            documents = list(stored_documents.values())
+            expires_at_query = self._query.get("expires_at", {})
+            if "$gt" in expires_at_query:
+                documents = [
+                    document
+                    for document in documents
+                    if document.expires_at > expires_at_query["$gt"]
+                ]
+            if "$lte" in expires_at_query:
+                documents = [
+                    document
+                    for document in documents
+                    if document.expires_at <= expires_at_query["$lte"]
+                ]
+            if self._sort_field:
+                documents.sort(key=lambda document: getattr(document, self._sort_field))
+            return documents
+
+    class FakeTemporaryDatasetDocument:
+        def __init__(self, **values):
+            for key, value in values.items():
+                setattr(self, key, value)
+
+        async def insert(self):
+            if self.dataset_id in stored_documents or any(
+                document.global_slot == self.global_slot
+                or (
+                    document.owner_id == self.owner_id
+                    and document.owner_slot == self.owner_slot
+                )
+                for document in stored_documents.values()
+            ):
+                raise DuplicateKeyError("duplicate dataset")
+            stored_documents[self.dataset_id] = self
+            inserted_documents.append(self)
+            return self
+
+        async def delete(self):
+            stored_documents.pop(self.dataset_id, None)
+
+        @classmethod
+        def find(cls, query):
+            return FakeTemporaryDatasetQuery(query)
+
+        @classmethod
+        async def find_one(cls, query):
+            document = stored_documents.get(query.get("dataset_id"))
+            if document is None or document.owner_id != query.get("owner_id"):
+                return None
+            lower_bound = (query.get("expires_at") or {}).get("$gt")
+            if lower_bound is not None and document.expires_at <= lower_bound:
+                return None
+            return document
+
+        def to_domain(self):
+            return self.dataset.model_copy(deep=True)
+
     monkeypatch.setattr(
         dataset_service_module,
         "inspect_local_dataset_directory",
         inspect_directory,
     )
     monkeypatch.setattr(dataset_service_module, "ensure_local_default_node", ensure_node)
+    monkeypatch.setattr(dataset_service_module, "_utc_now", lambda: clock[0])
     monkeypatch.setattr(
-        dataset_service_module.DataCenterDatasetDocument,
-        "insert",
-        forbidden_insert,
+        dataset_service_module,
+        "TemporaryDatasetDocument",
+        FakeTemporaryDatasetDocument,
     )
 
     service = object.__new__(DataCenterDatasetService)
@@ -90,17 +155,30 @@ def _install_submission_dependencies(monkeypatch):
         dataset_host_path_allowlist="/fallback-not-used",
         dataset_managed_volume="unused-volume",
     )
-    return service, registry, inventory, inspect_directory, ensure_node, forbidden_insert
+    service.ensure_seed_data = AsyncMock()
+    return (
+        service,
+        stored_documents,
+        inserted_documents,
+        inventory,
+        inspect_directory,
+        ensure_node,
+        clock,
+    )
 
 
-async def _create_submission(service: DataCenterDatasetService) -> DataCenterDataset:
+async def _create_submission(
+    service: DataCenterDatasetService,
+    *,
+    created_by: str = "owner-a",
+) -> DataCenterDataset:
     return await service.create_submission(
         external_id="external-1",
         name="Submitted dataset",
         summary="Summary",
         keywords=["raster", "raster", "science"],
         storage_directory=" /srv/datasets/center-a ",
-        created_by="owner-a",
+        created_by=created_by,
     )
 
 
@@ -162,14 +240,15 @@ def test_submission_schema_uses_one_normalized_storage_directory():
 
 
 @pytest.mark.asyncio
-async def test_submission_builds_recursive_files_in_memory_and_never_inserts_mongo(monkeypatch):
+async def test_submission_persists_recursive_inventory_and_survives_service_recreation(monkeypatch):
     (
         service,
-        registry,
+        stored_documents,
+        inserted_documents,
         inventory,
         inspect_directory,
         ensure_node,
-        forbidden_insert,
+        clock,
     ) = _install_submission_dependencies(monkeypatch)
 
     dataset = await _create_submission(service)
@@ -179,7 +258,7 @@ async def test_submission_builds_recursive_files_in_memory_and_never_inserts_mon
         "/srv/datasets/center-a",
         configured_roots=["/srv/datasets"],
     )
-    forbidden_insert.assert_not_awaited()
+    assert len(inserted_documents) == 1
     assert dataset.dataset_id.startswith("tds_")
     assert dataset.created_by == "owner-a"
     assert dataset.is_submission is True
@@ -218,45 +297,127 @@ async def test_submission_builds_recursive_files_in_memory_and_never_inserts_mon
     ]
     assert inventory.canonical_source_directory not in dataset_response(dataset).model_dump_json()
 
-    stored = await registry.get(dataset.dataset_id)
-    assert stored is not None
+    stored = stored_documents[dataset.dataset_id]
     assert stored.owner_id == "owner-a"
     assert stored.dataset.files == dataset.files
+    assert stored.dataset.name_key == "temporary-submission"
+    assert stored.expires_at == clock[0] + timedelta(hours=24)
+
+    # A newly constructed service has no process-local state but can still
+    # resolve the submission from MongoDB.
+    restarted_service = object.__new__(DataCenterDatasetService)
+    restarted_service._settings = service._settings
+    restarted_service.ensure_seed_data = AsyncMock()
+    restored = await restarted_service.get_dataset(dataset.dataset_id, user_id="owner-a")
+
+    assert restored == dataset
+    public_json = dataset_response(restored).model_dump_json()
+    assert inventory.canonical_source_directory not in public_json
+    assert "expires_at" not in public_json
 
 
 @pytest.mark.asyncio
 async def test_repeating_the_same_submission_returns_distinct_temporary_ids(monkeypatch):
-    service, registry, _, inspect_directory, _, forbidden_insert = (
+    service, stored_documents, inserted_documents, _, inspect_directory, _, _ = (
         _install_submission_dependencies(monkeypatch)
+    )
+    generated_ids = iter(["tds_collision", "tds_collision", "tds_second"])
+    monkeypatch.setattr(
+        dataset_service_module,
+        "_new_temporary_dataset_id",
+        lambda: next(generated_ids),
     )
 
     first = await _create_submission(service)
     second = await _create_submission(service)
 
-    assert first.dataset_id.startswith("tds_")
-    assert second.dataset_id.startswith("tds_")
+    assert first.dataset_id == "tds_collision"
+    assert second.dataset_id == "tds_second"
     assert first.dataset_id != second.dataset_id
     assert inspect_directory.call_count == 2
-    assert await registry.size() == 2
-    forbidden_insert.assert_not_awaited()
+    assert set(stored_documents) == {"tds_collision", "tds_second"}
+    assert len(inserted_documents) == 2
+    assert len({item.dataset_id for item in inserted_documents}) == 2
 
 
 @pytest.mark.asyncio
-async def test_temporary_submission_lookup_is_scoped_to_registry_owner(monkeypatch):
-    service, _, _, _, _, forbidden_insert = _install_submission_dependencies(monkeypatch)
-    forbidden_find_one = AsyncMock(
-        side_effect=AssertionError("temporary lookup must not fall through to MongoDB"),
-    )
+async def test_persisted_submission_limits_evict_oldest_owner_and_global_entries(monkeypatch):
+    service, stored_documents, _, _, _, _, clock = _install_submission_dependencies(monkeypatch)
+    monkeypatch.setattr(dataset_service_module, "TEMPORARY_DATASET_MAX_ENTRIES", 3)
     monkeypatch.setattr(
-        dataset_service_module.DataCenterDatasetDocument,
-        "find_one",
-        forbidden_find_one,
+        dataset_service_module,
+        "TEMPORARY_DATASET_MAX_ENTRIES_PER_OWNER",
+        2,
     )
+
+    owner_first = await _create_submission(service, created_by="owner-a")
+    clock[0] += timedelta(seconds=1)
+    owner_second = await _create_submission(service, created_by="owner-a")
+    clock[0] += timedelta(seconds=1)
+    owner_third = await _create_submission(service, created_by="owner-a")
+
+    assert owner_first.dataset_id not in stored_documents
+    assert owner_second.dataset_id in stored_documents
+    assert owner_third.dataset_id in stored_documents
+    assert sum(
+        document.owner_id == "owner-a"
+        for document in stored_documents.values()
+    ) == 2
+
+    clock[0] += timedelta(seconds=1)
+    owner_b = await _create_submission(service, created_by="owner-b")
+    clock[0] += timedelta(seconds=1)
+    owner_c = await _create_submission(service, created_by="owner-c")
+
+    assert len(stored_documents) == 3
+    assert owner_second.dataset_id not in stored_documents
+    assert owner_third.dataset_id in stored_documents
+    assert owner_b.dataset_id in stored_documents
+    assert owner_c.dataset_id in stored_documents
+    assert len({document.global_slot for document in stored_documents.values()}) == 3
+    assert len({
+        (document.owner_id, document.owner_slot)
+        for document in stored_documents.values()
+    }) == 3
+
+
+@pytest.mark.asyncio
+async def test_concurrent_persisted_submissions_remain_bounded(monkeypatch):
+    service, stored_documents, _, _, _, _, _ = _install_submission_dependencies(monkeypatch)
+    monkeypatch.setattr(dataset_service_module, "TEMPORARY_DATASET_MAX_ENTRIES", 4)
+    monkeypatch.setattr(
+        dataset_service_module,
+        "TEMPORARY_DATASET_MAX_ENTRIES_PER_OWNER",
+        2,
+    )
+
+    await asyncio.gather(*(
+        _create_submission(service, created_by="owner-a")
+        for _ in range(12)
+    ))
+
+    assert len(stored_documents) == 2
+    assert {document.owner_id for document in stored_documents.values()} == {"owner-a"}
+    assert len({document.global_slot for document in stored_documents.values()}) == 2
+    assert len({document.owner_slot for document in stored_documents.values()}) == 2
+
+
+@pytest.mark.asyncio
+async def test_persisted_submission_lookup_is_owner_scoped_and_fail_closed_on_expiry(monkeypatch):
+    service, stored_documents, _, _, _, _, clock = _install_submission_dependencies(monkeypatch)
     dataset = await _create_submission(service)
+    expires_at = stored_documents[dataset.dataset_id].expires_at
 
     owned = await service.get_dataset(dataset.dataset_id, user_id="owner-a")
 
     assert owned.dataset_id == dataset.dataset_id
+    assert (
+        await service.get_dataset(
+            dataset.dataset_id,
+            include_disabled=True,
+            user_id="owner-a",
+        )
+    ).dataset_id == dataset.dataset_id
     with pytest.raises(NotFoundError):
         await service.get_dataset(dataset.dataset_id, user_id="intruder")
     with pytest.raises(NotFoundError):
@@ -267,8 +428,127 @@ async def test_temporary_submission_lookup_is_scoped_to_registry_owner(monkeypat
         )
     with pytest.raises(NotFoundError):
         await service.get_dataset(dataset.dataset_id, user_id=None)
-    forbidden_insert.assert_not_awaited()
-    forbidden_find_one.assert_not_awaited()
+    with pytest.raises(NotFoundError):
+        await service.get_dataset(
+            dataset.dataset_id,
+            include_disabled=True,
+            user_id=None,
+        )
+
+    clock[0] = expires_at - timedelta(microseconds=1)
+    assert (await service.get_dataset(dataset.dataset_id, user_id="owner-a")).dataset_id == dataset.dataset_id
+
+    # MongoDB's TTL monitor runs asynchronously, so reads must reject an
+    # expired document even while it is still physically present.
+    clock[0] = expires_at
+    assert dataset.dataset_id in stored_documents
+    with pytest.raises(NotFoundError):
+        await service.get_dataset(dataset.dataset_id, user_id="owner-a")
+
+
+def test_temporary_dataset_document_has_unique_id_and_absolute_ttl_indexes():
+    unique_id_indexes = [
+        item.document
+        for item in TemporaryDatasetDocument.Settings.indexes
+        if getattr(item, "document", {}).get("unique") is True
+    ]
+    ttl_indexes = [
+        item.document
+        for item in TemporaryDatasetDocument.Settings.indexes
+        if getattr(item, "document", {}).get("expireAfterSeconds") == 0
+    ]
+    owner_slot_indexes = [
+        item.document
+        for item in TemporaryDatasetDocument.Settings.indexes
+        if getattr(item, "document", {}).get("name")
+        == "temporary_dataset_owner_slot_unique"
+    ]
+    global_slot_indexes = [
+        item.document
+        for item in TemporaryDatasetDocument.Settings.indexes
+        if getattr(item, "document", {}).get("name")
+        == "temporary_dataset_global_slot_unique"
+    ]
+
+    assert TemporaryDatasetDocument.Settings.name == "temporary_data_center_datasets"
+    assert any(
+        list(index["key"].items()) == [("dataset_id", 1)]
+        for index in unique_id_indexes
+    )
+    assert any(
+        list(index["key"].items()) == [("expires_at", 1)]
+        and index.get("name") == "temporary_dataset_expiration_ttl"
+        for index in ttl_indexes
+    )
+    assert any(
+        list(index["key"].items()) == [("owner_id", 1), ("owner_slot", 1)]
+        and index.get("unique") is True
+        and index.get("partialFilterExpression")
+        == {"owner_slot": {"$type": "int"}}
+        for index in owner_slot_indexes
+    )
+    assert any(
+        list(index["key"].items()) == [("global_slot", 1)]
+        and index.get("unique") is True
+        and index.get("partialFilterExpression")
+        == {"global_slot": {"$type": "int"}}
+        for index in global_slot_indexes
+    )
+
+
+@pytest.mark.asyncio
+async def test_catalog_list_keeps_persisted_submissions_hidden(monkeypatch):
+    catalog_dataset = DataCenterDataset(
+        dataset_id="ds_catalog",
+        data_center_id="catalog",
+        data_center_name="Catalog",
+        name="Catalog dataset",
+    )
+    catalog_document = SimpleNamespace(to_domain=lambda: catalog_dataset)
+    captured_conditions = []
+
+    class FakeCursor:
+        async def count(self):
+            return 1
+
+        def sort(self, *args):
+            return self
+
+        def skip(self, *args):
+            return self
+
+        def limit(self, *args):
+            return self
+
+        async def to_list(self):
+            return [catalog_document]
+
+    class FakeCatalogDocumentModel:
+        updated_at = 1
+
+        @staticmethod
+        def find(*conditions):
+            captured_conditions.extend(conditions)
+            return FakeCursor()
+
+    temporary_find = AsyncMock(
+        side_effect=AssertionError("catalog listing must not query temporary submissions"),
+    )
+    monkeypatch.setattr(
+        dataset_service_module,
+        "DataCenterDatasetDocument",
+        FakeCatalogDocumentModel,
+    )
+    monkeypatch.setattr(TemporaryDatasetDocument, "find_one", temporary_find)
+    service = object.__new__(DataCenterDatasetService)
+    service.ensure_seed_data = AsyncMock()
+
+    datasets, total = await service.list_datasets(include_disabled=True)
+
+    assert total == 1
+    assert [item.dataset_id for item in datasets] == ["ds_catalog"]
+    assert {"is_submission": {"$ne": True}} in captured_conditions
+    temporary_find.assert_not_awaited()
 
 
 @pytest.mark.asyncio
@@ -321,4 +601,3 @@ async def test_multiple_sources_resolve_to_unique_nested_read_only_targets():
         relative_target = PurePosixPath(mount.target).relative_to(dataset_root)
         assert relative_target.parts == ("sources", mount.source_id, mount.display_name)
         assert mount.source not in mount.target
-

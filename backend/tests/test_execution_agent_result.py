@@ -5,12 +5,23 @@ from unittest.mock import AsyncMock, MagicMock, patch
 from langchain.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
 from openai import APIConnectionError, BadRequestError, InternalServerError
 
-from app.domain.models.event import McpToolContent, MessageEvent, StepEvent, StepStatus, ToolEvent, ToolStatus
+from app.domain.models.event import (
+    McpToolContent,
+    MessageEvent,
+    PlanEvent,
+    PlanStatus,
+    StepEvent,
+    StepStatus,
+    ToolEvent,
+    ToolStatus,
+)
 from app.domain.models.message import Message
 from app.domain.models.plan import ExecutionStatus, Plan, Step
+from app.domain.models.session import SessionStatus
 from app.domain.services.agents.execution import ExecutionAgent
 from app.domain.services.agents.base import BaseAgent, LLMServiceUnavailableError
 from app.domain.services.agent_task_runner import AgentTaskRunner
+from app.domain.services.flows.plan_act import AgentStatus, PlanActFlow
 from app.domain.models.memory import Memory
 
 
@@ -287,6 +298,51 @@ async def test_large_tool_result_is_bounded_before_agent_memory_is_saved():
     assert memory_result.artifact is None
 
 
+@pytest.mark.asyncio
+async def test_successful_file_write_content_is_not_replayed_to_the_model():
+    agent = object.__new__(BaseAgent)
+    agent.max_iterations = 2
+    agent.max_retries = 0
+    agent.retry_interval = 0
+    source = "print('chart')\n" * 2000
+    first = AIMessage(content="", tool_calls=[{
+        "name": "file_write",
+        "args": {"file": "/home/ubuntu/output/chart.py", "content": source},
+        "id": "call-write",
+    }])
+    final = AIMessage(content="completed")
+    tool = SimpleNamespace(toolkit=SimpleNamespace(name="file"))
+    responses = []
+
+    async def ask(_request, _format=None):
+        return first
+
+    async def ask_with_messages(messages, _format=None):
+        responses.append(messages)
+        return final
+
+    async def invoke_tool(_tool, _tool_call):
+        return ToolMessage(
+            tool_call_id="call-write",
+            name="file_write",
+            content='{"success":true,"data":{"bytes_written":30000}}',
+            artifact=SimpleNamespace(success=True),
+        )
+
+    agent.ask = ask
+    agent.ask_with_messages = ask_with_messages
+    agent.get_tool = lambda _name: tool
+    agent.invoke_tool = invoke_tool
+
+    _events = [event async for event in agent.execute("write chart")]
+
+    compacted = first.tool_calls[0]["args"]["content"]
+    assert source not in compacted
+    assert "persisted successfully" in compacted
+    assert "sha256" in compacted
+    assert responses[0][0].content.startswith("{")
+
+
 def test_oversized_tool_event_is_bounded_before_session_persistence():
     runner = object.__new__(AgentTaskRunner)
     runner._agent_id = "agent-large"
@@ -323,6 +379,130 @@ def test_agent_memory_is_bounded_before_one_mongo_document_can_overflow():
     assert Memory._serialized_size(memory.messages) <= 1024 * 1024
     assert memory.messages[0].type == "system"
     assert any(message.content.startswith("question 19:") for message in memory.messages)
+
+
+def test_oversized_current_turn_keeps_request_and_latest_complete_tool_exchange():
+    messages = [
+        SystemMessage(content="system"),
+        HumanMessage(content="visualize this dataset"),
+    ]
+    for index in range(20):
+        messages.extend([
+            AIMessage(content="", tool_calls=[{
+                "name": "shell_view",
+                "args": {"id": "analysis"},
+                "id": f"call-{index}",
+            }]),
+            ToolMessage(
+                tool_call_id=f"call-{index}",
+                name="shell_view",
+                content=(f"output-{index}:" + "x" * 20_000),
+            ),
+        ])
+    memory = Memory(messages=messages)
+
+    changed = memory.bound(96 * 1024, 16 * 1024)
+
+    assert changed is True
+    assert Memory._serialized_size(memory.messages) <= 96 * 1024
+    assert any(
+        message.type == "human" and message.content == "visualize this dataset"
+        for message in memory.messages
+    )
+    assert any(
+        message.type == "tool" and message.tool_call_id == "call-19"
+        for message in memory.messages
+    )
+
+
+def test_successful_step_continues_without_replanning():
+    succeeded = Step(status=ExecutionStatus.COMPLETED, success=True)
+    failed = Step(status=ExecutionStatus.FAILED, success=False)
+
+    assert PlanActFlow._status_after_execution_step(succeeded) == AgentStatus.EXECUTING
+    assert PlanActFlow._status_after_execution_step(failed) == AgentStatus.UPDATING
+
+
+@pytest.mark.asyncio
+async def test_successful_step_emits_updated_plan_before_advancing():
+    original_plan = Plan(
+        title="two-step plan",
+        steps=[
+            Step(id="step-1", description="create an external artifact"),
+            Step(id="step-2", description="summarize the artifact"),
+        ],
+    )
+
+    class FakeSessionRepository:
+        def __init__(self):
+            self.session = SimpleNamespace(status=SessionStatus.PENDING)
+            self.events = [
+                PlanEvent(
+                    status=PlanStatus.CREATED,
+                    plan=original_plan.model_copy(deep=True),
+                )
+            ]
+
+        async def find_by_id(self, _session_id):
+            return self.session
+
+        async def get_events(self, _session_id):
+            return self.events
+
+        async def update_status(self, _session_id, status):
+            self.session.status = status
+
+    class FakeSkillRegistry:
+        def clear_restriction(self):
+            return None
+
+        def reload(self):
+            return None
+
+        def restrict_to(self, _names):
+            return None
+
+    class FakeExecutor:
+        async def execute_step(self, _plan, step, _message):
+            step.status = ExecutionStatus.COMPLETED
+            step.success = True
+            step.result = "artifact created"
+            yield StepEvent(status=StepStatus.COMPLETED, step=step)
+
+        async def compact_memory(self):
+            return None
+
+    repository = FakeSessionRepository()
+    flow = object.__new__(PlanActFlow)
+    flow._agent_id = "agent-1"
+    flow._session_id = "session-1"
+    flow._session_repository = repository
+    flow._sandbox = object()
+    flow.status = AgentStatus.EXECUTING
+    flow.plan = None
+    flow.skill_registry = FakeSkillRegistry()
+    flow.active_skill_context = ""
+    flow.session_context = ""
+    flow.dataset_context = ""
+    flow.enabled_subagents = {
+        "execution": SimpleNamespace(handler_type="execution"),
+    }
+    flow.executor = FakeExecutor()
+    flow.vision = object()
+
+    updated_event = None
+    event_stream = flow.run(Message(message="run both steps"))
+    async for event in event_stream:
+        if isinstance(event, PlanEvent) and event.status == PlanStatus.UPDATED:
+            updated_event = event.model_copy(deep=True)
+            await event_stream.aclose()
+            break
+
+    assert updated_event is not None
+    assert updated_event.step.id == "step-1"
+    assert updated_event.plan.steps[0].status == ExecutionStatus.COMPLETED
+    assert updated_event.plan.steps[0].success is True
+    assert updated_event.plan.get_next_step().id == "step-2"
 
 
 @pytest.mark.asyncio
