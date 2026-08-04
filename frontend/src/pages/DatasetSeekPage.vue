@@ -154,7 +154,7 @@
 
       <div
         ref="timelineRef"
-        class="min-h-0 min-w-0 max-w-full flex-1 overscroll-contain overflow-x-hidden overflow-y-auto"
+        class="timeline-scrollbar-hidden min-h-0 min-w-0 max-w-full flex-1 overscroll-contain overflow-x-hidden overflow-y-auto"
         @wheel.passive="handleTimelineWheel"
         @pointerdown="handleTimelinePointerDown"
         @pointerup="handleTimelinePointerUp"
@@ -212,7 +212,7 @@
             </div>
           </div>
 
-          <div v-else class="flex min-w-0 max-w-full flex-col gap-2 overflow-x-hidden">
+          <div v-else class="dataset-chat-list flex min-w-0 max-w-full flex-col gap-2">
             <template v-for="(message, index) in messages" :key="`${message.type}-${index}`">
               <div class="dataset-chat-message min-w-0 max-w-full">
                 <ChatMessage :message="message" :session-id="sessionId || undefined" :hide-header="isConsecutiveAssistant(messages, index)" />
@@ -777,7 +777,9 @@ onUnmounted(() => {
 .secondary-button { @apply h-9 shrink-0 items-center gap-1.5 rounded-md border border-[var(--border-main)] bg-[var(--background-menu-white)] px-3 text-xs text-[var(--text-secondary)] hover:bg-[var(--fill-tsp-white-light)]; }
 .history-button { @apply flex h-[54px] shrink-0 items-center justify-center gap-1.5 rounded-xl border border-[var(--border-main)] bg-[var(--background-gray-main)] px-3 text-[var(--text-secondary)] shadow-sm transition-colors hover:border-[#8eaa9c] hover:text-[#225f48]; }
 .send-button { @apply flex size-9 shrink-0 items-center justify-center rounded-lg bg-[#225f48] text-white transition-colors hover:bg-[#194d39] disabled:cursor-not-allowed disabled:bg-[var(--fill-tsp-white-dark)] disabled:text-[var(--text-disable)]; }
-.dataset-chat-message { min-width: 0; max-width: 100%; overflow-x: hidden; overflow-wrap: anywhere; font-size: 14px; line-height: 1.65; }
+.dataset-chat-list,
+.dataset-chat-message { overflow-x: clip; overflow-y: visible; }
+.dataset-chat-message { min-width: 0; max-width: 100%; overflow-wrap: anywhere; font-size: 14px; line-height: 1.65; }
 .dataset-chat-message :deep(.prose) { width: 100%; min-width: 0; max-width: 100% !important; overflow-wrap: anywhere; word-break: break-word; font-size: 14px !important; line-height: 1.7 !important; }
 .dataset-chat-message :deep(.prose p) { margin-top: 0.55em; margin-bottom: 0.55em; }
 .dataset-chat-message :deep(.prose li) { margin-top: 0.2em; margin-bottom: 0.2em; }
@@ -792,6 +794,8 @@ onUnmounted(() => {
 .dataset-chat-message :deep(.prose svg) { max-width: 100%; height: auto; }
 .dataset-chat-message :deep(.text-base) { font-size: 14px !important; line-height: 20px !important; }
 .dataset-chat-message :deep(.markdown-content) { min-width: 0; max-width: 100%; overflow: hidden; font-size: 13px; line-height: 20px; }
+.timeline-scrollbar-hidden { -ms-overflow-style: none; scrollbar-width: none; }
+.timeline-scrollbar-hidden::-webkit-scrollbar { display: none; width: 0; height: 0; }
 
 @media (max-width: 1023px) {
   .catalog-mobile-collapsed { transform: translateX(calc(-100% + 52px)); }
