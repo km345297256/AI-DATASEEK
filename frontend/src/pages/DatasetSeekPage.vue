@@ -1,5 +1,5 @@
 <template>
-  <div class="dataset-seek flex h-[100dvh] min-h-0 w-full overflow-hidden bg-[var(--background-white-main)] text-[var(--text-primary)]">
+  <div class="dataset-seek flex h-[100dvh] min-h-0 w-full max-w-full overflow-hidden bg-[var(--background-white-main)] text-[var(--text-primary)]">
     <button
       v-if="mobileCatalogOpen"
       type="button"
@@ -9,15 +9,49 @@
     />
 
     <aside
-      class="fixed inset-y-0 left-0 z-40 flex w-[min(88vw,320px)] shrink-0 flex-col border-r border-[var(--border-main)] bg-[var(--background-menu-white)] transition-transform duration-200 lg:static lg:w-[304px] lg:translate-x-0"
-      :class="mobileCatalogOpen ? 'translate-x-0' : '-translate-x-full'"
+      class="fixed inset-y-0 left-0 z-40 flex w-[min(88vw,320px)] shrink-0 flex-col border-r border-[var(--border-main)] bg-[var(--background-menu-white)] transition-[width,transform] duration-200 lg:static lg:translate-x-0"
+      :class="[
+        mobileCatalogOpen ? 'translate-x-0' : 'catalog-mobile-collapsed',
+        catalogCollapsed ? 'lg:w-14' : 'lg:w-[304px]',
+      ]"
     >
-      <header class="mobile-safe-top flex h-16 shrink-0 items-center gap-2 border-b border-[var(--border-main)] px-4">
-        <ScanSearch class="size-5 shrink-0 text-[#226b51]" aria-hidden="true" />
-        <h1 class="min-w-0 flex-1 truncate text-sm font-semibold">科学数据探查</h1>
+      <header
+        class="mobile-safe-top flex h-16 shrink-0 items-center gap-2 border-b border-[var(--border-main)] px-3"
+        :class="catalogCollapsed ? 'lg:justify-center lg:px-2' : ''"
+      >
+        <div
+          class="flex min-w-0 flex-1 items-center gap-2"
+          :class="[
+            catalogCollapsed ? 'lg:hidden' : '',
+            mobileCatalogOpen ? '' : 'catalog-mobile-header-hidden',
+          ]"
+        >
+          <ScanSearch class="size-5 shrink-0 text-[#226b51]" aria-hidden="true" />
+          <h1 class="min-w-0 flex-1 truncate text-sm font-semibold">科学数据探查</h1>
+        </div>
+        <button
+          type="button"
+          class="icon-button ml-auto"
+          :class="catalogCollapsed ? 'lg:mx-auto' : ''"
+          :aria-label="catalogToggleLabel"
+          :title="catalogToggleLabel"
+          :aria-expanded="!catalogPanelCollapsed"
+          aria-controls="dataset-catalog-panel"
+          @click="toggleCatalogPanel"
+        >
+          <PanelLeftOpen v-if="catalogPanelCollapsed" class="size-5" />
+          <PanelLeftClose v-else class="size-5" />
+        </button>
       </header>
 
-      <div class="min-h-0 flex-1 overflow-y-auto p-4">
+      <div
+        id="dataset-catalog-panel"
+        class="min-h-0 flex-1 overscroll-contain overflow-x-hidden overflow-y-auto p-4"
+        :class="[
+          catalogCollapsed ? 'lg:hidden' : '',
+          mobileCatalogOpen ? '' : 'catalog-mobile-content-hidden',
+        ]"
+      >
         <div v-if="catalogLoading" class="flex h-40 items-center justify-center text-xs text-[var(--text-tertiary)]">
           <LoaderCircle class="mr-2 size-4 animate-spin" />正在加载数据集
         </div>
@@ -104,9 +138,11 @@
       </div>
     </aside>
 
-    <main class="flex min-w-0 flex-1 flex-col bg-[var(--background-gray-main)]">
+    <main
+      class="flex min-h-0 min-w-0 max-w-full flex-1 flex-col overflow-hidden bg-[var(--background-gray-main)] transition-[padding] duration-200"
+      :class="mobileCatalogOpen ? '' : 'catalog-main-with-rail'"
+    >
       <header class="mobile-safe-top flex h-16 shrink-0 items-center gap-3 border-b border-[var(--border-main)] bg-[var(--background-menu-white)] px-3 sm:px-5">
-        <button type="button" class="icon-button lg:hidden" aria-label="打开数据集" @click="mobileCatalogOpen = true"><PanelLeft class="size-5" /></button>
         <div class="min-w-0 flex-1">
           <div class="truncate text-sm font-semibold">{{ dataset?.name || '科学数据探查' }}</div>
           <div class="mt-0.5 flex items-center gap-2 text-[10px] text-[var(--text-tertiary)]">
@@ -116,8 +152,15 @@
         <AgentSelector class="hidden sm:block" />
       </header>
 
-      <div ref="timelineRef" class="min-h-0 flex-1 overflow-y-auto scroll-smooth">
-        <div class="mx-auto flex min-h-full w-full max-w-[800px] flex-col px-4 pb-8 pt-5 sm:px-6 sm:pt-7">
+      <div
+        ref="timelineRef"
+        class="min-h-0 min-w-0 max-w-full flex-1 overscroll-contain overflow-x-hidden overflow-y-auto"
+        @wheel.passive="handleTimelineWheel"
+        @pointerdown="handleTimelinePointerDown"
+        @pointerup="handleTimelinePointerUp"
+        @pointercancel="handleTimelinePointerUp"
+      >
+        <div ref="timelineContentRef" class="mx-auto flex min-h-full w-full min-w-0 max-w-[800px] flex-col px-4 pb-8 pt-5 sm:px-6 sm:pt-7">
           <div v-if="messages.length === 0" class="flex flex-1 flex-col justify-center py-8 sm:py-12">
             <div v-if="dataset" class="max-w-2xl">
               <div class="flex size-11 items-center justify-center rounded-lg bg-[#e4f0ea] text-[#226b51]"><ScanSearch class="size-5" /></div>
@@ -169,9 +212,9 @@
             </div>
           </div>
 
-          <div v-else class="flex flex-col gap-2">
+          <div v-else class="flex min-w-0 max-w-full flex-col gap-2 overflow-x-hidden">
             <template v-for="(message, index) in messages" :key="`${message.type}-${index}`">
-              <div class="dataset-chat-message">
+              <div class="dataset-chat-message min-w-0 max-w-full">
                 <ChatMessage :message="message" :session-id="sessionId || undefined" :hide-header="isConsecutiveAssistant(messages, index)" />
               </div>
               <div
@@ -300,15 +343,15 @@
         </div>
       </div>
     </main>
+    <FilePanel resizable :reserved-width="catalogCollapsed ? 56 : 304" />
   </div>
-  <FilePanel />
   <SessionFileList :session-id="sessionId || undefined" />
 </template>
 
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
-import { ArrowUp, ChevronDown, ChevronRight, CircleAlert, Clock3, Database, FileText, History, Image as ImageIcon, LoaderCircle, PanelLeft, Plus, RefreshCw, ScanSearch, Square } from 'lucide-vue-next';
+import { ArrowUp, ChevronDown, ChevronRight, CircleAlert, Clock3, Database, FileText, History, Image as ImageIcon, LoaderCircle, PanelLeftClose, PanelLeftOpen, Plus, RefreshCw, ScanSearch, Square } from 'lucide-vue-next';
 import datasetDefaultCover from '@/assets/dataset-default-cover.png';
 import AgentSelector from '@/components/AgentSelector.vue';
 import ChatMessage from '@/components/ChatMessage.vue';
@@ -351,6 +394,10 @@ const lastEventId = ref<string>();
 const isLoading = ref(false);
 const loadingStatus = ref('');
 const mobileCatalogOpen = ref(false);
+const catalogCollapsed = ref(false);
+const desktopCatalogViewport = ref(false);
+const catalogPanelCollapsed = computed(() => desktopCatalogViewport.value ? catalogCollapsed.value : !mobileCatalogOpen.value);
+const catalogToggleLabel = computed(() => catalogPanelCollapsed.value ? '展开数据集详情' : '收起数据集详情');
 const suggestedQuestions = ref<string[]>([]);
 const suggestedQuestionsLoading = ref(false);
 const suggestedQuestionsError = ref('');
@@ -358,9 +405,15 @@ const historyOpen = ref(false);
 const historyLoading = ref(false);
 const historySessions = ref<DatasetChatSession[]>([]);
 const timelineRef = ref<HTMLElement>();
+const timelineContentRef = ref<HTMLElement>();
+const shouldFollowTimeline = ref(true);
 const currentPlan = ref<PlanEventData>();
 const lastTool = ref<ToolContent>();
 let cancelChat: (() => void) | null = null;
+let timelineResizeObserver: ResizeObserver | null = null;
+let desktopCatalogMediaQuery: MediaQueryList | null = null;
+
+const TIMELINE_BOTTOM_THRESHOLD = 120;
 
 watch(() => dataset.value?.preview_url, () => {
   datasetCoverFailed.value = false;
@@ -374,9 +427,39 @@ function datasetStorageKey() {
   return `${DATASET_STORAGE_KEY_PREFIX}:${selectedDatasetId.value}`;
 }
 
+function scrollTimelineToBottom() {
+  const timeline = timelineRef.value;
+  if (!timeline || !shouldFollowTimeline.value) return;
+  timeline.scrollTop = timeline.scrollHeight;
+}
+
+function updateTimelineFollowState() {
+  const timeline = timelineRef.value;
+  if (!timeline) return;
+  const distanceToBottom = timeline.scrollHeight - timeline.scrollTop - timeline.clientHeight;
+  shouldFollowTimeline.value = distanceToBottom <= TIMELINE_BOTTOM_THRESHOLD;
+}
+
+function handleTimelineWheel(event: WheelEvent) {
+  if (event.deltaY < 0) {
+    shouldFollowTimeline.value = false;
+    return;
+  }
+  requestAnimationFrame(updateTimelineFollowState);
+}
+
+function handleTimelinePointerDown() {
+  shouldFollowTimeline.value = false;
+}
+
+function handleTimelinePointerUp() {
+  updateTimelineFollowState();
+}
+
 watch(messages, async () => {
+  if (!shouldFollowTimeline.value) return;
   await nextTick();
-  timelineRef.value?.scrollTo({ top: timelineRef.value.scrollHeight, behavior: 'smooth' });
+  scrollTimelineToBottom();
 }, { deep: true });
 
 function handleDatasetCoverError() {
@@ -393,7 +476,20 @@ function loadMoreDatasetFiles() {
   visibleFileCount.value = Math.min(visibleFileCount.value + DATASET_FILE_BATCH_SIZE, total);
 }
 
+function toggleCatalogPanel() {
+  if (desktopCatalogViewport.value) {
+    catalogCollapsed.value = !catalogCollapsed.value;
+    return;
+  }
+  mobileCatalogOpen.value = !mobileCatalogOpen.value;
+}
+
+function handleCatalogViewportChange(event: MediaQueryListEvent) {
+  desktopCatalogViewport.value = event.matches;
+}
+
 function startUserTurn() {
+  shouldFollowTimeline.value = true;
   failRunningSteps(messages.value, false);
   currentPlan.value = undefined;
   lastTool.value = undefined;
@@ -574,6 +670,7 @@ function askSuggestion(question: string) {
 }
 
 function clearConversationState() {
+  shouldFollowTimeline.value = true;
   lastEventId.value = undefined;
   messages.value = [];
   currentPlan.value = undefined;
@@ -641,6 +738,13 @@ async function stop() {
 }
 
 onMounted(async () => {
+  desktopCatalogMediaQuery = window.matchMedia('(min-width: 1024px)');
+  desktopCatalogViewport.value = desktopCatalogMediaQuery.matches;
+  desktopCatalogMediaQuery.addEventListener('change', handleCatalogViewportChange);
+  if (typeof ResizeObserver !== 'undefined' && timelineContentRef.value) {
+    timelineResizeObserver = new ResizeObserver(() => scrollTimelineToBottom());
+    timelineResizeObserver.observe(timelineContentRef.value);
+  }
   await refreshProfiles().catch(() => undefined);
   const routeDatasetId = Array.isArray(route.params.datasetId) ? route.params.datasetId[0] : route.params.datasetId;
   if (!routeDatasetId) {
@@ -661,7 +765,11 @@ onMounted(async () => {
   await restoreConversation();
 });
 
-onUnmounted(() => { cancelChat?.(); });
+onUnmounted(() => {
+  cancelChat?.();
+  timelineResizeObserver?.disconnect();
+  desktopCatalogMediaQuery?.removeEventListener('change', handleCatalogViewportChange);
+});
 </script>
 
 <style scoped>
@@ -669,10 +777,26 @@ onUnmounted(() => { cancelChat?.(); });
 .secondary-button { @apply h-9 shrink-0 items-center gap-1.5 rounded-md border border-[var(--border-main)] bg-[var(--background-menu-white)] px-3 text-xs text-[var(--text-secondary)] hover:bg-[var(--fill-tsp-white-light)]; }
 .history-button { @apply flex h-[54px] shrink-0 items-center justify-center gap-1.5 rounded-xl border border-[var(--border-main)] bg-[var(--background-gray-main)] px-3 text-[var(--text-secondary)] shadow-sm transition-colors hover:border-[#8eaa9c] hover:text-[#225f48]; }
 .send-button { @apply flex size-9 shrink-0 items-center justify-center rounded-lg bg-[#225f48] text-white transition-colors hover:bg-[#194d39] disabled:cursor-not-allowed disabled:bg-[var(--fill-tsp-white-dark)] disabled:text-[var(--text-disable)]; }
-.dataset-chat-message { font-size: 14px; line-height: 1.65; }
-.dataset-chat-message :deep(.prose) { max-width: none; font-size: 14px !important; line-height: 1.7 !important; }
+.dataset-chat-message { min-width: 0; max-width: 100%; overflow-x: hidden; overflow-wrap: anywhere; font-size: 14px; line-height: 1.65; }
+.dataset-chat-message :deep(.prose) { width: 100%; min-width: 0; max-width: 100% !important; overflow-wrap: anywhere; word-break: break-word; font-size: 14px !important; line-height: 1.7 !important; }
 .dataset-chat-message :deep(.prose p) { margin-top: 0.55em; margin-bottom: 0.55em; }
 .dataset-chat-message :deep(.prose li) { margin-top: 0.2em; margin-bottom: 0.2em; }
+.dataset-chat-message :deep(.prose pre) { max-width: 100%; overflow-x: auto; overscroll-behavior-x: contain; white-space: pre; overflow-wrap: normal; word-break: normal; }
+.dataset-chat-message :deep(.prose pre code) { white-space: inherit; overflow-wrap: inherit; word-break: inherit; }
+.dataset-chat-message :deep(.prose table) { display: block; width: 100%; max-width: 100%; overflow-x: auto; overscroll-behavior-x: contain; }
+.dataset-chat-message :deep(.prose a),
+.dataset-chat-message :deep(.prose :not(pre) > code) { overflow-wrap: anywhere; word-break: break-word; }
+.dataset-chat-message :deep(.prose img),
+.dataset-chat-message :deep(.prose video),
+.dataset-chat-message :deep(.prose canvas),
+.dataset-chat-message :deep(.prose svg) { max-width: 100%; height: auto; }
 .dataset-chat-message :deep(.text-base) { font-size: 14px !important; line-height: 20px !important; }
-.dataset-chat-message :deep(.markdown-content) { font-size: 13px; line-height: 20px; }
+.dataset-chat-message :deep(.markdown-content) { min-width: 0; max-width: 100%; overflow: hidden; font-size: 13px; line-height: 20px; }
+
+@media (max-width: 1023px) {
+  .catalog-mobile-collapsed { transform: translateX(calc(-100% + 52px)); }
+  .catalog-mobile-header-hidden { display: none; }
+  .catalog-mobile-content-hidden { visibility: hidden; pointer-events: none; }
+  .catalog-main-with-rail { padding-left: 52px; }
+}
 </style>

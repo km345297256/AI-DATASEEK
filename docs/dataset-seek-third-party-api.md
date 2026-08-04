@@ -5,14 +5,14 @@
 本文档用于指导第三方业务系统向 AI-DataSeek 提交服务器数据集目录，并将用户跳转至 `/dataset/seek/:datasetId` 页面开展科学数据探查分析。
 
 - 接口版本：`v1`
-- 开发联调服务地址：`http://39.106.98.67:7000`
-- API 基础地址：`http://39.106.98.67:7000/api/v1`
+- 示例服务地址：`http://39.106.98.67:7100`
+- API 基础地址：`http://39.106.98.67:7100/api/v1`
 - 请求及响应编码：`UTF-8`
 - 请求数据格式：`application/json`
 
 > `/dataset/setup` 页面仅用于人工联调和模拟第三方调用。它不是正式接入链路的前置步骤。第三方系统应直接调用本文档中的 API，然后自行把浏览器重定向到探查页面。
 
-> `7000` 是当前隔离的开发与第三方联调环境；生产环境默认使用 `7100`。本文示例统一指向联调环境，正式上线时请替换为生产域名或地址。
+> `7100` 是 AI-DataSeek 的默认端口，用于与原系统的 `7000` 端口并行运行。实际接入时请统一替换为正式部署域名或地址。
 
 > **安全边界：** AI-DataSeek 固定为免登录系统，不提供应用层调用者认证。任何能够访问服务的客户端都以同一个系统管理员身份操作。本文示例仅适用于可信网络；接入公网前必须在网络边界增加访问控制并启用 HTTPS。
 
@@ -32,7 +32,7 @@
 4. 第三方服务将用户重定向至：
 
    ```text
-   http://39.106.98.67:7000/dataset/seek/{dataset_id}
+   http://39.106.98.67:7100/dataset/seek/{dataset_id}
    ```
 
 5. 页面加载数据集信息和四个简短的分析建议，并在用户发起分析时将整个目录只读挂载到沙箱。
@@ -143,7 +143,7 @@ Content-Type: application/json
 
 ```bash
 curl --request POST \
-  'http://39.106.98.67:7000/api/v1/datasets/submissions' \
+  'http://39.106.98.67:7100/api/v1/datasets/submissions' \
   --header 'Content-Type: application/json' \
   --data-raw '{
     "external_id": "7994ef4b-3c3a-48c1-8d85-8c2143d0f76a",
@@ -165,7 +165,7 @@ import express from 'express';
 
 const app = express();
 const AI_DATASEEK_BASE_URL = process.env.AI_DATASEEK_BASE_URL
-  ?? 'http://39.106.98.67:7000';
+  ?? 'http://39.106.98.67:7100';
 
 async function submitDataset() {
   const response = await fetch(
@@ -217,7 +217,7 @@ from flask import Flask, redirect
 
 AI_DATASEEK_BASE_URL = os.getenv(
     "AI_DATASEEK_BASE_URL",
-    "http://39.106.98.67:7000",
+    "http://39.106.98.67:7100",
 ).rstrip("/")
 
 
@@ -309,20 +309,20 @@ HTTP 状态码：`200 OK`
 提交成功后，对 `data.dataset_id` 执行 URL 编码并构造：
 
 ```text
-http://39.106.98.67:7000/dataset/seek/{URL-encoded dataset_id}
+http://39.106.98.67:7100/dataset/seek/{URL-encoded dataset_id}
 ```
 
 示例：
 
 ```text
-http://39.106.98.67:7000/dataset/seek/tds_URLvjM3-64XUXzNkB8q0BDQZ
+http://39.106.98.67:7100/dataset/seek/tds_URLvjM3-64XUXzNkB8q0BDQZ
 ```
 
 第三方 Web 服务可以返回：
 
 ```http
 HTTP/1.1 302 Found
-Location: http://39.106.98.67:7000/dataset/seek/tds_URLvjM3-64XUXzNkB8q0BDQZ
+Location: http://39.106.98.67:7100/dataset/seek/tds_URLvjM3-64XUXzNkB8q0BDQZ
 ```
 
 伪代码：
