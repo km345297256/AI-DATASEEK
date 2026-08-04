@@ -1,0 +1,44 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+
+#app {
+  display: contents;
+}
+
+body,html {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  font-family: -apple-system,BlinkMacSystemFont,Segoe UI Variable Display,Segoe UI,Helvetica,Apple Color Emoji,Arial,sans-serif,Segoe UI Emoji,Segoe UI Symbol;
+  background-color: var(--background-white-main);
+  color: var(--text-primary)
+}
+
+.app-viewport {
+  height: 100vh;
+  height: 100dvh;
+}
+
+@media (max-width: 639px) {
+  .mobile-safe-top {
+    padding-top: max(12px, env(safe-area-inset-top));
+  }
+
+  .mobile-safe-bottom {
+    padding-bottom: max(8px, env(safe-area-inset-bottom));
+  }
+}
+
+.clickable {
+  cursor: pointer;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  user-select: none;
+}
+
+.ltr\:border-l {
+  border-left-width: 1px;
+}
