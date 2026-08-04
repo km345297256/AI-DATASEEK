@@ -1,0 +1,7 @@
+{
+  "name": "code-change",
+  "description": "Use for software changes, debugging, implementation, refactoring, and repository-aware coding tasks.",
+  "triggers": ["code", "bug", "debug", "implement", "refactor", "test", "代码", "修复", "实现", "重构", "报错"],
+  "priority": 10,
+  "max_context_chars": 4000
+}
