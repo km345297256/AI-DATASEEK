@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "example-http-server": {
+      "transport": "streamable-http",
+      "url": "https://mcp.example.com/mcp",
+      "enabled": false,
+      "description": "Replace with a trusted MCP endpoint before enabling",
+      "scope": "global",
+      "risk_level": "standard"
+    }
+  }
+}

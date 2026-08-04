@@ -1,0 +1,111 @@
+name: ai-dataseek
+
+services:
+  frontend:
+    image: ${FRONTEND_IMAGE:-ai-dataseek-frontend:${IMAGE_TAG:-latest}}
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      target: production-stage
+    ports:
+      - "${FRONTEND_PORT:-7100}:80"
+    environment:
+      BACKEND_URL: http://backend:8000
+    depends_on:
+      backend:
+        condition: service_started
+    restart: unless-stopped
+    networks:
+      - ai-dataseek-network
+
+  backend:
+    image: ${BACKEND_IMAGE:-ai-dataseek-backend:${IMAGE_TAG:-latest}}
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    env_file:
+      - .env
+    environment:
+      AUTH_PROVIDER: none
+      MONGODB_URI: mongodb://mongodb:27017
+      MONGODB_DATABASE: ai_dataseek
+      REDIS_HOST: redis
+      MINIO_ENDPOINT: minio:9000
+      MINIO_BUCKET: ai-dataseek-files
+      SANDBOX_ISOLATION: session
+      SANDBOX_IMAGE: ${SANDBOX_IMAGE:-ai-dataseek-sandbox:${IMAGE_TAG:-latest}}
+      SANDBOX_NAME_PREFIX: ai-dataseek-sandbox
+      SANDBOX_NETWORK: ai-dataseek-network
+      DATASET_STORAGE_ROOT: /data/datasets
+      DATASET_MANAGED_VOLUME: ai-dataseek-dataset-data
+      SKILLS_DIR: /app/skills
+      USER_SKILLS_DIR: /data/skills/users
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - dataset-data:/data/datasets
+      - skills-data:/data/skills
+    depends_on:
+      sandbox-image:
+        condition: service_completed_successfully
+      mongodb:
+        condition: service_started
+      redis:
+        condition: service_started
+      minio:
+        condition: service_started
+    restart: unless-stopped
+    networks:
+      - ai-dataseek-network
+
+  # This one-shot service makes the sandbox image available to the backend.
+  # Analysis sandboxes themselves are created dynamically per session.
+  sandbox-image:
+    image: ${SANDBOX_IMAGE:-ai-dataseek-sandbox:${IMAGE_TAG:-latest}}
+    build:
+      context: ./sandbox
+      dockerfile: Dockerfile
+    command: ["/bin/true"]
+    restart: "no"
+    networks:
+      - ai-dataseek-network
+
+  mongodb:
+    image: ${MONGODB_IMAGE:-mongo:7.0}
+    volumes:
+      - mongodb-data:/data/db
+    restart: unless-stopped
+    networks:
+      - ai-dataseek-network
+
+  redis:
+    image: ${REDIS_IMAGE:-redis:7.0}
+    restart: unless-stopped
+    networks:
+      - ai-dataseek-network
+
+  minio:
+    image: ${MINIO_IMAGE:-minio/minio:RELEASE.2025-04-22T22-12-26Z}
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY:-minioadmin}
+    volumes:
+      - minio-data:/data
+    restart: unless-stopped
+    networks:
+      - ai-dataseek-network
+
+volumes:
+  mongodb-data:
+    name: ai-dataseek-mongodb-data
+  minio-data:
+    name: ai-dataseek-minio-data
+  dataset-data:
+    name: ai-dataseek-dataset-data
+  skills-data:
+    name: ai-dataseek-skills-data
+
+networks:
+  ai-dataseek-network:
+    name: ai-dataseek-network
+    driver: bridge
