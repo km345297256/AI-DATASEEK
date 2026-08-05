@@ -1,0 +1,38 @@
+# Keep the sandbox image context explicit. In particular, a developer's local
+# virtual environment must never overwrite the frozen environment built in the
+# Dockerfile, and local configuration must never be copied into an image layer.
+**
+
+!.dockerignore
+!Dockerfile
+!pyproject.toml
+!uv.lock
+!supervisord.conf
+!README.md
+!README_zh.md
+
+!app/
+!app/**
+!scripts/
+!scripts/**
+!resource/
+!resource/**
+
+# Defense in depth for files re-included by the runtime directory rules above.
+.venv/
+**/.venv/
+.env
+.env.*
+**/.env
+**/.env.*
+**/__pycache__/
+**/*.py[cod]
+**/.pytest_cache/
+**/.coverage
+**/.coverage.*
+**/htmlcov/
+**/.cache/
+**/.mypy_cache/
+**/.ruff_cache/
+tests/
+**/tests/

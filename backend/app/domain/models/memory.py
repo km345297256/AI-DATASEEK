@@ -57,6 +57,26 @@ class Memory(BaseModel):
     def _truncate_message(message: AnyMessage, max_content_bytes: int) -> AnyMessage:
         """Return a persistence-safe copy of an exceptionally large message."""
         bounded = message.model_copy(deep=True)
+        if getattr(bounded, "type", None) == "ai" and getattr(bounded, "tool_calls", None):
+            compacted_calls = []
+            argument_limit = max(1024, min(8 * 1024, max_content_bytes // 4))
+            for tool_call in bounded.tool_calls:
+                compacted_call = dict(tool_call)
+                args = compacted_call.get("args")
+                if isinstance(args, dict):
+                    compacted_args = dict(args)
+                    for key, value in args.items():
+                        if not isinstance(value, str):
+                            continue
+                        encoded_value = value.encode("utf-8")
+                        if len(encoded_value) > argument_limit:
+                            compacted_args[key] = (
+                                encoded_value[:argument_limit].decode("utf-8", errors="ignore")
+                                + f"\n[tool argument truncated from {len(encoded_value)} bytes]"
+                            )
+                    compacted_call["args"] = compacted_args
+                compacted_calls.append(compacted_call)
+            bounded.tool_calls = compacted_calls
         content = bounded.content
         if isinstance(content, str):
             raw_content = content
@@ -83,6 +103,63 @@ class Memory(BaseModel):
             # to be discarded by BaseAgent's history repair before the next invocation.
             bounded.tool_calls = []
         return bounded
+
+    @classmethod
+    def _trim_newest_turn(
+        cls,
+        prefix: List[AnyMessage],
+        turn: List[AnyMessage],
+        max_bytes: int,
+        message_content_bytes: int,
+    ) -> List[AnyMessage]:
+        """Keep the request plus the newest complete tool exchanges from one large turn."""
+        if not turn:
+            return []
+        bounded_turn = [cls._truncate_message(message, message_content_bytes) for message in turn]
+        if cls._serialized_size(prefix + bounded_turn) <= max_bytes:
+            return bounded_turn
+
+        header: List[AnyMessage] = []
+        start_index = 0
+        if bounded_turn[0].type == "human":
+            header = [bounded_turn[0]]
+            start_index = 1
+
+        units: List[List[AnyMessage]] = []
+        index = start_index
+        while index < len(bounded_turn):
+            message = bounded_turn[index]
+            unit = [message]
+            index += 1
+            if message.type == "ai" and getattr(message, "tool_calls", None):
+                expected_ids = {
+                    tool_call.get("id")
+                    for tool_call in message.tool_calls
+                    if tool_call.get("id")
+                }
+                while index < len(bounded_turn):
+                    candidate = bounded_turn[index]
+                    if candidate.type != "tool" or (
+                        expected_ids and getattr(candidate, "tool_call_id", None) not in expected_ids
+                    ):
+                        break
+                    unit.append(candidate)
+                    index += 1
+            units.append(unit)
+
+        retained_units: List[List[AnyMessage]] = []
+        for unit in reversed(units):
+            candidate_units = [unit] + retained_units
+            candidate = prefix + header + [
+                message for retained_unit in candidate_units for message in retained_unit
+            ]
+            if cls._serialized_size(candidate) <= max_bytes:
+                retained_units = candidate_units
+
+        trimmed = header + [
+            message for retained_unit in retained_units for message in retained_unit
+        ]
+        return trimmed if cls._serialized_size(prefix + trimmed) <= max_bytes else header
 
     def bound(self, max_bytes: int, message_content_bytes: int = 256 * 1024) -> bool:
         """Keep recent complete conversation turns within a Mongo-safe memory budget.
@@ -121,6 +198,15 @@ class Memory(BaseModel):
             candidate = retained_system + [message for item in reversed(retained_turns) for message in item] + bounded_turn
             if not retained_turns and self._serialized_size(candidate) <= max_bytes:
                 retained_turns.append(bounded_turn)
+            elif not retained_turns:
+                trimmed_turn = self._trim_newest_turn(
+                    retained_system,
+                    turn,
+                    max_bytes,
+                    message_content_bytes,
+                )
+                if trimmed_turn:
+                    retained_turns.append(trimmed_turn)
             break
 
         self.messages = retained_system + [

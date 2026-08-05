@@ -17,7 +17,7 @@ from app.domain.models.mcp_config import MCPConfig, MCPRiskLevel, MCPServerConfi
 from app.domain.services.approval_service import ApprovalService
 from app.domain.services.token_usage_service import TokenUsageService
 from langchain.messages import AIMessage
-from app.domain.models.event import MessageEvent, StepEvent, StepStatus
+from app.domain.models.event import DoneEvent, MessageEvent, StepEvent, StepStatus
 from app.domain.models.event import ToolEvent, ToolStatus
 from app.domain.models.event import FileToolContent
 from app.domain.models.session import Session
@@ -371,6 +371,7 @@ async def test_completed_step_discovers_and_syncs_generated_png_artifact():
 
     class FakeSandbox:
         async def file_find(self, path, glob_pattern):
+            assert path == "/home/ubuntu/output"
             assert glob_pattern == "**/*"
             return ToolResult(
                 success=True,
@@ -429,17 +430,19 @@ async def test_artifact_discovery_syncs_data_files_beyond_old_suffix_and_count_l
             return None
 
     generated_paths = [
-        f"/home/ubuntu/brightness_temperature/data_{index:02d}.csv"
+        f"/home/ubuntu/output/brightness_temperature/data_{index:02d}.csv"
         for index in range(35)
     ] + [
-        "/home/ubuntu/brightness_temperature/array.npy",
-        "/home/ubuntu/brightness_temperature/report.html",
-        "/home/ubuntu/.cache/ignored.csv",
-        "/home/ubuntu/brightness_temperature/raw.bin",
+        "/home/ubuntu/output/brightness_temperature/array.npy",
+        "/home/ubuntu/output/brightness_temperature/report.html",
+        "/home/ubuntu/output/.cache/ignored.csv",
+        "/home/ubuntu/output/brightness_temperature/raw.bin",
+        "/home/ubuntu/outside-output.csv",
     ]
 
     class FakeSandbox:
         async def file_find(self, path, glob_pattern):
+            assert path == "/home/ubuntu/output"
             assert glob_pattern == "**/*"
             return ToolResult(success=True, data={"path": path, "files": generated_paths})
 
@@ -458,17 +461,321 @@ async def test_artifact_discovery_syncs_data_files_beyond_old_suffix_and_count_l
     runner._sandbox = FakeSandbox()
     runner._file_storage = FakeFileStorage()
     runner._generated_files = []
-    runner._artifact_baseline_paths = {"/home/ubuntu/brightness_temperature/data_00.csv"}
+    runner._artifact_baseline_paths = {"/home/ubuntu/output/brightness_temperature/data_00.csv"}
 
     await runner._sync_discovered_artifacts_to_storage()
 
     synced_paths = {file.file_path for file in runner._session_repository.added_files}
-    assert "/home/ubuntu/brightness_temperature/data_00.csv" not in synced_paths
-    assert "/home/ubuntu/brightness_temperature/data_34.csv" in synced_paths
-    assert "/home/ubuntu/brightness_temperature/array.npy" in synced_paths
-    assert "/home/ubuntu/brightness_temperature/report.html" in synced_paths
-    assert "/home/ubuntu/.cache/ignored.csv" not in synced_paths
-    assert "/home/ubuntu/brightness_temperature/raw.bin" not in synced_paths
+    assert "/home/ubuntu/output/brightness_temperature/data_00.csv" not in synced_paths
+    assert "/home/ubuntu/output/brightness_temperature/data_34.csv" in synced_paths
+    assert "/home/ubuntu/output/brightness_temperature/array.npy" in synced_paths
+    assert "/home/ubuntu/output/brightness_temperature/report.html" in synced_paths
+    assert "/home/ubuntu/output/.cache/ignored.csv" not in synced_paths
+    assert "/home/ubuntu/output/brightness_temperature/raw.bin" not in synced_paths
+    assert "/home/ubuntu/outside-output.csv" not in synced_paths
+
+
+@pytest.mark.asyncio
+async def test_artifact_discovery_uploads_only_new_or_changed_content():
+    artifact_path = "/home/ubuntu/output/chart.png"
+
+    class FakeSessionRepository:
+        def __init__(self):
+            self.files_by_path = {}
+            self.added_files = []
+            self.removed_file_ids = []
+
+        async def get_file_by_path(self, session_id, file_path):
+            return self.files_by_path.get(file_path)
+
+        async def add_file(self, session_id, file_info):
+            self.files_by_path[file_info.file_path] = file_info
+            self.added_files.append(file_info)
+
+        async def remove_file(self, session_id, file_id):
+            self.removed_file_ids.append(file_id)
+            self.files_by_path = {
+                path: info
+                for path, info in self.files_by_path.items()
+                if info.file_id != file_id
+            }
+
+    class FakeSandbox:
+        def __init__(self):
+            self.content = b"first-render"
+            self.search_roots = []
+
+        async def file_find(self, path, glob_pattern):
+            self.search_roots.append(path)
+            return ToolResult(success=True, data={"path": path, "files": [artifact_path]})
+
+        async def file_download(self, file_path):
+            assert file_path == artifact_path
+            return io.BytesIO(self.content)
+
+    class FakeFileStorage:
+        def __init__(self):
+            self.uploads = []
+            self.deleted_file_ids = []
+
+        async def upload_file(self, file_data, file_name, user_id, metadata=None):
+            payload = file_data.read()
+            self.uploads.append((file_name, payload, metadata))
+            return FileInfo(
+                file_id=f"file-{len(self.uploads)}",
+                filename=file_name,
+                size=len(payload),
+                metadata=metadata,
+            )
+
+        async def delete_file(self, file_id, user_id):
+            self.deleted_file_ids.append(file_id)
+            return True
+
+    repository = FakeSessionRepository()
+    sandbox = FakeSandbox()
+    storage = FakeFileStorage()
+    runner = AgentTaskRunner.__new__(AgentTaskRunner)
+    runner._agent_id = "agent-1"
+    runner._session_id = "session-1"
+    runner._user_id = "user-1"
+    runner._session_repository = repository
+    runner._sandbox = sandbox
+    runner._file_storage = storage
+    runner._generated_files = []
+    runner._artifact_baseline_paths = set()
+    runner._artifact_fingerprints = {}
+
+    first = await runner._sync_discovered_artifacts_to_storage()
+    unchanged = await runner._sync_discovered_artifacts_to_storage()
+    first_fingerprint = runner._artifact_fingerprints[artifact_path]
+
+    sandbox.content = b"second-render"
+    changed = await runner._sync_discovered_artifacts_to_storage()
+
+    assert sandbox.search_roots == ["/home/ubuntu/output"] * 3
+    assert len(first) == 1
+    assert unchanged == []
+    assert len(changed) == 1
+    assert [payload for _, payload, _ in storage.uploads] == [b"first-render", b"second-render"]
+    assert repository.removed_file_ids == ["file-1"]
+    assert storage.deleted_file_ids == ["file-1"]
+    assert artifact_path in runner._artifact_baseline_paths
+    assert runner._artifact_fingerprints[artifact_path] != first_fingerprint
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "existing_metadata",
+    [
+        {"source": "user_upload", "session_id": "session-1"},
+        {"source": "sandbox_artifact", "session_id": "another-session"},
+    ],
+)
+async def test_replacing_artifact_does_not_delete_unmanaged_or_other_session_uploads(
+    existing_metadata,
+):
+    artifact_path = "/home/ubuntu/output/report.csv"
+
+    class FakeSessionRepository:
+        def __init__(self):
+            self.file_info = FileInfo(
+                file_id="user-upload",
+                filename="report.csv",
+                file_path=artifact_path,
+                metadata=existing_metadata,
+            )
+
+        async def get_file_by_path(self, session_id, file_path):
+            return self.file_info
+
+        async def add_file(self, session_id, file_info):
+            self.file_info = file_info
+
+        async def remove_file(self, session_id, file_id):
+            return None
+
+    class FakeSandbox:
+        async def file_download(self, file_path):
+            return io.BytesIO(b"new report")
+
+    class FakeFileStorage:
+        def __init__(self):
+            self.deleted_file_ids = []
+
+        async def upload_file(self, file_data, file_name, user_id, metadata=None):
+            return FileInfo(file_id="generated-report", filename=file_name, metadata=metadata)
+
+        async def delete_file(self, file_id, user_id):
+            self.deleted_file_ids.append(file_id)
+            return True
+
+    storage = FakeFileStorage()
+    runner = AgentTaskRunner.__new__(AgentTaskRunner)
+    runner._agent_id = "agent-1"
+    runner._session_id = "session-1"
+    runner._user_id = "user-1"
+    runner._session_repository = FakeSessionRepository()
+    runner._sandbox = FakeSandbox()
+    runner._file_storage = storage
+    runner._artifact_baseline_paths = set()
+    runner._artifact_fingerprints = {}
+
+    synced = await runner._sync_file_to_storage(artifact_path)
+
+    assert synced.file_id == "generated-report"
+    assert storage.deleted_file_ids == []
+
+
+@pytest.mark.asyncio
+async def test_explicit_attachment_outside_output_is_preserved_and_deduplicated():
+    attachment_path = "/home/ubuntu/work/report.csv"
+
+    class FakeSessionRepository:
+        def __init__(self):
+            self.file_info = None
+
+        async def get_file_by_path(self, session_id, file_path):
+            return self.file_info
+
+        async def add_file(self, session_id, file_info):
+            self.file_info = file_info
+
+        async def remove_file(self, session_id, file_id):
+            self.file_info = None
+
+    class FakeSandbox:
+        async def file_download(self, file_path):
+            assert file_path == attachment_path
+            return io.BytesIO(b"a,b\n1,2\n")
+
+    class FakeFileStorage:
+        def __init__(self):
+            self.upload_count = 0
+
+        async def upload_file(self, file_data, file_name, user_id, metadata=None):
+            self.upload_count += 1
+            return FileInfo(
+                file_id=f"file-{self.upload_count}",
+                filename=file_name,
+                metadata=metadata,
+            )
+
+    repository = FakeSessionRepository()
+    storage = FakeFileStorage()
+    runner = AgentTaskRunner.__new__(AgentTaskRunner)
+    runner._agent_id = "agent-1"
+    runner._session_id = "session-1"
+    runner._user_id = "user-1"
+    runner._session_repository = repository
+    runner._sandbox = FakeSandbox()
+    runner._file_storage = storage
+    runner._generated_files = []
+    runner._artifact_baseline_paths = set()
+    runner._artifact_fingerprints = {}
+
+    first = await runner._sync_explicit_paths_to_storage([attachment_path])
+    repeated = await runner._sync_explicit_paths_to_storage([attachment_path])
+
+    assert first[0].file_id == "file-1"
+    assert repeated[0].file_id == "file-1"
+    assert storage.upload_count == 1
+
+
+@pytest.mark.asyncio
+async def test_file_read_tool_event_does_not_upload_the_file_directly():
+    class FakeSandbox:
+        async def file_read(self, file_path):
+            return ToolResult(success=True, data={"content": "print('ready')"})
+
+    runner = AgentTaskRunner.__new__(AgentTaskRunner)
+    runner._agent_id = "agent-1"
+    runner._session_id = "session-1"
+    runner._sandbox = FakeSandbox()
+    sync_calls = []
+
+    async def record_sync(file_path):
+        sync_calls.append(file_path)
+
+    runner._sync_file_to_storage = record_sync
+    event = ToolEvent(
+        tool_call_id="tool-1",
+        tool_name="file",
+        function_name="file_read",
+        function_args={"file": "/home/ubuntu/output/plot.py"},
+        status=ToolStatus.CALLED,
+    )
+
+    await runner._handle_tool_event(event)
+
+    assert event.tool_content.content == "print('ready')"
+    assert sync_calls == []
+
+
+@pytest.mark.asyncio
+async def test_flow_does_not_rescan_unchanged_artifacts_at_summary_and_done():
+    class FakeSafetyReviewer:
+        async def review(self, message, excerpts):
+            return SimpleNamespace(
+                allowed=True,
+                decision="allow",
+                risk_level="low",
+                categories=[],
+                reason="",
+                suggestion="",
+            )
+
+    class FakeFlow:
+        status = AgentStatus.EXECUTING
+
+        async def run(self, message):
+            yield ToolEvent(
+                tool_call_id="tool-1",
+                tool_name="message",
+                function_name="message_notify",
+                function_args={},
+                status=ToolStatus.CALLED,
+            )
+            yield StepEvent(status=StepStatus.COMPLETED, step=Step())
+            self.status = AgentStatus.SUMMARIZING
+            yield MessageEvent(message="summary")
+            yield DoneEvent()
+
+    class FakeSessionRepository:
+        async def find_by_id(self, session_id):
+            return None
+
+    runner = AgentTaskRunner.__new__(AgentTaskRunner)
+    runner._agent_id = "agent-1"
+    runner._session_id = "session-1"
+    runner._flow = FakeFlow()
+    runner._safety_reviewer = FakeSafetyReviewer()
+    runner._session_repository = FakeSessionRepository()
+    runner._generated_files = []
+    discovery_calls = []
+
+    async def noop(*args, **kwargs):
+        return None
+
+    async def record_discovery():
+        discovery_calls.append(True)
+        return []
+
+    runner._record_safety_audit = noop
+    runner._initialize_mcp_tool = noop
+    runner._handle_tool_event = noop
+    runner._sync_discovered_artifacts_to_storage = record_discovery
+
+    message = SimpleNamespace(
+        message="make a chart",
+        attachment_file_infos=[],
+        mcp_servers=[],
+        mcp_access_all=False,
+    )
+    events = [event async for event in runner._run_flow(message)]
+
+    assert len(discovery_calls) == 1
+    assert [type(event) for event in events] == [ToolEvent, StepEvent, MessageEvent, DoneEvent]
 
 
 @pytest.mark.asyncio

@@ -1,5 +1,6 @@
 from typing import Any, Optional, AsyncGenerator, List
 import asyncio
+import hashlib
 import json
 import logging
 import os
@@ -62,10 +63,18 @@ def _rewind_or_buffer_stream(file_data):
         except (OSError, io.UnsupportedOperation):
             pass
     if hasattr(file_data, "read"):
-        return io.BytesIO(file_data.read())
+        content = file_data.read()
+        if isinstance(content, str):
+            content = content.encode("utf-8")
+        return io.BytesIO(content)
     return file_data
 
-ARTIFACT_SEARCH_ROOTS = ("/home/ubuntu",)
+
+# Agents are instructed to publish generated outputs here.  Keeping automatic
+# discovery inside this boundary avoids recursively walking datasets, package
+# caches and other sandbox working files.  Explicit step/message attachments
+# remain supported outside this directory.
+ARTIFACT_SEARCH_ROOTS = ("/home/ubuntu/output",)
 ARTIFACT_EXTENSIONS = (
     ".avif",
     ".csv",
@@ -111,6 +120,12 @@ ARTIFACT_EXCLUDED_PARTS = {
 MAX_AUTO_SYNC_ARTIFACTS = 500
 MAX_EVENT_PAYLOAD_BYTES = 2 * 1024 * 1024
 MAX_EVENT_PREVIEW_BYTES = 256 * 1024
+ARTIFACT_HASH_METADATA_KEY = "artifact_sha256"
+ARTIFACT_SIZE_METADATA_KEY = "artifact_size"
+ARTIFACT_HASH_CHUNK_BYTES = 1024 * 1024
+
+ArtifactFingerprint = tuple[int, str]
+
 
 class AgentTaskRunner(TaskRunner):
     """Agent task that can be cancelled"""
@@ -161,6 +176,7 @@ class AgentTaskRunner(TaskRunner):
         )
         self._generated_files: List[FileInfo] = []
         self._artifact_baseline_paths: set[str] = set()
+        self._artifact_fingerprints: dict[str, ArtifactFingerprint] = {}
         self._dataset_service = DataCenterDatasetService()
         self._mounted_dataset_ids: set[str] = set()
         # Only files materialized from the data-center catalog are protected from
@@ -262,23 +278,169 @@ class AgentTaskRunner(TaskRunner):
         )
         return result.file_id
 
-    async def _sync_file_to_storage(self, file_path: str) -> Optional[FileInfo]:
-        """Upload or update file and return FileInfo"""
+    def _artifact_fingerprint_state(self) -> dict[str, ArtifactFingerprint]:
+        """Return fingerprint state, including for runners built directly in tests."""
+        state = getattr(self, "_artifact_fingerprints", None)
+        if state is None:
+            state = {}
+            self._artifact_fingerprints = state
+        return state
+
+    def _artifact_baseline_state(self) -> set[str]:
+        baseline = getattr(self, "_artifact_baseline_paths", None)
+        if baseline is None:
+            baseline = set()
+            self._artifact_baseline_paths = baseline
+        return baseline
+
+    @staticmethod
+    def _fingerprint_stream(file_data) -> tuple[Any, ArtifactFingerprint]:
+        """Hash a downloaded stream without retaining a second full-size copy."""
+        stream = _rewind_or_buffer_stream(file_data)
+        if not hasattr(stream, "read"):
+            raise TypeError("Downloaded artifact is not a readable stream")
+
+        try:
+            stream.seek(0)
+        except (AttributeError, OSError, io.UnsupportedOperation):
+            content = stream.read()
+            if isinstance(content, str):
+                content = content.encode("utf-8")
+            stream = io.BytesIO(content)
+
+        digest = hashlib.sha256()
+        size = 0
+        while True:
+            chunk = stream.read(ARTIFACT_HASH_CHUNK_BYTES)
+            if not chunk:
+                break
+            if isinstance(chunk, str):
+                chunk = chunk.encode("utf-8")
+            digest.update(chunk)
+            size += len(chunk)
+        stream.seek(0)
+        return stream, (size, digest.hexdigest())
+
+    async def _read_artifact_with_fingerprint(
+        self,
+        file_path: str,
+    ) -> tuple[Any, ArtifactFingerprint]:
+        file_data = await self._sandbox.file_download(file_path)
+        return self._fingerprint_stream(file_data)
+
+    @staticmethod
+    def _file_matches_fingerprint(
+        file_info: Optional[FileInfo],
+        fingerprint: ArtifactFingerprint,
+    ) -> bool:
+        if not file_info or not file_info.metadata:
+            return False
+        expected_size, expected_hash = fingerprint
+        metadata = file_info.metadata
+        try:
+            stored_size = int(metadata.get(ARTIFACT_SIZE_METADATA_KEY))
+        except (TypeError, ValueError):
+            return False
+        return (
+            stored_size == expected_size
+            and metadata.get(ARTIFACT_HASH_METADATA_KEY) == expected_hash
+        )
+
+    def _remember_artifact_fingerprint(
+        self,
+        file_path: str,
+        fingerprint: ArtifactFingerprint,
+    ) -> None:
+        self._artifact_baseline_state().add(file_path)
+        self._artifact_fingerprint_state()[file_path] = fingerprint
+
+    def _can_delete_replaced_storage_file(self, file_info: Optional[FileInfo]) -> bool:
+        """Only delete storage objects that this session created as artifacts."""
+        if not file_info or not file_info.file_id or not file_info.metadata:
+            return False
+        metadata = file_info.metadata
+        return (
+            metadata.get("source") == "sandbox_artifact"
+            and str(metadata.get("session_id") or "") == str(self._session_id)
+        )
+
+    async def _delete_replaced_storage_file(self, file_info: Optional[FileInfo]) -> None:
+        if not self._can_delete_replaced_storage_file(file_info):
+            return
+        try:
+            deleted = await self._file_storage.delete_file(file_info.file_id, self._user_id)
+            if not deleted:
+                logger.warning(
+                    "Agent %s could not delete replaced artifact object %s",
+                    self._agent_id,
+                    file_info.file_id,
+                )
+        except Exception as exc:
+            # The new attachment is already durable.  Object cleanup is
+            # intentionally best-effort and must not make the task fail.
+            logger.warning(
+                "Agent %s failed to delete replaced artifact object %s: %s",
+                self._agent_id,
+                file_info.file_id,
+                exc,
+            )
+
+    async def _sync_file_to_storage(
+        self,
+        file_path: str,
+        *,
+        file_data=None,
+        fingerprint: Optional[ArtifactFingerprint] = None,
+    ) -> Optional[FileInfo]:
+        """Upload a changed file once and return its current FileInfo."""
         try:
             if not file_path:
                 return None
-            file_info = await self._session_repository.get_file_by_path(self._session_id, file_path)
-            file_data = await self._sandbox.file_download(file_path)
-            if file_info:
-                await self._session_repository.remove_file(self._session_id, file_info.file_id)
+            if file_data is None:
+                file_data, fingerprint = await self._read_artifact_with_fingerprint(file_path)
+            elif fingerprint is None:
+                file_data, fingerprint = self._fingerprint_stream(file_data)
+            else:
+                file_data = _rewind_or_buffer_stream(file_data)
+            assert fingerprint is not None
+
+            existing_file = await self._session_repository.get_file_by_path(
+                self._session_id,
+                file_path,
+            )
+            if self._file_matches_fingerprint(existing_file, fingerprint):
+                existing_file.file_path = file_path
+                self._remember_artifact_fingerprint(file_path, fingerprint)
+                return existing_file
+
             file_name = file_path.split("/")[-1]
+            artifact_size, artifact_hash = fingerprint
+            storage_metadata = {
+                "session_id": self._session_id,
+                "file_path": file_path,
+                "source": "sandbox_artifact",
+                ARTIFACT_SIZE_METADATA_KEY: artifact_size,
+                ARTIFACT_HASH_METADATA_KEY: artifact_hash,
+            }
             file_info = await self._upload_file_to_storage(
                 file_data,
                 file_name,
-                metadata={"session_id": self._session_id, "file_path": file_path, "source": "sandbox_artifact"},
+                metadata=storage_metadata,
             )
             file_info.file_path = file_path
+            file_info.metadata = {**(file_info.metadata or {}), **storage_metadata}
+            # Upload first so a transient storage failure cannot remove the last
+            # working attachment reference from the session.
             await self._session_repository.add_file(self._session_id, file_info)
+            if existing_file and existing_file.file_id:
+                await self._session_repository.remove_file(
+                    self._session_id,
+                    existing_file.file_id,
+                )
+                await self._delete_replaced_storage_file(existing_file)
+            # Only advance the baseline after both storage and repository writes
+            # have succeeded; otherwise the next discovery pass must retry.
+            self._remember_artifact_fingerprint(file_path, fingerprint)
             return file_info
         except Exception as e:
             logger.exception(f"Agent {self._agent_id} failed to sync file: {e}")
@@ -302,6 +464,16 @@ class AgentTaskRunner(TaskRunner):
         if any(part in ARTIFACT_EXCLUDED_PARTS for part in path.parts):
             return False
         return path.suffix.lower() in ARTIFACT_EXTENSIONS
+
+    @staticmethod
+    def _is_in_artifact_search_roots(file_path: str) -> bool:
+        path = PurePosixPath(file_path)
+        if not path.is_absolute() or ".." in path.parts:
+            return False
+        return any(
+            path == PurePosixPath(root) or PurePosixPath(root) in path.parents
+            for root in ARTIFACT_SEARCH_ROOTS
+        )
 
     def _is_data_center_dataset_path(self, file_path: str) -> bool:
         if not file_path:
@@ -356,6 +528,7 @@ class AgentTaskRunner(TaskRunner):
                 for file_path in files:
                     if (
                         file_path in seen_paths
+                        or not self._is_in_artifact_search_roots(file_path)
                         or self._is_data_center_dataset_path(file_path)
                         or not self._is_syncable_artifact(file_path)
                     ):
@@ -367,19 +540,64 @@ class AgentTaskRunner(TaskRunner):
         return discovered_paths
 
     async def _capture_artifact_baseline(self) -> None:
-        self._artifact_baseline_paths = set(await self._list_sandbox_artifacts())
+        baseline_paths = await self._list_sandbox_artifacts()
+        self._artifact_baseline_paths = set(baseline_paths)
+        self._artifact_fingerprints = {}
+        for file_path in baseline_paths:
+            try:
+                _, fingerprint = await self._read_artifact_with_fingerprint(file_path)
+                self._artifact_fingerprints[file_path] = fingerprint
+            except Exception as exc:
+                logger.warning(
+                    "Agent %s could not fingerprint baseline artifact %s: %s",
+                    self._agent_id,
+                    file_path,
+                    exc,
+                )
 
     async def _sync_discovered_artifacts_to_storage(self) -> List[FileInfo]:
         current_paths = await self._list_sandbox_artifacts()
-        file_paths = [
-            file_path
-            for file_path in current_paths
-            if file_path not in self._artifact_baseline_paths
-        ]
-        if not file_paths:
-            return []
-        file_paths = file_paths[:MAX_AUTO_SYNC_ARTIFACTS]
-        return await self._sync_explicit_paths_to_storage(file_paths)
+        current_path_set = set(current_paths)
+        baseline = self._artifact_baseline_state()
+        fingerprints = self._artifact_fingerprint_state()
+
+        for removed_path in baseline - current_path_set:
+            baseline.discard(removed_path)
+            fingerprints.pop(removed_path, None)
+
+        attachments: List[FileInfo] = []
+        for file_path in current_paths:
+            if len(attachments) >= MAX_AUTO_SYNC_ARTIFACTS:
+                break
+            try:
+                file_data, fingerprint = await self._read_artifact_with_fingerprint(file_path)
+            except Exception as exc:
+                logger.warning(
+                    "Agent %s could not fingerprint artifact %s: %s",
+                    self._agent_id,
+                    file_path,
+                    exc,
+                )
+                continue
+
+            previous_fingerprint = fingerprints.get(file_path)
+            if previous_fingerprint == fingerprint:
+                continue
+            if file_path in baseline and previous_fingerprint is None:
+                # Compatibility for a baseline captured before fingerprinting was
+                # available: observe it once without publishing pre-task output.
+                fingerprints[file_path] = fingerprint
+                continue
+
+            file_info = await self._sync_file_to_storage(
+                file_path,
+                file_data=file_data,
+                fingerprint=fingerprint,
+            )
+            if file_info:
+                attachments.append(file_info)
+                self._remember_generated_file(file_info)
+        return attachments
     
     async def _sync_file_to_sandbox(self, file_id: str) -> Optional[FileInfo]:
         """Download file from storage to sandbox"""
@@ -484,9 +702,6 @@ class AgentTaskRunner(TaskRunner):
                         file_read_result = await self._sandbox.file_read(file_path)
                         file_content: str = file_read_result.data.get("content", "")
                         event.tool_content = FileToolContent(content=file_content)
-                        if not self._is_data_center_dataset_path(file_path):
-                            file_info = await self._sync_file_to_storage(file_path)
-                            self._remember_generated_file(file_info)
                     else:
                         event.tool_content = FileToolContent(content="(No Content)")
                 elif event.tool_name == "mcp":
@@ -691,19 +906,32 @@ class AgentTaskRunner(TaskRunner):
 
         await self._initialize_mcp_tool(message.mcp_servers, is_admin=message.mcp_access_all)
 
+        artifact_discovery_dirty = False
+        artifact_discovery_ran = False
+
         async for event in self._flow.run(message):
             if isinstance(event, ToolEvent):
                 # TODO: move to tool function
                 await self._handle_tool_event(event)
                 if event.status == ToolStatus.CALLED:
-                    await self._sync_discovered_artifacts_to_storage()
+                    # Tools may create or replace files.  Defer discovery until
+                    # the step boundary instead of scanning after every event.
+                    artifact_discovery_dirty = True
             elif isinstance(event, StepEvent):
                 await self._sync_step_attachments_to_storage(event)
-                if event.status == StepStatus.COMPLETED:
+                if event.status == StepStatus.COMPLETED and (
+                    artifact_discovery_dirty or not artifact_discovery_ran
+                ):
                     await self._sync_discovered_artifacts_to_storage()
+                    artifact_discovery_dirty = False
+                    artifact_discovery_ran = True
             elif isinstance(event, MessageEvent):
-                if self._should_attach_generated_files_to_message():
+                if self._should_attach_generated_files_to_message() and (
+                    artifact_discovery_dirty or not artifact_discovery_ran
+                ):
                     await self._sync_discovered_artifacts_to_storage()
+                    artifact_discovery_dirty = False
+                    artifact_discovery_ran = True
                 await self._sync_message_attachments_to_storage(event)
                 if (
                     not event.attachments
@@ -711,8 +939,16 @@ class AgentTaskRunner(TaskRunner):
                     and self._should_attach_generated_files_to_message()
                 ):
                     event.attachments = self._generated_files
+            elif isinstance(event, WaitEvent):
+                if artifact_discovery_dirty or not artifact_discovery_ran:
+                    await self._sync_discovered_artifacts_to_storage()
+                    artifact_discovery_dirty = False
+                    artifact_discovery_ran = True
             elif isinstance(event, DoneEvent):
-                await self._sync_discovered_artifacts_to_storage()
+                if artifact_discovery_dirty or not artifact_discovery_ran:
+                    await self._sync_discovered_artifacts_to_storage()
+                    artifact_discovery_dirty = False
+                    artifact_discovery_ran = True
                 session = await self._session_repository.find_by_id(self._session_id)
                 if session:
                     try:

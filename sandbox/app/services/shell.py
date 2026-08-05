@@ -2,14 +2,14 @@
 Shell Service Implementation - Async Version
 """
 import os
-import subprocess
 import uuid
 import getpass
 import socket
 import logging
 import asyncio
+import codecs
 import re
-from typing import Dict, Any, Optional, List, Tuple
+from typing import Dict, Any, Optional, List
 from app.models.shell import (
     ShellExecResult, ShellViewResult, ShellWaitResult,
     ShellWriteResult, ShellKillResult, ShellTask, ConsoleRecord
@@ -20,6 +20,9 @@ from app.core.exceptions import AppException, ResourceNotFoundException, BadRequ
 logger = logging.getLogger(__name__)
 
 class ShellService:
+    EXEC_COMPLETION_GRACE_SECONDS = 5
+    OUTPUT_READER_DRAIN_GRACE_SECONDS = 1
+
     # Store active shell sessions
     active_shells: Dict[str, Dict[str, Any]] = {}
     
@@ -60,32 +63,111 @@ class ShellService:
             limit=1024*1024  # Set buffer size to 1MB
         )
 
-    async def _start_output_reader(self, session_id: str, process: asyncio.subprocess.Process):
+    def _append_process_output(
+        self,
+        session_id: str,
+        process: asyncio.subprocess.Process,
+        console_record: Optional[ConsoleRecord],
+        output: str,
+    ) -> None:
+        """Append output only to the process and record that produced it."""
+        if not output:
+            return
+
+        shell = self.active_shells.get(session_id)
+        if not shell:
+            return
+
+        if shell.get("process") is process:
+            shell["output"] += output
+
+        if console_record is not None and any(
+            record is console_record for record in shell.get("console", [])
+        ):
+            console_record.output += output
+
+    async def _start_output_reader(
+        self,
+        session_id: str,
+        process: asyncio.subprocess.Process,
+        console_record: Optional[ConsoleRecord] = None,
+    ):
         """Start a coroutine to continuously read process output and store it"""
         logger.debug(f"Starting output reader for session: {session_id}")
-        while True:
-            if process.stdout:
+        shell = self.active_shells.get(session_id)
+        if console_record is None and shell and shell.get("process") is process:
+            console = shell.get("console") or []
+            console_record = console[-1] if console else None
+
+        decoder = codecs.getincrementaldecoder("utf-8")(errors="replace")
+        try:
+            while process.stdout:
                 try:
                     buffer = await process.stdout.read(128)
                     if not buffer:
                         # Process output ended
                         break
-                    
-                    output = buffer.decode('utf-8')
-                    # Add output to shell session
-                    shell = self.active_shells.get(session_id)
-                    if shell:
-                        shell["output"] += output
-                        # Update the output of the latest console record
-                        if shell["console"]:
-                            shell["console"][-1].output += output
+
+                    output = decoder.decode(buffer, final=False)
+                    self._append_process_output(
+                        session_id,
+                        process,
+                        console_record,
+                        output,
+                    )
                 except Exception as e:
                     logger.error(f"Error reading process output: {str(e)}", exc_info=True)
                     break
-            else:
-                break
-        
+        finally:
+            remaining_output = decoder.decode(b"", final=True)
+            self._append_process_output(
+                session_id,
+                process,
+                console_record,
+                remaining_output,
+            )
+
         logger.debug(f"Output reader for session {session_id} has finished")
+
+    async def _wait_for_output_reader(
+        self,
+        session_id: str,
+        process: asyncio.subprocess.Process,
+    ) -> None:
+        """Give the matching reader time to drain output after process exit.
+
+        A descendant can keep the inherited pipe open after the shell itself
+        exits, so the wait is bounded and shielded rather than cancelling the
+        reader and permanently discarding later output.
+        """
+        shell = self.active_shells.get(session_id)
+        if not shell or shell.get("process") is not process:
+            return
+
+        reader_task = shell.get("reader_task")
+        if not reader_task or reader_task is asyncio.current_task():
+            return
+
+        try:
+            await asyncio.wait_for(
+                asyncio.shield(reader_task),
+                timeout=self.OUTPUT_READER_DRAIN_GRACE_SECONDS,
+            )
+        except asyncio.TimeoutError:
+            logger.warning(
+                "Output reader for session %s did not reach EOF within %ss",
+                session_id,
+                self.OUTPUT_READER_DRAIN_GRACE_SECONDS,
+            )
+        except asyncio.CancelledError:
+            raise
+        except Exception as e:
+            logger.warning(
+                "Output reader for session %s failed while draining: %s",
+                session_id,
+                e,
+                exc_info=True,
+            )
 
     async def exec_command(self, session_id: str, exec_dir: Optional[str], command: str) -> ShellExecResult:
         """
@@ -107,14 +189,17 @@ class ShellService:
             if session_id not in self.active_shells:
                 logger.debug(f"Creating new shell session: {session_id}")
                 process = await self._create_process(command, exec_dir)
-                self.active_shells[session_id] = {
+                console_record = ConsoleRecord(ps1=ps1, command=command, output="")
+                shell = self.active_shells[session_id] = {
                     "process": process,
                     "exec_dir": exec_dir,
                     "output": "",
-                    "console": [ConsoleRecord(ps1=ps1, command=command, output="")]
+                    "console": [console_record],
                 }
                 # Start the output reader coroutine
-                asyncio.create_task(self._start_output_reader(session_id, process))
+                shell["reader_task"] = asyncio.create_task(
+                    self._start_output_reader(session_id, process, console_record)
+                )
             else:
                 # Execute command in an existing session
                 logger.debug(f"Using existing shell session: {session_id}")
@@ -127,10 +212,17 @@ class ShellService:
                     try:
                         old_process.terminate()
                         await asyncio.wait_for(old_process.wait(), timeout=1)
-                    except:
+                    except asyncio.TimeoutError:
                         # If graceful termination fails, force kill
                         logger.warning(f"Forcefully killing process in session: {session_id}")
-                        old_process.kill()
+                        if old_process.returncode is None:
+                            old_process.kill()
+                            await old_process.wait()
+                    except ProcessLookupError:
+                        # The process exited between the returncode check and terminate.
+                        pass
+
+                await self._wait_for_output_reader(session_id, old_process)
                 
                 # Create a new process
                 process = await self._create_process(command, exec_dir)
@@ -141,16 +233,22 @@ class ShellService:
                 self.active_shells[session_id]["output"] = ""  # Clear previous output
                 
                 # Record command console record, but output is initially empty, will be updated later
-                shell["console"].append(ConsoleRecord(ps1=ps1, command=command, output=""))
+                console_record = ConsoleRecord(ps1=ps1, command=command, output="")
+                shell["console"].append(console_record)
                 
                 # Start the output reader coroutine
-                asyncio.create_task(self._start_output_reader(session_id, process))
+                shell["reader_task"] = asyncio.create_task(
+                    self._start_output_reader(session_id, process, console_record)
+                )
             
             # Try to wait for the process to complete (max 5 seconds)
             try:
                 logger.debug(f"Waiting for process completion in session: {session_id}")
-                wait_result = await self.wait_for_process(session_id, seconds=5)
-                if wait_result.returncode is not None:
+                wait_result = await self.wait_for_process(
+                    session_id,
+                    seconds=self.EXEC_COMPLETION_GRACE_SECONDS,
+                )
+                if wait_result.status == "completed":
                     # Process has completed, get the output
                     logger.debug(f"Process completed with code: {wait_result.returncode}")
                     view_result = await self.view_shell(session_id)
@@ -162,10 +260,6 @@ class ShellService:
                         returncode=wait_result.returncode,
                         output=view_result.output,
                     )
-            except BadRequestException:
-                # Wait timeout, process still running
-                logger.debug(f"Process still running after timeout in session: {session_id}")
-                pass
             except Exception as e:
                 # Other exceptions, ignore and continue
                 logger.warning(f"Exception while waiting for process: {str(e)}")
@@ -248,18 +342,35 @@ class ShellService:
         process = shell["process"]
         
         try:
-            # Asynchronously wait for process to complete
             if seconds is None:
                 seconds = 60
-            await asyncio.wait_for(process.wait(), timeout=seconds)
+
+            # `asyncio.wait_for(coroutine, timeout=0)` cancels a newly-created
+            # coroutine before it can observe an already-finished process. Check
+            # returncode first so zero-second polling remains accurate.
+            if process.returncode is None:
+                await asyncio.wait_for(process.wait(), timeout=seconds)
+
+            await self._wait_for_output_reader(session_id, process)
             
             logger.info(f"Process completed with return code: {process.returncode}")
             return ShellWaitResult(
+                status="completed",
                 returncode=process.returncode
             )
         except asyncio.TimeoutError:
-            logger.warning(f"Process wait timeout expired: {seconds}s")
-            raise BadRequestException(f"Wait timeout: {seconds} seconds")
+            if process.returncode is not None:
+                await self._wait_for_output_reader(session_id, process)
+                return ShellWaitResult(
+                    status="completed",
+                    returncode=process.returncode,
+                )
+            logger.info(
+                "Process in session %s is still running after waiting %ss",
+                session_id,
+                seconds,
+            )
+            return ShellWaitResult(status="running", returncode=None)
         except Exception as e:
             logger.error(f"Failed to wait for process: {str(e)}", exc_info=True)
             raise AppException(message=f"Failed to wait for process: {str(e)}")
@@ -332,6 +443,8 @@ class ShellService:
                     logger.warning(f"Forcefully killing the process")
                     process.kill()
                     await process.wait()
+
+                await self._wait_for_output_reader(session_id, process)
                 
                 logger.info(f"Process terminated with return code: {process.returncode}")
                 return ShellKillResult(
@@ -339,6 +452,7 @@ class ShellService:
                     returncode=process.returncode
                 )
             else:
+                await self._wait_for_output_reader(session_id, process)
                 logger.info(f"Process was already terminated with return code: {process.returncode}")
                 return ShellKillResult(
                     status="already_terminated",

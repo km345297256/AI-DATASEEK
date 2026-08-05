@@ -36,7 +36,9 @@ export async function getSessionsSSE(callbacks?: SSECallbacks<ListSessionRespons
   return createSSEConnection<ListSessionResponse>(
     '/sessions',
     {
-      method: 'POST'
+      method: 'POST',
+      // This POST only opens the read-only session-list stream and has no body.
+      retryOnError: true,
     },
     callbacks
   );
@@ -101,7 +103,12 @@ export const chatWithSession = async (
   agentProfileId?: string | null,
   callbacks?: SSECallbacks<AgentSSEEvent['data']>,
   datasetIds?: string[],
+  clientMessageId?: string,
 ): Promise<() => void> => {
+  const effectiveClientMessageId = message
+    ? clientMessageId || createClientMessageId()
+    : undefined;
+
   return createSSEConnection<AgentSSEEvent['data']>(
     `/sessions/${sessionId}/chat`,
     {
@@ -114,12 +121,20 @@ export const chatWithSession = async (
         attachments,
         skills,
         mcp_servers: mcpServers,
-        dataset_ids: datasetIds
+        dataset_ids: datasetIds,
+        client_message_id: effectiveClientMessageId,
       }
     },
     callbacks
   );
 };
+
+function createClientMessageId(): string {
+  if (typeof globalThis.crypto?.randomUUID === 'function') {
+    return globalThis.crypto.randomUUID();
+  }
+  return `msg_${Date.now().toString(36)}_${Math.random().toString(36).slice(2)}`;
+}
 
 /**
  * View Shell session output

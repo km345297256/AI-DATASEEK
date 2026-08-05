@@ -3,15 +3,15 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import secrets
 import shutil
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path, PurePosixPath
 from typing import Iterable, Sequence
 
 from pymongo.errors import DuplicateKeyError
 
 from app.application.errors.exceptions import BadRequestError, NotFoundError
-from app.application.services.temporary_dataset_registry import get_temporary_dataset_registry
 from app.core.config import get_settings
 from app.domain.models.dataset import (
     DataCenterDataset,
@@ -26,17 +26,37 @@ from app.infrastructure.external.sandbox.dataset_mount_validator import (
     DatasetDirectoryInspectionError,
     inspect_local_dataset_directory,
 )
-from app.infrastructure.models.documents import DataCenterDatasetDocument, ExecutionNodeDocument
+from app.infrastructure.models.documents import (
+    DataCenterDatasetDocument,
+    ExecutionNodeDocument,
+    TemporaryDatasetDocument,
+)
 
 
 logger = logging.getLogger(__name__)
 
 DATASET_SEED_ROOT = Path(__file__).resolve().parents[2] / "resources" / "datasets"
 SANDBOX_DATASET_ROOT = PurePosixPath("/home/ubuntu/datasets")
+TEMPORARY_DATASET_TTL = timedelta(hours=24)
+TEMPORARY_DATASET_ID_ATTEMPTS = 32
+TEMPORARY_DATASET_MAX_ENTRIES = 128
+TEMPORARY_DATASET_MAX_ENTRIES_PER_OWNER = 16
 
 
 def _name_key(value: str) -> str:
     return " ".join(value.strip().lower().split())
+
+
+def _utc_now() -> datetime:
+    return datetime.now(UTC)
+
+
+def _as_utc(value: datetime) -> datetime:
+    return value.replace(tzinfo=UTC) if value.tzinfo is None else value.astimezone(UTC)
+
+
+def _new_temporary_dataset_id() -> str:
+    return f"tds_{secrets.token_urlsafe(18)}"
 
 
 def _safe_relative_path(value: str) -> PurePosixPath:
@@ -67,7 +87,7 @@ def _unique_mount_names(source_paths: Sequence[str]) -> list[str]:
 
 
 class DataCenterDatasetService:
-    """Catalog datasets plus process-local, non-persistent demo submissions."""
+    """Catalog datasets plus owner-scoped, short-lived persisted submissions."""
 
     def __init__(self, seed_root: Path = DATASET_SEED_ROOT):
         self._seed_root = seed_root
@@ -80,7 +100,7 @@ class DataCenterDatasetService:
         for manifest_path in sorted(self._seed_root.glob("*/manifest.json")):
             payload = json.loads(manifest_path.read_text(encoding="utf-8"))
             dataset_id = payload["dataset_id"]
-            if await DataCenterDatasetDocument.find_one(DataCenterDatasetDocument.dataset_id == dataset_id):
+            if await DataCenterDatasetDocument.find_one({"dataset_id": dataset_id}):
                 continue
             source_dir = manifest_path.parent
             managed_dir = self._managed_dataset_dir(dataset_id)
@@ -144,24 +164,39 @@ class DataCenterDatasetService:
         include_disabled: bool = False,
         user_id: str | None = None,
     ) -> DataCenterDataset:
-        temporary_entry = await get_temporary_dataset_registry().get(dataset_id)
-        if temporary_entry is not None:
-            # Temporary setup submissions are always owner-scoped, including
-            # callers that otherwise have catalog administration privileges.
-            if user_id is None or temporary_entry.owner_id != user_id:
+        if dataset_id.startswith("tds_"):
+            if user_id is None:
                 raise NotFoundError(f"Dataset '{dataset_id}' was not found in the data-center catalog")
-            return temporary_entry.dataset
+            now = _utc_now()
+            temporary_doc = await TemporaryDatasetDocument.find_one({
+                "dataset_id": dataset_id,
+                "owner_id": user_id,
+                "expires_at": {"$gt": now},
+            })
+            # Keep the local checks as defense in depth and for deterministic
+            # expiration at the boundary while MongoDB's TTL monitor catches up.
+            if (
+                not temporary_doc
+                or temporary_doc.owner_id != user_id
+                or _as_utc(temporary_doc.expires_at) <= now
+            ):
+                raise NotFoundError(f"Dataset '{dataset_id}' was not found in the data-center catalog")
+            return temporary_doc.to_domain()
 
         await self.ensure_seed_data()
-        doc = await DataCenterDatasetDocument.find_one(DataCenterDatasetDocument.dataset_id == dataset_id)
+        doc = await DataCenterDatasetDocument.find_one({"dataset_id": dataset_id})
+        submission_unavailable = bool(
+            doc
+            and doc.is_submission
+            and (
+                user_id is None
+                or doc.created_by != user_id
+            )
+        )
         if (
             not doc
             or (not include_disabled and not doc.enabled)
-            or (
-                doc.is_submission
-                and not include_disabled
-                and (user_id is None or doc.created_by != user_id)
-            )
+            or submission_unavailable
         ):
             raise NotFoundError(f"Dataset '{dataset_id}' was not found in the data-center catalog")
         return doc.to_domain()
@@ -179,6 +214,9 @@ class DataCenterDatasetService:
         normalized_directory = storage_directory.strip()
         if not normalized_directory:
             raise BadRequestError("A server storage directory is required")
+        owner_id = created_by.strip()
+        if not owner_id:
+            raise BadRequestError("Dataset owner is required")
 
         node = await ensure_local_default_node()
         configured_roots = (
@@ -204,12 +242,12 @@ class DataCenterDatasetService:
             verified=True,
             verification_message="Directory inspected on the execution node and mounted read-only",
         )
-        dataset = DataCenterDataset(
+        now = _utc_now()
+        dataset_values = dict(
             external_id=external_id.strip(),
             data_center_id="dataset-chat-demo",
             data_center_name="测试数据集",
             name=name.strip(),
-            name_key="temporary-submission",
             description=summary.strip(),
             data_type="服务器目录",
             tags=normalized_keywords,
@@ -229,11 +267,127 @@ class DataCenterDatasetService:
             locations=[location],
             enabled=True,
             is_submission=True,
-            created_by=created_by,
+            created_by=owner_id,
+            created_at=now,
+            updated_at=now,
         )
-        dataset_id = await get_temporary_dataset_registry().put(dataset, created_by)
-        dataset.dataset_id = dataset_id
-        return dataset
+        expires_at = now + TEMPORARY_DATASET_TTL
+        for _ in range(TEMPORARY_DATASET_ID_ATTEMPTS):
+            dataset_id = _new_temporary_dataset_id()
+            owner_slot, global_slot = await self._allocate_temporary_dataset_slots(
+                owner_id,
+                now,
+            )
+            dataset = DataCenterDataset(
+                **dataset_values,
+                dataset_id=dataset_id,
+                name_key="temporary-submission",
+            )
+            document = TemporaryDatasetDocument(
+                dataset_id=dataset_id,
+                owner_id=owner_id,
+                dataset=dataset,
+                owner_slot=owner_slot,
+                global_slot=global_slot,
+                created_at=now,
+                expires_at=expires_at,
+            )
+            try:
+                await document.insert()
+                return document.to_domain()
+            except DuplicateKeyError:
+                logger.info(
+                    "Temporary dataset ID or quota-slot collision; retrying insertion",
+                )
+        raise RuntimeError("Failed to generate a unique temporary dataset ID")
+
+    async def _allocate_temporary_dataset_slots(
+        self,
+        owner_id: str,
+        now: datetime,
+    ) -> tuple[int, int]:
+        """Reserve bounded owner/global slots for a temporary submission.
+
+        MongoDB unique indexes are the final concurrency guard.  Multiple
+        backend replicas may select the same free slots, but only one insert
+        can win; the caller retries after ``DuplicateKeyError``.  When a limit
+        is full we preserve the previous registry behavior by evicting the
+        oldest entry first.
+        """
+
+        expired_documents = await TemporaryDatasetDocument.find({
+            "expires_at": {"$lte": now},
+        }).to_list()
+        for document in expired_documents:
+            await document.delete()
+
+        active_documents = await TemporaryDatasetDocument.find({
+            "expires_at": {"$gt": now},
+        }).sort("+created_at").to_list()
+
+        owner_documents = [
+            document
+            for document in active_documents
+            if document.owner_id == owner_id
+        ]
+        delete_ids = {
+            document.dataset_id
+            for document in owner_documents[
+                : max(
+                    0,
+                    len(owner_documents)
+                    - TEMPORARY_DATASET_MAX_ENTRIES_PER_OWNER
+                    + 1,
+                )
+            ]
+        }
+
+        remaining_documents = [
+            document
+            for document in active_documents
+            if document.dataset_id not in delete_ids
+        ]
+        global_excess = max(
+            0,
+            len(remaining_documents) - TEMPORARY_DATASET_MAX_ENTRIES + 1,
+        )
+        delete_ids.update(
+            document.dataset_id
+            for document in remaining_documents[:global_excess]
+        )
+
+        if delete_ids:
+            for document in active_documents:
+                if document.dataset_id in delete_ids:
+                    await document.delete()
+            active_documents = [
+                document
+                for document in active_documents
+                if document.dataset_id not in delete_ids
+            ]
+
+        owner_slots = {
+            document.owner_slot
+            for document in active_documents
+            if document.owner_id == owner_id
+            and isinstance(document.owner_slot, int)
+        }
+        global_slots = {
+            document.global_slot
+            for document in active_documents
+            if isinstance(document.global_slot, int)
+        }
+        owner_slot = next(
+            slot
+            for slot in range(TEMPORARY_DATASET_MAX_ENTRIES_PER_OWNER)
+            if slot not in owner_slots
+        )
+        global_slot = next(
+            slot
+            for slot in range(TEMPORARY_DATASET_MAX_ENTRIES)
+            if slot not in global_slots
+        )
+        return owner_slot, global_slot
 
     async def create_dataset(self, values: dict, created_by: str) -> DataCenterDataset:
         name = str(values.get("name") or "").strip()
@@ -444,7 +598,7 @@ class DataCenterDatasetService:
         return mounted
 
     async def _document(self, dataset_id: str) -> DataCenterDatasetDocument:
-        doc = await DataCenterDatasetDocument.find_one(DataCenterDatasetDocument.dataset_id == dataset_id)
+        doc = await DataCenterDatasetDocument.find_one({"dataset_id": dataset_id})
         if not doc:
             raise NotFoundError("Dataset was not found")
         return doc

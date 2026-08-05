@@ -199,8 +199,8 @@ class RedisStreamQueue(MessageQueue):
             bool: True if message was deleted successfully, False otherwise
         """
         try:
-            await self._redis.client.xdel(self._stream_name, message_id)
-            return True
+            deleted_count = await self._redis.client.xdel(self._stream_name, message_id)
+            return bool(deleted_count)
         except Exception:
             return False
 

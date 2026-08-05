@@ -1,5 +1,6 @@
 import logging
 import asyncio
+import hashlib
 import uuid
 from abc import ABC
 from typing import List, Dict, Any, Optional, AsyncGenerator, Callable
@@ -58,8 +59,16 @@ class BaseAgent(ABC):
     retry_interval: float = 1.0
     tool_choice: Optional[str] = None
     bind_tools: bool = True
-    MAX_TOOL_MESSAGE_CONTENT_BYTES = 256 * 1024
-    MAX_MEMORY_BYTES = 1024 * 1024
+    MAX_TOOL_MESSAGE_CONTENT_BYTES = 64 * 1024
+    MAX_MEMORY_BYTES = 256 * 1024
+    TOOL_MESSAGE_CONTENT_LIMITS = {
+        "shell_exec": 16 * 1024,
+        "shell_view": 16 * 1024,
+        "shell_wait": 16 * 1024,
+        "file_read": 24 * 1024,
+        "file_find_in_content": 24 * 1024,
+    }
+    MAX_RETAINED_TOOL_ARGUMENT_BYTES = 8 * 1024
 
     _JSON_PARSE_PROMPT = PromptTemplate.from_template(
         "Extract or repair the JSON from the following LLM output.\n\n{input}"
@@ -135,19 +144,105 @@ class BaseAgent(ABC):
         """Keep model context bounded and avoid persisting raw tool artifacts in memory."""
         content = self._message_content_to_text(tool_result.content)
         encoded = content.encode("utf-8")
-        if len(encoded) > self.MAX_TOOL_MESSAGE_CONTENT_BYTES:
+        content_limit = self.TOOL_MESSAGE_CONTENT_LIMITS.get(
+            tool_name,
+            self.MAX_TOOL_MESSAGE_CONTENT_BYTES,
+        )
+        if len(encoded) > content_limit:
             prefix = (
-                "[Tool result truncated for model context; full inline output is available "
-                "from the task tool event.]\n"
+                f"[Tool result truncated and compacted from {len(encoded)} bytes for model context; "
+                "the task event retains the bounded display result.]\n"
             )
-            available = self.MAX_TOOL_MESSAGE_CONTENT_BYTES - len(prefix.encode("utf-8"))
-            content = prefix + encoded[:max(0, available)].decode("utf-8", errors="ignore")
+            separator = "\n...[middle omitted]...\n"
+            available = max(
+                0,
+                content_limit
+                - len(prefix.encode("utf-8"))
+                - len(separator.encode("utf-8")),
+            )
+            # Command errors and summaries are commonly written at the end, while
+            # headers/schema usually appear at the start. Preserve both.
+            head_size = available // 3
+            tail_size = available - head_size
+            head = encoded[:head_size].decode("utf-8", errors="ignore")
+            tail = encoded[-tail_size:].decode("utf-8", errors="ignore") if tail_size else ""
+            content = f"{prefix}{head}{separator}{tail}"
             logger.warning(
                 "Tool %s result truncated from %d bytes for agent memory",
                 tool_name,
                 len(encoded),
             )
         return ToolMessage(tool_call_id=tool_call_id, name=tool_name, content=content)
+
+    @staticmethod
+    def _tool_result_succeeded(tool_result: ToolMessage) -> bool:
+        artifact = getattr(tool_result, "artifact", None)
+        if artifact is None:
+            return False
+        success = (
+            artifact.get("success")
+            if isinstance(artifact, dict)
+            else getattr(artifact, "success", None)
+        )
+        return success is not False
+
+    def _compact_tool_call_arguments(
+        self,
+        tool_call: ToolCall,
+        tool_result: ToolMessage,
+    ) -> None:
+        """Remove bulky successful inputs from the next model turn.
+
+        LangChain stores assistant tool-call arguments in memory. A successful
+        file_write therefore used to replay an entire generated script on every
+        subsequent model request even though the sandbox already persisted it.
+        """
+        if not self._tool_result_succeeded(tool_result):
+            return
+        args = tool_call.get("args")
+        if not isinstance(args, dict):
+            return
+
+        tool_name = tool_call.get("name") or ""
+        compacted_args = dict(args)
+        changed = False
+
+        if tool_name == "file_write" and isinstance(args.get("content"), str):
+            content = args["content"]
+            encoded = content.encode("utf-8")
+            digest = hashlib.sha256(encoded).hexdigest()[:16]
+            compacted_args["content"] = (
+                f"[content persisted successfully; {len(encoded)} bytes; sha256:{digest}]"
+            )
+            changed = True
+        elif tool_name == "file_str_replace":
+            for key in ("old_str", "new_str"):
+                value = args.get(key)
+                if not isinstance(value, str):
+                    continue
+                encoded = value.encode("utf-8")
+                if len(encoded) <= self.MAX_RETAINED_TOOL_ARGUMENT_BYTES:
+                    continue
+                digest = hashlib.sha256(encoded).hexdigest()[:16]
+                compacted_args[key] = (
+                    f"[replacement text persisted; {len(encoded)} bytes; sha256:{digest}]"
+                )
+                changed = True
+        elif tool_name == "shell_exec" and isinstance(args.get("command"), str):
+            command = args["command"]
+            encoded = command.encode("utf-8")
+            if len(encoded) > self.MAX_RETAINED_TOOL_ARGUMENT_BYTES:
+                preview_size = self.MAX_RETAINED_TOOL_ARGUMENT_BYTES // 2
+                digest = hashlib.sha256(encoded).hexdigest()[:16]
+                compacted_args["command"] = (
+                    encoded[:preview_size].decode("utf-8", errors="ignore")
+                    + f"\n...[command compacted; {len(encoded)} bytes; sha256:{digest}]...\n"
+                    + encoded[-preview_size:].decode("utf-8", errors="ignore")
+                )
+                changed = True
+
+        if changed:
+            tool_call["args"] = compacted_args
     
     def get_tool(self, name: str) -> Optional[Tool]:
         """Get specified tool"""
@@ -230,6 +325,8 @@ class BaseAgent(ABC):
                     function_args=function_args,
                     function_result=tool_result.artifact
                 )
+
+                self._compact_tool_call_arguments(tool_call, tool_result)
 
                 tool_responses.append(
                     self._tool_result_for_memory(tool_result, tool_call_id, function_name)

@@ -291,6 +291,7 @@ async def chat(
             dataset_ids=request.dataset_ids or [],
             mcp_access_all=user.role == "admin",
             llm_overrides=llm_overrides,
+            client_message_id=request.client_message_id,
         ):
             logger.debug(f"Received event from chat: {event}")
             sse_event = await EventMapper.event_to_sse_event(event)

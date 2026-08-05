@@ -24,6 +24,7 @@ class ChatRequest(BaseModel):
     """Chat request schema"""
     timestamp: Optional[int] = None
     message: Optional[str] = None
+    client_message_id: Optional[str] = Field(default=None, min_length=1, max_length=128)
     agent_profile_id: Optional[str] = None
     attachments: Optional[List[dict]] = None
     skills: Optional[List[str]] = None

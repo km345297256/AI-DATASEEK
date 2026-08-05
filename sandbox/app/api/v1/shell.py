@@ -58,10 +58,14 @@ async def wait_for_process(request: ShellWaitRequest):
         seconds=request.seconds
     )
     
-    # Construct response
+    if result.status == "running":
+        message = "Process is still running"
+    else:
+        message = f"Process completed, return code: {result.returncode}"
+
     return Response(
         success=True,
-        message=f"Process completed, return code: {result.returncode}",
+        message=message,
         data=result.model_dump()
     )
 
