@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
+import { ApiError } from '../src/utils/apiError.ts';
 import { datasetSubmissionErrorMessage } from '../src/utils/datasetSubmissionError.ts';
 
 
@@ -68,4 +69,30 @@ test('dataset submission reads FastAPI validation detail from an Axios response'
   });
 
   assert.equal(message, 'Field required');
+});
+
+
+test('dataset submission prioritizes validation details on a normalized API error', () => {
+  const message = datasetSubmissionErrorMessage(new ApiError('Unprocessable Entity', {
+    status: 422,
+    code: 422,
+    details: {
+      detail: [
+        { loc: ['body', 'storage_directory'], msg: 'Field required', input: '/private/path' },
+        { loc: ['body', 'storage_directory'], msg: 'Field required' },
+        { loc: ['body', 'name'], msg: 'Name is too short' },
+      ],
+    },
+  }));
+
+  assert.equal(message, 'Field required；Name is too short');
+  assert.equal(message.includes('/private/path'), false);
+});
+
+
+test('dataset submission reads a plain Error message', () => {
+  assert.equal(
+    datasetSubmissionErrorMessage(new Error('The selected directory is unavailable')),
+    'The selected directory is unavailable',
+  );
 });

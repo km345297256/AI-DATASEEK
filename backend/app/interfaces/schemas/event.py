@@ -14,6 +14,7 @@ from app.domain.models.event import (
     ToolEvent,
     StepEvent,
 )
+from app.domain.utils.public_error import public_error_message
 
 class BaseEventData(BaseModel):
     event_id: Optional[str]
@@ -122,6 +123,15 @@ class ErrorEventData(BaseEventData):
 class ErrorSSEEvent(BaseSSEEvent):
     event: Literal["error"] = "error"
     data: ErrorEventData
+
+    @classmethod
+    def from_event(cls, event: ErrorEvent) -> Self:
+        return cls(
+            data=ErrorEventData(
+                **BaseEventData.base_event_data(event),
+                error=public_error_message(event.error),
+            )
+        )
 
 class StepEventData(BaseEventData):
     status: ExecutionStatus

@@ -1,10 +1,15 @@
 // Backend API client configuration
-import axios, { AxiosError } from 'axios';
-import { fetchEventSource, EventSourceMessage } from '@microsoft/fetch-event-source';
+import axios from 'axios';
+import type { AxiosError } from 'axios';
+import { fetchEventSource } from '@microsoft/fetch-event-source';
+import type { EventSourceMessage } from '@microsoft/fetch-event-source';
+import { ApiError, apiResponseMessage, normalizeApiError } from '../utils/apiError.ts';
+
+export { ApiError } from '../utils/apiError.ts';
 
 // API configuration
 export const API_CONFIG = {
-  host: import.meta.env.VITE_API_URL || '',
+  host: import.meta.env?.VITE_API_URL || '',
   version: 'v1',
   timeout: 30000, // Request timeout in milliseconds
 };
@@ -19,13 +24,6 @@ export interface ApiResponse<T> {
   code: number;
   msg: string;
   data: T;
-}
-
-// Error format
-export interface ApiError {
-  code: number;
-  message: string;
-  details?: unknown;
 }
 
 // Create axios instance
@@ -52,43 +50,18 @@ apiClient.interceptors.response.use(
     if (response.data && typeof response.data.code === 'number') {
       // If it's a business logic error (code not 0), convert to error handling
       if (response.data.code !== 0) {
-        const apiError: ApiError = {
+        const apiError = new ApiError(apiResponseMessage(response.data) ?? 'Unknown error', {
+          status: response.status,
           code: response.data.code,
-          message: response.data.msg || 'Unknown error',
-          details: response.data
-        };
+          details: response.data,
+        });
         return Promise.reject(apiError);
       }
     }
     return response;
   },
   (error: AxiosError) => {
-    const apiError: ApiError = {
-      code: 500,
-      message: 'Request failed',
-    };
-
-    if (error.response) {
-      const status = error.response.status;
-      apiError.code = status;
-      
-      // Try to extract detailed error information from response content
-      if (error.response.data && typeof error.response.data === 'object') {
-        const data = error.response.data as any;
-        if (data.code && data.msg) {
-          apiError.code = data.code;
-          apiError.message = data.msg;
-        } else {
-          apiError.message = data.message || error.response.statusText || 'Request failed';
-        }
-        apiError.details = data;
-      } else {
-        apiError.message = error.response.statusText || 'Request failed';
-      }
-    } else if (error.request) {
-      apiError.code = 503;
-      apiError.message = 'Network error, please check your connection';
-    }
+    const apiError = normalizeApiError(error);
 
     console.error('API Error:', apiError);
     return Promise.reject(apiError);

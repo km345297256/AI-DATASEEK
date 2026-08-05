@@ -39,8 +39,8 @@ Dataset submission
 
 ## 部署隔离
 
-Compose project、网络、镜像、数据库、MinIO bucket、数据卷、技能卷及 Sandbox 前缀均使用 `ai-dataseek` 命名，避免资源冲突。生产前端端口为 `7100`，隔离的开发与第三方联调前端端口为 `7000`。
+Compose project、网络、镜像、数据库、MinIO bucket、数据卷、技能卷及 Sandbox 前缀均使用 `ai-dataseek` 命名，避免资源冲突。稳定联测前端端口为 `7000`，隔离的开发前端端口为 `7100`；常规迭代只更新开发环境，稳定联测环境仅在明确要求时发布。
 
 ## 临时数据约束
 
-Setup 提交不会写入数据集数据库。临时数据集保存在 Backend 进程内，因此生产首版应保持单个 Uvicorn Worker；多进程或多副本部署需要先把临时注册表迁移为带 TTL 的共享存储。
+Setup 提交不会加入长期数据集目录。Backend 会在 MongoDB 中保存按所有者隔离的临时记录，并为其设置 24 小时绝对 TTL 索引。读取时会先检查过期时间，因此不依赖 MongoDB TTL 清理任务的执行延迟；同一 MongoDB 下的多进程或多副本 Backend 可共享未过期提交。真实服务器路径只保留在服务端，不进入响应、URL 或浏览器存储。

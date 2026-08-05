@@ -1,3 +1,5 @@
+import json
+
 from app.domain.models.plan import ExecutionStatus, Plan, Step
 from app.domain.models.message import Message
 from app.domain.models.event import MessageEvent, PlanEvent, PlanStatus, StepEvent, StepStatus, DoneEvent
@@ -118,11 +120,15 @@ def test_planner_prompt_includes_uploaded_file_ids():
     captured = {}
     planner = object.__new__(PlannerAgent)
 
+    async def fake_reset_context():
+        captured["reset"] = True
+
     async def fake_execute(prompt):
         captured["prompt"] = prompt
         if False:
             yield None
 
+    planner.reset_context = fake_reset_context
     planner.execute = fake_execute
 
     async def run():
@@ -131,6 +137,7 @@ def test_planner_prompt_includes_uploaded_file_ids():
 
     asyncio.run(run())
 
+    assert captured["reset"] is True
     assert "uploaded_file_id:file-1" in captured["prompt"]
 
 
@@ -381,11 +388,12 @@ def test_session_context_includes_previous_vision_results():
 
     context = flow._render_session_context([event])
 
-    assert "图片中包含一张温度分布图。" in context
-    assert "Do not search the sandbox filesystem" in context
+    payload = json.loads(context)
+    assert payload["schema"] == "session_history/v1"
+    assert payload["prior_vision_results"] == ["图片中包含一张温度分布图。"]
 
 
-def test_dynamic_system_prompt_combines_runtime_skill_and_session_context():
+def test_dynamic_system_prompt_excludes_untrusted_session_context():
     flow = object.__new__(PlanActFlow)
     flow._session_id = "session-123"
     flow.active_skill_context = "skill-context"
@@ -398,7 +406,8 @@ def test_dynamic_system_prompt_combines_runtime_skill_and_session_context():
     assert "Current local time:" in prompt
     assert "Current UTC time:" in prompt
     assert "skill-context" in prompt
-    assert "session-context" in prompt
+    assert "session-context" not in prompt
+    assert flow._dynamic_user_context() == "session-context"
 
 
 def test_docker_sandbox_file_upload_rewinds_stream(monkeypatch):

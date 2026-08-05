@@ -105,6 +105,11 @@ def _mcp_response(name: str, server, owner_names: dict[str, str]) -> AdminMCPSer
 
 
 def _execution_node_response(doc: ExecutionNodeDocument) -> ExecutionNodeResponse:
+    # This endpoint only feeds the dataset-location node picker.  Runtime
+    # configuration can contain DATASET_HOST_PATH_ALLOWLIST values, while a
+    # worker health payload can contain arbitrary node-local details.  Neither
+    # is needed by the browser, so return only the safe operational summary.
+    public_health = doc.health.model_copy(update={"raw": {}})
     return ExecutionNodeResponse(
         id=doc.node_id,
         name=doc.name,
@@ -112,17 +117,17 @@ def _execution_node_response(doc: ExecutionNodeDocument) -> ExecutionNodeRespons
         type=doc.type,
         status=doc.status,
         enabled=doc.enabled,
-        base_url=doc.base_url,
+        base_url=None,
         auth_type=doc.auth_type,
-        credential_ref=doc.credential_ref,
-        runtime_config=doc.runtime_config,
+        credential_ref=None,
+        runtime_config={},
         capacity=doc.capacity,
         labels=doc.labels,
         taints=doc.taints,
-        health=doc.health,
+        health=public_health,
         last_heartbeat_at=doc.last_heartbeat_at,
         last_checked_at=doc.last_checked_at,
-        failure_reason=doc.failure_reason,
+        failure_reason=("Execution node health check failed" if doc.failure_reason else None),
         created_by=doc.created_by,
         created_at=doc.created_at,
         updated_at=doc.updated_at,

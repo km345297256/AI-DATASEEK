@@ -134,12 +134,7 @@ class ShellService:
         session_id: str,
         process: asyncio.subprocess.Process,
     ) -> None:
-        """Give the matching reader time to drain output after process exit.
-
-        A descendant can keep the inherited pipe open after the shell itself
-        exits, so the wait is bounded and shielded rather than cancelling the
-        reader and permanently discarding later output.
-        """
+        """Give the matching reader bounded time to drain after process exit."""
         shell = self.active_shells.get(session_id)
         if not shell or shell.get("process") is not process:
             return
@@ -346,8 +341,7 @@ class ShellService:
                 seconds = 60
 
             # `asyncio.wait_for(coroutine, timeout=0)` cancels a newly-created
-            # coroutine before it can observe an already-finished process. Check
-            # returncode first so zero-second polling remains accurate.
+            # coroutine before it can observe an already-finished process.
             if process.returncode is None:
                 await asyncio.wait_for(process.wait(), timeout=seconds)
 

@@ -54,6 +54,7 @@ class PlannerAgent(BaseAgent):
         dynamic_system_prompt_provider: Optional[Callable[[], str]] = None,
         llm_overrides: Optional[dict] = None,
         usage_context: Optional[dict] = None,
+        dynamic_user_context_provider: Optional[Callable[[], str]] = None,
     ):
         super().__init__(
             agent_id=agent_id,
@@ -62,10 +63,14 @@ class PlannerAgent(BaseAgent):
             dynamic_system_prompt_provider=dynamic_system_prompt_provider,
             llm_overrides=llm_overrides,
             usage_context=usage_context,
+            dynamic_user_context_provider=dynamic_user_context_provider,
         )
 
 
     async def create_plan(self, message: Message) -> AsyncGenerator[BaseEvent, None]:
+        # A new user request must not carry prior planner prose back into the
+        # model. The current request and dynamic dataset context are sufficient.
+        await self.reset_context()
         attachments = list(message.attachments)
         attachments.extend([f"uploaded_file_id:{file_id}" for file_id in message.attachment_file_ids])
         message = CREATE_PLAN_PROMPT.format(
@@ -84,6 +89,9 @@ class PlannerAgent(BaseAgent):
                 yield event
 
     async def update_plan(self, plan: Plan, step: Step) -> AsyncGenerator[BaseEvent, None]:
+        # UPDATE_PLAN_PROMPT already contains the authoritative bounded plan and
+        # failed step, so historical planner messages only add latency.
+        await self.reset_context()
         message = UPDATE_PLAN_PROMPT.format(plan=plan.dump_json(), step=step.model_dump_json())
         async for event in self.execute(message):
             if isinstance(event, MessageEvent):

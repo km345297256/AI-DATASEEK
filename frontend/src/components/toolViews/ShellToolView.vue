@@ -23,6 +23,7 @@
 import { onMounted, ref, computed, watch, onUnmounted } from 'vue';
 import { viewShellSession } from '@/api/agent';
 import { ToolContent } from '@/types/message';
+import { sanitizeToolDisplayText } from '@/utils/toolDisplay';
 //import { showErrorToast } from '@/utils/toast';
 
 const props = defineProps<{
@@ -71,20 +72,20 @@ const updateShellContent = (console: any) => {
   }
 
   if (typeof console === 'string') {
-    shell.value = escapeHtml(console);
+    shell.value = escapeHtml(sanitizeToolDisplayText(console));
     return;
   }
 
   if (!Array.isArray(console)) {
-    shell.value = escapeHtml(console?.output ?? '');
+    shell.value = escapeHtml(sanitizeToolDisplayText(console?.output ?? ''));
     return;
   }
 
   let newShell = '';
   for (const e of console) {
-    const prompt = escapeHtml(e?.ps1);
-    const command = escapeHtml(e?.command);
-    const output = escapeHtml(e?.output);
+    const prompt = escapeHtml(sanitizeToolDisplayText(e?.ps1));
+    const command = escapeHtml(sanitizeToolDisplayText(e?.command));
+    const output = escapeHtml(sanitizeToolDisplayText(e?.output));
     if (prompt || command) {
       newShell += `<span style="color: rgb(0, 187, 0);">${prompt}</span>${command ? `<span> ${command}</span>` : ''}\n`;
     }
@@ -98,14 +99,14 @@ const updateShellContent = (console: any) => {
 }
 
 const showPendingShellContent = () => {
-  const command = props.toolContent.args?.command;
+  const command = sanitizeToolDisplayText(props.toolContent.args?.command);
   shell.value = command
     ? `<span style="color: rgb(0, 187, 0);">$</span><span> ${escapeHtml(command)}</span>\n<span>Waiting for command output...</span>`
     : 'Waiting for command output...';
 };
 
 const showCommandSnapshotFallback = () => {
-  const command = props.toolContent.args?.command;
+  const command = sanitizeToolDisplayText(props.toolContent.args?.command);
   if (!command) {
     shell.value = '';
     return;

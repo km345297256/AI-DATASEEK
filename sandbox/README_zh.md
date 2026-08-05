@@ -41,6 +41,14 @@ sandbox/
    - VNC 远程桌面服务
    - WebSocket 接口
 5. **进程管理**：通过 Supervisor 管理各组件进程
+6. **离线地球科学分析**：
+   - 使用 Xarray、Dask 和 SciPy 分析多维 NetCDF/HDF5 与 Zarr 数据
+   - 使用 GeoPandas、Pyogrio、Shapely、PyProj、Rasterio 和 Rioxarray
+     完成矢量、坐标系与栅格工作流
+   - 预装 `ncdump`、`h5dump`、`projinfo` 和 GDAL 命令行工具
+
+分析栈在构建镜像时安装并锁定。数据集任务不应再执行 `pip install`，
+从而降低启动延迟，并让无外网沙箱中的分析结果保持确定性。
 
 ## 运行环境要求
 

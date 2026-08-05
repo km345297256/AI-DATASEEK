@@ -1,3 +1,4 @@
+import json
 import logging
 from datetime import datetime, UTC
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
@@ -13,7 +14,7 @@ from app.domain.models.event import (
     DoneEvent,
     TitleEvent,
 )
-from app.domain.models.plan import ExecutionStatus, Step
+from app.domain.models.plan import ExecutionStatus, Plan, Step
 from app.domain.services.agents.planner import PlannerAgent
 from app.domain.services.agents.execution import ExecutionAgent
 from app.domain.services.agents.vision import VisionAgent
@@ -47,6 +48,13 @@ class AgentStatus(str, Enum):
     UPDATING = "updating"
 
 class PlanActFlow(BaseFlow):
+    # Follow-up dataset questions need conversational continuity, but replaying a
+    # complete event/tool transcript would make the hot path slow and noisy. Keep
+    # only a small, deterministic window of user/assistant text.
+    MAX_SESSION_CONTEXT_MESSAGES = 8
+    MAX_SESSION_CONTEXT_MESSAGE_BYTES = 2 * 1024
+    MAX_SESSION_CONTEXT_BYTES = 12 * 1024
+
     def __init__(
         self,
         agent_id: str,
@@ -82,6 +90,7 @@ class PlanActFlow(BaseFlow):
         self.active_skill_context = ""
         self.session_context = ""
         self.dataset_context = ""
+        self._dataset_fast_path_active = False
         self.agent_profile_config = (llm_overrides or {}).get("agent_profile") or {}
         self.subagents = self._load_subagents(self.agent_profile_config)
         self.enabled_subagents = {
@@ -117,6 +126,7 @@ class PlanActFlow(BaseFlow):
             agent_repository=self._repository,
             tools=tools,
             dynamic_system_prompt_provider=self._dynamic_system_prompt,
+            dynamic_user_context_provider=self._dynamic_user_context,
             llm_overrides=self._agent_llm_overrides(base_llm_overrides, "planner"),
             usage_context=usage_context,
         )
@@ -127,6 +137,7 @@ class PlanActFlow(BaseFlow):
             agent_repository=self._repository,
             tools=tools,
             dynamic_system_prompt_provider=self._dynamic_system_prompt,
+            dynamic_user_context_provider=self._dynamic_user_context,
             llm_overrides=self._agent_llm_overrides(base_llm_overrides, "execution"),
             usage_context=usage_context,
         )
@@ -137,6 +148,7 @@ class PlanActFlow(BaseFlow):
             agent_repository=self._repository,
             tools=tools,
             dynamic_system_prompt_provider=self._dynamic_system_prompt,
+            dynamic_user_context_provider=self._dynamic_user_context,
             llm_overrides=self._agent_llm_overrides(base_llm_overrides, "vision"),
             usage_context=usage_context,
             file_storage=self._file_storage,
@@ -168,7 +180,10 @@ class PlanActFlow(BaseFlow):
         events = await self._session_repository.get_events(self._session_id)
         last_plan_event = next((e for e in reversed(events) if isinstance(e, PlanEvent)), None)
         self.plan = last_plan_event.plan if last_plan_event else None
-        self.session_context = self._render_session_context(events)
+        self.session_context = self._render_session_context(
+            events,
+            current_user_message=message.message,
+        )
         self.dataset_context = render_dataset_context(message.datasets)
         active_skills = self._activate_skills(message.skills or [])
         if active_skills:
@@ -187,18 +202,30 @@ class PlanActFlow(BaseFlow):
             elif self.status == AgentStatus.PLANNING:
                 # Create plan
                 logger.info(f"Agent {self._agent_id} started creating plan")
-                async for event in self.planner.create_plan(message):
-                    if isinstance(event, PlanEvent) and event.status == PlanStatus.CREATED:
-                        self.plan = event.plan
-                        self._normalize_plan_agents()
-                        self._ensure_vision_step_for_image_message(message)
-                        logger.info(f"Agent {self._agent_id} created plan successfully with {len(event.plan.steps)} steps")
-                        yield TitleEvent(title=event.plan.title)
-                        yield MessageEvent(role="assistant", message=event.plan.message or "")
-                    yield event
+                if self._should_use_dataset_fast_path(message):
+                    self._dataset_fast_path_active = True
+                    self.plan = self._create_dataset_fast_path_plan(message)
+                    logger.info(
+                        "Agent %s selected the bounded dataset fast path",
+                        self._agent_id,
+                    )
+                    yield TitleEvent(title=self.plan.title)
+                    yield MessageEvent(role="assistant", message=self.plan.message or "")
+                    yield PlanEvent(status=PlanStatus.CREATED, plan=self.plan)
+                else:
+                    self._dataset_fast_path_active = False
+                    async for event in self.planner.create_plan(message):
+                        if isinstance(event, PlanEvent) and event.status == PlanStatus.CREATED:
+                            self.plan = event.plan
+                            self._normalize_plan_agents()
+                            self._ensure_vision_step_for_image_message(message)
+                            logger.info(f"Agent {self._agent_id} created plan successfully with {len(event.plan.steps)} steps")
+                            yield TitleEvent(title=event.plan.title)
+                            yield MessageEvent(role="assistant", message=event.plan.message or "")
+                        yield event
                 logger.info(f"Agent {self._agent_id} state changed from {AgentStatus.PLANNING} to {AgentStatus.EXECUTING}")
                 self.status = AgentStatus.EXECUTING
-                if len(event.plan.steps) == 0:
+                if len(self.plan.steps) == 0:
                     logger.info(f"Agent {self._agent_id} created plan successfully with no steps")
                     self.status = AgentStatus.COMPLETED
                     
@@ -242,7 +269,13 @@ class PlanActFlow(BaseFlow):
                 # A successful step does not invalidate the original plan. Replanning
                 # after every success adds an LLM round trip and can also make a later
                 # step repeat work that has already finished. Replan only on failure.
-                self.status = self._status_after_execution_step(step)
+                if self._should_complete_after_execution_step(step):
+                    # A dataset fast-path request is intentionally one bounded step.
+                    # Likewise, any successful single-step plan has already delivered
+                    # its complete result. Do not add a duplicate summarizer round trip.
+                    self.status = AgentStatus.COMPLETED
+                else:
+                    self.status = self._status_after_execution_step(step)
                 logger.info(
                     "Agent %s state changed from %s to %s",
                     self._agent_id,
@@ -285,7 +318,27 @@ class PlanActFlow(BaseFlow):
             return AgentStatus.EXECUTING
         return AgentStatus.UPDATING
 
+    def _should_complete_after_execution_step(self, step: Step) -> bool:
+        step_succeeded = bool(
+            step.status == ExecutionStatus.COMPLETED and step.success
+        )
+        if getattr(self, "_dataset_fast_path_active", False):
+            return step_succeeded
+        return bool(self.plan and len(self.plan.steps) == 1 and step_succeeded)
+
     def _dynamic_system_prompt(self) -> str:
+        if getattr(self, "_dataset_fast_path_active", False):
+            # Keep the hot path focused. Skill/MCP/vision requests are excluded
+            # from this path and therefore do not need their orchestration
+            # capabilities repeated in every execution-model request.
+            return "\n\n".join(
+                part
+                for part in [
+                    self._runtime_context_prompt(),
+                    self.dataset_context,
+                ]
+                if part
+            )
         parts = [
             part
             for part in [
@@ -293,11 +346,458 @@ class PlanActFlow(BaseFlow):
                 self._subagent_capabilities_prompt(),
                 self.active_skill_context,
                 getattr(self, "dataset_context", ""),
-                self.session_context,
             ]
             if part
         ]
         return "\n\n".join(parts)
+
+    def _dynamic_user_context(self) -> str:
+        return getattr(self, "session_context", "")
+
+    def _should_use_dataset_fast_path(self, message: Message) -> bool:
+        """Use one bounded execution step for ordinary mounted-dataset requests.
+
+        Skills, MCP servers, and image understanding have their own orchestration
+        contracts and continue through the planner. All other dataset exploration,
+        profiling, analysis, and visualization requests can be handled directly by
+        the execution agent with the authoritative mounted manifest.
+        """
+        return bool(
+            message.datasets
+            and "execution" in self._enabled_subagents()
+            and not message.skills
+            and not message.mcp_servers
+            and not self._message_has_image_attachment(message)
+        )
+
+    @staticmethod
+    def _create_dataset_fast_path_plan(message: Message) -> Plan:
+        dataset_name = next(
+            (dataset.name.strip() for dataset in message.datasets if dataset.name.strip()),
+            "dataset",
+        )
+        dataset_intent = PlanActFlow._dataset_request_intent(message.message)
+        intent_config = {
+            "visualization": {
+                "description": "分析当前数据集并生成可视化结果",
+                "instruction": (
+                    "围绕用户明确提出的可视化需求分析数据。对于概览、分布、空间格局、"
+                    "质量和描述统计等快速探查能够覆盖的请求，先且只调用一次通用快速探查；"
+                    "只有用户明确指定其不支持的计算、分组或专业方法时，才执行有针对性的分析和绘图。"
+                    "最终用用户使用的语言解释图表所依据的数据、主要发现、方法与限制，"
+                    "并返回图表、摘要和可复用数据结果。"
+                ),
+                "include_archive_tree": False,
+                "allow_terminal_quicklook": True,
+            },
+            "inventory": {
+                "description": "探查数据集文件组织并回答用户问题",
+                "instruction": (
+                    "检查挂载清单以及压缩包内部目录；最终答案必须直接展示清晰、可读的文件组织树，"
+                    "包括压缩包节点、解压后的目录层级和文件名，并说明清单是否因规模限制而截断。"
+                    "除非用户同时明确要求绘图，否则不要生成图表。"
+                ),
+                "include_archive_tree": True,
+                "allow_terminal_quicklook": False,
+            },
+            "analysis": {
+                "description": "分析当前数据集并回答用户问题",
+                "instruction": (
+                    "完整保留并回答用户的具体问题，只读取回答该问题所需的数据。先给直接结论，"
+                    "再列出可核验的数据证据、分析方法和必要限制；定量结论必须对应实际读取的文件、"
+                    "字段或波段以及筛选范围，推断必须与观测事实分开。把计算结果在同一次主要分析中"
+                    "写成可下载的 Markdown、CSV 或 JSON 产物并返回。不要把普通问答改写成通用数据"
+                    "探查或可视化任务；仅在用户明确要求图表时生成图表。"
+                ),
+                "include_archive_tree": False,
+                "allow_terminal_quicklook": False,
+            },
+        }[dataset_intent]
+        allow_terminal_quicklook = (
+            dataset_intent == "visualization"
+            and len(message.datasets or []) == 1
+            and PlanActFlow._is_broad_quicklook_request(message.message)
+        )
+        requested_dimensions = PlanActFlow._dataset_requested_dimensions(
+            message.message
+        )
+        prefer_quicklook_evidence = (
+            dataset_intent == "visualization"
+            and len(message.datasets or []) == 1
+            and PlanActFlow._prefers_quicklook_evidence(message.message)
+        )
+        uses_chinese = any("\u3400" <= character <= "\u9fff" for character in message.message)
+        if uses_chinese:
+            title = f"{dataset_name}分析"
+            progress = "正在快速分析当前数据集…"
+            language = "zh"
+        else:
+            title = f"Analyze {dataset_name}"
+            progress = "Analyzing the current dataset…"
+            language = "en"
+
+        return Plan(
+            title=title[:80],
+            goal=message.message,
+            language=language,
+            message=progress,
+            steps=[
+                Step(
+                    id="dataset-fast-path",
+                    agent="execution",
+                    inputs={
+                        # Keep the execution mode stable because it also selects the
+                        # bounded dataset tool scope. The separate intent tells the
+                        # executor whether a quicklook result may end the turn.
+                        "execution_mode": "dataset_fast_path",
+                        "dataset_intent": dataset_intent,
+                        "requested_dimensions": requested_dimensions,
+                        "prefer_quicklook_evidence": prefer_quicklook_evidence,
+                        # Preserve the exact wording independently of the concise
+                        # UI description. The executor treats this field as the
+                        # authoritative analysis question instead of attempting to
+                        # reconstruct it from a generic step label.
+                        "user_question": message.message,
+                        "execution_guidance": intent_config["instruction"],
+                        "require_model_answer": True,
+                        "require_evidence": True,
+                        "require_method_and_limitations": True,
+                        "require_downloadable_result": True,
+                        "include_archive_tree": intent_config["include_archive_tree"],
+                        # Only an unconstrained broad quicklook can finish without
+                        # a second model decision. A request for named dimensions,
+                        # metrics, comparisons, or explanations must inspect the
+                        # compact manifest evidence and answer every requested part.
+                        "allow_terminal_quicklook": allow_terminal_quicklook,
+                    },
+                    # Plan descriptions are streamed into the conversation UI. Keep
+                    # them brief and Chinese; internal execution detail belongs above.
+                    description=intent_config["description"],
+                )
+            ],
+        )
+
+    @staticmethod
+    def _dataset_request_intent(user_message: str) -> str:
+        """Classify only the behavior needed by the dataset one-step executor.
+
+        This is deliberately a small, generic router rather than a dataset-specific
+        rule. Ambiguous requests remain normal model-assisted analysis, so an
+        unrelated user question is never silently converted into visualization.
+        """
+        normalized = " ".join((user_message or "").casefold().split())
+        file_structure_markers = (
+            "包含哪些文件",
+            "都有哪些文件",
+            "有哪些文件",
+            "文件列表",
+            "文件清单",
+            "文件组织",
+            "组织结构",
+            "目录结构",
+            "目录树",
+            "文件树",
+            "解压后",
+            "解压以后",
+            "压缩包内容",
+            "archive contents",
+            "file list",
+            "which files",
+            "what files",
+            "directory structure",
+            "folder structure",
+            "directory tree",
+        )
+        visualization_markers = (
+            "可视化",
+            "快速探查",
+            "数据探查",
+            "数据概览",
+            "画图",
+            "绘图",
+            "图表",
+            "折线图",
+            "柱状图",
+            "散点图",
+            "直方图",
+            "箱线图",
+            "热力图",
+            "空间分布图",
+            "visualization",
+            "visualisation",
+            "visualize",
+            "visualise",
+            "quicklook",
+            "quick look",
+            "explore the dataset",
+            "dataset overview",
+            "plot",
+            "chart",
+            "graph",
+            "heatmap",
+            "histogram",
+            "boxplot",
+        )
+        if any(marker in normalized for marker in file_structure_markers):
+            return "inventory"
+        if any(marker in normalized for marker in visualization_markers):
+            return "visualization"
+        return "analysis"
+
+    @staticmethod
+    def _is_broad_quicklook_request(user_message: str) -> bool:
+        """Conservatively identify requests satisfied by a generic quicklook.
+
+        The quicklook capability is intentionally terminal only for broad dataset
+        overview/visualization requests. Named analytical dimensions require a
+        model-authored coverage check after the quicklook manifest is available;
+        otherwise a fast response can look successful while silently omitting most
+        of the user's question.
+        """
+        normalized = " ".join((user_message or "").casefold().split())
+        if not normalized:
+            return False
+        broad_markers = (
+            "数据可视化",
+            "可视化",
+            "快速探查",
+            "数据探查",
+            "数据概览",
+            "画图",
+            "绘图",
+            "visualize",
+            "visualise",
+            "visualization",
+            "visualisation",
+            "quicklook",
+            "quick look",
+            "explore the dataset",
+            "dataset overview",
+        )
+        if not any(marker in normalized for marker in broad_markers):
+            return False
+
+        requested_dimensions = set(
+            PlanActFlow._dataset_requested_dimensions(normalized)
+        )
+        return requested_dimensions <= {"overview", "visualization"}
+
+    @staticmethod
+    def _prefers_quicklook_evidence(user_message: str) -> bool:
+        """Prefer deterministic evidence for generic multi-part visualization.
+
+        Quicklook already profiles file structure, distributions, missingness,
+        raster spatial zones, descriptive statistics, explicit time dimensions,
+        and representative charts.  Named transformations and inferential or
+        predictive methods remain custom analysis.  This router describes
+        capability classes only; it never keys on a dataset name or value.
+        """
+        normalized = " ".join((user_message or "").casefold().split())
+        if not normalized:
+            return False
+        custom_method_markers = (
+            "回归",
+            "相关系数",
+            "显著性",
+            "假设检验",
+            "聚类",
+            "分类模型",
+            "预测",
+            "预报",
+            "插值",
+            "重采样",
+            "裁剪",
+            "分区统计",
+            "主成分",
+            "小波",
+            "傅里叶",
+            "频谱",
+            "机器学习",
+            "变化检测",
+            "regression",
+            "correlation coefficient",
+            "significance test",
+            "hypothesis test",
+            "cluster",
+            "classification model",
+            "forecast",
+            "prediction",
+            "interpolation",
+            "resampling",
+            "zonal statistics",
+            "principal component",
+            "fourier",
+            "wavelet",
+            "machine learning",
+            "change detection",
+        )
+        return not any(marker in normalized for marker in custom_method_markers)
+
+    @staticmethod
+    def _dataset_requested_dimensions(user_message: str) -> list[str]:
+        """Extract a stable analysis checklist without dataset-specific tuning."""
+        normalized = " ".join((user_message or "").casefold().split())
+        dimensions: list[str] = []
+        marker_groups = (
+            (
+                "overview",
+                (
+                    "快速探查",
+                    "数据探查",
+                    "数据概览",
+                    "quicklook",
+                    "quick look",
+                    "explore the dataset",
+                    "dataset overview",
+                ),
+            ),
+            (
+                "file_inventory",
+                (
+                    "哪些文件",
+                    "文件列表",
+                    "文件清单",
+                    "文件组织",
+                    "目录结构",
+                    "目录树",
+                    "压缩包内容",
+                    "what files",
+                    "file list",
+                    "file inventory",
+                    "directory structure",
+                    "directory tree",
+                    "archive contents",
+                ),
+            ),
+            (
+                "spatial_pattern",
+                (
+                    "空间",
+                    "地理分布",
+                    "区域分布",
+                    "spatial",
+                    "geographic distribution",
+                ),
+            ),
+            (
+                "temporal_trend",
+                (
+                    "时间",
+                    "年度",
+                    "年份",
+                    "年际",
+                    "月度",
+                    "月份",
+                    "月际",
+                    "趋势",
+                    "变化",
+                    "temporal",
+                    "annual",
+                    "yearly",
+                    "monthly",
+                    "trend",
+                    "time series",
+                ),
+            ),
+            (
+                "data_quality",
+                (
+                    "质量",
+                    "缺失",
+                    "完整性",
+                    "无效值",
+                    "nodata",
+                    "quality",
+                    "missing",
+                    "completeness",
+                ),
+            ),
+            (
+                "anomaly",
+                ("异常", "离群", "极端", "anomal", "outlier", "extreme"),
+            ),
+            (
+                "relationship",
+                (
+                    "相关",
+                    "关系",
+                    "回归",
+                    "correlat",
+                    "relationship",
+                    "regression",
+                ),
+            ),
+            (
+                "comparison",
+                ("对比", "比较", "差异", "compare", "comparison", "difference"),
+            ),
+            (
+                "grouped_analysis",
+                ("分组", "按年", "按月", "按区域", "group by", "grouped"),
+            ),
+            (
+                "forecast",
+                ("预测", "预报", "forecast", "prediction"),
+            ),
+            (
+                "quantitative_metrics",
+                (
+                    "量化",
+                    "指标",
+                    "最大",
+                    "最小",
+                    "平均",
+                    "均值",
+                    "中位数",
+                    "标准差",
+                    "总量",
+                    "metric",
+                    "maximum",
+                    "minimum",
+                    "mean",
+                    "median",
+                    "standard deviation",
+                ),
+            ),
+            (
+                "visualization",
+                (
+                    "可视化",
+                    "画图",
+                    "绘图",
+                    "图表",
+                    "折线图",
+                    "柱状图",
+                    "散点图",
+                    "直方图",
+                    "箱线图",
+                    "热力图",
+                    "visualiz",
+                    "plot",
+                    "chart",
+                    "graph",
+                    "heatmap",
+                    "histogram",
+                    "boxplot",
+                ),
+            ),
+            (
+                "methodology",
+                ("方法", "怎么计算", "如何计算", "method", "methodology"),
+            ),
+            (
+                "limitations",
+                ("局限", "限制", "不确定性", "limitation", "uncertainty"),
+            ),
+            (
+                "interpretation",
+                ("原因", "影响", "说明什么", "解释", "why", "impact", "interpret"),
+            ),
+        )
+        for dimension, markers in marker_groups:
+            if any(marker in normalized for marker in markers):
+                dimensions.append(dimension)
+        return dimensions or ["question_answering"]
 
     def _activate_skills(self, requested_names: list[str]):
         # Reload before every user turn because a long-lived task runner may be
@@ -432,28 +932,131 @@ class PlanActFlow(BaseFlow):
                 logger.warning("Planner selected unavailable agent %s; falling back to %s", step.agent, fallback)
                 step.agent = fallback
 
-    def _render_session_context(self, events: list[BaseEvent]) -> str:
+    @staticmethod
+    def _truncate_session_text(value: str, max_bytes: int) -> str:
+        encoded = value.encode("utf-8")
+        if len(encoded) <= max_bytes:
+            return value
+        suffix = "\n[earlier text truncated]"
+        available = max(0, max_bytes - len(suffix.encode("utf-8")))
+        return encoded[:available].decode("utf-8", errors="ignore") + suffix
+
+    def _render_session_context(
+        self,
+        events: list[BaseEvent],
+        *,
+        current_user_message: str | None = None,
+    ) -> str:
+        current_event_index: int | None = None
+        if current_user_message:
+            # The current user event is persisted before the flow starts. Exclude
+            # only its latest matching occurrence so an identical older question
+            # can still be legitimate follow-up context.
+            for index in range(len(events) - 1, -1, -1):
+                event = events[index]
+                if (
+                    isinstance(event, MessageEvent)
+                    and event.role == "user"
+                    and event.message == current_user_message
+                ):
+                    current_event_index = index
+                    break
+
+        conversation: list[tuple[str, str]] = []
         vision_results: list[str] = []
-        for event in events:
+        analysis_results: list[tuple[str, tuple[str, ...]]] = []
+        seen_analysis_results: set[tuple[str, tuple[str, ...]]] = set()
+        for index, event in enumerate(events):
+            if (
+                isinstance(event, MessageEvent)
+                and index != current_event_index
+                and event.message.strip()
+            ):
+                conversation.append((event.role, event.message.strip()))
             if not isinstance(event, PlanEvent):
                 continue
             for step in event.plan.steps:
                 if step.agent == "vision" and step.result:
                     vision_results.append(step.result)
-        if not vision_results:
+                    continue
+                if not step.success or (not step.result and not step.attachments):
+                    continue
+                result = step.result or "Prior analysis completed."
+                attachments = tuple(
+                    path for path in step.attachments[:8] if isinstance(path, str) and path
+                )
+                key = (result, attachments)
+                if key in seen_analysis_results:
+                    continue
+                seen_analysis_results.add(key)
+                analysis_results.append(key)
+
+        conversation = conversation[-self.MAX_SESSION_CONTEXT_MESSAGES:]
+        rendered_messages_reversed: list[dict[str, str]] = []
+        remaining_bytes = self.MAX_SESSION_CONTEXT_BYTES
+        # Select from newest to oldest.  Filling this budget in chronological
+        # order caused a long conversation to keep stale turns while silently
+        # dropping the immediately preceding answer needed by a follow-up.
+        for role, content in reversed(conversation):
+            bounded = self._truncate_session_text(
+                content,
+                self.MAX_SESSION_CONTEXT_MESSAGE_BYTES,
+            )
+            entry = {"role": role, "content": bounded}
+            entry_size = len(json.dumps(
+                entry,
+                ensure_ascii=False,
+                separators=(",", ":"),
+            ).encode("utf-8"))
+            if entry_size > remaining_bytes:
+                break
+            rendered_messages_reversed.append(entry)
+            remaining_bytes -= entry_size
+        rendered_messages = list(reversed(rendered_messages_reversed))
+
+        rendered_vision_results = [
+            self._truncate_session_text(
+                result,
+                self.MAX_SESSION_CONTEXT_MESSAGE_BYTES,
+            )
+            for result in vision_results[-3:]
+        ]
+        rendered_analysis_results = [
+            (
+                self._truncate_session_text(
+                    result,
+                    self.MAX_SESSION_CONTEXT_MESSAGE_BYTES,
+                ),
+                attachments,
+            )
+            for result, attachments in analysis_results[-3:]
+        ]
+        if (
+            not rendered_messages
+            and not rendered_vision_results
+            and not rendered_analysis_results
+        ):
             return ""
-        latest_results = vision_results[-3:]
-        rendered = "\n\n".join(
-            f"[Vision result {index}]\n{result}"
-            for index, result in enumerate(latest_results, start=1)
-        )
-        return (
-            "<session_context>\n"
-            "The following visual analysis results were produced earlier in this same conversation. "
-            "Use them as authoritative context for follow-up requests. Do not search the sandbox filesystem "
-            "for the original image unless the user explicitly asks to reprocess a new file.\n\n"
-            f"{rendered}\n"
-            "</session_context>"
+
+        # Serialize historical values as data.  This JSON is inserted as a
+        # HumanMessage by BaseAgent; no prior user-controlled text is promoted
+        # into a SystemMessage or concatenated into trusted instructions.
+        payload = {
+            "schema": "session_history/v1",
+            "messages": rendered_messages,
+            "prior_vision_results": rendered_vision_results,
+            "prior_analysis_results": [
+                {
+                    "result": result,
+                    "attachments": list(attachments),
+                }
+                for result, attachments in rendered_analysis_results
+            ],
+        }
+        return json.dumps(
+            payload,
+            ensure_ascii=False,
+            separators=(",", ":"),
         )
 
     def _ensure_vision_step_for_image_message(self, message: Message) -> None:

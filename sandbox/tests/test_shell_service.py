@@ -22,6 +22,10 @@ class _CompletedProcess:
         return self.returncode
 
 
+class _FailedProcess(_CompletedProcess):
+    returncode = 7
+
+
 class _ChunkedOutput:
     def __init__(self, chunks):
         self._chunks = list(chunks)
@@ -102,6 +106,44 @@ def test_wait_api_keeps_running_process_as_success(client):
     assert payload["success"] is True
     assert payload["message"] == "Process is still running"
     assert payload["data"] == {"status": "running", "returncode": None}
+
+
+@pytest.mark.shell_api
+def test_wait_api_marks_nonzero_return_code_as_failure(client):
+    session_id = f"api-failed-{uuid.uuid4().hex}"
+    _register_process(session_id, _FailedProcess())
+    try:
+        response = client.post(
+            f"{BASE_URL}/api/v1/shell/wait",
+            json={"id": session_id, "seconds": 1},
+        )
+    finally:
+        ShellService.active_shells.pop(session_id, None)
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["success"] is False
+    assert payload["message"] == "Process failed with return code: 7"
+    assert payload["data"] == {"status": "completed", "returncode": 7}
+
+
+@pytest.mark.shell_api
+def test_exec_api_marks_nonzero_return_code_as_failure(client):
+    session_id = f"api-exec-failed-{uuid.uuid4().hex}"
+    try:
+        response = client.post(
+            f"{BASE_URL}/api/v1/shell/exec",
+            json={"id": session_id, "exec_dir": "/tmp", "command": "exit 9"},
+        )
+    finally:
+        ShellService.active_shells.pop(session_id, None)
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["success"] is False
+    assert payload["message"] == "Command failed with return code: 9"
+    assert payload["data"]["status"] == "completed"
+    assert payload["data"]["returncode"] == 9
 
 
 @pytest.mark.shell_api

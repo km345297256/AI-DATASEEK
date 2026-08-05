@@ -21,7 +21,7 @@ from app.interfaces.schemas.session import (
     ShareSessionResponse, SharedSessionResponse, CreateSessionRequest,
     UpdateSessionTitleRequest,
 )
-from app.interfaces.schemas.file import FileViewRequest, FileViewResponse
+from app.interfaces.schemas.file import FileInfoResponse, FileViewRequest, FileViewResponse
 from app.interfaces.schemas.resource import AccessTokenRequest, SignedUrlResponse
 from app.interfaces.schemas.event import EventMapper
 from app.domain.models.file import FileInfo
@@ -429,11 +429,14 @@ async def get_session_files(
     sort_order: str = Query("desc", pattern="^(asc|desc)$"),
     current_user: Optional[User] = Depends(get_optional_current_user),
     agent_service: AgentService = Depends(get_agent_service)
-) -> APIResponse[List[FileInfo]]:
+) -> APIResponse[List[FileInfoResponse]]:
     if not current_user and not await agent_service.is_session_shared(session_id):
         raise UnauthorizedError()
     files = await agent_service.get_session_files(session_id, current_user.id if current_user else None)
-    return APIResponse.success(_sort_session_files(files, sort_by, sort_order))
+    return APIResponse.success([
+        FileInfoResponse.public_from_file_info(file)
+        for file in _sort_session_files(files, sort_by, sort_order)
+    ])
 
 
 @router.post("/{session_id}/vnc/signed-url", response_model=APIResponse[SignedUrlResponse])
@@ -498,12 +501,16 @@ async def get_shared_session_files(
     sort_by: str = Query("upload_date", pattern="^(filename|size|upload_date)$"),
     sort_order: str = Query("desc", pattern="^(asc|desc)$"),
     agent_service: AgentService = Depends(get_agent_service)
-) -> APIResponse[List[FileInfo]]:
+) -> APIResponse[List[FileInfoResponse]]:
     files = await agent_service.get_shared_session_files(session_id)
     files = _sort_session_files(files, sort_by, sort_order)
+    file_service = get_file_service()
     for file in files:
-        await get_file_service().enrich_with_file_url(file)
-    return APIResponse.success(files)
+        await file_service.enrich_with_file_url(file)
+    return APIResponse.success([
+        FileInfoResponse.public_from_file_info(file)
+        for file in files
+    ])
 
 
 @router.delete("/{session_id}/share", response_model=APIResponse[ShareSessionResponse])

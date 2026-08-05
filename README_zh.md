@@ -26,7 +26,7 @@ AI-DataSeek 是从 AI-MANUS 中抽取出的数据集智能探查与分析系统�
                                     -> 数据集服务器目录（只读）
 ```
 
-生产环境默认使用 `7100` 端口；隔离的开发与第三方联调环境使用 `7000` 端口。
+稳定联测环境默认使用 `7000` 端口；隔离的开发环境使用 `7100` 端口。
 
 ## 快速启动
 
@@ -38,7 +38,7 @@ cp .env.example .env
 ./run.sh up -d --build
 ```
 
-访问 `http://localhost:7100`。
+访问 `http://localhost:7000`。
 
 AI-DataSeek 固定采用免登录模式。浏览器和 API 请求均不使用 Bearer Token
 或 `X-API-Key`，所有调用者统一以系统内置管理员身份操作。Token 消耗只用于
@@ -61,7 +61,7 @@ cp .env.example .env
 
 默认开发端口：
 
-- 前端（第三方联调入口）：`http://localhost:7000`
+- 前端（开发入口）：`http://localhost:7100`
 - 后端：`http://localhost:8001`
 - MongoDB：`localhost:27018`
 - MinIO API/控制台：`localhost:9010` / `localhost:9011`

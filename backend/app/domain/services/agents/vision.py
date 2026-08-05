@@ -43,6 +43,7 @@ class VisionAgent(BaseAgent):
         usage_context: Optional[dict] = None,
         file_storage: Optional[FileStorage] = None,
         user_id: Optional[str] = None,
+        dynamic_user_context_provider: Optional[Callable[[], str]] = None,
     ):
         self._file_storage = file_storage
         self._user_id = user_id
@@ -53,6 +54,7 @@ class VisionAgent(BaseAgent):
             dynamic_system_prompt_provider=dynamic_system_prompt_provider,
             llm_overrides=self._build_vision_overrides(llm_overrides),
             usage_context=usage_context,
+            dynamic_user_context_provider=dynamic_user_context_provider,
         )
 
     @staticmethod

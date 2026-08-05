@@ -64,11 +64,18 @@ async def replace_in_file(request: FileReplaceRequest):
         new_str=request.new_str,
         sudo=request.sudo
     )
-    
+
+    succeeded = result.replaced_count > 0
+    message = (
+        f"Replacement completed, replaced {result.replaced_count} occurrences"
+        if succeeded
+        else "Replacement made no changes: target text was not found"
+    )
+
     # Construct response
     return Response(
-        success=True,
-        message=f"Replacement completed, replaced {result.replaced_count} occurrences",
+        success=succeeded,
+        message=message,
         data=result.model_dump()
     )
 

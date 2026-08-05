@@ -6,6 +6,7 @@ from langchain.messages import AIMessage, HumanMessage, SystemMessage, ToolMessa
 from openai import APIConnectionError, BadRequestError, InternalServerError
 
 from app.domain.models.event import (
+    ErrorEvent,
     McpToolContent,
     MessageEvent,
     PlanEvent,
@@ -23,11 +24,103 @@ from app.domain.services.agents.base import BaseAgent, LLMServiceUnavailableErro
 from app.domain.services.agent_task_runner import AgentTaskRunner
 from app.domain.services.flows.plan_act import AgentStatus, PlanActFlow
 from app.domain.models.memory import Memory
+from app.domain.utils.robust_json_parser import parse_json_lenient
+
+
+def test_parse_json_lenient_prefers_explicit_json_after_a_file_tree_block():
+    raw = '''文件组织如下：
+```
+demo.zip
+└── data/
+    └── values.csv
+```
+
+```json
+{"success": true, "result": "found values.csv", "attachments": []}
+```'''
+
+    assert parse_json_lenient(raw) == {
+        "success": True,
+        "result": "found values.csv",
+        "attachments": [],
+    }
+
+
+@pytest.mark.asyncio
+async def test_null_execution_payload_fails_cleanly_without_validation_exception():
+    agent = object.__new__(ExecutionAgent)
+    agent.reset_context = AsyncMock()
+
+    async def fake_execute(_message):
+        yield MessageEvent(message="null")
+
+    agent.execute = fake_execute
+    step = Step(description="analyze dataset")
+
+    events = [
+        event
+        async for event in agent.execute_step(
+            Plan(language="zh", steps=[step]),
+            step,
+            Message(message="analyze dataset"),
+        )
+    ]
+
+    assert step.status == ExecutionStatus.FAILED
+    assert step.success is False
+    assert step.error
+    assert "validation error for ExecutionResult" not in step.error
+    assert any(
+        isinstance(event, StepEvent) and event.status == StepStatus.FAILED
+        for event in events
+    )
+    assert any(isinstance(event, ErrorEvent) for event in events)
+
+
+@pytest.mark.asyncio
+async def test_execution_step_accepts_json_block_after_a_markdown_tree():
+    agent = object.__new__(ExecutionAgent)
+    agent.reset_context = AsyncMock()
+    agent.ask_with_messages = AsyncMock(
+        side_effect=AssertionError("valid local JSON extraction must not call repair")
+    )
+
+    async def fake_execute(_message):
+        yield MessageEvent(message='''文件清单：
+```
+archive.zip
+└── data.csv
+```
+```json
+{"success":true,"result":"包含 data.csv","attachments":[]}
+```''')
+
+    agent.execute = fake_execute
+    step = Step(description="list files")
+
+    events = [
+        event
+        async for event in agent.execute_step(
+            Plan(language="zh", steps=[step]),
+            step,
+            Message(message="这个数据集包含哪些文件？"),
+        )
+    ]
+
+    assert step.status == ExecutionStatus.COMPLETED
+    assert step.success is True
+    assert step.result == "包含 data.csv"
+    assert any(
+        isinstance(event, MessageEvent) and event.message == "包含 data.csv"
+        for event in events
+    )
+    agent.ask_with_messages.assert_not_awaited()
 
 
 @pytest.mark.asyncio
 async def test_execution_result_ignores_llm_status_without_changing_step_state():
     agent = object.__new__(ExecutionAgent)
+    agent.reset_context = AsyncMock()
 
     async def fake_execute(_message):
         yield MessageEvent(message='{"success": true, "result": "done"}')
@@ -187,6 +280,23 @@ async def test_non_transient_llm_status_error_is_not_retried():
 
 
 @pytest.mark.asyncio
+async def test_no_tool_finalization_does_not_bind_or_advertise_tools():
+    final = AIMessage(content='{"success":false,"result":"bounded","attachments":[]}')
+    agent, _chain = _agent_with_model_chain([final])
+    agent.bind_tools = True
+    agent.get_tools = MagicMock(return_value=[MagicMock()])
+    runnable = agent._model.bind.return_value
+
+    with patch("app.domain.services.agents.base.RobustJsonParser.from_llm", return_value=object()):
+        result = await agent.ask_with_messages([], allow_tools=False)
+
+    assert result is final
+    assert agent._model.bind.call_args.kwargs == {"response_format": None}
+    runnable.bind_tools.assert_not_called()
+    agent.get_tools.assert_not_called()
+
+
+@pytest.mark.asyncio
 async def test_unknown_tool_call_receives_tool_message_before_next_model_turn():
     agent = object.__new__(BaseAgent)
     agent.max_iterations = 2
@@ -341,6 +451,48 @@ async def test_successful_file_write_content_is_not_replayed_to_the_model():
     assert "persisted successfully" in compacted
     assert "sha256" in compacted
     assert responses[0][0].content.startswith("{")
+
+
+@pytest.mark.asyncio
+async def test_successful_shell_run_command_is_compacted_before_next_model_turn():
+    agent = object.__new__(BaseAgent)
+    agent.max_iterations = 2
+    agent.max_retries = 0
+    agent.retry_interval = 0
+    command = "python -c 'print(1)'\n" * 1000
+    first = AIMessage(content="", tool_calls=[{
+        "name": "shell_run",
+        "args": {"id": "plot", "exec_dir": "/home/ubuntu", "command": command},
+        "id": "call-shell-run",
+    }])
+    final = AIMessage(content="completed")
+    tool = SimpleNamespace(toolkit=SimpleNamespace(name="shell"))
+
+    async def ask(_request, _format=None):
+        return first
+
+    async def ask_with_messages(_messages, _format=None):
+        return final
+
+    async def invoke_tool(_tool, _tool_call):
+        return ToolMessage(
+            tool_call_id="call-shell-run",
+            name="shell_run",
+            content="ok",
+            artifact=SimpleNamespace(success=True),
+        )
+
+    agent.ask = ask
+    agent.ask_with_messages = ask_with_messages
+    agent.get_tool = lambda _name: tool
+    agent.invoke_tool = invoke_tool
+
+    _events = [event async for event in agent.execute("run chart")]
+
+    compacted = first.tool_calls[0]["args"]["command"]
+    assert command not in compacted
+    assert "command compacted" in compacted
+    assert "sha256" in compacted
 
 
 def test_oversized_tool_event_is_bounded_before_session_persistence():

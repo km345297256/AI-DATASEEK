@@ -40,6 +40,41 @@ class CompletionAdviceService:
     def to_payload(self, advice: CompletionAdvice) -> dict[str, Any]:
         return asdict(advice)
 
+    def analyze_fast(self, events: list[Any]) -> CompletionAdvice:
+        """Build completion advice without another model round trip.
+
+        Completion advice is UI decoration, so it must never extend the critical
+        path between the final task result and the ``done`` event.  Keep the
+        model-backed ``analyze`` method for explicit/offline callers, while the
+        live task runner uses this deterministic heuristic.
+        """
+        if not events:
+            return self._default_advice()
+
+        user_messages = [
+            event
+            for event in events
+            if isinstance(event, MessageEvent) and event.role == "user"
+        ]
+        assistant_messages = [
+            event
+            for event in events
+            if isinstance(event, MessageEvent) and event.role == "assistant"
+        ]
+        steps = [event for event in events if isinstance(event, StepEvent)]
+        tools = [event for event in events if isinstance(event, ToolEvent)]
+        plans = [event for event in events if isinstance(event, PlanEvent)]
+
+        if len(steps) + len(tools) < 2 or not user_messages:
+            return self._default_advice()
+        return self._heuristic_skill_candidate(
+            user_messages,
+            assistant_messages,
+            plans,
+            steps,
+            tools,
+        )
+
     def _serialize_events(self, events: list[Any]) -> str:
         messages: list[dict[str, Any]] = []
         for event in events:

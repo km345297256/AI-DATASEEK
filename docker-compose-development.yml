@@ -11,7 +11,7 @@ services:
       - ./frontend:/app
       - /app/node_modules
     ports:
-      - "${DEV_FRONTEND_PORT:-7000}:5173"
+      - "${DEV_FRONTEND_PORT:-7100}:5173"
     environment:
       NODE_ENV: development
       BACKEND_URL: http://backend:8000
@@ -30,7 +30,7 @@ services:
       - .env
     environment:
       AUTH_PROVIDER: none
-      SERVER_HOST: ${DEV_SERVER_HOST:-http://localhost:7000}
+      SERVER_HOST: ${DEV_SERVER_HOST:-http://localhost:7100}
       MONGODB_URI: mongodb://mongodb:27017
       MONGODB_DATABASE: ai_dataseek_dev
       REDIS_HOST: redis

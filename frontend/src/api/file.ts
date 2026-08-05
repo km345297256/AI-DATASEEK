@@ -1,6 +1,7 @@
 // File API service
-import { apiClient, ApiResponse, API_CONFIG, BASE_URL } from './client';
-import { SignedUrlResponse } from '../types/response';
+import { apiClient, API_CONFIG, BASE_URL } from './client.ts';
+import type { ApiResponse } from './client.ts';
+import type { SignedUrlResponse } from '../types/response.ts';
 
 /**
  * File info type
@@ -8,7 +9,7 @@ import { SignedUrlResponse } from '../types/response';
 export interface FileInfo {
   file_id: string;
   filename: string;
-  file_path?: string;
+  relative_path?: string;
   content_type?: string;
   size?: number;
   upload_date: string;
@@ -151,7 +152,9 @@ export async function deleteFile(fileId: string): Promise<boolean> {
  */
 export async function getFileInfo(fileId: string): Promise<FileInfo | null> {
   try {
-    const response = await apiClient.get<ApiResponse<FileInfo>>(`/files/${fileId}`);
+    const response = await apiClient.get<ApiResponse<FileInfo>>(
+      `/files/${encodeURIComponent(fileId)}/info`,
+    );
     return response.data.data;
   } catch (error) {
     console.error('Failed to get file info:', error);

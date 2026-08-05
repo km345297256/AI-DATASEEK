@@ -105,10 +105,10 @@ def _install_submission_dependencies(monkeypatch):
 
         async def insert(self):
             if self.dataset_id in stored_documents or any(
-                document.global_slot == self.global_slot
+                getattr(document, "global_slot", None) == self.global_slot
                 or (
                     document.owner_id == self.owner_id
-                    and document.owner_slot == self.owner_slot
+                    and getattr(document, "owner_slot", None) == self.owner_slot
                 )
                 for document in stored_documents.values()
             ):

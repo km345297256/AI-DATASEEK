@@ -28,6 +28,7 @@ from app.domain.models.event import (
     McpToolContent,
     SkillToolContent,
 )
+from app.domain.utils.public_error import public_error_message
 from app.domain.services.flows.plan_act import AgentStatus, PlanActFlow
 from app.domain.external.sandbox import Sandbox
 from app.domain.external.browser import Browser
@@ -115,6 +116,10 @@ ARTIFACT_EXCLUDED_PARTS = {
     ".venv",
     "__pycache__",
     "node_modules",
+    # `dataset_unpack` uses these as private working trees. Publishing them
+    # would duplicate mounted source data and can dominate artifact latency.
+    "unpacked",
+    "unpacked_archives",
     "upload",
 }
 MAX_AUTO_SYNC_ARTIFACTS = 500
@@ -184,6 +189,10 @@ class AgentTaskRunner(TaskRunner):
         # in the same directory must remain publishable artifacts.
         self._protected_dataset_paths: set[str] = set()
         self._protected_dataset_roots: set[str] = set()
+        # Tool-owned working trees (for example recursive archive extraction)
+        # are evidence inputs, not generated deliverables. Track their exact
+        # roots from tool arguments instead of relying on a directory name.
+        self._private_artifact_roots: set[str] = set()
 
     async def _put_and_add_event(self, task: Task, event: AgentEvent) -> None:
         event = self._bound_event_payload(event)
@@ -354,6 +363,22 @@ class AgentTaskRunner(TaskRunner):
         self._artifact_baseline_state().add(file_path)
         self._artifact_fingerprint_state()[file_path] = fingerprint
 
+    @staticmethod
+    def _fingerprint_from_file_info(
+        file_info: Optional[FileInfo],
+    ) -> Optional[ArtifactFingerprint]:
+        """Read a durable artifact fingerprint without downloading its body."""
+        if not file_info or not file_info.metadata:
+            return None
+        try:
+            artifact_size = int(file_info.metadata.get(ARTIFACT_SIZE_METADATA_KEY))
+        except (TypeError, ValueError):
+            return None
+        artifact_hash = file_info.metadata.get(ARTIFACT_HASH_METADATA_KEY)
+        if not artifact_hash:
+            return None
+        return artifact_size, str(artifact_hash)
+
     def _can_delete_replaced_storage_file(self, file_info: Optional[FileInfo]) -> bool:
         """Only delete storage objects that this session created as artifacts."""
         if not file_info or not file_info.file_id or not file_info.metadata:
@@ -457,13 +482,62 @@ class AgentTaskRunner(TaskRunner):
             return
         self._generated_files.append(file_info)
 
+    @staticmethod
+    def _file_delivery_key(file_info: FileInfo) -> str:
+        return str(file_info.file_id or file_info.file_path or file_info.filename)
+
+    @classmethod
+    def _unique_files(cls, files: List[FileInfo]) -> List[FileInfo]:
+        unique: List[FileInfo] = []
+        seen: set[str] = set()
+        for file_info in files:
+            key = cls._file_delivery_key(file_info)
+            if not key or key in seen:
+                continue
+            seen.add(key)
+            unique.append(file_info)
+        return unique
+
     def _is_syncable_artifact(self, file_path: str) -> bool:
         if not file_path:
             return False
         path = PurePosixPath(file_path)
         if any(part in ARTIFACT_EXCLUDED_PARTS for part in path.parts):
             return False
+        if self._is_private_artifact_path(file_path):
+            return False
         return path.suffix.lower() in ARTIFACT_EXTENSIONS
+
+    def _is_private_artifact_path(self, file_path: str) -> bool:
+        if not file_path:
+            return False
+        path = PurePosixPath(file_path)
+        return any(
+            path == PurePosixPath(root) or PurePosixPath(root) in path.parents
+            for root in getattr(self, "_private_artifact_roots", set())
+        )
+
+    def _remember_private_tool_output(self, event: ToolEvent) -> None:
+        """Exclude exact dataset-unpack working roots from artifact delivery."""
+        if event.function_name != "dataset_unpack":
+            return
+        output_dir = (event.function_args or {}).get("output_dir")
+        if not isinstance(output_dir, str):
+            return
+        path = PurePosixPath(output_dir)
+        output_root = PurePosixPath("/home/ubuntu/output")
+        if (
+            not path.is_absolute()
+            or ".." in path.parts
+            or path == output_root
+            or not path.is_relative_to(output_root)
+        ):
+            return
+        roots = getattr(self, "_private_artifact_roots", None)
+        if roots is None:
+            roots = set()
+            self._private_artifact_roots = roots
+        roots.add(str(path))
 
     @staticmethod
     def _is_in_artifact_search_roots(file_path: str) -> bool:
@@ -507,7 +581,12 @@ class AgentTaskRunner(TaskRunner):
         attachments: List[FileInfo] = []
         seen_paths = set()
         for file_path in file_paths:
-            if not file_path or file_path in seen_paths or self._is_data_center_dataset_path(file_path):
+            if (
+                not file_path
+                or file_path in seen_paths
+                or self._is_data_center_dataset_path(file_path)
+                or self._is_private_artifact_path(file_path)
+            ):
                 continue
             seen_paths.add(file_path)
             file_info = await self._sync_file_to_storage(file_path)
@@ -515,6 +594,19 @@ class AgentTaskRunner(TaskRunner):
                 attachments.append(file_info)
                 self._remember_generated_file(file_info)
         return attachments
+
+    def _known_generated_file(self, file_path: str) -> Optional[FileInfo]:
+        """Return a file already synchronized during this runner lifecycle."""
+        if file_path not in self._artifact_fingerprint_state():
+            return None
+        return next(
+            (
+                item
+                for item in reversed(self._generated_files)
+                if item.file_path == file_path and item.file_id
+            ),
+            None,
+        )
 
     async def _list_sandbox_artifacts(self) -> List[str]:
         discovered_paths: List[str] = []
@@ -543,19 +635,50 @@ class AgentTaskRunner(TaskRunner):
         baseline_paths = await self._list_sandbox_artifacts()
         self._artifact_baseline_paths = set(baseline_paths)
         self._artifact_fingerprints = {}
-        for file_path in baseline_paths:
-            try:
-                _, fingerprint = await self._read_artifact_with_fingerprint(file_path)
-                self._artifact_fingerprints[file_path] = fingerprint
-            except Exception as exc:
-                logger.warning(
-                    "Agent %s could not fingerprint baseline artifact %s: %s",
-                    self._agent_id,
-                    file_path,
-                    exc,
-                )
+        # Session artifact uploads already carry size + sha256 metadata.  Reuse
+        # that metadata instead of downloading every historical output at the
+        # beginning of every task runner invocation.  Legacy session files do
+        # not have this metadata, so hash those bodies once at task start; a
+        # later overwrite can then be distinguished from untouched pre-task
+        # output and delivered normally.
+        files_by_path: dict[str, FileInfo] = {}
+        try:
+            session = await self._session_repository.find_by_id(self._session_id)
+            files_by_path = {
+                item.file_path: item
+                for item in (getattr(session, "files", None) or [])
+                if item.file_path
+            }
+        except Exception as exc:
+            logger.warning(
+                "Agent %s could not load artifact baseline metadata: %s",
+                self._agent_id,
+                exc,
+            )
 
-    async def _sync_discovered_artifacts_to_storage(self) -> List[FileInfo]:
+        for file_path in baseline_paths:
+            fingerprint = self._fingerprint_from_file_info(files_by_path.get(file_path))
+            if fingerprint is None:
+                try:
+                    _, fingerprint = await self._read_artifact_with_fingerprint(file_path)
+                except Exception as exc:
+                    # Keep the path-only compatibility fallback when a legacy
+                    # body cannot be read.  Discovery will observe it without
+                    # publishing once, as before.
+                    logger.warning(
+                        "Agent %s could not fingerprint legacy baseline artifact %s: %s",
+                        self._agent_id,
+                        file_path,
+                        exc,
+                    )
+                    continue
+            self._artifact_fingerprints[file_path] = fingerprint
+
+    async def _sync_discovered_artifacts_to_storage(
+        self,
+        *,
+        skip_paths: Optional[set[str]] = None,
+    ) -> List[FileInfo]:
         current_paths = await self._list_sandbox_artifacts()
         current_path_set = set(current_paths)
         baseline = self._artifact_baseline_state()
@@ -566,9 +689,12 @@ class AgentTaskRunner(TaskRunner):
             fingerprints.pop(removed_path, None)
 
         attachments: List[FileInfo] = []
+        skipped = skip_paths or set()
         for file_path in current_paths:
             if len(attachments) >= MAX_AUTO_SYNC_ARTIFACTS:
                 break
+            if file_path in skipped:
+                continue
             try:
                 file_data, fingerprint = await self._read_artifact_with_fingerprint(file_path)
             except Exception as exc:
@@ -617,23 +743,31 @@ class AgentTaskRunner(TaskRunner):
         attachments: List[FileInfo] = []
         try:
             if event.attachments:
-                attachments.extend(await self._sync_explicit_paths_to_storage([
-                    attachment.file_path for attachment in event.attachments
-                ]))
+                paths_to_sync: List[str] = []
+                for attachment in event.attachments:
+                    if not attachment.file_path:
+                        continue
+                    known = self._known_generated_file(attachment.file_path)
+                    if known is not None:
+                        attachments.append(known)
+                    else:
+                        paths_to_sync.append(attachment.file_path)
+                attachments.extend(await self._sync_explicit_paths_to_storage(paths_to_sync))
             event.attachments = attachments
         except Exception as e:
             logger.exception(f"Agent {self._agent_id} failed to sync attachments to storage: {e}")
 
-    async def _sync_step_attachments_to_storage(self, event: StepEvent) -> None:
+    async def _sync_step_attachments_to_storage(self, event: StepEvent) -> List[FileInfo]:
         """Sync files explicitly reported by a completed step."""
         try:
             if event.status == StepStatus.COMPLETED and event.step.attachments:
-                await self._sync_explicit_paths_to_storage(event.step.attachments)
+                return await self._sync_explicit_paths_to_storage(event.step.attachments)
         except Exception as e:
             logger.exception(f"Agent {self._agent_id} failed to sync step attachments to storage: {e}")
+        return []
 
     def _should_attach_generated_files_to_message(self) -> bool:
-        """Only the final summary message should render auto-collected files."""
+        """Return whether the current assistant message is the final summary."""
         return getattr(self._flow, "status", None) == AgentStatus.SUMMARIZING
 
     def _shell_console_for_event(self, console: list, event: ToolEvent) -> list:
@@ -813,6 +947,10 @@ class AgentTaskRunner(TaskRunner):
                     mcp_access_all=bool(metadata.get("mcp_access_all", False)),
                 )
 
+                # Generated attachments belong to one user turn.  Keeping files
+                # from an earlier turn here makes later summaries re-deliver
+                # stale artifacts even when nothing changed.
+                self._generated_files = []
                 async for event in self._run_flow(message_obj):
                     await self._put_and_add_event(task, event)
                     if isinstance(event, TitleEvent):
@@ -840,7 +978,10 @@ class AgentTaskRunner(TaskRunner):
                 traceback.print_exc()
                 debugpy.breakpoint()  # This will pause execution if a debugger is attached
             
-            await self._put_and_add_event(task, ErrorEvent(error=f"Task error: {str(e)}"))
+            await self._put_and_add_event(
+                task,
+                ErrorEvent(error=public_error_message(f"Task error: {e}")),
+            )
             await self._session_repository.update_status(self._session_id, SessionStatus.COMPLETED)
 
     async def _initialize_mcp_tool(self, selected_servers: List[str], *, is_admin: bool = False) -> None:
@@ -908,56 +1049,224 @@ class AgentTaskRunner(TaskRunner):
 
         artifact_discovery_dirty = False
         artifact_discovery_ran = False
+        delivered_file_keys: set[str] = set()
+        completed_step_count = 0
+        early_artifact_delivery_count = 0
+        skip_next_step_result: Optional[str] = None
+        # Completion advice only needs the current turn.  Keeping this compact
+        # also avoids loading and serializing the full session at Done time.
+        turn_events: List[BaseEvent] = [
+            MessageEvent(role="user", message=message.message)
+        ]
 
         async for event in self._flow.run(message):
+            pre_events: List[BaseEvent] = []
+            post_events: List[BaseEvent] = []
+            suppress_event = False
             if isinstance(event, ToolEvent):
                 # TODO: move to tool function
+                self._remember_private_tool_output(event)
                 await self._handle_tool_event(event)
                 if event.status == ToolStatus.CALLED:
                     # Tools may create or replace files.  Defer discovery until
                     # the step boundary instead of scanning after every event.
                     artifact_discovery_dirty = True
             elif isinstance(event, StepEvent):
-                await self._sync_step_attachments_to_storage(event)
+                explicit_files = await self._sync_step_attachments_to_storage(event)
                 if event.status == StepStatus.COMPLETED and (
                     artifact_discovery_dirty or not artifact_discovery_ran
                 ):
-                    await self._sync_discovered_artifacts_to_storage()
+                    # Explicit step attachments were just downloaded, hashed and
+                    # uploaded.  Do not download the same bytes again during the
+                    # output-directory discovery pass in this step.
+                    explicit_paths = {
+                        file_info.file_path
+                        for file_info in explicit_files
+                        if file_info.file_path
+                    }
+                    if explicit_paths:
+                        discovered_files = await self._sync_discovered_artifacts_to_storage(
+                            skip_paths=explicit_paths,
+                        )
+                    else:
+                        discovered_files = await self._sync_discovered_artifacts_to_storage()
                     artifact_discovery_dirty = False
                     artifact_discovery_ran = True
+                else:
+                    discovered_files = []
+
+                if event.status == StepStatus.COMPLETED:
+                    completed_step_count += 1
+                    new_files = [
+                        file_info
+                        for file_info in self._unique_files(explicit_files + discovered_files)
+                        if self._file_delivery_key(file_info) not in delivered_file_keys
+                    ]
+                    if new_files:
+                        result_message = (event.step.result or "").strip()
+                        delivery_message = result_message or f"已生成 {len(new_files)} 个结果文件。"
+                        delivery_event = MessageEvent(
+                            role="assistant",
+                            message=delivery_message,
+                            attachments=new_files,
+                            metadata={
+                                "artifact_delivery": True,
+                                "step_id": event.step.id,
+                            },
+                        )
+                        delivered_file_keys.update(
+                            self._file_delivery_key(file_info) for file_info in new_files
+                        )
+                        early_artifact_delivery_count += 1
+                        post_events.append(delivery_event)
+                        if result_message:
+                            # ExecutionAgent emits step.result immediately after
+                            # StepEvent.  The delivery event above is that same
+                            # answer with its files attached, so discard the
+                            # following attachment-free duplicate.
+                            skip_next_step_result = result_message
             elif isinstance(event, MessageEvent):
-                if self._should_attach_generated_files_to_message() and (
+                is_summary = self._should_attach_generated_files_to_message()
+                summary_discovered_files: List[FileInfo] = []
+                normalized_message = (event.message or "").strip()
+                if (
+                    skip_next_step_result is not None
+                    and not is_summary
+                    and not event.attachments
+                    and normalized_message == skip_next_step_result
+                ):
+                    suppress_event = True
+                    skip_next_step_result = None
+                elif skip_next_step_result is not None and not is_summary:
+                    skip_next_step_result = None
+
+                if not suppress_event and is_summary and (
                     artifact_discovery_dirty or not artifact_discovery_ran
                 ):
-                    await self._sync_discovered_artifacts_to_storage()
+                    summary_discovered_files = await self._sync_discovered_artifacts_to_storage()
                     artifact_discovery_dirty = False
                     artifact_discovery_ran = True
-                await self._sync_message_attachments_to_storage(event)
-                if (
-                    not event.attachments
-                    and self._generated_files
-                    and self._should_attach_generated_files_to_message()
-                ):
-                    event.attachments = self._generated_files
+                if not suppress_event:
+                    await self._sync_message_attachments_to_storage(event)
+                    event.attachments = [
+                        file_info
+                        for file_info in self._unique_files(
+                            list(event.attachments or []) + summary_discovered_files
+                        )
+                        if self._file_delivery_key(file_info) not in delivered_file_keys
+                    ]
+                    if event.attachments:
+                        delivered_file_keys.update(
+                            self._file_delivery_key(file_info)
+                            for file_info in event.attachments
+                        )
+                    # A one-step result with artifacts was already delivered at
+                    # the completed-step boundary.  Do not show a second LLM
+                    # rendition of the same answer merely to carry those files.
+                    if (
+                        is_summary
+                        and completed_step_count == 1
+                        and early_artifact_delivery_count == 1
+                        and not event.attachments
+                    ):
+                        suppress_event = True
+            elif isinstance(event, ErrorEvent):
+                # The live SSE consumer treats ErrorEvent as terminal.  Publish
+                # any durable partial outputs first; otherwise they are uploaded
+                # later at Done time and exist in history, but the connected user
+                # never receives them before the stream closes.
+                if artifact_discovery_dirty or not artifact_discovery_ran:
+                    partial_files = await self._sync_discovered_artifacts_to_storage()
+                    artifact_discovery_dirty = False
+                    artifact_discovery_ran = True
+                    partial_files = [
+                        file_info
+                        for file_info in partial_files
+                        if self._file_delivery_key(file_info) not in delivered_file_keys
+                    ]
+                    if partial_files:
+                        delivered_file_keys.update(
+                            self._file_delivery_key(file_info)
+                            for file_info in partial_files
+                        )
+                        pre_events.append(
+                            MessageEvent(
+                                role="assistant",
+                                message=(
+                                    f"任务未能完整完成，但已保留 {len(partial_files)} "
+                                    "个阶段性结果文件。"
+                                ),
+                                attachments=partial_files,
+                                metadata={
+                                    "artifact_delivery": True,
+                                    "partial": True,
+                                },
+                            )
+                        )
             elif isinstance(event, WaitEvent):
                 if artifact_discovery_dirty or not artifact_discovery_ran:
-                    await self._sync_discovered_artifacts_to_storage()
+                    late_files = await self._sync_discovered_artifacts_to_storage()
                     artifact_discovery_dirty = False
                     artifact_discovery_ran = True
+                    late_files = [
+                        file_info
+                        for file_info in late_files
+                        if self._file_delivery_key(file_info) not in delivered_file_keys
+                    ]
+                    if late_files:
+                        delivered_file_keys.update(
+                            self._file_delivery_key(file_info) for file_info in late_files
+                        )
+                        pre_events.append(
+                            MessageEvent(
+                                role="assistant",
+                                message=f"已生成 {len(late_files)} 个结果文件。",
+                                attachments=late_files,
+                                metadata={"artifact_delivery": True},
+                            )
+                        )
             elif isinstance(event, DoneEvent):
                 if artifact_discovery_dirty or not artifact_discovery_ran:
-                    await self._sync_discovered_artifacts_to_storage()
+                    late_files = await self._sync_discovered_artifacts_to_storage()
                     artifact_discovery_dirty = False
                     artifact_discovery_ran = True
-                session = await self._session_repository.find_by_id(self._session_id)
-                if session:
+                    late_files = [
+                        file_info
+                        for file_info in late_files
+                        if self._file_delivery_key(file_info) not in delivered_file_keys
+                    ]
+                    if late_files:
+                        delivered_file_keys.update(
+                            self._file_delivery_key(file_info) for file_info in late_files
+                        )
+                        pre_events.append(
+                            MessageEvent(
+                                role="assistant",
+                                message=f"已生成 {len(late_files)} 个结果文件。",
+                                attachments=late_files,
+                                metadata={"artifact_delivery": True},
+                            )
+                        )
+                completion_advice_service = getattr(
+                    self,
+                    "_completion_advice_service",
+                    None,
+                )
+                if completion_advice_service is not None:
                     try:
-                        events = await self._session_repository.get_events(self._session_id)
-                        advice = await self._completion_advice_service.analyze(events)
-                        event.advice = self._completion_advice_service.to_payload(advice)
+                        advice = completion_advice_service.analyze_fast(turn_events)
+                        event.advice = completion_advice_service.to_payload(advice)
                     except Exception as exc:
                         logger.warning("Failed to build completion advice for session %s: %s", self._session_id, exc)
-            yield event
+            for pre_event in pre_events:
+                yield pre_event
+                turn_events.append(pre_event)
+            if not suppress_event:
+                yield event
+                turn_events.append(event)
+            for post_event in post_events:
+                yield post_event
+                turn_events.append(post_event)
 
         logger.info(f"Agent {self._agent_id} completed processing one message")
 

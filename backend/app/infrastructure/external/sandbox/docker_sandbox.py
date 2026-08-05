@@ -56,6 +56,36 @@ class DockerSandbox(Sandbox):
         self.base_url = f"http://{self.ip}:8080"
         self._vnc_url = f"ws://{self.ip}:5901"
         self._cdp_url = f"http://{self.ip}:9222"
+
+    @staticmethod
+    def _tool_result_from_response(response, operation: str) -> ToolResult:
+        """Normalize sandbox responses while older sandbox images are drained.
+
+        Older images reported a successful HTTP operation as a successful tool
+        even when a command returned non-zero or a replacement changed nothing.
+        Keep the adapter defensive so agents receive truthful execution state
+        during rolling upgrades as well as from current images.
+        """
+        result = ToolResult(**response.json())
+        data = result.data if isinstance(result.data, dict) else {}
+
+        if operation in {"shell_exec", "shell_wait"}:
+            returncode = data.get("returncode")
+            if data.get("status") == "completed" and returncode not in (None, 0):
+                return ToolResult(
+                    success=False,
+                    message=f"Command failed with return code: {returncode}",
+                    data=result.data,
+                )
+
+        if operation == "file_replace" and data.get("replaced_count") == 0:
+            return ToolResult(
+                success=False,
+                message="Replacement made no changes: target text was not found",
+                data=result.data,
+            )
+
+        return result
     
     @property
     def id(self) -> str:
@@ -369,7 +399,7 @@ class DockerSandbox(Sandbox):
                 "command": command
             }
         )
-        return ToolResult(**response.json())
+        return self._tool_result_from_response(response, "shell_exec")
 
     async def view_shell(self, session_id: str, console: bool = False) -> ToolResult:
         response = await self.client.post(
@@ -389,7 +419,7 @@ class DockerSandbox(Sandbox):
                 "seconds": seconds
             }
         )
-        return ToolResult(**response.json())
+        return self._tool_result_from_response(response, "shell_wait")
 
     async def write_to_process(self, session_id: str, input_text: str, press_enter: bool = True) -> ToolResult:
         response = await self.client.post(
@@ -528,7 +558,7 @@ class DockerSandbox(Sandbox):
                 "sudo": sudo
             }
         )
-        return ToolResult(**response.json())
+        return self._tool_result_from_response(response, "file_replace")
 
     async def file_search(self, file: str, regex: str, sudo: bool = False) -> ToolResult:
         """Search in file content

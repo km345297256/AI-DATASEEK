@@ -9,6 +9,7 @@ from app.domain.models.session import Session, SessionStatus
 from app.domain.external.sandbox import Sandbox
 from app.domain.external.search import SearchEngine
 from app.domain.models.event import BaseEvent, ErrorEvent, DoneEvent, MessageEvent, WaitEvent, AgentEvent
+from app.domain.utils.public_error import public_error_message
 from pydantic import TypeAdapter
 from app.domain.repositories.agent_repository import AgentRepository
 from app.domain.repositories.session_repository import SessionRepository
@@ -238,7 +239,10 @@ class AgentDomainService:
     async def _handle_chat_bootstrap_error(self, session_id: str, exc: BaseException) -> None:
         logger.exception("Chat bootstrap failed for session %s: %s", session_id, exc)
         try:
-            await self._session_repository.add_event(session_id, ErrorEvent(error=str(exc)))
+            await self._session_repository.add_event(
+                session_id,
+                ErrorEvent(error=public_error_message(exc)),
+            )
             await self._session_repository.update_status(session_id, SessionStatus.COMPLETED)
         except Exception:
             logger.exception("Failed to persist chat bootstrap error for session %s", session_id)
@@ -532,7 +536,7 @@ class AgentDomainService:
             raise
         except Exception as e:
             logger.exception(f"Error in Session {session_id}")
-            event = ErrorEvent(error=str(e))
+            event = ErrorEvent(error=public_error_message(e))
             try:
                 await self._session_repository.add_event(session_id, event)
             except Exception as persist_error:
