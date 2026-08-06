@@ -41,6 +41,11 @@ class Settings(BaseSettings):
     llm_retry_attempts: int = 4
     llm_retry_base_seconds: float = 1.0
     llm_retry_max_seconds: float = 8.0
+    # Once the bounded tool budget is exhausted, the Agent gets one tool-free
+    # turn to synthesize the evidence it already collected. Keep this separate
+    # from provider/network retries and from the dataset quicklook synthesis
+    # deadline, which has its own larger professional-analysis budget.
+    agent_finalization_timeout_seconds: float = 45.0
 
     # System-owned safety gate. It always runs before Planner and is not part
     # of a user-editable Agent profile. If review is unavailable, it fails closed.

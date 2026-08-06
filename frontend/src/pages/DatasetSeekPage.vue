@@ -216,7 +216,12 @@
           <div v-else class="dataset-chat-list flex min-w-0 max-w-full flex-col gap-2">
             <template v-for="(message, index) in messages" :key="`${message.type}-${index}`">
               <div class="dataset-chat-message min-w-0 max-w-full">
-                <ChatMessage :message="message" :session-id="sessionId || undefined" :hide-header="isConsecutiveAssistant(messages, index)" />
+                <ChatMessage
+                  :message="message"
+                  :session-id="sessionId || undefined"
+                  :hide-header="isConsecutiveAssistant(messages, index)"
+                  @toolClick="handleToolClick"
+                />
               </div>
               <div
                 v-if="imageArtifacts(message).length"
@@ -344,6 +349,13 @@
         </div>
       </div>
     </main>
+    <ToolPanel
+      ref="toolPanel"
+      :session-id="sessionId || undefined"
+      :real-time="toolPanelRealTime"
+      :is-share="false"
+      @jump-to-real-time="jumpToLatestTool"
+    />
     <FilePanel resizable :reserved-width="catalogCollapsed ? 56 : 304" />
   </div>
   <SessionFileList :session-id="sessionId || undefined" />
@@ -358,6 +370,7 @@ import AgentSelector from '@/components/AgentSelector.vue';
 import ChatMessage from '@/components/ChatMessage.vue';
 import FilePanel from '@/components/FilePanel.vue';
 import SessionFileList from '@/components/SessionFileList.vue';
+import ToolPanel from '@/components/ToolPanel.vue';
 import { createSession, getSession, chatWithSession, stopSession } from '@/api/agent';
 import { API_CONFIG } from '@/api/client';
 import { generateDatasetSuggestedQuestions, getDataCenterDataset, listDatasetChatSessions, type DataCenterDataset, type DatasetChatSession } from '@/api/dataset';
@@ -413,6 +426,9 @@ const timelineContentRef = ref<HTMLElement>();
 const shouldFollowTimeline = ref(true);
 const currentPlan = ref<PlanEventData>();
 const lastTool = ref<ToolContent>();
+const lastNoMessageTool = ref<ToolContent>();
+const toolPanel = ref<InstanceType<typeof ToolPanel>>();
+const toolPanelRealTime = ref(true);
 let cancelChat: (() => void) | null = null;
 let timelineResizeObserver: ResizeObserver | null = null;
 let datasetSummaryResizeObserver: ResizeObserver | null = null;
@@ -527,10 +543,35 @@ function handleCatalogViewportChange(event: MediaQueryListEvent) {
 }
 
 function startUserTurn() {
+  closeToolPanel();
   shouldFollowTimeline.value = true;
   failRunningSteps(messages.value, false);
   currentPlan.value = undefined;
   lastTool.value = undefined;
+  lastNoMessageTool.value = undefined;
+}
+
+function closeToolPanel() {
+  toolPanel.value?.hideToolPanel();
+  toolPanelRealTime.value = true;
+}
+
+function handleToolClick(tool: ToolContent) {
+  if (!sessionId.value) return;
+  toolPanelRealTime.value = false;
+  toolPanel.value?.showToolPanel(tool, false);
+}
+
+function jumpToLatestTool() {
+  toolPanelRealTime.value = true;
+  if (!lastNoMessageTool.value) {
+    toolPanel.value?.hideToolPanel();
+    return;
+  }
+  toolPanel.value?.showToolPanel(
+    lastNoMessageTool.value,
+    lastNoMessageTool.value.status === 'calling',
+  );
 }
 
 function handleMessage(data: MessageEventData) {
@@ -549,6 +590,15 @@ function handleTool(data: ToolEventData) {
     if (runningStep) runningStep.tools.push(tool);
     else messages.value.push({ type: 'tool', content: tool });
     lastTool.value = tool;
+  }
+  if (tool.name !== 'message') {
+    lastNoMessageTool.value = lastTool.value;
+    if (toolPanelRealTime.value && lastNoMessageTool.value) {
+      toolPanel.value?.showToolPanel(
+        lastNoMessageTool.value,
+        lastNoMessageTool.value.status === 'calling',
+      );
+    }
   }
 }
 
@@ -708,11 +758,13 @@ function askSuggestion(question: string) {
 }
 
 function clearConversationState() {
+  closeToolPanel();
   shouldFollowTimeline.value = true;
   lastEventId.value = undefined;
   messages.value = [];
   currentPlan.value = undefined;
   lastTool.value = undefined;
+  lastNoMessageTool.value = undefined;
   isLoading.value = false;
   loadingStatus.value = '';
 }
@@ -809,6 +861,7 @@ onMounted(async () => {
 
 onUnmounted(() => {
   cancelChat?.();
+  closeToolPanel();
   timelineResizeObserver?.disconnect();
   datasetSummaryResizeObserver?.disconnect();
   desktopCatalogMediaQuery?.removeEventListener('change', handleCatalogViewportChange);

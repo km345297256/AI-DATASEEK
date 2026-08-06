@@ -65,6 +65,21 @@ def public_error_message(value: object) -> str:
     if not message:
         return PUBLIC_ERROR_FALLBACK
 
+    # Internal terminal-state identifiers are useful in logs and metrics, but
+    # they are not actionable user messages. Keep the public SSE contract
+    # stable and human-readable across execution, repair, and provider failures.
+    normalized = message.casefold()
+    if "finalization_timeout" in normalized:
+        return "分析过程未能在等待时限内生成最终回答，请重试或缩小问题范围。"
+    if "finalization_failed" in normalized:
+        return "分析过程暂时无法生成最终回答，请稍后重试。"
+    if "invalid_final_result" in normalized:
+        return "分析已经结束，但未能生成可用的最终回答，请重试。"
+    if "maximum iteration count" in normalized:
+        return "分析步骤已达到本次执行上限，请缩小问题范围后重试。"
+    if "validation error for executionresult" in normalized:
+        return "分析结果格式异常，系统未能生成可用回答，请重试。"
+
     def replace_quoted(match: re.Match[str]) -> str:
         quote = match.group("quote")
         return f"{quote}[redacted path]{quote}"

@@ -1,3 +1,6 @@
+import asyncio
+import json
+
 import pytest
 import httpx
 from types import SimpleNamespace
@@ -5,20 +8,12 @@ from unittest.mock import AsyncMock, MagicMock, patch
 from langchain.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
 from openai import APIConnectionError, BadRequestError, InternalServerError
 
-from app.domain.models.event import (
-    ErrorEvent,
-    McpToolContent,
-    MessageEvent,
-    PlanEvent,
-    PlanStatus,
-    StepEvent,
-    StepStatus,
-    ToolEvent,
-    ToolStatus,
-)
+from app.domain.models.event import ErrorEvent, McpToolContent, MessageEvent, StepEvent, StepStatus, ToolEvent, ToolStatus
+from app.domain.models.event import PlanEvent, PlanStatus
 from app.domain.models.message import Message
-from app.domain.models.plan import ExecutionStatus, Plan, Step
 from app.domain.models.session import SessionStatus
+from app.domain.models.plan import ExecutionResult, ExecutionStatus, Plan, Step
+from app.domain.models.tool_result import ToolResult
 from app.domain.services.agents.execution import ExecutionAgent
 from app.domain.services.agents.base import BaseAgent, LLMServiceUnavailableError
 from app.domain.services.agent_task_runner import AgentTaskRunner
@@ -70,6 +65,306 @@ async def test_null_execution_payload_fails_cleanly_without_validation_exception
     assert step.success is False
     assert step.error
     assert "validation error for ExecutionResult" not in step.error
+    assert any(
+        isinstance(event, StepEvent) and event.status == StepStatus.FAILED
+        for event in events
+    )
+    assert any(isinstance(event, ErrorEvent) for event in events)
+
+
+@pytest.mark.asyncio
+async def test_failed_execution_payload_without_result_is_not_silently_accepted():
+    agent = object.__new__(ExecutionAgent)
+    agent._parse_json = AsyncMock(return_value={
+        "success": False,
+        "result": None,
+        "attachments": [],
+    })
+
+    result = await agent._decode_execution_result(
+        '{"success":false,"result":null,"attachments":[]}'
+    )
+
+    assert result is None
+
+
+def _completed_shell_result(output: str) -> ToolMessage:
+    return ToolMessage(
+        tool_call_id="call-stdout",
+        name="shell_run",
+        content="completed",
+        artifact=ToolResult(
+            success=True,
+            message="Command completed successfully",
+            data={
+                "status": "completed",
+                "returncode": 0,
+                "output": output,
+            },
+        ),
+    )
+
+
+@pytest.mark.asyncio
+async def test_explicit_stdout_request_finishes_after_one_successful_shell_batch():
+    agent = object.__new__(ExecutionAgent)
+    agent.max_iterations = 4
+    agent._dataset_fast_path_mode = True
+    agent._dataset_intent = ExecutionAgent.DATASET_INTENT_ANALYSIS
+    agent._allow_terminal_quicklook = False
+    agent._current_plan = Plan(language="zh")
+    agent._current_message = Message(
+        message="请执行脚本统计扩展名，并把标准输出反馈在对话中。"
+    )
+    first = AIMessage(content="", tool_calls=[{
+        "name": "shell_run",
+        "args": {"command": "count extensions"},
+        "id": "call-stdout",
+    }])
+    agent.ask = AsyncMock(return_value=first)
+    agent.ask_with_messages = AsyncMock(return_value=AIMessage(content=(
+        '{"success":true,"result":"统计完成：共 59 个文件，其中 JPG/jpg 合计 55 个、'
+        'xlsx 2 个、pdf 2 个。","attachments":[]}'
+    )))
+    agent.get_tool = lambda _name: SimpleNamespace(
+        toolkit=SimpleNamespace(name="shell")
+    )
+    agent.invoke_tool = AsyncMock(return_value=_completed_shell_result(
+        "     50 JPG\n      5 jpg\n      2 xlsx\n      2 pdf\n"
+    ))
+
+    events = [event async for event in agent.execute("count extensions")]
+
+    message_event = next(event for event in events if isinstance(event, MessageEvent))
+    result = ExecutionResult.model_validate_json(message_event.message)
+    assert result.success is True
+    assert "59 个文件" in result.result
+    assert "JPG/jpg 合计 55 个" in result.result
+    assert "```" not in result.result
+    assert "50 JPG\n" not in result.result
+    assert sum(isinstance(event, ToolEvent) for event in events) == 2
+    agent.ask_with_messages.assert_awaited_once()
+    call = agent.ask_with_messages.await_args
+    assert call.kwargs["allow_tools"] is False
+    assert call.kwargs["max_tokens"] == agent.TOOL_FREE_COMPLETION_MAX_TOKENS
+    assert "50 JPG" in call.args[0][-1].content
+    assert all("50 JPG" not in item.content for item in call.args[0][:-1])
+
+
+def test_shell_stdout_answer_is_sanitized_and_not_used_for_mixed_analysis():
+    agent = object.__new__(ExecutionAgent)
+    agent._current_plan = Plan(language="zh")
+    agent._dataset_fast_path_mode = False
+    agent._current_message = Message(
+        message="执行脚本并把标准输出反馈给我"
+    )
+    tool_result = _completed_shell_result(
+        "TOKEN=super-secret /root/private/data.nc\nfinished=true"
+    )
+
+    assert agent._completion_from_tool_batch([tool_result]) is None
+    instruction = agent._tool_free_completion_instruction([tool_result])
+    assert instruction is not None
+    assert "super-secret" not in instruction
+    assert "/root/private" not in instruction
+    assert "[敏感参数已隐藏]" in instruction
+    assert "[受保护路径]" in instruction
+
+    agent._current_message = Message(
+        message="执行脚本，分析趋势并解释标准输出"
+    )
+    assert agent._completion_from_tool_batch([tool_result]) is None
+    assert agent._tool_free_completion_instruction([tool_result]) is None
+
+    partial = agent._completion_from_finalization_failure(
+        [({"name": "shell_run", "args": {}, "id": "call-stdout"}, tool_result)],
+        reason="finalization_timeout",
+    )
+    partial_result = ExecutionResult.model_validate_json(partial)
+    assert partial_result.success is False
+    assert "后续自动分析未能完成" in partial_result.result
+    assert "super-secret" not in partial_result.result
+    assert "```" not in partial_result.result
+
+
+def test_empty_successful_stdout_is_summarized_without_reopening_tools():
+    agent = object.__new__(ExecutionAgent)
+    agent._current_plan = Plan(language="zh")
+    agent._current_message = Message(
+        message="运行脚本并告诉我脚本输出结果"
+    )
+    tool_result = _completed_shell_result("\n\t")
+
+    instruction = agent._tool_free_completion_instruction([tool_result])
+    fallback = agent._shell_output_completion([tool_result], direct=True)
+
+    assert instruction is not None
+    result = ExecutionResult.model_validate_json(fallback)
+    assert result.success is True
+    assert "未产生需要展示的文本结果" in result.result
+    assert "```" not in result.result
+
+
+def test_unknown_shell_output_fallback_never_replays_path_lines():
+    agent = object.__new__(ExecutionAgent)
+    agent._current_plan = Plan(language="zh")
+    agent._current_message = Message(
+        message="运行命令并反馈命令输出结果"
+    )
+    raw_paths = (
+        "./sources/dataset/rain_195101.nc\n"
+        "./sources/dataset/rain_195102.nc\n"
+        "./sources/dataset/rain_195103.nc"
+    )
+
+    completion = agent._shell_output_completion(
+        [_completed_shell_result(raw_paths)],
+        direct=True,
+    )
+
+    result = ExecutionResult.model_validate_json(completion)
+    assert result.success is True
+    assert "3 条非空记录" in result.result
+    assert "sources" not in result.result
+    assert ".nc" not in result.result
+
+
+@pytest.mark.parametrize("query", [
+    "执行脚本输出统计结果并可视化",
+    "运行命令输出结果并导出报告",
+    "run a script, summarize the script output, and plot a chart",
+    "execute the command output and save an attachment",
+])
+def test_mixed_shell_deliverables_do_not_terminate_at_first_output(query):
+    message = Message(message=query)
+
+    assert ExecutionAgent._explicit_shell_output_request(message) is True
+    assert ExecutionAgent._direct_shell_output_request(message) is False
+
+
+@pytest.mark.asyncio
+async def test_invalid_raw_stdout_synthesis_falls_back_to_natural_summary_once():
+    agent = object.__new__(ExecutionAgent)
+    agent.max_iterations = 4
+    agent._dataset_fast_path_mode = False
+    agent._current_plan = Plan(language="zh")
+    agent._current_message = Message(
+        message="执行脚本统计扩展名，并把标准输出结果告诉我"
+    )
+    agent.ask = AsyncMock(return_value=AIMessage(content="", tool_calls=[{
+        "name": "shell_run",
+        "args": {"command": "count extensions"},
+        "id": "call-stdout",
+    }]))
+    raw_output = "50 JPG\n5 jpg\n2 xlsx\n2 pdf"
+    agent.ask_with_messages = AsyncMock(return_value=AIMessage(content=json.dumps({
+        "success": True,
+        "result": raw_output,
+        "attachments": [],
+    }, ensure_ascii=False)))
+    agent.get_tool = lambda _name: SimpleNamespace(
+        toolkit=SimpleNamespace(name="shell")
+    )
+    agent.invoke_tool = AsyncMock(return_value=_completed_shell_result(raw_output))
+
+    events = [event async for event in agent.execute("count extensions")]
+
+    message_event = next(event for event in events if isinstance(event, MessageEvent))
+    result = ExecutionResult.model_validate_json(message_event.message)
+    assert result.success is True
+    assert "共识别 3 类、合计 59 项" in result.result
+    assert "JPG 55" in result.result
+    assert "```" not in result.result
+    assert raw_output not in result.result
+    agent.ask_with_messages.assert_awaited_once()
+
+
+def test_shell_summary_validation_rejects_sensitive_values_paths_and_attachments():
+    agent = object.__new__(ExecutionAgent)
+    agent._terminal_shell_outputs = ["count=3"]
+
+    secret = AIMessage(content=json.dumps({
+        "success": True,
+        "result": "TOKEN=super-secret，count 为 3。",
+        "attachments": [],
+    }, ensure_ascii=False))
+    internal_path = AIMessage(content=json.dumps({
+        "success": True,
+        "result": "结果来自 ./sources/dataset/file.nc，count 为 3。",
+        "attachments": [],
+    }, ensure_ascii=False))
+    invented_attachment = AIMessage(content=json.dumps({
+        "success": True,
+        "result": "count 为 3。",
+        "attachments": ["/home/ubuntu/output/invented.csv"],
+    }, ensure_ascii=False))
+
+    assert agent._tool_free_completion_is_valid(secret) is False
+    assert agent._tool_free_completion_is_valid(internal_path) is False
+    assert agent._tool_free_completion_is_valid(invented_attachment) is False
+
+
+@pytest.mark.asyncio
+async def test_stdout_summary_timeout_returns_local_summary_without_error():
+    agent = object.__new__(ExecutionAgent)
+    agent.max_iterations = 4
+    agent.TOOL_FREE_COMPLETION_TIMEOUT_SECONDS = 0.01
+    agent._dataset_fast_path_mode = False
+    agent._current_plan = Plan(language="zh")
+    agent._current_message = Message(
+        message="运行脚本统计文件类型并反馈脚本输出结果"
+    )
+    agent.ask = AsyncMock(return_value=AIMessage(content="", tool_calls=[{
+        "name": "shell_run",
+        "args": {"command": "count extensions"},
+        "id": "call-stdout",
+    }]))
+
+    async def slow_summary(*_args, **_kwargs):
+        await asyncio.sleep(1)
+        return AIMessage(content="unreachable")
+
+    agent.ask_with_messages = AsyncMock(side_effect=slow_summary)
+    agent.get_tool = lambda _name: SimpleNamespace(
+        toolkit=SimpleNamespace(name="shell")
+    )
+    agent.invoke_tool = AsyncMock(return_value=_completed_shell_result(
+        "55 jpg\n2 xlsx\n2 pdf"
+    ))
+
+    events = [event async for event in agent.execute("count extensions")]
+
+    assert not any(isinstance(event, ErrorEvent) for event in events)
+    message_event = next(event for event in events if isinstance(event, MessageEvent))
+    result = ExecutionResult.model_validate_json(message_event.message)
+    assert result.success is True
+    assert "共识别 3 类、合计 59 项" in result.result
+    assert "```" not in result.result
+    agent.ask_with_messages.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_execution_step_never_marks_an_empty_event_stream_completed():
+    agent = object.__new__(ExecutionAgent)
+    agent.reset_context = AsyncMock()
+
+    async def empty_execute(*_args, **_kwargs):
+        if False:
+            yield MessageEvent(message="unreachable")
+
+    agent.execute = empty_execute
+    step = Step(description="analyze dataset")
+    events = [
+        event
+        async for event in agent.execute_step(
+            Plan(language="zh", steps=[step]),
+            step,
+            Message(message="分析这个数据集"),
+        )
+    ]
+
+    assert step.status == ExecutionStatus.FAILED
+    assert step.success is False
     assert any(
         isinstance(event, StepEvent) and event.status == StepStatus.FAILED
         for event in events
@@ -294,6 +589,25 @@ async def test_no_tool_finalization_does_not_bind_or_advertise_tools():
     assert agent._model.bind.call_args.kwargs == {"response_format": None}
     runnable.bind_tools.assert_not_called()
     agent.get_tools.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_single_call_max_tokens_override_does_not_change_default_model_calls():
+    limited = AIMessage(content='{"success":true,"result":"bounded","attachments":[]}')
+    agent, _chain = _agent_with_model_chain([limited])
+
+    with patch("app.domain.services.agents.base.RobustJsonParser.from_llm", return_value=object()):
+        result = await agent.ask_with_messages(
+            [],
+            allow_tools=False,
+            max_tokens=777,
+        )
+
+    assert result is limited
+    assert agent._model.bind.call_args.kwargs == {
+        "response_format": None,
+        "max_tokens": 777,
+    }
 
 
 @pytest.mark.asyncio
@@ -576,6 +890,48 @@ def test_successful_step_continues_without_replanning():
 
 
 @pytest.mark.asyncio
+async def test_incomplete_tool_call_history_is_repaired_before_model_invocation():
+    agent = object.__new__(BaseAgent)
+    agent.max_retries = 1
+    agent.retry_interval = 0
+    agent.bind_tools = False
+    agent.tool_choice = None
+    agent.dynamic_system_prompt_provider = None
+    agent._agent_id = "agent-1"
+    agent.name = "base"
+    agent.memory = Memory(messages=[
+        SystemMessage(content="system"),
+        AIMessage(content="", tool_calls=[{
+            "name": "interrupted_tool",
+            "args": {},
+            "id": "call-interrupted",
+        }]),
+        HumanMessage(content="continue"),
+    ])
+    agent._add_to_memory = AsyncMock()
+    agent._record_token_usage = AsyncMock()
+    agent._repository = SimpleNamespace(save_memory=AsyncMock())
+    model = MagicMock()
+    runnable = MagicMock()
+    chain = MagicMock()
+    chain.ainvoke = AsyncMock(return_value=AIMessage(content="recovered"))
+    runnable.bind_tools.return_value = runnable
+    runnable.__or__.return_value = chain
+    model.bind.return_value = runnable
+    agent._model = model
+
+    with patch("app.domain.services.agents.base.RobustJsonParser.from_llm", return_value=object()):
+        result = await agent.ask_with_messages([])
+
+    assert result.content == "recovered"
+    context = chain.ainvoke.await_args.args[0]
+    assert [message.type for message in context] == ["system", "ai", "tool", "human"]
+    repaired = context[2]
+    assert isinstance(repaired, ToolMessage)
+    assert repaired.tool_call_id == "call-interrupted"
+
+
+@pytest.mark.asyncio
 async def test_successful_step_emits_updated_plan_before_advancing():
     original_plan = Plan(
         title="two-step plan",
@@ -655,45 +1011,3 @@ async def test_successful_step_emits_updated_plan_before_advancing():
     assert updated_event.plan.steps[0].status == ExecutionStatus.COMPLETED
     assert updated_event.plan.steps[0].success is True
     assert updated_event.plan.get_next_step().id == "step-2"
-
-
-@pytest.mark.asyncio
-async def test_incomplete_tool_call_history_is_repaired_before_model_invocation():
-    agent = object.__new__(BaseAgent)
-    agent.max_retries = 1
-    agent.retry_interval = 0
-    agent.bind_tools = False
-    agent.tool_choice = None
-    agent.dynamic_system_prompt_provider = None
-    agent._agent_id = "agent-1"
-    agent.name = "base"
-    agent.memory = Memory(messages=[
-        SystemMessage(content="system"),
-        AIMessage(content="", tool_calls=[{
-            "name": "interrupted_tool",
-            "args": {},
-            "id": "call-interrupted",
-        }]),
-        HumanMessage(content="continue"),
-    ])
-    agent._add_to_memory = AsyncMock()
-    agent._record_token_usage = AsyncMock()
-    agent._repository = SimpleNamespace(save_memory=AsyncMock())
-    model = MagicMock()
-    runnable = MagicMock()
-    chain = MagicMock()
-    chain.ainvoke = AsyncMock(return_value=AIMessage(content="recovered"))
-    runnable.bind_tools.return_value = runnable
-    runnable.__or__.return_value = chain
-    model.bind.return_value = runnable
-    agent._model = model
-
-    with patch("app.domain.services.agents.base.RobustJsonParser.from_llm", return_value=object()):
-        result = await agent.ask_with_messages([])
-
-    assert result.content == "recovered"
-    context = chain.ainvoke.await_args.args[0]
-    assert [message.type for message in context] == ["system", "ai", "tool", "human"]
-    repaired = context[2]
-    assert isinstance(repaired, ToolMessage)
-    assert repaired.tool_call_id == "call-interrupted"

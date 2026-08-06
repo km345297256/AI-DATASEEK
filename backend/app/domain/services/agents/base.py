@@ -71,7 +71,19 @@ class BaseAgent(ABC):
     # every model call.  Larger raw outputs remain available in task events and
     # generated files; only the active reasoning context is bounded here.
     MAX_MEMORY_BYTES = 96 * 1024
-    FINALIZATION_TIMEOUT_SECONDS = 10.0
+    # Configurable through AGENT_FINALIZATION_TIMEOUT_SECONDS.  This class
+    # default remains useful for light-weight test agents created without the
+    # normal constructor.
+    FINALIZATION_TIMEOUT_SECONDS = 45.0
+    FINALIZATION_TIMEOUT_ERROR = (
+        "finalization_timeout: the tool-free final response exceeded its configured deadline"
+    )
+    FINALIZATION_FAILED_ERROR = (
+        "finalization_failed: the tool-free final response could not be generated"
+    )
+    INVALID_FINAL_RESULT_ERROR = (
+        "invalid_final_result: the tool-free final response requested another tool"
+    )
     TOOL_MESSAGE_CONTENT_LIMITS = {
         "shell_exec": 16 * 1024,
         "shell_run": 16 * 1024,
@@ -83,6 +95,11 @@ class BaseAgent(ABC):
         "file_find_in_content": 24 * 1024,
     }
     MAX_RETAINED_TOOL_ARGUMENT_BYTES = 8 * 1024
+    # Specialized agents can terminate a narrowly classified tool request with
+    # one bounded, tool-free synthesis turn.  The ordinary agent loop remains
+    # unchanged for multi-step analysis tasks.
+    TOOL_FREE_COMPLETION_TIMEOUT_SECONDS = 30.0
+    TOOL_FREE_COMPLETION_MAX_TOKENS: Optional[int] = 1024
     RUNTIME_INSTALL_COMMAND_PATTERN = re.compile(
         r"(?im)(?:^|&&|\|\||[;|\n]|\bthen\b)\s*(?:\(\s*)?(?:sudo\s+)?(?:"
         r"apt(?:-get)?\b|"
@@ -118,6 +135,25 @@ class BaseAgent(ABC):
         self._llm_retry_attempts = max(1, settings.llm_retry_attempts)
         self._llm_retry_base_seconds = max(0.0, settings.llm_retry_base_seconds)
         self._llm_retry_max_seconds = max(0.0, settings.llm_retry_max_seconds)
+        configured_finalization_timeout = getattr(
+            settings,
+            "agent_finalization_timeout_seconds",
+            self.FINALIZATION_TIMEOUT_SECONDS,
+        )
+        try:
+            # Prevent an accidental zero/negative deadline or an effectively
+            # unbounded deployment setting.  Tests that bypass __init__ can
+            # still install a smaller instance value for fast timeout checks.
+            self.FINALIZATION_TIMEOUT_SECONDS = max(
+                1.0,
+                min(float(configured_finalization_timeout), 300.0),
+            )
+        except (TypeError, ValueError):
+            logger.warning(
+                "Ignoring invalid agent_finalization_timeout_seconds %r",
+                configured_finalization_timeout,
+            )
+            self.FINALIZATION_TIMEOUT_SECONDS = type(self).FINALIZATION_TIMEOUT_SECONDS
         llm_overrides = dict(llm_overrides or {})
         configured_max_iterations = llm_overrides.pop("max_iterations", None)
         if configured_max_iterations is not None:
@@ -160,7 +196,7 @@ class BaseAgent(ABC):
         self.dynamic_system_prompt_provider = dynamic_system_prompt_provider
         self.dynamic_user_context_provider = dynamic_user_context_provider
         # ``message_ask_user`` is an interrupted tool exchange, not a completed
-        # task boundary.  A resumed answer must reach the model together with
+        # task boundary. A resumed answer must reach the model together with
         # the originating assistant tool call exactly once.
         self._preserve_context_for_next_request = False
         self.usage_context = usage_context or {}
@@ -326,6 +362,55 @@ class BaseAgent(ABC):
         """
         return None
 
+    def _tool_free_completion_instruction(
+        self,
+        tool_results: List[ToolMessage],
+    ) -> Optional[str]:
+        """Request one terminal synthesis turn for a verified tool batch.
+
+        Returning an instruction opts a specialized agent into a single model
+        call with tools disabled.  This is intentionally separate from
+        ``_completion_from_tool_batch``: that hook is deterministic, whereas
+        this hook lets the model turn bounded evidence into a user-facing
+        answer without reopening the tool loop.
+        """
+        return None
+
+    def _tool_free_completion_is_valid(self, message: AIMessage) -> bool:
+        """Validate a terminal synthesis before it leaves the bounded loop."""
+        return not message.tool_calls and bool(
+            self._message_content_to_text(message.content).strip()
+        )
+
+    def _tool_free_completion_tool_responses(
+        self,
+        tool_results: List[ToolMessage],
+        tool_responses: List[ToolMessage],
+    ) -> List[ToolMessage]:
+        """Return protocol-complete tool messages for terminal synthesis.
+
+        The default retains normal bounded tool context.  Agents that embed a
+        separately sanitized evidence payload can replace these messages to
+        avoid presenting the same raw result to the model twice.
+        """
+        return tool_responses
+
+    def _completion_from_finalization_failure(
+        self,
+        successful_tool_calls: List[tuple[ToolCall, ToolMessage]],
+        *,
+        reason: str,
+    ) -> Optional[str]:
+        """Return a deterministic partial result from already verified evidence.
+
+        The base Agent cannot assume a response schema or safely interpret
+        arbitrary tool output, so specialized Agents opt in.  ``execute``
+        nevertheless retains successful calls across all bounded batches so a
+        schema-aware Agent can preserve useful evidence when only final model
+        synthesis fails.
+        """
+        return None
+
     @classmethod
     def _blocked_runtime_install_reason(cls, tool_call: ToolCall) -> Optional[str]:
         """Reject package installation in analysis sandboxes deterministically."""
@@ -378,6 +463,7 @@ class BaseAgent(ABC):
                 )
         message = await self.ask(request, format)
         iterations = 0
+        successful_tool_calls: List[tuple[ToolCall, ToolMessage]] = []
         while message.tool_calls:
             if iterations >= iteration_budget:
                 yield ErrorEvent(error="Maximum iteration count reached, failed to complete the task")
@@ -471,6 +557,18 @@ class BaseAgent(ABC):
 
                 self._compact_tool_call_arguments(tool_call, tool_result)
                 completed_tool_results.append(tool_result)
+                if self._tool_result_succeeded(tool_result):
+                    # Preserve only bounded metadata plus the ToolMessage.  In
+                    # particular, a compacted file-write body is never replayed
+                    # or copied into the deterministic fallback.
+                    successful_tool_calls.append((
+                        {
+                            "name": tool_call.get("name", ""),
+                            "args": dict(tool_call.get("args") or {}),
+                            "id": tool_call.get("id", ""),
+                        },
+                        tool_result,
+                    ))
 
                 tool_responses.append(
                     self._tool_result_for_memory(tool_result, tool_call_id, function_name)
@@ -486,6 +584,82 @@ class BaseAgent(ABC):
                     iterations,
                 )
                 message = AIMessage(content=deterministic_completion)
+                break
+
+            tool_free_instruction = self._tool_free_completion_instruction(
+                completed_tool_results
+            )
+            if tool_free_instruction is not None:
+                # A successful capability already produced the required
+                # evidence.  Give the model exactly one opportunity to turn it
+                # into the user-facing result, with no tools bound; on timeout,
+                # invalid output, or provider failure, preserve the verified
+                # evidence through the specialized deterministic fallback.
+                failure_reason: Optional[str] = None
+                completion_tool_responses = self._tool_free_completion_tool_responses(
+                    completed_tool_results,
+                    tool_responses,
+                )
+                try:
+                    message = await asyncio.wait_for(
+                        self.ask_with_messages(
+                            [
+                                *completion_tool_responses,
+                                HumanMessage(content=tool_free_instruction),
+                            ],
+                            format,
+                            allow_tools=False,
+                            max_tokens=self.TOOL_FREE_COMPLETION_MAX_TOKENS,
+                        ),
+                        timeout=self.TOOL_FREE_COMPLETION_TIMEOUT_SECONDS,
+                    )
+                except asyncio.TimeoutError:
+                    failure_reason = "finalization_timeout"
+                    logger.warning(
+                        "Agent %s terminal tool synthesis exceeded %.1fs after %d tool batch(es)",
+                        self.name,
+                        self.TOOL_FREE_COMPLETION_TIMEOUT_SECONDS,
+                        iterations,
+                    )
+                except Exception as exc:
+                    failure_reason = "finalization_failed"
+                    logger.warning(
+                        "Agent %s terminal tool synthesis failed after %d tool batch(es) (%s)",
+                        self.name,
+                        iterations,
+                        type(exc).__name__,
+                    )
+
+                if failure_reason is None and not self._tool_free_completion_is_valid(message):
+                    failure_reason = "invalid_final_result"
+                    logger.warning(
+                        "Agent %s terminal tool synthesis returned an invalid result after %d tool batch(es)",
+                        self.name,
+                        iterations,
+                    )
+
+                if failure_reason is not None:
+                    fallback_completion = self._completion_from_finalization_failure(
+                        successful_tool_calls,
+                        reason=failure_reason,
+                    )
+                    if fallback_completion is not None:
+                        message = AIMessage(content=fallback_completion)
+                    else:
+                        error = {
+                            "finalization_timeout": self.FINALIZATION_TIMEOUT_ERROR,
+                            "finalization_failed": self.FINALIZATION_FAILED_ERROR,
+                        }.get(failure_reason, self.INVALID_FINAL_RESULT_ERROR)
+                        yield ErrorEvent(
+                            error=error
+                        )
+                        return
+
+                logger.info(
+                    "Agent %s completed from one tool-free synthesis after %d tool batch(es)",
+                    self.name,
+                    iterations,
+                )
                 break
 
             if iterations >= iteration_budget:
@@ -516,9 +690,30 @@ class BaseAgent(ABC):
                         self.FINALIZATION_TIMEOUT_SECONDS,
                         iteration_budget,
                     )
-                    yield ErrorEvent(
-                        error="Maximum iteration count reached before a final result was produced"
+                    fallback_completion = self._completion_from_finalization_failure(
+                        successful_tool_calls,
+                        reason="finalization_timeout",
                     )
+                    if fallback_completion is not None:
+                        yield MessageEvent(message=fallback_completion)
+                    else:
+                        yield ErrorEvent(error=self.FINALIZATION_TIMEOUT_ERROR)
+                    return
+                except Exception as exc:
+                    logger.warning(
+                        "Agent %s no-tool finalization failed at budget %d (%s)",
+                        self.name,
+                        iteration_budget,
+                        type(exc).__name__,
+                    )
+                    fallback_completion = self._completion_from_finalization_failure(
+                        successful_tool_calls,
+                        reason="finalization_failed",
+                    )
+                    if fallback_completion is not None:
+                        yield MessageEvent(message=fallback_completion)
+                    else:
+                        yield ErrorEvent(error=self.FINALIZATION_FAILED_ERROR)
                     return
                 if message.tool_calls:
                     logger.warning(
@@ -526,9 +721,14 @@ class BaseAgent(ABC):
                         self.name,
                         iteration_budget,
                     )
-                    yield ErrorEvent(
-                        error="Maximum iteration count reached before a final result was produced"
+                    fallback_completion = self._completion_from_finalization_failure(
+                        successful_tool_calls,
+                        reason="invalid_final_result",
                     )
+                    if fallback_completion is not None:
+                        yield MessageEvent(message=fallback_completion)
+                    else:
+                        yield ErrorEvent(error=self.INVALID_FINAL_RESULT_ERROR)
                     return
                 break
 
@@ -566,6 +766,7 @@ class BaseAgent(ABC):
         format: Optional[str] = None,
         *,
         allow_tools: bool = True,
+        max_tokens: Optional[int] = None,
     ) -> AIMessage:
         await self._add_to_memory(messages)
 
@@ -576,6 +777,12 @@ class BaseAgent(ABC):
         # Stage 1-3: model chain | RobustJsonParser repairs invalid tool call JSON.
         # Stages 4-5: outer retry loop handles cases that survive stages 1-3.
         bind_kwargs: Dict[str, Any] = {"response_format": response_format}
+        if max_tokens is not None:
+            if isinstance(max_tokens, bool) or not isinstance(max_tokens, int) or max_tokens < 1:
+                raise ValueError("max_tokens must be a positive integer when provided")
+            # ``bind`` applies this to this runnable only; it does not mutate
+            # the Agent model or change later/default calls.
+            bind_kwargs["max_tokens"] = max_tokens
         if allow_tools:
             bind_kwargs["tool_choice"] = self.tool_choice
         runnable = self._model.bind(**bind_kwargs)

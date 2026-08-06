@@ -2,6 +2,7 @@ import json
 import logging
 import re
 from datetime import datetime, UTC
+from pathlib import PurePosixPath
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from app.domain.services.flows.base import BaseFlow
 from app.domain.models.message import Message
@@ -37,6 +38,7 @@ from app.domain.services.skills import SkillRegistry, SkillRenderer
 from app.core.config import get_settings
 from app.domain.models.agent_profile import AgentSubAgentConfig, default_subagents
 from app.application.services.data_center_dataset_service import render_dataset_context
+from app.domain.models.dataset import DatasetFile
 
 logger = logging.getLogger(__name__)
 
@@ -55,6 +57,92 @@ class PlanActFlow(BaseFlow):
     MAX_SESSION_CONTEXT_MESSAGES = 8
     MAX_SESSION_CONTEXT_MESSAGE_BYTES = 2 * 1024
     MAX_SESSION_CONTEXT_BYTES = 12 * 1024
+    _EXPLICIT_FILE_REFERENCE = re.compile(
+        r"[^\W\d_][^\s,，。;；!?！？:：\"'“”‘’<>《》]{0,511}"
+        r"\.[a-z0-9][a-z0-9+_-]{0,15}"
+        r"(?=$|[\s,，。;；!?！？:：\"'“”‘’()（）\[\]【】<>《》])",
+        re.IGNORECASE,
+    )
+    _FILE_PREVIEW_ACTION_MARKERS = (
+        "展示",
+        "预览",
+        "打开",
+        "查看",
+        "显示",
+        "看一下",
+        "看下",
+        "看看",
+        "可视化下",
+        "可视化一下",
+        "显示原图",
+        "查看原图",
+        "preview",
+        "open",
+        "view",
+        "show",
+        "display",
+        "look at",
+        "show the image",
+        "display the image",
+        "view the image",
+    )
+    _FILE_REFERENCE_PREFIX_MARKERS = _FILE_PREVIEW_ACTION_MARKERS + (
+        "分析",
+        "基于",
+        "读取",
+        "使用",
+        "处理",
+        "检查",
+        "针对",
+        "比较",
+        "可视化",
+        "文件",
+    )
+    _FILE_REFERENCE_SUFFIX_MARKERS = (
+        "生成",
+        "进行",
+        "分析",
+        "绘制",
+        "制作",
+        "计算",
+        "比较",
+        "文件",
+        "数据",
+    )
+    _IMAGE_FILE_SUFFIXES = {
+        ".avif",
+        ".bmp",
+        ".gif",
+        ".heic",
+        ".heif",
+        ".ico",
+        ".jpeg",
+        ".jpg",
+        ".png",
+        ".svg",
+        ".tif",
+        ".tiff",
+        ".webp",
+    }
+    _PREVIEWABLE_FILE_SUFFIXES = _IMAGE_FILE_SUFFIXES | {
+        ".css",
+        ".geojson",
+        ".htm",
+        ".html",
+        ".ini",
+        ".json",
+        ".log",
+        ".md",
+        ".pdf",
+        ".py",
+        ".rst",
+        ".sql",
+        ".toml",
+        ".txt",
+        ".xml",
+        ".yaml",
+        ".yml",
+    }
 
     def __init__(
         self,
@@ -382,8 +470,25 @@ class PlanActFlow(BaseFlow):
             (dataset.name.strip() for dataset in message.datasets if dataset.name.strip()),
             "dataset",
         )
+        target_file = PlanActFlow._resolve_dataset_file_reference(message)
         dataset_intent = PlanActFlow._dataset_request_intent(message.message)
+        if target_file and PlanActFlow._is_file_preview_request(
+            message.message,
+            target_file,
+            classified_intent=dataset_intent,
+        ):
+            dataset_intent = "file_preview"
         intent_config = {
+            "file_preview": {
+                "description": "预览数据集中的指定文件",
+                "instruction": (
+                    "仅处理挂载清单中已精确解析的目标逻辑文件，直接返回该原始文件供用户预览或下载；"
+                    "不要对整个数据集执行快速探查，不要生成替代图表，也不要启动临时 HTTP 服务。"
+                    "不得暴露宿主机真实路径。"
+                ),
+                "include_archive_tree": False,
+                "allow_terminal_quicklook": False,
+            },
             "visualization": {
                 "description": "分析当前数据集并生成可视化结果",
                 "instruction": (
@@ -415,6 +520,16 @@ class PlanActFlow(BaseFlow):
                 "include_archive_tree": False,
                 "allow_terminal_quicklook": False,
             },
+            "catalog_description": {
+                "description": "根据数据集登记说明回答用途问题",
+                "instruction": (
+                    "仅使用数据中心登记的名称、说明、标签和覆盖范围回答数据集用途或研究价值；"
+                    "明确区分登记说明与本次实测结论，不运行快速探查，不读取文件内容，也不暴露宿主机真实路径。"
+                    "登记说明不足时必须明确说明证据不足，不得根据文件名或领域常识补造用途。"
+                ),
+                "include_archive_tree": False,
+                "allow_terminal_quicklook": False,
+            },
             "analysis": {
                 "description": "分析当前数据集并回答用户问题",
                 "instruction": (
@@ -435,9 +550,15 @@ class PlanActFlow(BaseFlow):
         requested_dimensions = PlanActFlow._dataset_requested_dimensions(
             message.message
         )
+        if dataset_intent == "file_preview":
+            requested_dimensions = ["file_preview"]
+        has_explicit_file_reference = bool(target_file) or (
+            PlanActFlow._message_has_explicit_file_reference(message.message)
+        )
         prefer_quicklook_evidence = (
-            dataset_intent == "visualization"
+            dataset_intent in {"analysis", "visualization"}
             and len(message.datasets or []) == 1
+            and not has_explicit_file_reference
             and PlanActFlow._prefers_quicklook_evidence(message.message)
         )
         explicit_artifact_request = PlanActFlow._requests_downloadable_result(
@@ -447,7 +568,7 @@ class PlanActFlow(BaseFlow):
             dataset_intent == "visualization" and not prefer_quicklook_evidence
         ):
             artifact_policy = "required"
-        elif dataset_intent == "visualization":
+        elif dataset_intent in {"file_preview", "visualization"}:
             artifact_policy = "capability"
         else:
             artifact_policy = "optional"
@@ -478,15 +599,25 @@ class PlanActFlow(BaseFlow):
                         "dataset_intent": dataset_intent,
                         "requested_dimensions": requested_dimensions,
                         "prefer_quicklook_evidence": prefer_quicklook_evidence,
+                        **(
+                            {
+                                "target_file": target_file.path,
+                                "target_filename": PlanActFlow._dataset_file_basename(
+                                    target_file
+                                ),
+                            }
+                            if target_file
+                            else {}
+                        ),
                         # Preserve the exact wording independently of the concise
                         # UI description. The executor treats this field as the
                         # authoritative analysis question instead of attempting to
                         # reconstruct it from a generic step label.
                         "user_question": message.message,
                         "execution_guidance": intent_config["instruction"],
-                        "require_model_answer": dataset_intent not in {"catalog_metadata", "inventory"},
+                        "require_model_answer": dataset_intent not in {"catalog_description", "catalog_metadata", "file_preview", "inventory"},
                         "require_evidence": True,
-                        "require_method_and_limitations": dataset_intent not in {"catalog_metadata", "inventory"},
+                        "require_method_and_limitations": dataset_intent not in {"catalog_description", "catalog_metadata", "file_preview", "inventory"},
                         "require_downloadable_result": artifact_policy in {"required", "capability"},
                         "artifact_policy": artifact_policy,
                         "include_archive_tree": intent_config["include_archive_tree"],
@@ -553,6 +684,14 @@ class PlanActFlow(BaseFlow):
             "箱线图",
             "热力图",
             "空间分布图",
+            "伪彩色图",
+            "伪彩色",
+            "假彩色图",
+            "假彩色",
+            "专题图",
+            "等值线图",
+            "密度图",
+            "小提琴图",
             "visualization",
             "visualisation",
             "visualize",
@@ -567,14 +706,147 @@ class PlanActFlow(BaseFlow):
             "heatmap",
             "histogram",
             "boxplot",
+            "pseudocolor",
+            "pseudo-color",
+            "false color",
+            "false colour",
+            "thematic map",
+            "contour plot",
+            "density plot",
+            "violin plot",
         )
         if any(marker in normalized for marker in file_structure_markers):
             return "inventory"
+        if PlanActFlow._is_catalog_description_request(normalized):
+            return "catalog_description"
         if PlanActFlow._is_catalog_metadata_request(normalized):
             return "catalog_metadata"
         if any(marker in normalized for marker in visualization_markers):
             return "visualization"
         return "analysis"
+
+    @staticmethod
+    def _dataset_file_basename(dataset_file: DatasetFile) -> str:
+        return PurePosixPath(dataset_file.path.replace("\\", "/")).name
+
+    @staticmethod
+    def _safe_dataset_file_path(dataset_file: DatasetFile) -> str | None:
+        raw_path = (dataset_file.path or "").strip().replace("\\", "/")
+        if not raw_path or raw_path.startswith("/") or re.match(r"^[a-zA-Z]:/", raw_path):
+            return None
+        logical_path = PurePosixPath(raw_path)
+        if ".." in logical_path.parts:
+            return None
+        normalized = "/".join(part for part in logical_path.parts if part not in {"", "."})
+        return normalized.casefold() or None
+
+    @staticmethod
+    def _is_file_reference_character(character: str) -> bool:
+        return character.isalnum() or character in "._+-/\\"
+
+    @classmethod
+    def _message_contains_file_variant(
+        cls,
+        normalized_message: str,
+        variant: str,
+    ) -> bool:
+        """Match one inventory path without accepting filename substrings."""
+        for match in re.finditer(re.escape(variant), normalized_message):
+            prefix = normalized_message[: match.start()]
+            suffix = normalized_message[match.end() :]
+            if (
+                prefix
+                and cls._is_file_reference_character(prefix[-1])
+                and not any(
+                    prefix.endswith(marker)
+                    for marker in cls._FILE_REFERENCE_PREFIX_MARKERS
+                )
+            ):
+                continue
+            if (
+                suffix
+                and cls._is_file_reference_character(suffix[0])
+                and not any(
+                    suffix.startswith(marker)
+                    for marker in cls._FILE_REFERENCE_SUFFIX_MARKERS
+                )
+            ):
+                continue
+            return True
+        return False
+
+    @classmethod
+    def _resolve_dataset_file_reference(cls, message: Message) -> DatasetFile | None:
+        """Resolve exactly one inventory file named by path or basename.
+
+        Matching is case-insensitive and accepts any logical-path suffix exposed
+        to the user. A basename shared by multiple files is deliberately
+        ambiguous unless the message includes a unique directory-qualified path.
+        """
+        normalized_message = (message.message or "").replace("\\", "/").casefold()
+        matches: list[tuple[DatasetFile, str]] = []
+        for dataset in message.datasets or []:
+            for dataset_file in dataset.files or []:
+                normalized_path = PlanActFlow._safe_dataset_file_path(dataset_file)
+                if not normalized_path:
+                    continue
+                parts = PurePosixPath(normalized_path).parts
+                matched_variants = [
+                    "/".join(parts[index:])
+                    for index in range(len(parts))
+                    if cls._message_contains_file_variant(
+                        normalized_message,
+                        "/".join(parts[index:]),
+                    )
+                ]
+                if matched_variants:
+                    matches.append(
+                        (dataset_file, max(matched_variants, key=len))
+                    )
+
+        if not matches:
+            return None
+        directory_qualified = [item for item in matches if "/" in item[1]]
+        if directory_qualified:
+            # A single qualified path safely disambiguates duplicate basenames.
+            if len(directory_qualified) == 1:
+                return directory_qualified[0][0]
+            return None
+        return matches[0][0] if len(matches) == 1 else None
+
+    @classmethod
+    def _message_has_explicit_file_reference(cls, user_message: str) -> bool:
+        return bool(cls._EXPLICIT_FILE_REFERENCE.search(user_message or ""))
+
+    @classmethod
+    def _is_image_dataset_file(cls, dataset_file: DatasetFile) -> bool:
+        content_type = (dataset_file.content_type or "").casefold()
+        suffix = PurePosixPath(dataset_file.path.replace("\\", "/")).suffix.casefold()
+        return content_type.startswith("image/") or suffix in cls._IMAGE_FILE_SUFFIXES
+
+    @classmethod
+    def _is_previewable_dataset_file(cls, dataset_file: DatasetFile) -> bool:
+        content_type = (dataset_file.content_type or "").casefold()
+        suffix = PurePosixPath(dataset_file.path.replace("\\", "/")).suffix.casefold()
+        return (
+            content_type.startswith(("image/", "text/"))
+            or content_type in {"application/json", "application/pdf", "application/xml"}
+            or suffix in cls._PREVIEWABLE_FILE_SUFFIXES
+        )
+
+    @classmethod
+    def _is_file_preview_request(
+        cls,
+        user_message: str,
+        dataset_file: DatasetFile,
+        *,
+        classified_intent: str,
+    ) -> bool:
+        normalized = " ".join((user_message or "").casefold().split())
+        has_preview_action = any(
+            marker in normalized for marker in cls._FILE_PREVIEW_ACTION_MARKERS
+        )
+        return cls._is_previewable_dataset_file(dataset_file) and has_preview_action
 
     @staticmethod
     def _is_catalog_metadata_request(user_message: str) -> bool:
@@ -623,6 +895,34 @@ class PlanActFlow(BaseFlow):
         return any(re.fullmatch(pattern, stripped) for pattern in patterns)
 
     @staticmethod
+    def _is_catalog_description_request(user_message: str) -> bool:
+        """Recognize narrow purpose/value questions answerable from catalog text.
+
+        This route is intentionally semantic rather than dataset-specific. Mixed
+        questions that ask for suitability validation, file-content evidence,
+        quality, statistics, comparisons, or a custom method stay on the normal
+        mounted-data analysis path.
+        """
+
+        normalized = " ".join((user_message or "").casefold().split())
+        if not normalized or len(normalized) > 240:
+            return False
+        dimensions = set(PlanActFlow._dataset_requested_dimensions(normalized))
+        if not dimensions or not dimensions <= {"use_cases", "scientific_value"}:
+            return False
+        analytical_markers = (
+            "基于文件", "根据文件", "读取文件", "验证", "核验", "数据质量", "缺失", "异常",
+            "统计", "比较", "趋势", "关系", "相关", "回归", "预测", "空间格局", "时间变化",
+            "字段", "波段", "像元", "样本", "图表", "绘图", "可视化", "是否适合", "适用性",
+            "from the files", "based on the files", "inspect the files", "validate", "verify",
+            "data quality", "missing", "anomaly", "statistics", "compare", "trend",
+            "relationship", "correlation", "regression", "predict", "spatial pattern",
+            "temporal", "field", "band", "pixel", "sample", "plot", "chart",
+            "suitable for", "applicability",
+        )
+        return not any(marker in normalized for marker in analytical_markers)
+
+    @staticmethod
     def _requests_downloadable_result(user_message: str) -> bool:
         normalized = " ".join((user_message or "").casefold().split())
         markers = (
@@ -645,6 +945,8 @@ class PlanActFlow(BaseFlow):
         """
         normalized = " ".join((user_message or "").casefold().split())
         if not normalized:
+            return False
+        if PlanActFlow._message_has_explicit_file_reference(normalized):
             return False
         broad_markers = (
             "数据可视化",
@@ -673,16 +975,20 @@ class PlanActFlow(BaseFlow):
 
     @staticmethod
     def _prefers_quicklook_evidence(user_message: str) -> bool:
-        """Prefer deterministic evidence for generic multi-part visualization.
+        """Prefer deterministic evidence for recognized, quicklook-covered work.
 
         Quicklook already profiles file structure, distributions, missingness,
         raster spatial zones, descriptive statistics, explicit time dimensions,
-        and representative charts.  Named transformations and inferential or
-        predictive methods remain custom analysis.  This router describes
-        capability classes only; it never keys on a dataset name or value.
+        and representative charts. Named transformations and inferential or
+        predictive methods remain custom analysis. Unrecognized requests also
+        remain custom analysis rather than assuming that quicklook can answer an
+        arbitrary calculation. This router describes capability classes only; it
+        never keys on a dataset name or value.
         """
         normalized = " ".join((user_message or "").casefold().split())
         if not normalized:
+            return False
+        if PlanActFlow._message_has_explicit_file_reference(normalized):
             return False
         custom_method_markers = (
             "回归",
@@ -701,6 +1007,7 @@ class PlanActFlow(BaseFlow):
             "小波",
             "傅里叶",
             "频谱",
+            "熵",
             "机器学习",
             "变化检测",
             "regression",
@@ -717,10 +1024,41 @@ class PlanActFlow(BaseFlow):
             "principal component",
             "fourier",
             "wavelet",
+            "entropy",
             "machine learning",
             "change detection",
         )
-        return not any(marker in normalized for marker in custom_method_markers)
+        if any(marker in normalized for marker in custom_method_markers):
+            return False
+
+        requested_dimensions = set(
+            PlanActFlow._dataset_requested_dimensions(normalized)
+        )
+        quicklook_evidence_dimensions = {
+            "overview",
+            "spatial_pattern",
+            "temporal_trend",
+            "data_quality",
+            "anomaly",
+            "relationship",
+            "quantitative_metrics",
+            "visualization",
+            "scientific_value",
+            "use_cases",
+            "applicability",
+            "overall_assessment",
+        }
+        quicklook_modifier_dimensions = {
+            "methodology",
+            "limitations",
+            "interpretation",
+        }
+        if requested_dimensions == {"question_answering"}:
+            return False
+        return bool(requested_dimensions & quicklook_evidence_dimensions) and (
+            requested_dimensions
+            <= quicklook_evidence_dimensions | quicklook_modifier_dimensions
+        )
 
     @staticmethod
     def _dataset_requested_dimensions(user_message: str) -> list[str]:
@@ -734,10 +1072,75 @@ class PlanActFlow(BaseFlow):
                     "快速探查",
                     "数据探查",
                     "数据概览",
+                    "概览",
+                    "概述",
+                    "总体情况",
                     "quicklook",
                     "quick look",
                     "explore the dataset",
                     "dataset overview",
+                    "overview",
+                    "summarize the dataset",
+                    "summary of the dataset",
+                ),
+            ),
+            (
+                "scientific_value",
+                (
+                    "科学价值",
+                    "研究价值",
+                    "学术价值",
+                    "数据价值",
+                    "价值",
+                    "scientific value",
+                    "research value",
+                    "academic value",
+                    "dataset value",
+                ),
+            ),
+            (
+                "use_cases",
+                (
+                    "用途",
+                    "用处",
+                    "有什么用",
+                    "有何用",
+                    "应用场景",
+                    "可以用来",
+                    "可用于",
+                    "能用来",
+                    "use case",
+                    "used for",
+                    "potential use",
+                    "potential application",
+                ),
+            ),
+            (
+                "applicability",
+                (
+                    "适用性",
+                    "适用于",
+                    "适合用于",
+                    "是否适合",
+                    "应用范围",
+                    "applicability",
+                    "suitable for",
+                    "fit for",
+                    "appropriate for",
+                ),
+            ),
+            (
+                "overall_assessment",
+                (
+                    "综合评价",
+                    "综合评判",
+                    "综合评估",
+                    "总体评价",
+                    "整体评价",
+                    "overall assessment",
+                    "comprehensive assessment",
+                    "comprehensive evaluation",
+                    "overall evaluation",
                 ),
             ),
             (
@@ -774,6 +1177,8 @@ class PlanActFlow(BaseFlow):
                     "时间",
                     "年度",
                     "年份",
+                    "哪一年",
+                    "哪个年份",
                     "年际",
                     "月度",
                     "月份",
@@ -783,6 +1188,7 @@ class PlanActFlow(BaseFlow):
                     "temporal",
                     "annual",
                     "yearly",
+                    "which year",
                     "monthly",
                     "trend",
                     "time series",
@@ -835,6 +1241,9 @@ class PlanActFlow(BaseFlow):
                     "指标",
                     "最大",
                     "最小",
+                    "最高",
+                    "最低",
+                    "峰值",
                     "平均",
                     "均值",
                     "中位数",
@@ -843,6 +1252,9 @@ class PlanActFlow(BaseFlow):
                     "metric",
                     "maximum",
                     "minimum",
+                    "highest",
+                    "lowest",
+                    "peak",
                     "mean",
                     "median",
                     "standard deviation",
@@ -861,6 +1273,14 @@ class PlanActFlow(BaseFlow):
                     "直方图",
                     "箱线图",
                     "热力图",
+                    "伪彩色图",
+                    "伪彩色",
+                    "假彩色图",
+                    "假彩色",
+                    "专题图",
+                    "等值线图",
+                    "密度图",
+                    "小提琴图",
                     "visualiz",
                     "plot",
                     "chart",
@@ -868,6 +1288,14 @@ class PlanActFlow(BaseFlow):
                     "heatmap",
                     "histogram",
                     "boxplot",
+                    "pseudocolor",
+                    "pseudo-color",
+                    "false color",
+                    "false colour",
+                    "thematic map",
+                    "contour plot",
+                    "density plot",
+                    "violin plot",
                 ),
             ),
             (

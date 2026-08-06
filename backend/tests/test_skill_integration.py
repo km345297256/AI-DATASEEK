@@ -19,7 +19,7 @@ from app.domain.services.token_usage_service import TokenUsageService
 from langchain.messages import AIMessage
 from app.domain.models.event import DoneEvent, MessageEvent, StepEvent, StepStatus
 from app.domain.models.event import ToolEvent, ToolStatus
-from app.domain.models.event import FileToolContent
+from app.domain.models.event import FileToolContent, ShellToolContent
 from app.domain.models.session import Session
 from app.domain.services.agent_task_runner import AgentTaskRunner
 from app.domain.services.agent_domain_service import AgentDomainService
@@ -347,6 +347,109 @@ async def test_shell_exec_tool_event_renders_only_current_command_console():
     assert event.tool_content.console == [
         {"ps1": "$", "command": "python plot_png.py", "output": "png ok\n"}
     ]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("success", "returncode", "output"),
+    [
+        (True, 0, "analysis complete\n"),
+        (False, 7, "analysis failed with useful diagnostics\n"),
+    ],
+)
+async def test_completed_shell_run_uses_result_snapshot_without_second_sandbox_lookup(
+    success,
+    returncode,
+    output,
+):
+    runner = AgentTaskRunner.__new__(AgentTaskRunner)
+    runner._agent_id = "agent-1"
+    runner._session_id = "session-1"
+
+    class FakeSandbox:
+        async def view_shell(self, _session_id, console=False):
+            raise AssertionError("completed shell_run must use its durable result snapshot")
+
+    runner._sandbox = FakeSandbox()
+    event = ToolEvent(
+        tool_call_id="tool-shell-run",
+        tool_name="shell",
+        function_name="shell_run",
+        function_args={
+            "id": "shell-1",
+            "exec_dir": "/home/ubuntu",
+            "command": "python stale-command.py",
+        },
+        status=ToolStatus.CALLED,
+        function_result=ToolResult(
+            success=success,
+            message="completed",
+            data={
+                "status": "completed",
+                "returncode": returncode,
+                "command": "python analyze.py",
+                "output": output,
+            },
+        ),
+    )
+
+    await runner._handle_tool_event(event)
+
+    assert isinstance(event.tool_content, ShellToolContent)
+    assert event.tool_content.console == [{
+        "ps1": "$",
+        "command": "python analyze.py",
+        "output": output,
+        "status": "completed",
+        "returncode": returncode,
+    }]
+
+
+@pytest.mark.asyncio
+async def test_shell_run_without_completed_output_falls_back_to_sandbox_console():
+    runner = AgentTaskRunner.__new__(AgentTaskRunner)
+    runner._agent_id = "agent-1"
+    runner._session_id = "session-1"
+
+    class FakeSandbox:
+        async def view_shell(self, session_id, console=False):
+            assert session_id == "shell-1"
+            assert console is True
+            return ToolResult(
+                success=True,
+                data={
+                    "console": [{
+                        "ps1": "$",
+                        "command": "python analyze.py",
+                        "output": "still running\n",
+                    }]
+                },
+            )
+
+    runner._sandbox = FakeSandbox()
+    event = ToolEvent(
+        tool_call_id="tool-shell-run",
+        tool_name="shell",
+        function_name="shell_run",
+        function_args={
+            "id": "shell-1",
+            "exec_dir": "/home/ubuntu",
+            "command": "python analyze.py",
+        },
+        status=ToolStatus.CALLED,
+        function_result=ToolResult(
+            success=True,
+            data={"status": "running", "returncode": None},
+        ),
+    )
+
+    await runner._handle_tool_event(event)
+
+    assert event.tool_content.console == [{
+        "ps1": "$",
+        "command": "python analyze.py",
+        "output": "still running\n",
+    }]
 
 
 @pytest.mark.asyncio

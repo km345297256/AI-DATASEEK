@@ -785,6 +785,49 @@ class AgentTaskRunner(TaskRunner):
                 if getattr(record, "command", None) == command:
                     return [record]
         return console[-1:] if console else []
+
+    @staticmethod
+    def _completed_shell_console_from_result(event: ToolEvent) -> Optional[list[dict[str, Any]]]:
+        """Build a durable console snapshot from a completed shell result.
+
+        ``shell_run`` and the bounded dataset shell capabilities already return
+        the exact command and its completed output. Prefer that authoritative
+        result over a second sandbox lookup, which can race with sandbox pause
+        or cleanup after the command has finished.
+        """
+        function_result = event.function_result
+        if isinstance(function_result, ToolResult):
+            result_data = function_result.data
+        elif isinstance(function_result, dict):
+            nested_data = function_result.get("data")
+            result_data = nested_data if isinstance(nested_data, dict) else function_result
+        else:
+            result_data = getattr(function_result, "data", None)
+
+        if not isinstance(result_data, dict) or result_data.get("status") != "completed":
+            return None
+        if "output" not in result_data:
+            return None
+
+        command = result_data.get("command")
+        if not isinstance(command, str) or not command:
+            command = (event.function_args or {}).get("command")
+        if not isinstance(command, str) or not command:
+            return None
+
+        output = result_data.get("output")
+        if output is None:
+            output = ""
+        elif not isinstance(output, str):
+            output = str(output)
+
+        return [{
+            "ps1": "$",
+            "command": command,
+            "output": output,
+            "status": "completed",
+            "returncode": result_data.get("returncode"),
+        }]
     
     async def _sync_message_attachments_to_sandbox(self, event: MessageEvent) -> None:
         """Sync message attachments and update event attachments"""
@@ -821,9 +864,13 @@ class AgentTaskRunner(TaskRunner):
                     logger.debug(f"Search tool results: {search_results}")
                     event.tool_content = SearchToolContent(results=search_results.data.results)
                 elif event.tool_name == "shell":
-                    if "id" in event.function_args:
+                    completed_console = self._completed_shell_console_from_result(event)
+                    if completed_console is not None:
+                        event.tool_content = ShellToolContent(console=completed_console)
+                    elif "id" in event.function_args:
                         shell_result = await self._sandbox.view_shell(event.function_args["id"], console=True)
-                        console = self._shell_console_for_event(shell_result.data.get("console", []), event)
+                        shell_data = shell_result.data if isinstance(shell_result.data, dict) else {}
+                        console = self._shell_console_for_event(shell_data.get("console", []), event)
                         event.tool_content = ShellToolContent(console=console)
                     else:
                         event.tool_content = ShellToolContent(console="(No Console)")
