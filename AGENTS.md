@@ -13,6 +13,13 @@ architecture decision.
 | Backend | FastAPI + Beanie + Redis | APIs, Agent execution, plugins, administration |
 | Sandbox | FastAPI + Chromium + VNC | Isolated analysis runtime |
 
+## Deployment
+
+AI-DataSeek has one supported Compose stack: `docker-compose.yml`, project
+`ai-dataseek`, with the frontend exposed at `http://39.106.98.67:7000`. Use
+`./run.sh` for all container updates. Do not recreate a separate development
+stack or expose a second frontend port.
+
 ## Required checks
 
 ```bash

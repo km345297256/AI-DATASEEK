@@ -1,8 +1,8 @@
 """Focused administration routes for AI-DataSeek.
 
-The administration interface intentionally contains only resource usage, task
-inspection, and Skill/MCP governance. User-facing plugin installation remains
-in the dedicated Skill, MCP and Renderer modules.
+The administration interface intentionally contains only resource usage and
+configuration, task inspection, and Skill/MCP governance. User-facing plugin
+installation remains in the dedicated Skill, MCP and Renderer modules.
 """
 
 from datetime import UTC, datetime
@@ -16,24 +16,18 @@ from fastapi import APIRouter, Depends, Query
 
 from app.application.errors.exceptions import BadRequestError, NotFoundError, UnauthorizedError
 from app.application.services.agent_service import AgentService
+from app.application.services.resource_configuration_service import ResourceConfigurationService
 from app.core.config import get_settings
 from app.domain.models.audit import AuditRiskLevel
 from app.domain.models.mcp_config import MCPScope
-from app.domain.models.execution_node import ExecutionNodeStatus
 from app.domain.models.session import SessionStatus
 from app.domain.models.skill import SkillScope
 from app.domain.models.user import User, UserRole
 from app.domain.services.audit_service import AuditService, get_audit_service
 from app.domain.services.resource_usage_service import ResourceUsageService, get_resource_usage_service
 from app.domain.services.user_name_service import UserNameService
-from app.infrastructure.models.documents import (
-    ExecutionNodeDocument,
-    SessionDocument,
-    SkillDocument,
-    UserDocument,
-)
+from app.infrastructure.models.documents import SessionDocument, SkillDocument, UserDocument
 from app.infrastructure.repositories.mongo_mcp_repository import MongoMCPRepository
-from app.infrastructure.external.sandbox.node_health import ensure_local_default_node
 from app.interfaces.dependencies import get_agent_service, get_current_user
 from app.interfaces.schemas.admin import (
     AdminMCPServerListResponse,
@@ -45,8 +39,8 @@ from app.interfaces.schemas.admin import (
     AdminTaskListResponse,
     AdminTaskResponse,
     ResourceUsageOverviewResponse,
-    ExecutionNodeListResponse,
-    ExecutionNodeResponse,
+    SandboxResourceConfigurationResponse,
+    SandboxResourceConfigurationUpdateRequest,
 )
 from app.interfaces.schemas.base import APIResponse
 from app.interfaces.schemas.event import EventMapper
@@ -104,36 +98,6 @@ def _mcp_response(name: str, server, owner_names: dict[str, str]) -> AdminMCPSer
     )
 
 
-def _execution_node_response(doc: ExecutionNodeDocument) -> ExecutionNodeResponse:
-    # This endpoint only feeds the dataset-location node picker.  Runtime
-    # configuration can contain DATASET_HOST_PATH_ALLOWLIST values, while a
-    # worker health payload can contain arbitrary node-local details.  Neither
-    # is needed by the browser, so return only the safe operational summary.
-    public_health = doc.health.model_copy(update={"raw": {}})
-    return ExecutionNodeResponse(
-        id=doc.node_id,
-        name=doc.name,
-        description=doc.description,
-        type=doc.type,
-        status=doc.status,
-        enabled=doc.enabled,
-        base_url=None,
-        auth_type=doc.auth_type,
-        credential_ref=None,
-        runtime_config={},
-        capacity=doc.capacity,
-        labels=doc.labels,
-        taints=doc.taints,
-        health=public_health,
-        last_heartbeat_at=doc.last_heartbeat_at,
-        last_checked_at=doc.last_checked_at,
-        failure_reason=("Execution node health check failed" if doc.failure_reason else None),
-        created_by=doc.created_by,
-        created_at=doc.created_at,
-        updated_at=doc.updated_at,
-    )
-
-
 @router.get("/resource-usage", response_model=APIResponse[ResourceUsageOverviewResponse])
 async def get_resource_usage(
     start_at: Optional[datetime] = Query(default=None),
@@ -151,37 +115,31 @@ async def get_resource_usage(
     return APIResponse.success(ResourceUsageOverviewResponse(**overview))
 
 
-@router.get("/execution-nodes", response_model=APIResponse[ExecutionNodeListResponse])
-async def list_execution_nodes(
-    query: Optional[str] = Query(default=None),
-    include_deleted: bool = Query(default=False),
-    limit: int = Query(default=50, ge=1, le=200),
-    offset: int = Query(default=0, ge=0),
+@router.get(
+    "/resource-config",
+    response_model=APIResponse[SandboxResourceConfigurationResponse],
+)
+async def get_resource_configuration(
     current_user: User = Depends(get_current_user),
-) -> APIResponse[ExecutionNodeListResponse]:
-    """Read-only node catalog used when registering dataset host paths."""
+) -> APIResponse[SandboxResourceConfigurationResponse]:
     _require_admin(current_user)
-    await ensure_local_default_node()
-    docs = await ExecutionNodeDocument.find().sort("-updated_at").to_list()
-    if not include_deleted:
-        docs = [doc for doc in docs if doc.status != ExecutionNodeStatus.DELETED]
-    if query:
-        needle = query.lower()
-        docs = [
-            doc
-            for doc in docs
-            if needle in doc.node_id.lower()
-            or needle in doc.name.lower()
-            or needle in (doc.description or "").lower()
-        ]
-    total = len(docs)
-    page_docs = docs[offset : offset + limit]
-    return APIResponse.success(
-        ExecutionNodeListResponse(
-            nodes=[_execution_node_response(doc) for doc in page_docs],
-            total=total,
-        )
+    config = await ResourceConfigurationService().get()
+    return APIResponse.success(SandboxResourceConfigurationResponse(**config))
+
+
+@router.patch(
+    "/resource-config",
+    response_model=APIResponse[SandboxResourceConfigurationResponse],
+)
+async def update_resource_configuration(
+    request: SandboxResourceConfigurationUpdateRequest,
+    current_user: User = Depends(get_current_user),
+) -> APIResponse[SandboxResourceConfigurationResponse]:
+    _require_admin(current_user)
+    config = await ResourceConfigurationService().update(
+        **request.model_dump(exclude_none=True),
     )
+    return APIResponse.success(SandboxResourceConfigurationResponse(**config))
 
 
 @router.get("/tasks", response_model=APIResponse[AdminTaskListResponse])

@@ -29,6 +29,7 @@ from app.application.services.file_service import FileService
 from app.domain.models.tool_result import ToolResult
 from app.domain.models.session import SessionStatus
 from app.domain.models.file import FileInfo
+from app.domain.external.sandbox_runtime import SandboxNotFoundError
 from app.domain.models.plan import Step
 from app.domain.models.execution_node import ExecutionNodeAuthType, ExecutionNodeCapacity, ExecutionNodeHealth, ExecutionNodeStatus, ExecutionNodeType, SandboxAllocationStatus
 from app.domain.models.user import User, UserRole
@@ -465,6 +466,10 @@ async def test_artifact_discovery_syncs_data_files_beyond_old_suffix_and_count_l
     runner._file_storage = FakeFileStorage()
     runner._generated_files = []
     runner._artifact_baseline_paths = {"/home/ubuntu/output/brightness_temperature/data_00.csv"}
+    runner._private_artifact_roots = {
+        "/home/ubuntu/output/unpacked",
+        "/home/ubuntu/output/unpacked_archives",
+    }
 
     await runner._sync_discovered_artifacts_to_storage()
 
@@ -1322,7 +1327,7 @@ async def test_agent_domain_service_hydrates_replacement_sandbox_from_session_fi
 
         async def restore(self, sandbox_id):
             assert sandbox_id == "sandbox-old"
-            raise RuntimeError("No such container")
+            raise SandboxNotFoundError("No such container")
 
         async def allocate(self, session=None):
             return self.sandbox
@@ -1893,6 +1898,14 @@ async def test_local_node_health_separates_warm_running_from_paused_sandboxes(mo
 
     monkeypatch.setattr(node_health_module, "SandboxRecordDocument", FakeSandboxRecordDocument)
     monkeypatch.setattr(node_health_module, "_local_sandbox_container_states", fake_container_states)
+    async def no_op_reconcile(**_kwargs):
+        return None
+
+    monkeypatch.setattr(
+        node_health_module,
+        "_reconcile_local_sandbox_lifecycle",
+        no_op_reconcile,
+    )
     monkeypatch.setattr(
         node_health_module,
         "_host_metrics",
@@ -1909,6 +1922,7 @@ async def test_local_node_health_separates_warm_running_from_paused_sandboxes(mo
         },
     )
     doc = SimpleNamespace(
+        node_id="local-default",
         capacity=ExecutionNodeCapacity(max_sandboxes=10),
         enabled=True,
         status=ExecutionNodeStatus.UNKNOWN,
@@ -1918,7 +1932,9 @@ async def test_local_node_health_separates_warm_running_from_paused_sandboxes(mo
 
     await node_health_module._check_local_docker_node(doc)
 
-    assert doc.health.running_sandboxes == 1
+    # Capacity follows Docker reality, including warm or temporarily untracked
+    # running containers, instead of trusting only assigned database records.
+    assert doc.health.running_sandboxes == 2
     assert doc.health.warm_sandboxes == 1
     assert doc.health.assigned_sandboxes == 1
     assert doc.health.paused_sandboxes == 2
@@ -1942,7 +1958,12 @@ async def test_node_monitor_destroys_expired_paused_sandboxes(monkeypatch):
         async def save(self):
             self.saved = True
 
-    expired = FakeRecord("sandbox-expired", now - timedelta(minutes=31))
+    # MongoDB may deserialize legacy UTC values without tzinfo.  The monitor
+    # must still compare and retire them instead of aborting the entire tick.
+    expired = FakeRecord(
+        "sandbox-expired",
+        (now - timedelta(minutes=31)).replace(tzinfo=None),
+    )
     fresh = FakeRecord("sandbox-fresh", now - timedelta(minutes=5))
 
     class FakeQuery:
@@ -1955,6 +1976,32 @@ async def test_node_monitor_destroys_expired_paused_sandboxes(monkeypatch):
         @classmethod
         def find(cls, *args):
             return FakeQuery()
+
+    class FakeAllocation:
+        def __init__(self, sandbox_id):
+            self.sandbox_id = sandbox_id
+            self.status = SandboxAllocationStatus.PAUSED
+            self.updated_at = now
+            self.saved = False
+
+        async def save(self):
+            self.saved = True
+
+    expired_allocation = FakeAllocation("sandbox-expired")
+    fresh_allocation = FakeAllocation("sandbox-fresh")
+
+    class AllocationQuery:
+        async def to_list(self):
+            return [expired_allocation, fresh_allocation]
+
+    class FakeSandboxAllocationDocument:
+        node_id = "node_id"
+        sandbox_id = "sandbox_id"
+        status = "status"
+
+        @classmethod
+        def find(cls, *args):
+            return AllocationQuery()
 
     class FakeContainer:
         def __init__(self, name):
@@ -1979,7 +2026,22 @@ async def test_node_monitor_destroys_expired_paused_sandboxes(monkeypatch):
             return None
 
     monkeypatch.setattr(node_monitor_module, "SandboxRecordDocument", FakeSandboxRecordDocument)
+    monkeypatch.setattr(
+        node_monitor_module,
+        "SandboxAllocationDocument",
+        FakeSandboxAllocationDocument,
+    )
     monkeypatch.setattr(node_monitor_module.docker, "from_env", lambda: FakeDockerClient())
+    cleared = []
+
+    async def fake_clear(sandbox_ids, **_kwargs):
+        cleared.extend(sandbox_ids)
+
+    monkeypatch.setattr(
+        node_monitor_module,
+        "clear_session_sandbox_references",
+        fake_clear,
+    )
 
     monitor = node_monitor_module.ExecutionNodeMonitor()
     node = SimpleNamespace(
@@ -1993,6 +2055,9 @@ async def test_node_monitor_destroys_expired_paused_sandboxes(monkeypatch):
     assert expired.destroyed_at is not None
     assert expired.saved is True
     assert removed["sandbox-expired"].removed is True
+    assert expired_allocation.status == SandboxAllocationStatus.RELEASED
+    assert expired_allocation.saved is True
+    assert cleared == ["sandbox-expired"]
     assert fresh.status == "paused"
     assert "sandbox-fresh" not in removed
 

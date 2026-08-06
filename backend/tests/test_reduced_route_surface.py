@@ -9,7 +9,12 @@ ROUTE_PATHS = {route.path for route in router.routes}
 def test_dataset_analysis_and_plugin_routes_remain_available():
     expected_paths = {
         "/sessions",
+        "/datasets",
         "/datasets/submissions",
+        "/datasets/{dataset_id}",
+        "/datasets/{dataset_id}/preview",
+        "/datasets/{dataset_id}/sessions",
+        "/datasets/{dataset_id}/suggested-questions",
         "/skills",
         "/mcp/servers",
         "/renderers",
@@ -17,8 +22,6 @@ def test_dataset_analysis_and_plugin_routes_remain_available():
         "/admin/tasks",
         "/admin/mcp/servers",
         "/admin/skills",
-        "/admin/datasets",
-        "/admin/execution-nodes",
     }
 
     assert expected_paths <= ROUTE_PATHS
@@ -34,6 +37,8 @@ def test_removed_product_domains_are_not_routable():
         "/scientific-sites",
         "/admin/a2a",
         "/admin/audit",
+        "/admin/datasets",
+        "/admin/execution-nodes",
         "/admin/knowledge-bases",
         "/admin/models",
         "/admin/safety-rules",

@@ -1,5 +1,6 @@
 import json
 import logging
+import re
 from datetime import datetime, UTC
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from app.domain.services.flows.base import BaseFlow
@@ -101,7 +102,13 @@ class PlanActFlow(BaseFlow):
         base_llm_overrides = llm_overrides or {}
         tools = [
             ShellToolkit(sandbox),
-            BrowserToolkit(browser),
+            BrowserToolkit(
+                browser,
+                readiness_check=(
+                    getattr(sandbox, "ensure_browser_ready", None)
+                    or getattr(sandbox, "ensure_sandbox", None)
+                ),
+            ),
             FileToolkit(sandbox),
             MessageToolkit(),
             SkillToolkit(
@@ -257,9 +264,8 @@ class PlanActFlow(BaseFlow):
                     async for event in self.executor.execute_step(self.plan, step, message):
                         yield event
                 logger.info(f"Agent {self._agent_id} completed step {step.id}")
-                # StepEvent carries only one step. Persist the complete updated
-                # plan before moving on so task/process recovery cannot repeat a
-                # successful side-effecting step from an older PlanEvent.
+                # Persist the complete updated plan before moving on so task or
+                # process recovery cannot repeat a successful side-effecting step.
                 yield PlanEvent(status=PlanStatus.UPDATED, plan=self.plan, step=step)
                 if complete_after_vision_step:
                     self.status = AgentStatus.COMPLETED
@@ -400,13 +406,21 @@ class PlanActFlow(BaseFlow):
                 "include_archive_tree": True,
                 "allow_terminal_quicklook": False,
             },
+            "catalog_metadata": {
+                "description": "读取数据集目录元数据并回答用户问题",
+                "instruction": (
+                    "仅使用数据中心已验证的登记清单回答总大小、文件数量和格式分组；"
+                    "不读取或推断文件内容，不暴露宿主机真实路径。登记清单不完整时必须回退到挂载数据检查。"
+                ),
+                "include_archive_tree": False,
+                "allow_terminal_quicklook": False,
+            },
             "analysis": {
                 "description": "分析当前数据集并回答用户问题",
                 "instruction": (
                     "完整保留并回答用户的具体问题，只读取回答该问题所需的数据。先给直接结论，"
                     "再列出可核验的数据证据、分析方法和必要限制；定量结论必须对应实际读取的文件、"
-                    "字段或波段以及筛选范围，推断必须与观测事实分开。把计算结果在同一次主要分析中"
-                    "写成可下载的 Markdown、CSV 或 JSON 产物并返回。不要把普通问答改写成通用数据"
+                    "字段或波段以及筛选范围，推断必须与观测事实分开。不要把普通问答改写成通用数据"
                     "探查或可视化任务；仅在用户明确要求图表时生成图表。"
                 ),
                 "include_archive_tree": False,
@@ -426,6 +440,17 @@ class PlanActFlow(BaseFlow):
             and len(message.datasets or []) == 1
             and PlanActFlow._prefers_quicklook_evidence(message.message)
         )
+        explicit_artifact_request = PlanActFlow._requests_downloadable_result(
+            message.message
+        )
+        if explicit_artifact_request or (
+            dataset_intent == "visualization" and not prefer_quicklook_evidence
+        ):
+            artifact_policy = "required"
+        elif dataset_intent == "visualization":
+            artifact_policy = "capability"
+        else:
+            artifact_policy = "optional"
         uses_chinese = any("\u3400" <= character <= "\u9fff" for character in message.message)
         if uses_chinese:
             title = f"{dataset_name}分析"
@@ -459,10 +484,11 @@ class PlanActFlow(BaseFlow):
                         # reconstruct it from a generic step label.
                         "user_question": message.message,
                         "execution_guidance": intent_config["instruction"],
-                        "require_model_answer": True,
+                        "require_model_answer": dataset_intent not in {"catalog_metadata", "inventory"},
                         "require_evidence": True,
-                        "require_method_and_limitations": True,
-                        "require_downloadable_result": True,
+                        "require_method_and_limitations": dataset_intent not in {"catalog_metadata", "inventory"},
+                        "require_downloadable_result": artifact_policy in {"required", "capability"},
+                        "artifact_policy": artifact_policy,
                         "include_archive_tree": intent_config["include_archive_tree"],
                         # Only an unconstrained broad quicklook can finish without
                         # a second model decision. A request for named dimensions,
@@ -500,7 +526,11 @@ class PlanActFlow(BaseFlow):
             "解压后",
             "解压以后",
             "压缩包内容",
+            "压缩包里",
+            "包内文件",
             "archive contents",
+            "inside the archive",
+            "inside archive",
             "file list",
             "which files",
             "what files",
@@ -540,9 +570,68 @@ class PlanActFlow(BaseFlow):
         )
         if any(marker in normalized for marker in file_structure_markers):
             return "inventory"
+        if PlanActFlow._is_catalog_metadata_request(normalized):
+            return "catalog_metadata"
         if any(marker in normalized for marker in visualization_markers):
             return "visualization"
         return "analysis"
+
+    @staticmethod
+    def _is_catalog_metadata_request(user_message: str) -> bool:
+        """Recognize only narrow, answerable catalog facts.
+
+        The negative list is intentionally conservative: any request involving
+        values, trends, comparisons, scientific interpretation, or file contents
+        keeps the professional mounted-data analysis path.
+        """
+
+        normalized = " ".join((user_message or "").casefold().split())
+        if not normalized or len(normalized) > 160:
+            return False
+        analytical_markers = (
+            "分析", "趋势", "关系", "相关", "比较", "回归", "预测", "质量", "缺失",
+            "字段", "波段", "像元", "数值", "平均", "最大值", "最小值", "空间", "时间",
+            "年份", "月份", "绘图", "画图", "图表", "内容", "解压", "目录树", "压缩包",
+            "包内", "最大", "最小", "排序", "按文件", "统计", "适合", "内存", "转换",
+            "兼容", "推荐", "方案",
+            "analyze", "analyse", "trend", "relationship", "correlation", "compare",
+            "regression", "predict", "quality", "missing", "field", "band", "pixel",
+            "mean", "maximum", "minimum", "spatial", "temporal", "plot", "chart",
+            "contents", "extract", "directory tree", "archive", "compressed", "uncompressed",
+            "largest", "smallest", "sort", "group", "statistics", "suitable", "memory",
+            "convert", "conversion", "compatible", "recommend", "unusually",
+        )
+        if any(marker in normalized for marker in analytical_markers):
+            return False
+        stripped = normalized.strip(" \t\r\n,，。.!！?？;；:")
+        patterns = (
+            r"(?:请(?:告诉我|问)?|帮我(?:看|看看|查看)?|想知道)?(?:这个|该)?数据集(?:总共|一共)?(?:有)?多大(?:呢|吗|是多少)?",
+            r"(?:请(?:告诉我|问)?|帮我(?:看|看看|查看)?|想知道)?数据集(?:的)?(?:文件)?(?:总)?大小(?:是多少)?",
+            r"(?:请(?:告诉我|问)?|帮我(?:看|看看|查看)?|想知道)?(?:总|合计)(?:文件)?大小(?:是多少)?",
+            r"(?:请(?:告诉我|问)?|帮我(?:看|看看|查看)?|想知道)?占用(?:了)?多少(?:磁盘|存储)?空间",
+            r"(?:请(?:告诉我|问)?|帮我(?:看|看看|查看|统计)?|想知道)?(?:一共|总共)?(?:有)?多少(?:个|份)?文件(?:呢|吗)?",
+            r"(?:请(?:告诉我|问)?|帮我(?:看|看看|查看|统计)?|想知道)?文件(?:总)?数(?:量)?(?:是多少|有多少)?",
+            r"(?:请(?:告诉我|问)?|帮我(?:看|看看|查看)?|想知道)?(?:有|包含|是)?哪些?(?:种)?文件格式",
+            r"(?:请(?:告诉我|问)?|帮我(?:看|看看|查看)?|想知道)?文件(?:格式|类型)(?:有哪些|是什么|分组)?",
+            r"(?:please )?(?:tell me )?(?:what is )?(?:this |the )?dataset size",
+            r"(?:please )?(?:tell me )?how (?:large|big) is (?:this |the )?dataset",
+            r"(?:please )?(?:tell me )?how many files(?: are there| does (?:this |the )?dataset contain)?",
+            r"(?:please )?(?:tell me )?(?:the )?(?:file count|number of files)",
+            r"(?:please )?(?:tell me )?(?:which|what) file (?:formats|types)(?: are there)?",
+            r"(?:please )?(?:tell me )?file (?:formats|types)",
+        )
+        return any(re.fullmatch(pattern, stripped) for pattern in patterns)
+
+    @staticmethod
+    def _requests_downloadable_result(user_message: str) -> bool:
+        normalized = " ".join((user_message or "").casefold().split())
+        markers = (
+            "下载", "导出", "保存", "生成报告", "分析报告", "输出文件", "生成 csv",
+            "生成csv", "生成 json", "生成json", "生成 markdown", "生成markdown",
+            "download", "export", "save as", "write a report", "generate a report",
+            "csv file", "json file", "markdown file",
+        )
+        return any(marker in normalized for marker in markers)
 
     @staticmethod
     def _is_broad_quicklook_request(user_message: str) -> bool:
@@ -994,9 +1083,8 @@ class PlanActFlow(BaseFlow):
         conversation = conversation[-self.MAX_SESSION_CONTEXT_MESSAGES:]
         rendered_messages_reversed: list[dict[str, str]] = []
         remaining_bytes = self.MAX_SESSION_CONTEXT_BYTES
-        # Select from newest to oldest.  Filling this budget in chronological
-        # order caused a long conversation to keep stale turns while silently
-        # dropping the immediately preceding answer needed by a follow-up.
+        # Select newest turns first so a bounded follow-up context does not keep
+        # stale history while dropping the immediately preceding answer.
         for role, content in reversed(conversation):
             bounded = self._truncate_session_text(
                 content,
@@ -1038,9 +1126,9 @@ class PlanActFlow(BaseFlow):
         ):
             return ""
 
-        # Serialize historical values as data.  This JSON is inserted as a
-        # HumanMessage by BaseAgent; no prior user-controlled text is promoted
-        # into a SystemMessage or concatenated into trusted instructions.
+        # Historical values are serialized as data and inserted as a
+        # HumanMessage by BaseAgent. Never promote user-controlled history into
+        # a SystemMessage or concatenate it with trusted instructions.
         payload = {
             "schema": "session_history/v1",
             "messages": rendered_messages,

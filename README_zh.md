@@ -6,12 +6,11 @@ AI-DataSeek 是从 AI-MANUS 中抽取出的数据集智能探查与分析系统�
 
 ## 保留能力
 
-- `/dataset/setup` 临时数据集测试入口与第三方提交接口。
+- `POST /api/v1/datasets/submissions` 第三方临时数据集提交接口。
 - `/dataset/seek/:datasetId` 科学数据探查：递归展示文件、模型生成分析与可视化问题、只读挂载数据目录。
 - 通用数据分析探查任务：`/chat` 与 `/chat/:sessionId`。
 - Skill、MCP、Renderer 三类插件及数据成果预览。
-- 独立的数据集管理入口，不计入系统管理菜单。
-- 系统管理仅保留：资源用量、任务管理、MCP 管理和技能管理。
+- 系统管理仅保留：资源用量与配置、任务管理、MCP 管理和技能管理。
 - 会话历史、分析文件和沙箱桌面。
 - 用于运维和容量分析的 Token 用量统计，不设置用户额度。
 
@@ -26,7 +25,7 @@ AI-DataSeek 是从 AI-MANUS 中抽取出的数据集智能探查与分析系统�
                                     -> 数据集服务器目录（只读）
 ```
 
-稳定联测环境默认使用 `7000` 端口；隔离的开发环境使用 `7100` 端口。
+AI-DataSeek 仅保留一套 Compose 服务，统一通过 `7000` 端口访问和更新。
 
 ## 快速启动
 
@@ -38,7 +37,7 @@ cp .env.example .env
 ./run.sh up -d --build
 ```
 
-访问 `http://localhost:7000`。
+访问 `http://39.106.98.67:7000`。
 
 AI-DataSeek 固定采用免登录模式。浏览器和 API 请求均不使用 Bearer Token
 或 `X-API-Key`，所有调用者统一以系统内置管理员身份操作。Token 消耗只用于
@@ -52,19 +51,13 @@ DATASET_DOCKER_HOST_ROOT=/var/lib/snapd/hostfs
 
 `DATASET_HOST_PATH_ALLOWLIST` 控制允许访问的数据根目录。系统会先校验第三方提交的服务器目录，再以只读方式挂载到分析沙箱。
 
-## 开发环境
+## 开发与更新
+
+所有容器化运行与更新都使用唯一的 `7000` 服务：
 
 ```bash
-cp .env.example .env
-./dev.sh up -d --build
+./run.sh up -d --build
 ```
-
-默认开发端口：
-
-- 前端（开发入口）：`http://localhost:7100`
-- 后端：`http://localhost:8001`
-- MongoDB：`localhost:27018`
-- MinIO API/控制台：`localhost:9010` / `localhost:9011`
 
 常用检查：
 
@@ -77,7 +70,7 @@ docker compose config --quiet
 
 ## 第三方接入
 
-`/dataset/setup` 页面仅用于模拟第三方系统调用。正式业务系统应直接调用临时数据集提交接口，并将用户跳转至 `/dataset/seek/:datasetId`，详见 [第三方接入接口文档](docs/dataset-seek-third-party-api.md)。
+人工数据集设置页面已移除。第三方业务系统直接调用临时数据集提交接口，并将用户跳转至 `/dataset/seek/:datasetId`，详见 [第三方接入接口文档](docs/dataset-seek-third-party-api.md)。
 
 ## 项目结构
 

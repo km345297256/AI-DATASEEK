@@ -102,6 +102,23 @@ def test_rejects_zip_symbolic_links(tmp_path):
         unpack_recursive(source, tmp_path / "unpacked", Limits())
 
 
+def test_source_root_rejects_archive_symlink_escape(tmp_path):
+    allowed_root = tmp_path / "mounted-dataset"
+    allowed_root.mkdir()
+    outside = tmp_path / "outside.zip"
+    outside.write_bytes(_zip_bytes({"data.csv": b"x\n1\n"}))
+    linked_archive = allowed_root / "dataset.zip"
+    linked_archive.symlink_to(outside)
+
+    with pytest.raises(UnpackError, match="outside the allowed dataset root"):
+        unpack_recursive(
+            linked_archive,
+            tmp_path / "unpacked",
+            Limits(),
+            allowed_source_root=allowed_root,
+        )
+
+
 def test_rejects_declared_expansion_over_limit_without_partial_output(tmp_path):
     source = tmp_path / "large.zip"
     source.write_bytes(_zip_bytes({"one.bin": b"123456", "two.bin": b"abcdef"}))

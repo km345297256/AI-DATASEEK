@@ -291,7 +291,75 @@ class DockerSandbox(Sandbox):
             return None
 
     async def ensure_sandbox(self) -> None:
-        """Ensure sandbox is ready by checking that all services are RUNNING"""
+        """Start the full legacy profile and wait for every sandbox service."""
+        await self._ensure_supervisor_profile("vnc")
+        await self._wait_for_supervisor_services(
+            required_services={
+                "app",
+                "xvfb",
+                "chrome",
+                "socat",
+                "x11vnc",
+                "websockify",
+            },
+        )
+
+    async def ensure_api_ready(self) -> None:
+        """Wait only for the sandbox API used by dataset and shell tools.
+
+        The supervisor endpoint is served by the API process itself, so a
+        successful response is sufficient. GUI services are started lazily on
+        first browser-tool or VNC access.
+        """
+        await self._wait_for_supervisor_services(required_services={"app"})
+
+    async def ensure_browser_ready(self) -> None:
+        """Start and wait for the services required by CDP browser tools."""
+        await self._ensure_supervisor_profile("browser")
+        await self._wait_for_supervisor_services(
+            required_services={"app", "xvfb", "chrome", "socat"},
+        )
+
+    async def ensure_vnc_ready(self) -> None:
+        """Start and wait for the browser-backed interactive VNC viewer."""
+        await self._ensure_supervisor_profile("vnc")
+        await self._wait_for_supervisor_services(
+            required_services={
+                "app",
+                "xvfb",
+                "chrome",
+                "socat",
+                "x11vnc",
+                "websockify",
+            },
+        )
+
+    async def _ensure_supervisor_profile(self, profile: str) -> None:
+        """Start a fixed service profile, with rolling-upgrade compatibility."""
+        response = await self.client.post(
+            f"{self.base_url}/api/v1/supervisor/ensure",
+            json={"profile": profile},
+        )
+        if response.status_code == 404:
+            # Older sandbox images autostart all services and do not expose the
+            # profile endpoint. The readiness poll below remains sufficient
+            # while those containers are naturally drained.
+            logger.info(
+                "Sandbox %s uses legacy supervisor startup; waiting for %s services",
+                self.id,
+                profile,
+            )
+            return
+        response.raise_for_status()
+        result = ToolResult(**response.json())
+        if not result.success:
+            raise RuntimeError(result.message or f"Failed to start {profile} services")
+
+    async def _wait_for_supervisor_services(
+        self,
+        *,
+        required_services: Optional[set[str]],
+    ) -> None:
         max_retries = 60  # Maximum number of retries
         retry_interval = 2  # Seconds between retries
         
@@ -314,20 +382,24 @@ class DockerSandbox(Sandbox):
                     await asyncio.sleep(retry_interval)
                     continue
                 
-                # Check if all services are RUNNING
-                all_running = True
-                non_running_services = []
-                
-                for service in services:
-                    service_name = service.get("name", "unknown")
-                    state_name = service.get("statename", "")
-                    
-                    if state_name != "RUNNING":
-                        all_running = False
-                        non_running_services.append(f"{service_name}({state_name})")
+                states = {
+                    str(service.get("name", "unknown")): str(service.get("statename", ""))
+                    for service in services
+                    if isinstance(service, dict)
+                }
+                names_to_check = set(states) if required_services is None else required_services
+                non_running_services = [
+                    f"{service_name}({states.get(service_name, 'MISSING')})"
+                    for service_name in sorted(names_to_check)
+                    if states.get(service_name) != "RUNNING"
+                ]
+                all_running = not non_running_services
                 
                 if all_running:
-                    logger.info(f"All {len(services)} services are RUNNING - sandbox is ready")
+                    logger.info(
+                        "Required sandbox services are RUNNING: %s",
+                        ", ".join(sorted(names_to_check)),
+                    )
                     return  # Success - all services are running
                 else:
                     logger.info(f"Waiting for services to start... Non-running: {', '.join(non_running_services)} (attempt {attempt + 1}/{max_retries})")
@@ -692,7 +764,11 @@ class DockerSandbox(Sandbox):
             if self.client:
                 await self.client.aclose()
             if self._container_name:
-                docker_client = docker.from_env()
+                docker_client = (
+                    docker.DockerClient(base_url=self._docker_host)
+                    if self._docker_host
+                    else docker.from_env()
+                )
                 try:
                     docker_client.containers.get(self._container_name).remove(force=True)
                 except docker.errors.NotFound:
@@ -702,6 +778,12 @@ class DockerSandbox(Sandbox):
                     if callable(close):
                         close()
                 await DockerSandbox._update_record_destroyed(self._container_name)
+                await DockerSandbox._update_allocation_status(self._container_name, "released")
+                from app.infrastructure.external.sandbox.node_health import (
+                    clear_session_sandbox_references,
+                )
+
+                await clear_session_sandbox_references({self._container_name})
             return True
         except Exception as e:
             logger.error(f"Failed to destroy Docker sandbox: {str(e)}")
@@ -962,19 +1044,25 @@ class DockerSandbox(Sandbox):
             return DockerSandbox(ip=ip, container_name=id)
 
         docker_client = docker.from_env()
-        container = docker_client.containers.get(id)
-        container.reload()
-        
-        ip_address = cls._get_container_ip(container)
-        logger.info(f"IP address: {ip_address}")
-        return DockerSandbox(ip=ip_address, container_name=container.name)
+        try:
+            container = docker_client.containers.get(id)
+            container.reload()
+
+            ip_address = cls._get_container_ip(container)
+            logger.info(f"IP address: {ip_address}")
+            return DockerSandbox(ip=ip_address, container_name=container.name)
+        finally:
+            docker_client.close()
 
     @classmethod
     async def get_on_host(cls, id: str, docker_host: str) -> Sandbox:
         docker_client = docker.DockerClient(base_url=docker_host)
-        container = docker_client.containers.get(id)
-        container.reload()
+        try:
+            container = docker_client.containers.get(id)
+            container.reload()
 
-        ip_address = cls._get_container_ip(container)
-        logger.info(f"Remote sandbox IP address: {ip_address}")
-        return DockerSandbox(ip=ip_address, container_name=container.name, docker_host=docker_host)
+            ip_address = cls._get_container_ip(container)
+            logger.info(f"Remote sandbox IP address: {ip_address}")
+            return DockerSandbox(ip=ip_address, container_name=container.name, docker_host=docker_host)
+        finally:
+            docker_client.close()

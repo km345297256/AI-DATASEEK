@@ -63,18 +63,6 @@
     <div v-else
       class="max-w-none p-0 m-0 prose prose-sm sm:prose-base dark:prose-invert [&_pre:not(.shiki)]:!bg-[var(--fill-tsp-white-light)] [&_pre:not(.shiki)]:text-[var(--text-primary)] text-base text-[var(--text-primary)]"
       v-html="renderMarkdown(messageContent.content)"></div>
-    <div v-if="messageContent.content" class="flex h-7 w-full items-center justify-start opacity-0 pointer-events-none transition-opacity group-hover:opacity-100 group-hover:pointer-events-auto group-focus-within:opacity-100 group-focus-within:pointer-events-auto max-sm:opacity-100 max-sm:pointer-events-auto">
-      <button
-        type="button"
-        class="flex h-7 w-7 items-center justify-center rounded-md text-[var(--icon-tertiary)] transition-colors hover:bg-[var(--fill-tsp-white-light)] hover:text-[var(--icon-primary)] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--border-dark)]"
-        :aria-label="assistantCopied ? '已复制' : '复制回复'"
-        :title="assistantCopied ? '已复制' : '复制回复'"
-        @click="copyAssistantMessage"
-      >
-        <CheckIcon v-if="assistantCopied" :size="15" />
-        <CopyIcon v-else :size="15" />
-      </button>
-    </div>
   </div>
   <ToolUse v-else-if="message.type === 'tool'" :tool="toolContent" @click="handleToolClick(toolContent)" />
   <div v-else-if="message.type === 'step'" class="flex flex-col">
@@ -180,8 +168,6 @@ const handleToolClick = (tool: ToolContent) => {
 
 const copied = ref(false);
 let copiedTimer: ReturnType<typeof setTimeout> | null = null;
-const assistantCopied = ref(false);
-let assistantCopiedTimer: ReturnType<typeof setTimeout> | null = null;
 
 const copyUserMessage = async () => {
   const text = messageContent.value.content;
@@ -199,25 +185,8 @@ const copyUserMessage = async () => {
   }, 1500);
 };
 
-const copyAssistantMessage = async () => {
-  const text = messageContent.value.content;
-  if (!text) return;
-  const success = await copyToClipboard(text);
-  if (!success) {
-    showErrorToast('复制失败，请检查浏览器剪贴板权限');
-    return;
-  }
-  assistantCopied.value = true;
-  if (assistantCopiedTimer) clearTimeout(assistantCopiedTimer);
-  assistantCopiedTimer = setTimeout(() => {
-    assistantCopied.value = false;
-    assistantCopiedTimer = null;
-  }, 1500);
-};
-
 onUnmounted(() => {
   if (copiedTimer) clearTimeout(copiedTimer);
-  if (assistantCopiedTimer) clearTimeout(assistantCopiedTimer);
 });
 
 // For backward compatibility, provide the original computed properties

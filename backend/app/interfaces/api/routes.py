@@ -1,7 +1,6 @@
 from fastapi import APIRouter
 from . import (
     admin_routes,
-    admin_dataset_routes,
     agent_profile_routes,
     config_routes,
     dataset_routes,
@@ -25,7 +24,6 @@ def create_api_router() -> APIRouter:
     api_router.include_router(agent_profile_routes.router)
     api_router.include_router(renderer_routes.router)
     api_router.include_router(admin_routes.router)
-    api_router.include_router(admin_dataset_routes.router)
     api_router.include_router(dataset_routes.router)
 
     return api_router

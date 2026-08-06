@@ -58,6 +58,7 @@ def test_visualization_request_uses_chinese_one_step_fast_path():
     assert plan.steps[0].inputs["require_evidence"] is True
     assert plan.steps[0].inputs["require_method_and_limitations"] is True
     assert plan.steps[0].inputs["require_downloadable_result"] is True
+    assert plan.steps[0].inputs["artifact_policy"] == "capability"
     assert "解释图表所依据的数据" in plan.steps[0].inputs["execution_guidance"]
 
 
@@ -91,8 +92,69 @@ def test_custom_dataset_question_remains_model_assisted_analysis():
     assert step.inputs["user_question"] == "哪一年降水量最高，可能说明了什么？"
     assert "完整保留并回答用户的具体问题" in step.inputs["execution_guidance"]
     assert "可核验的数据证据" in step.inputs["execution_guidance"]
-    assert "可下载" in step.inputs["execution_guidance"]
+    assert step.inputs["artifact_policy"] == "optional"
+    assert step.inputs["require_downloadable_result"] is False
     assert "不要把普通问答改写成通用数据探查或可视化任务" in step.inputs["execution_guidance"]
+
+
+@pytest.mark.parametrize(
+    "question",
+    [
+        "这个数据集有多大？",
+        "一共有多少个文件？",
+        "文件格式有哪些？",
+        "What is the dataset size?",
+        "How many files are there?",
+    ],
+)
+def test_catalog_metadata_questions_use_model_free_intent(question):
+    step = _flow()._create_dataset_fast_path_plan(
+        Message(message=question, datasets=[_dataset()])
+    ).steps[0]
+
+    assert step.inputs["dataset_intent"] == "catalog_metadata"
+    assert step.inputs["require_model_answer"] is False
+    assert step.inputs["artifact_policy"] == "optional"
+    assert step.inputs["require_downloadable_result"] is False
+
+
+@pytest.mark.parametrize(
+    "question",
+    [
+        "分析文件大小与降水量的关系",
+        "比较各年份的文件数量趋势",
+        "按空间区域分析文件中的最大值",
+        "Analyze the relationship between file size and rainfall",
+        "这个数据集有多大，是否适合在 8GB 内存中处理？",
+        "哪个文件大小最大？",
+        "按文件类型统计大小",
+        "What file format should I convert to?",
+        "Is the dataset size unusually large?",
+    ],
+)
+def test_catalog_metadata_router_does_not_capture_analysis_questions(question):
+    step = _flow()._create_dataset_fast_path_plan(
+        Message(message=question, datasets=[_dataset()])
+    ).steps[0]
+
+    assert step.inputs["dataset_intent"] == "analysis"
+
+
+def test_explicit_export_keeps_required_artifact_policy():
+    step = _flow()._create_dataset_fast_path_plan(
+        Message(message="分析数据质量并导出 CSV 报告", datasets=[_dataset()])
+    ).steps[0]
+
+    assert step.inputs["artifact_policy"] == "required"
+    assert step.inputs["require_downloadable_result"] is True
+
+
+def test_archive_internal_count_routes_to_inventory_not_top_level_metadata():
+    step = _flow()._create_dataset_fast_path_plan(
+        Message(message="压缩包里有多少个文件？", datasets=[_dataset()])
+    ).steps[0]
+
+    assert step.inputs["dataset_intent"] == "inventory"
 
 
 def test_specific_multi_part_visualization_requires_evidence_coverage_model_turn():
@@ -150,6 +212,7 @@ def test_named_specialized_methods_keep_the_custom_analysis_path(question):
     assert step.inputs["dataset_intent"] == "visualization"
     assert step.inputs["prefer_quicklook_evidence"] is False
     assert step.inputs["allow_terminal_quicklook"] is False
+    assert step.inputs["artifact_policy"] == "required"
 
 
 def test_multiple_datasets_do_not_force_a_single_input_quicklook():

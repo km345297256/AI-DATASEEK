@@ -4,21 +4,19 @@ Vue 3, TypeScript, Vite, and Tailwind frontend for AI-DataSeek.
 
 ## Retained pages
 
-- `/dataset/setup` — temporary third-party submission simulator.
 - `/dataset/seek/:datasetId` — scientific dataset exploration and analysis.
 - `/chat` and `/chat/:sessionId` — general data exploration tasks.
 - `/chat/plugins` — Skill, MCP, and Renderer plugins.
-- `/chat/datasets` — dataset administration.
-- `/chat/admin` — resource usage, tasks, MCP, skills, and users only.
+- `/chat/admin` — resource usage, tasks, MCP, and skills only.
 
-## Development
+## Development and deployment
 
 ```bash
-npm ci
-BACKEND_URL=http://127.0.0.1:8000 npm run dev
+cd ..
+./run.sh up -d --build
 ```
 
-The development server defaults to port `5173` when run directly. The root development Compose file maps AI-DataSeek to port `5174` to avoid conflicts with the original project.
+The frontend is built and deployed with the repository's sole Compose stack and is available at `http://39.106.98.67:7000`.
 
 ## Checks
 

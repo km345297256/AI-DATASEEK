@@ -418,8 +418,18 @@ def _relative_display(path: Path, root: Path) -> str:
     return path.relative_to(root).as_posix()
 
 
-def unpack_recursive(source_archive: Path, output_directory: Path, limits: Limits) -> dict:
+def unpack_recursive(
+    source_archive: Path,
+    output_directory: Path,
+    limits: Limits,
+    *,
+    allowed_source_root: Path | None = None,
+) -> dict:
     source_archive = source_archive.expanduser().resolve(strict=True)
+    if allowed_source_root is not None:
+        source_root = allowed_source_root.expanduser().resolve(strict=True)
+        if not source_root.is_dir() or not source_archive.is_relative_to(source_root):
+            raise UnpackError("source archive resolves outside the allowed dataset root")
     if not source_archive.is_file():
         raise UnpackError(f"source archive is not a file: {source_archive}")
     root_kind = archive_kind(source_archive)
@@ -531,6 +541,11 @@ def parse_arguments(argv: list[str] | None = None) -> argparse.Namespace:
     )
     parser.add_argument("archive", type=Path, help="source ZIP, RAR, or 7z file")
     parser.add_argument("--output", type=Path, help="new output directory")
+    parser.add_argument(
+        "--source-root",
+        type=Path,
+        help="optional real-path boundary that must contain the source archive",
+    )
     parser.add_argument("--max-depth", type=int, default=5)
     parser.add_argument("--max-archives", type=int, default=100)
     parser.add_argument("--max-files", type=int, default=2_000)
@@ -554,7 +569,12 @@ def main(argv: list[str] | None = None) -> int:
         timeout_seconds=max(1, min(args.timeout_seconds, 600)),
     )
     try:
-        manifest = unpack_recursive(args.archive, output, limits)
+        manifest = unpack_recursive(
+            args.archive,
+            output,
+            limits,
+            allowed_source_root=args.source_root,
+        )
     except (OSError, rarfile.Error, zipfile.BadZipFile, UnpackError) as exc:
         print(
             json.dumps({"success": False, "error": str(exc)}, ensure_ascii=False),

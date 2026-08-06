@@ -41,6 +41,10 @@ from app.infrastructure.models.documents import (
 )
 from app.domain.services.safety.policy_store import ensure_safety_rule_seeds
 from app.infrastructure.external.sandbox.sandbox_pool import SandboxPool, set_sandbox_pool, get_sandbox_pool
+from app.infrastructure.external.sandbox.node_health import (
+    WARM_POOL_TARGET_KEY,
+    ensure_local_default_node,
+)
 from app.infrastructure.external.sandbox.node_monitor import ExecutionNodeMonitor
 from beanie import init_beanie
 
@@ -98,6 +102,8 @@ async def lifespan(app: FastAPI):
     await ensure_safety_rule_seeds()
     logger.info("Successfully initialized Beanie")
 
+    local_node = await ensure_local_default_node()
+
     execution_node_monitor = ExecutionNodeMonitor(interval_seconds=30)
     execution_node_monitor.start()
     logger.info("Execution node monitor started")
@@ -105,12 +111,22 @@ async def lifespan(app: FastAPI):
     # Initialize Redis
     await get_redis().initialize()
 
-    # Initialize sandbox warm pool if configured
-    if settings.sandbox_isolation == "session" and settings.sandbox_pool_size > 0:
-        pool = SandboxPool(settings.sandbox_pool_size)
+    # Keep a node-local manager even at target zero so stale warm containers
+    # left by an unclean restart are converged instead of consuming capacity.
+    if settings.sandbox_isolation == "session":
+        warm_pool_target = max(
+            0,
+            int(
+                (local_node.runtime_config or {}).get(
+                    WARM_POOL_TARGET_KEY,
+                    settings.sandbox_pool_size,
+                )
+            ),
+        )
+        pool = SandboxPool(warm_pool_target)
         set_sandbox_pool(pool)
         pool.start_background_init()
-        logger.info(f"Sandbox warm pool started with target size {settings.sandbox_pool_size}")
+        logger.info("Sandbox warm pool manager started with target size %s", warm_pool_target)
 
     try:
         yield
@@ -121,15 +137,11 @@ async def lifespan(app: FastAPI):
         pool = get_sandbox_pool()
         if pool:
             await pool.shutdown()
+            set_sandbox_pool(None)
 
         if execution_node_monitor:
             await execution_node_monitor.stop()
             execution_node_monitor = None
-
-        # Disconnect from MongoDB
-        await get_mongodb().shutdown()
-        # Disconnect from Redis
-        await get_redis().shutdown()
 
         logger.info("Cleaning up AgentService instance")
         try:
@@ -139,6 +151,11 @@ async def lifespan(app: FastAPI):
             logger.warning("AgentService shutdown timed out after 30 seconds")
         except Exception as e:
             logger.error(f"Error during AgentService cleanup: {str(e)}")
+
+        # Runner cleanup persists final sandbox/allocation state and may still
+        # consume Redis streams. Close shared stores only after it completes.
+        await get_redis().shutdown()
+        await get_mongodb().shutdown()
 
 app = FastAPI(title="AI-DataSeek", lifespan=lifespan)
 

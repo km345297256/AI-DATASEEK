@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 from pydantic import BaseModel
-from typing import Optional
+from typing import Literal, Optional
 
 from app.schemas.response import Response
 from app.services.supervisor import supervisor_service
@@ -9,6 +9,10 @@ from app.services.supervisor import supervisor_service
 # Request model
 class TimeoutRequest(BaseModel):
     minutes: Optional[int] = None
+
+
+class EnsureProfileRequest(BaseModel):
+    profile: Literal["browser", "vnc"]
 
 
 router = APIRouter()
@@ -23,6 +27,17 @@ async def get_status():
         success=True,
         message="Services status retrieved successfully",
         data=processes
+    )
+
+
+@router.post("/ensure", response_model=Response)
+async def ensure_service_profile(request: EnsureProfileRequest):
+    """Start only the fixed services needed by browser or VNC access."""
+    processes = await supervisor_service.ensure_profile(request.profile)
+    return Response(
+        success=True,
+        message=f"{request.profile} services are ready",
+        data=processes,
     )
 
 @router.post("/stop", response_model=Response)
@@ -116,4 +131,4 @@ async def get_timeout_status():
         success=True,
         message=message,
         data=result.model_dump()
-    ) 
+    )

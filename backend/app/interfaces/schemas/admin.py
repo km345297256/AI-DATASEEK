@@ -3,16 +3,9 @@
 from datetime import date, datetime
 from typing import Any, Dict, List, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from app.domain.models.mcp_config import MCPRiskLevel, MCPScope, MCPTransport
-from app.domain.models.execution_node import (
-    ExecutionNodeAuthType,
-    ExecutionNodeCapacity,
-    ExecutionNodeHealth,
-    ExecutionNodeStatus,
-    ExecutionNodeType,
-)
 from app.domain.models.session import SessionStatus
 from app.domain.models.skill import SkillScope
 from app.domain.models.user import RegistrationStatus, UserRole
@@ -204,29 +197,34 @@ class ResourceUsageOverviewResponse(BaseModel):
     generated_at: datetime
 
 
-class ExecutionNodeResponse(BaseModel):
-    id: str
-    name: str
-    description: str = ""
-    type: ExecutionNodeType
-    status: ExecutionNodeStatus
-    enabled: bool
-    base_url: Optional[str] = None
-    auth_type: ExecutionNodeAuthType
-    credential_ref: Optional[str] = None
-    runtime_config: Dict[str, Any] = Field(default_factory=dict)
-    capacity: ExecutionNodeCapacity
-    labels: Dict[str, str] = Field(default_factory=dict)
-    taints: Dict[str, str] = Field(default_factory=dict)
-    health: ExecutionNodeHealth
-    last_heartbeat_at: Optional[datetime] = None
-    last_checked_at: Optional[datetime] = None
-    failure_reason: Optional[str] = None
-    created_by: Optional[str] = None
-    created_at: datetime
-    updated_at: datetime
+class SandboxResourceConfigurationResponse(BaseModel):
+    sandbox_max_concurrent: int
+    sandbox_pool_size: int
+    sandbox_paused_destroy_after_minutes: int
+    running_sandboxes: int = 0
+    warm_sandboxes: int = 0
+    paused_sandboxes: int = 0
+    configuration_source: str
+    browser_on_demand: bool = True
+    vnc_on_demand: bool = True
+    updated_at: Optional[datetime] = None
 
 
-class ExecutionNodeListResponse(BaseModel):
-    nodes: List[ExecutionNodeResponse] = Field(default_factory=list)
-    total: int = 0
+class SandboxResourceConfigurationUpdateRequest(BaseModel):
+    sandbox_max_concurrent: Optional[int] = Field(default=None, ge=1, le=64)
+    sandbox_pool_size: Optional[int] = Field(default=None, ge=0, le=16)
+    sandbox_paused_destroy_after_minutes: Optional[int] = Field(
+        default=None,
+        ge=1,
+        le=10080,
+    )
+
+    @model_validator(mode="after")
+    def require_change(self):
+        if (
+            self.sandbox_max_concurrent is None
+            and self.sandbox_pool_size is None
+            and self.sandbox_paused_destroy_after_minutes is None
+        ):
+            raise ValueError("At least one resource configuration value is required")
+        return self

@@ -265,6 +265,8 @@ async def test_submission_persists_recursive_inventory_and_survives_service_recr
     assert dataset.tags == ["raster", "science"]
     assert dataset.metadata == {
         "temporary": True,
+        "inventory_complete": True,
+        "inventory_source": "verified_recursive_scan",
         "recursive_file_count": 3,
         "total_size_bytes": inventory.total_size,
     }

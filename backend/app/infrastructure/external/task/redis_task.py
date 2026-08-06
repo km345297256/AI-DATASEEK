@@ -1,9 +1,11 @@
 import asyncio
 import uuid
 import logging
+from contextlib import suppress
 from typing import Optional, Dict
 
 from app.domain.external.task import Task, TaskRunner
+from app.domain.external.task import TaskInputClosedError
 from app.infrastructure.external.message_queue.redis_stream_queue import RedisStreamQueue, MessageQueue
 
 logger = logging.getLogger(__name__)
@@ -23,6 +25,9 @@ class RedisStreamTask(Task):
         self._runner = runner
         self._id = str(uuid.uuid4())
         self._execution_task: Optional[asyncio.Task] = None
+        self._input_lifecycle_lock = asyncio.Lock()
+        self._closing = False
+        self._closed = asyncio.Event()
         
         # Create input/output streams based on task ID
         input_stream_name = f"task:input:{self._id}"
@@ -48,9 +53,52 @@ class RedisStreamTask(Task):
         if self._execution_task is None:
             return True
         return self._execution_task.done()
+
+    @property
+    def accepting_input(self) -> bool:
+        return not self._closing and not self._closed.is_set()
+
+    async def enqueue_input(self, message) -> str:
+        """Atomically enqueue input unless the runner has begun cleanup."""
+        async with self._input_lifecycle_lock:
+            if self._closing or self._closed.is_set():
+                raise TaskInputClosedError(
+                    f"Task {self._id} is closing and cannot accept new input"
+                )
+            event_id = await self._input_stream.put(message)
+            # ``cancel`` is synchronous and may set the closing flag while the
+            # Redis write is in flight. Remove that just-written message before
+            # handing the caller a false success.
+            if self._closing or self._closed.is_set():
+                try:
+                    await self._input_stream.delete_message(event_id)
+                except Exception:
+                    logger.exception(
+                        "Task %s could not remove input queued during shutdown",
+                        self._id,
+                    )
+                raise TaskInputClosedError(
+                    f"Task {self._id} closed while accepting input"
+                )
+            return event_id
+
+    async def pop_input_or_close(self):
+        """Atomically pop input or commit the task to graceful cleanup."""
+        async with self._input_lifecycle_lock:
+            if self._closing:
+                return None, None
+            if await self._input_stream.is_empty():
+                self._closing = True
+                return None, None
+            return await self._input_stream.pop()
+
+    async def wait_closed(self) -> None:
+        await self._closed.wait()
     
     async def run(self) -> None:
         """Run the task using the provided TaskRunner."""
+        if self._closing or self._closed.is_set():
+            raise TaskInputClosedError(f"Task {self._id} is already closed")
         if self.done:
             self._execution_task = asyncio.create_task(self._execute_task())
             logger.info(f"Task {self._id} execution started")
@@ -61,10 +109,14 @@ class RedisStreamTask(Task):
         Returns:
             bool: True if the task is cancelled, False otherwise
         """
+        self._closing = True
+        if self._execution_task is None:
+            self._cleanup_registry()
+            self._closed.set()
+            return False
         if not self.done:
             self._execution_task.cancel()
             logger.info(f"Task {self._id} cancelled")
-            self._cleanup_registry()
             return True
         
         self._cleanup_registry()
@@ -80,12 +132,15 @@ class RedisStreamTask(Task):
         """Output stream."""
         return self._output_stream
     
-    def _on_task_done(self) -> None:
+    async def _on_task_done(self) -> None:
         """Called when the task is done."""
-        self._task_done = True
-        if self._runner:
-            asyncio.create_task(self._runner.on_done(self))
-        self._cleanup_registry()
+        self._closing = True
+        try:
+            if self._runner:
+                await self._runner.on_done(self)
+        finally:
+            self._cleanup_registry()
+            self._closed.set()
     
     def _cleanup_registry(self) -> None:
         """Remove this task from the registry."""
@@ -102,7 +157,7 @@ class RedisStreamTask(Task):
         except Exception as e:
             logger.error(f"Task {self._id} execution failed: {str(e)}")
         finally:
-            self._on_task_done()
+            await self._on_task_done()
     
     @classmethod
     def get(cls, task_id: str) -> Optional['RedisStreamTask']:
@@ -128,9 +183,13 @@ class RedisStreamTask(Task):
     @classmethod
     async def destroy(cls) -> None:
         """Destroy all task instances."""
-        for task_id in cls._task_registry:
-            task = cls._task_registry[task_id]
+        tasks = list(cls._task_registry.values())
+        for task in tasks:
             task.cancel()
+        for task in tasks:
+            if task._execution_task is not None:
+                with suppress(asyncio.CancelledError):
+                    await task._execution_task
             if task._runner:
                 await task._runner.destroy()
         cls._task_registry.clear()

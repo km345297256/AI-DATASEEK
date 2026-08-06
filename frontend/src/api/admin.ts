@@ -8,7 +8,6 @@ export type MCPRiskLevel = 'standard' | 'internal' | 'sensitive' | 'restricted';
 export type MCPTransport = 'stdio' | 'sse' | 'streamable-http';
 export type ExecutionNodeType = 'local_docker' | 'worker_agent' | 'remote_docker' | 'kubernetes' | 'fixed_sandbox';
 export type ExecutionNodeStatus = 'unknown' | 'checking' | 'healthy' | 'degraded' | 'unhealthy' | 'disabled' | 'draining' | 'deleted';
-export type ExecutionNodeAuthType = 'none' | 'bearer' | 'basic' | 'mtls' | 'kubeconfig' | 'docker_tls';
 
 export interface AdminUserInfo {
   id: string;
@@ -112,53 +111,6 @@ export interface AdminMCPServerListResponse {
   total: number;
 }
 
-export interface ExecutionNodeCapacity {
-  max_sandboxes: number;
-  cpu_cores?: number | null;
-  memory_bytes?: number | null;
-  disk_bytes?: number | null;
-  gpu_count: number;
-}
-
-export interface ExecutionNodeHealth {
-  running_sandboxes: number;
-  warm_sandboxes?: number;
-  assigned_sandboxes?: number;
-  paused_sandboxes?: number;
-  cpu_percent?: number | null;
-  memory_used_bytes?: number | null;
-  disk_used_bytes?: number | null;
-  raw: Record<string, unknown>;
-}
-
-export interface ExecutionNodeInfo {
-  id: string;
-  name: string;
-  description: string;
-  type: ExecutionNodeType;
-  status: ExecutionNodeStatus;
-  enabled: boolean;
-  base_url?: string | null;
-  auth_type: ExecutionNodeAuthType;
-  credential_ref?: string | null;
-  runtime_config: Record<string, unknown>;
-  capacity: ExecutionNodeCapacity;
-  labels: Record<string, string>;
-  taints: Record<string, string>;
-  health: ExecutionNodeHealth;
-  last_heartbeat_at?: string | null;
-  last_checked_at?: string | null;
-  failure_reason?: string | null;
-  created_by?: string | null;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface ExecutionNodeListResponse {
-  nodes: ExecutionNodeInfo[];
-  total: number;
-}
-
 export interface TokenUsageByModelInfo {
   model_name: string;
   record_count: number;
@@ -217,12 +169,46 @@ export interface ResourceUsageOverview {
   generated_at: string;
 }
 
+export interface SandboxResourceConfiguration {
+  sandbox_max_concurrent: number;
+  sandbox_pool_size: number;
+  sandbox_paused_destroy_after_minutes: number;
+  running_sandboxes: number;
+  warm_sandboxes: number;
+  paused_sandboxes: number;
+  configuration_source: 'admin' | 'deployment';
+  browser_on_demand: boolean;
+  vnc_on_demand: boolean;
+  updated_at?: string | null;
+}
+
+export interface SandboxResourceConfigurationUpdate {
+  sandbox_max_concurrent?: number;
+  sandbox_pool_size?: number;
+  sandbox_paused_destroy_after_minutes?: number;
+}
+
 export async function getResourceUsage(params?: {
   start_at?: string;
   end_at?: string;
   include_sandboxes?: boolean;
 }): Promise<ResourceUsageOverview> {
   const response = await apiClient.get<ApiResponse<ResourceUsageOverview>>('/admin/resource-usage', { params });
+  return response.data.data;
+}
+
+export async function getSandboxResourceConfiguration(): Promise<SandboxResourceConfiguration> {
+  const response = await apiClient.get<ApiResponse<SandboxResourceConfiguration>>('/admin/resource-config');
+  return response.data.data;
+}
+
+export async function updateSandboxResourceConfiguration(
+  request: SandboxResourceConfigurationUpdate,
+): Promise<SandboxResourceConfiguration> {
+  const response = await apiClient.patch<ApiResponse<SandboxResourceConfiguration>>(
+    '/admin/resource-config',
+    request,
+  );
   return response.data.data;
 }
 
@@ -377,16 +363,5 @@ export async function updateAdminUser(
     `/admin/users/${encodeURIComponent(userId)}`,
     request,
   );
-  return response.data.data;
-}
-
-// Dataset management only needs a read-only execution-node catalogue to register host paths.
-export async function listExecutionNodes(params?: {
-  query?: string;
-  include_deleted?: boolean;
-  limit?: number;
-  offset?: number;
-}): Promise<ExecutionNodeListResponse> {
-  const response = await apiClient.get<ApiResponse<ExecutionNodeListResponse>>('/admin/execution-nodes', { params });
   return response.data.data;
 }

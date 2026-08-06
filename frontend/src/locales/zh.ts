@@ -129,8 +129,6 @@ export default {
   'Upload large files through backend-proxied multipart upload. The client never receives the object storage address.': '通过后端代理分片上传大文件，客户端不会拿到对象存储地址。',
   // Plugins
   'Plugins': '插件',
-  'Scientific Data Exploration': '科学数据探查',
-  'Dataset Management': '数据集管理',
   'Discover official and community plugins, then add them to your personal library.': '发现官方与用户发布的插件，添加后即可在个人插件列表中管理。',
   'Publisher': '发布来源',
   'All': '全部',

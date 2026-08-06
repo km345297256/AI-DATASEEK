@@ -9,12 +9,42 @@ import docker
 import httpx
 
 from app.core.config import get_settings
-from app.domain.models.execution_node import ExecutionNodeAuthType, ExecutionNodeHealth, ExecutionNodeStatus, ExecutionNodeType
+from app.domain.models.execution_node import (
+    ExecutionNodeAuthType,
+    ExecutionNodeCapacity,
+    ExecutionNodeHealth,
+    ExecutionNodeStatus,
+    ExecutionNodeType,
+    SandboxAllocationStatus,
+)
 from app.infrastructure.external.sandbox.container_identity import is_sandbox_container_name
-from app.infrastructure.models.documents import ExecutionNodeDocument, NodeCredentialDocument, SandboxRecordDocument
+from app.infrastructure.models.documents import (
+    ExecutionNodeDocument,
+    NodeCredentialDocument,
+    SandboxAllocationDocument,
+    SandboxRecordDocument,
+    SessionDocument,
+)
 
 
 LOCAL_DEFAULT_NODE_ID = "local-default"
+RESOURCE_CONFIG_MANAGED_KEY = "admin_resource_configured"
+WARM_POOL_TARGET_KEY = "warm_pool_target"
+PAUSED_RECLAIM_MINUTES_KEY = "paused_sandbox_destroy_after_minutes"
+
+
+def normalized_warm_pool_target(value: object, max_sandboxes: object) -> int:
+    """Keep warm capacity bounded while reserving one slot for mounted data."""
+
+    try:
+        maximum = max(1, int(max_sandboxes))
+    except (TypeError, ValueError):
+        maximum = 1
+    try:
+        target = max(0, int(value))
+    except (TypeError, ValueError):
+        target = 0
+    return min(target, 16, max(0, maximum - 1))
 
 
 def _read_cpu_times() -> Optional[tuple[int, int]]:
@@ -118,12 +148,15 @@ def _local_sandbox_container_states() -> Optional[dict[str, str]]:
 
 
 async def ensure_local_default_node() -> ExecutionNodeDocument:
+    settings = get_settings()
     doc = await ExecutionNodeDocument.find_one(ExecutionNodeDocument.node_id == LOCAL_DEFAULT_NODE_ID)
     if not doc:
         doc = await ExecutionNodeDocument.find_one(ExecutionNodeDocument.name == "local-default")
     now = datetime.now(UTC)
     if doc:
         changed = False
+        runtime_config = dict(doc.runtime_config or {})
+        admin_managed = bool(runtime_config.get(RESOURCE_CONFIG_MANAGED_KEY))
         if doc.node_id != LOCAL_DEFAULT_NODE_ID:
             doc.node_id = LOCAL_DEFAULT_NODE_ID
             changed = True
@@ -137,11 +170,52 @@ async def ensure_local_default_node() -> ExecutionNodeDocument:
         if not doc.description:
             doc.description = "当前 backend 所在服务器的本地 Docker 执行环境"
             changed = True
+        configured_capacity = None if admin_managed else settings.sandbox_max_concurrent
+        if configured_capacity is not None:
+            configured_capacity = max(1, int(configured_capacity))
+            if doc.capacity.max_sandboxes != configured_capacity:
+                doc.capacity.max_sandboxes = configured_capacity
+                changed = True
+        configured_paused_ttl = None if admin_managed else settings.sandbox_paused_destroy_after_minutes
+        if configured_paused_ttl is not None:
+            configured_paused_ttl = max(1, int(configured_paused_ttl))
+            if runtime_config.get(PAUSED_RECLAIM_MINUTES_KEY) != configured_paused_ttl:
+                runtime_config[PAUSED_RECLAIM_MINUTES_KEY] = configured_paused_ttl
+                doc.runtime_config = runtime_config
+                changed = True
+        warm_source = (
+            runtime_config.get(WARM_POOL_TARGET_KEY, 0)
+            if admin_managed
+            else settings.sandbox_pool_size
+        )
+        configured_warm_target = normalized_warm_pool_target(
+            warm_source,
+            doc.capacity.max_sandboxes,
+        )
+        if runtime_config.get(WARM_POOL_TARGET_KEY) != configured_warm_target:
+            runtime_config[WARM_POOL_TARGET_KEY] = configured_warm_target
+            doc.runtime_config = runtime_config
+            changed = True
         if changed:
             doc.updated_at = now
             await doc.save()
         return doc
 
+    maximum = max(1, int(settings.sandbox_max_concurrent or 1))
+    runtime_config = {
+        WARM_POOL_TARGET_KEY: normalized_warm_pool_target(
+            settings.sandbox_pool_size,
+            maximum,
+        ),
+    }
+    if settings.sandbox_paused_destroy_after_minutes is not None:
+        runtime_config[PAUSED_RECLAIM_MINUTES_KEY] = max(
+            1,
+            int(settings.sandbox_paused_destroy_after_minutes),
+        )
+    capacity = ExecutionNodeCapacity(
+        max_sandboxes=maximum,
+    )
     doc = ExecutionNodeDocument(
         node_id=LOCAL_DEFAULT_NODE_ID,
         name="local-default",
@@ -149,6 +223,8 @@ async def ensure_local_default_node() -> ExecutionNodeDocument:
         type=ExecutionNodeType.LOCAL_DOCKER,
         status=ExecutionNodeStatus.UNKNOWN,
         enabled=True,
+        runtime_config=runtime_config,
+        capacity=capacity,
     )
     await doc.insert()
     return doc
@@ -245,6 +321,11 @@ async def _check_local_docker_node(doc: ExecutionNodeDocument) -> None:
         destroyed_sandboxes = sum(1 for record in sandbox_records if record.status == "destroyed")
         container_states = {}
     else:
+        await _reconcile_local_sandbox_lifecycle(
+            node_id=doc.node_id,
+            container_states=container_states,
+            sandbox_records=sandbox_records,
+        )
         warm_sandboxes = sum(
             1
             for record in sandbox_records
@@ -255,7 +336,12 @@ async def _check_local_docker_node(doc: ExecutionNodeDocument) -> None:
             for record in sandbox_records
             if record.status == "assigned" and container_states.get(record.container_name) == "running"
         )
-        running_sandboxes = assigned_sandboxes
+        # Capacity is a Docker runtime property, not a database-record property.
+        # Count warm and temporarily untracked containers as well so prewarming
+        # and crash recovery cannot silently overcommit the host.
+        running_sandboxes = sum(
+            1 for status in container_states.values() if status == "running"
+        )
         paused_sandboxes = sum(1 for status in container_states.values() if status == "paused")
         destroyed_sandboxes = sum(1 for record in sandbox_records if record.status == "destroyed")
     doc.health = ExecutionNodeHealth(
@@ -280,6 +366,100 @@ async def _check_local_docker_node(doc: ExecutionNodeDocument) -> None:
     _update_capacity_from_usage(doc, metrics)
     doc.status = ExecutionNodeStatus.HEALTHY if doc.enabled else ExecutionNodeStatus.DISABLED
     doc.last_heartbeat_at = datetime.now(UTC)
+
+
+async def _reconcile_local_sandbox_lifecycle(
+    *,
+    node_id: str,
+    container_states: dict[str, str],
+    sandbox_records: list,
+) -> None:
+    """Converge persisted lifecycle state with the local Docker daemon.
+
+    Docker containers use ``remove=True`` and can disappear after a crash or
+    sandbox timeout without giving the backend a final callback.  Leaving those
+    allocations in ``running`` makes capacity/admin state permanently stale and
+    leaves sessions pointing at containers that can never be restored.
+    """
+
+    now = datetime.now(UTC)
+    active_allocations = await SandboxAllocationDocument.find(
+        SandboxAllocationDocument.node_id == node_id,
+        SandboxAllocationDocument.status != SandboxAllocationStatus.RELEASED,
+    ).to_list()
+    records_by_id = {record.container_name: record for record in sandbox_records}
+    missing_ids: set[str] = set()
+    for allocation in active_allocations:
+        state = container_states.get(allocation.sandbox_id)
+        record = records_by_id.get(allocation.sandbox_id)
+        if state in {"created", "restarting"}:
+            # Do not release a container while Docker is still bringing it up.
+            # The next health tick will converge it once the state stabilizes.
+            continue
+        if state in {"running", "paused"}:
+            expected_allocation_status = (
+                SandboxAllocationStatus.PAUSED
+                if state == "paused"
+                else SandboxAllocationStatus.RUNNING
+            )
+            if allocation.status != expected_allocation_status:
+                allocation.status = expected_allocation_status
+                allocation.updated_at = now
+                await allocation.save()
+            if record:
+                expected_record_status = (
+                    "paused"
+                    if state == "paused"
+                    else ("assigned" if allocation.session_id else "warm")
+                )
+                if record.status != expected_record_status:
+                    record.status = expected_record_status
+                    if state == "paused" and not record.paused_at:
+                        record.paused_at = now
+                    elif state == "running":
+                        record.paused_at = None
+                    await record.save()
+            continue
+        allocation.status = SandboxAllocationStatus.RELEASED
+        allocation.updated_at = now
+        allocation.failure_reason = allocation.failure_reason or (
+            "Sandbox container no longer exists"
+            if state is None
+            else f"Sandbox container is not active ({state})"
+        )
+        await allocation.save()
+        missing_ids.add(allocation.sandbox_id)
+        if record and record.status != "destroyed":
+            record.status = "destroyed"
+            record.destroyed_at = now
+            record.last_used_at = now
+            await record.save()
+
+    await clear_session_sandbox_references(missing_ids, now=now)
+
+
+async def clear_session_sandbox_references(
+    sandbox_ids: set[str] | list[str],
+    *,
+    now: datetime | None = None,
+) -> None:
+    """Clear persisted session pointers after a sandbox is definitively gone."""
+
+    normalized_ids = sorted({sandbox_id for sandbox_id in sandbox_ids if sandbox_id})
+    if not normalized_ids:
+        return
+    sessions = await SessionDocument.find(
+        {"sandbox_id": {"$in": normalized_ids}}
+    ).to_list()
+    changed_at = now or datetime.now(UTC)
+    for session in sessions:
+        session.sandbox_id = None
+        session.sandbox_dataset_ids = []
+        # Task instances are process-local. If the backing container vanished,
+        # a persisted task id cannot be resumed safely after reconciliation.
+        session.task_id = None
+        session.updated_at = changed_at
+        await session.save()
 
 
 async def _check_worker_agent_node(doc: ExecutionNodeDocument) -> None:

@@ -1,7 +1,8 @@
 from typing import Optional, AsyncGenerator, List
 import asyncio
-import io
 import logging
+import shutil
+import tempfile
 import uuid
 import weakref
 from datetime import datetime
@@ -14,17 +15,25 @@ from pydantic import TypeAdapter
 from app.domain.repositories.agent_repository import AgentRepository
 from app.domain.repositories.session_repository import SessionRepository
 from app.domain.services.agent_task_runner import AgentTaskRunner
-from app.domain.external.task import Task
+from app.domain.external.task import Task, TaskInputClosedError
 from typing import Type
 from app.domain.external.file import FileStorage
-from app.domain.external.sandbox_runtime import SandboxRuntime
+from app.domain.external.sandbox_runtime import SandboxNotFoundError, SandboxRuntime
 from app.domain.models.file import FileInfo
 from app.domain.repositories.mcp_repository import MCPRepository
 from app.infrastructure.external.sandbox.sandbox_pool import get_sandbox_pool
-from app.infrastructure.external.sandbox.runtime import get_default_sandbox_runtime
+from app.infrastructure.external.sandbox.runtime import (
+    SandboxCapacityError,
+    get_default_sandbox_runtime,
+)
+from app.core.config import get_settings
 
 # Setup logging
 logger = logging.getLogger(__name__)
+
+
+class _SandboxRetirementError(RuntimeError):
+    pass
 
 class AgentDomainService:
     """
@@ -51,7 +60,7 @@ class AgentDomainService:
         self._mcp_repository = mcp_repository
         self._sandbox_runtime = sandbox_runtime or get_default_sandbox_runtime(sandbox_cls)
         self._chat_bootstrap_tasks: set[asyncio.Task] = set()
-        self._chat_bootstrap_locks: weakref.WeakValueDictionary[str, asyncio.Lock] = (
+        self._session_bootstrap_locks: weakref.WeakValueDictionary[str, asyncio.Lock] = (
             weakref.WeakValueDictionary()
         )
         logger.info("AgentDomainService initialization completed")
@@ -72,9 +81,16 @@ class AgentDomainService:
         if sandbox_id and set(session.sandbox_dataset_ids) != set(requested_dataset_ids):
             try:
                 stale_sandbox = await sandbox_runtime.restore(sandbox_id)
-                await stale_sandbox.destroy()
+                await self._retire_replaced_sandbox(stale_sandbox, sandbox_id)
+            except SandboxNotFoundError:
+                logger.info(
+                    "Session %s sandbox %s was already gone before dataset remount",
+                    session.id,
+                    sandbox_id,
+                )
             except Exception as exc:
-                logger.warning("Failed to destroy sandbox %s before dataset remount: %s", sandbox_id, exc)
+                logger.error("Failed to retire sandbox %s before dataset remount: %s", sandbox_id, exc)
+                raise RuntimeError("The previous analysis environment could not be safely released") from exc
             logger.info(
                 "Replacing session %s sandbox because dataset mounts changed from %s to %s",
                 session.id,
@@ -83,6 +99,8 @@ class AgentDomainService:
             )
             session.sandbox_id = None
             session.sandbox_dataset_ids = []
+            session.task_id = None
+            await self._session_repository.save(session)
             sandbox_id = None
             sandbox_replaced = True
         if sandbox_id:
@@ -92,19 +110,63 @@ class AgentDomainService:
                     logger.info("Session %s sandbox %s is paused; resuming", session.id, sandbox_id)
                     if not await sandbox.resume():
                         logger.warning("Session %s sandbox %s failed to resume; creating a replacement", session.id, sandbox_id)
+                        await self._retire_replaced_sandbox(sandbox, sandbox_id)
                         sandbox = None
-                if hasattr(sandbox, "is_available") and not await sandbox.is_available():
-                    logger.warning("Session %s sandbox %s is unavailable; creating a replacement", session.id, sandbox_id)
+                    elif not await self._wait_for_resumed_sandbox(sandbox):
+                        logger.warning(
+                            "Session %s sandbox %s did not become ready after resume; retiring it before replacement",
+                            session.id,
+                            sandbox_id,
+                        )
+                        await self._retire_replaced_sandbox(sandbox, sandbox_id)
+                        sandbox = None
+                elif hasattr(sandbox, "is_available") and not await sandbox.is_available():
+                    logger.warning(
+                        "Session %s sandbox %s is unavailable; retiring it before replacement",
+                        session.id,
+                        sandbox_id,
+                    )
+                    await self._retire_replaced_sandbox(sandbox, sandbox_id)
                     sandbox = None
+            except _SandboxRetirementError:
+                raise
+            except SandboxCapacityError:
+                # A paused sandbox that is merely waiting for a capacity slot
+                # is still healthy and owned by this session. Never delete it
+                # just because the bounded admission queue timed out.
+                raise
+            except SandboxNotFoundError as exc:
+                logger.info(
+                    "Session %s sandbox %s no longer exists: %s",
+                    session.id,
+                    sandbox_id,
+                    exc,
+                )
+                sandbox = None
             except Exception as e:
                 logger.warning("Session %s sandbox %s could not be restored: %s", session.id, sandbox_id, e)
-                sandbox = None
-                session.sandbox_id = None
+                if sandbox is not None:
+                    await self._retire_replaced_sandbox(sandbox, sandbox_id)
+                    sandbox = None
+                else:
+                    # Unknown restore errors may be transient node/network
+                    # failures. Allocating a replacement here could leak the
+                    # still-running original and overcommit capacity.
+                    raise RuntimeError(
+                        "The previous analysis environment could not be safely restored"
+                    ) from e
             sandbox_replaced = sandbox is None
+            if sandbox_replaced:
+                # Persist the cleared pointer before capacity selection. A retry
+                # must never resume the same broken container again.
+                session.sandbox_id = None
+                session.sandbox_dataset_ids = []
+                session.task_id = None
+                await self._session_repository.save(session)
 
         if not sandbox:
             pool = get_sandbox_pool() if not dataset_ids else None
-            if pool:
+            if pool and pool.enabled:
                 sandbox = await pool.acquire()
                 # Warm container already has a record; update it with session association
                 await sandbox_runtime.assign(sandbox, session)
@@ -118,7 +180,20 @@ class AgentDomainService:
             session.sandbox_dataset_ids = requested_dataset_ids
             await self._session_repository.save(session)
             if sandbox_replaced:
-                await self._hydrate_replacement_sandbox(session, sandbox, previous_sandbox_id=sandbox_id)
+                try:
+                    await self._ensure_sandbox_api_ready(sandbox)
+                    await self._hydrate_replacement_sandbox(
+                        session,
+                        sandbox,
+                        previous_sandbox_id=sandbox_id,
+                    )
+                except Exception:
+                    await self._retire_replaced_sandbox(sandbox, sandbox.id)
+                    session.sandbox_id = None
+                    session.sandbox_dataset_ids = []
+                    session.task_id = None
+                    await self._session_repository.save(session)
+                    raise
 
         browser = await sandbox.get_browser()
         if not browser:
@@ -150,6 +225,50 @@ class AgentDomainService:
 
         return task
 
+    async def _wait_for_resumed_sandbox(self, sandbox: Sandbox) -> bool:
+        """Give a resumed container time to wake before declaring it stale."""
+
+        ensure_ready = getattr(sandbox, "ensure_api_ready", None)
+        if not callable(ensure_ready):
+            ensure_ready = getattr(sandbox, "ensure_sandbox", None)
+        if callable(ensure_ready):
+            try:
+                await asyncio.wait_for(
+                    ensure_ready(),
+                    timeout=max(1.0, get_settings().sandbox_resume_ready_timeout_seconds),
+                )
+                return True
+            except Exception as exc:
+                logger.warning("Resumed sandbox %s did not become ready: %s", sandbox.id, exc)
+                return False
+        is_available = getattr(sandbox, "is_available", None)
+        return bool(await is_available()) if callable(is_available) else True
+
+    async def _ensure_sandbox_api_ready(self, sandbox: Sandbox) -> None:
+        ensure_ready = getattr(sandbox, "ensure_api_ready", None)
+        if not callable(ensure_ready):
+            ensure_ready = getattr(sandbox, "ensure_sandbox", None)
+        if callable(ensure_ready):
+            await ensure_ready()
+
+    @staticmethod
+    async def _retire_replaced_sandbox(sandbox: Sandbox, sandbox_id: str) -> None:
+        """Release a broken sandbox without leaking a running capacity slot."""
+
+        destroy = getattr(sandbox, "destroy", None)
+        if callable(destroy) and await destroy():
+            return
+        pause = getattr(sandbox, "pause", None)
+        if callable(pause) and await pause():
+            logger.warning(
+                "Sandbox %s could not be destroyed but was paused before replacement",
+                sandbox_id,
+            )
+            return
+        raise _SandboxRetirementError(
+            "The previous analysis environment could not be safely released"
+        )
+
     async def _hydrate_replacement_sandbox(
         self,
         session: Session,
@@ -161,40 +280,76 @@ class AgentDomainService:
         restored = 0
         failed = 0
         seen_paths: set[str] = set()
+        pending_files: list[FileInfo] = []
         for file_info in session.files:
             if not file_info.file_id or not file_info.file_path or file_info.file_path in seen_paths:
                 continue
             seen_paths.add(file_info.file_path)
-            try:
-                file_data, stored_info = await self._file_storage.download_file(file_info.file_id, session.user_id)
-                raw = file_data.read()
-                if isinstance(raw, str):
-                    raw = raw.encode("utf-8")
-                result = await sandbox.file_upload(
-                    io.BytesIO(raw),
-                    file_info.file_path,
-                    filename=stored_info.filename or file_info.filename,
-                )
-                if result.success:
-                    restored += 1
-                else:
-                    failed += 1
+            pending_files.append(file_info)
+
+        semaphore = asyncio.Semaphore(
+            max(1, get_settings().sandbox_hydration_concurrency)
+        )
+
+        async def restore_file(file_info: FileInfo) -> bool:
+            async with semaphore:
+                file_data = None
+                staged_file = None
+                try:
+                    file_data, stored_info = await self._file_storage.download_file(file_info.file_id, session.user_id)
+                    # MinIO/urllib3 response reads are synchronous. Stage them
+                    # off the event loop and spill larger files to disk instead
+                    # of keeping several full artifacts resident in memory.
+                    staged_file = tempfile.SpooledTemporaryFile(max_size=8 * 1024 * 1024)
+                    await asyncio.to_thread(
+                        shutil.copyfileobj,
+                        file_data,
+                        staged_file,
+                        1024 * 1024,
+                    )
+                    await asyncio.to_thread(staged_file.seek, 0)
+                    result = await sandbox.file_upload(
+                        staged_file,
+                        file_info.file_path,
+                        filename=stored_info.filename or file_info.filename,
+                    )
+                    if result.success:
+                        return True
                     logger.warning(
                         "Failed to hydrate file %s into replacement sandbox %s: %s",
                         file_info.file_path,
                         sandbox.id,
                         result.message,
                     )
-            except Exception as exc:
+                except Exception as exc:
+                    logger.warning(
+                        "Failed to hydrate file %s (%s) for session %s into replacement sandbox %s: %s",
+                        file_info.file_path,
+                        file_info.file_id,
+                        session.id,
+                        sandbox.id,
+                        exc,
+                    )
+                finally:
+                    if staged_file is not None:
+                        await asyncio.to_thread(staged_file.close)
+                    if file_data is not None:
+                        close = getattr(file_data, "close", None)
+                        if callable(close):
+                            await asyncio.to_thread(close)
+                        release_conn = getattr(file_data, "release_conn", None)
+                        if callable(release_conn):
+                            await asyncio.to_thread(release_conn)
+                return False
+
+        results = await asyncio.gather(
+            *(restore_file(file_info) for file_info in pending_files)
+        )
+        for succeeded in results:
+            if succeeded:
+                restored += 1
+            else:
                 failed += 1
-                logger.warning(
-                    "Failed to hydrate file %s (%s) for session %s into replacement sandbox %s: %s",
-                    file_info.file_path,
-                    file_info.file_id,
-                    session.id,
-                    sandbox.id,
-                    exc,
-                )
         logger.info(
             "Session %s hydrated replacement sandbox %s from previous sandbox %s: restored=%d failed=%d",
             session.id,
@@ -223,6 +378,37 @@ class AgentDomainService:
         if task:
             task.cancel()
         await self._session_repository.update_status(session_id, SessionStatus.COMPLETED)
+
+    async def delete_session_resources(self, session: Session) -> None:
+        """Stop active work and retire the sandbox before a session is deleted."""
+        lock = self._session_bootstrap_locks.setdefault(session.id, asyncio.Lock())
+        async with lock:
+            latest_session = await self._session_repository.find_by_id(session.id)
+            if latest_session is not None:
+                session = latest_session
+
+            task = await self._get_task(session)
+            if task is not None:
+                task.cancel()
+                wait_closed = getattr(task, "wait_closed", None)
+                if callable(wait_closed):
+                    await wait_closed()
+
+            if not session.sandbox_id:
+                return
+
+            try:
+                sandbox = await self._sandbox_runtime.restore(session.sandbox_id)
+                destroyed = await sandbox.destroy()
+            except SandboxNotFoundError:
+                logger.info(
+                    "Session %s sandbox %s was already gone during deletion",
+                    session.id,
+                    session.sandbox_id,
+                )
+                return
+            if destroyed is False:
+                raise RuntimeError("The analysis environment could not be released")
 
     def _track_chat_bootstrap(self, task: asyncio.Task, session_id: str) -> asyncio.Task:
         self._chat_bootstrap_tasks.add(task)
@@ -282,19 +468,20 @@ class AgentDomainService:
         client_message_id: Optional[str],
     ) -> Optional[Task]:
         """Serialize one session's bootstrap and refresh state inside the lock."""
-        lock = self._chat_bootstrap_locks.get(session.id)
-        if lock is None:
-            lock = asyncio.Lock()
-            self._chat_bootstrap_locks[session.id] = lock
+        lock = self._session_bootstrap_locks.setdefault(session.id, asyncio.Lock())
         async with lock:
-            latest_session = await self._session_repository.find_by_id_and_user_id(
-                session.id,
-                user_id,
+            find_session = getattr(
+                self._session_repository,
+                "find_by_id_and_user_id",
+                None,
             )
-            if not latest_session:
-                raise RuntimeError("Session not found")
+            if callable(find_session):
+                latest_session = await find_session(session.id, user_id)
+                if latest_session is None:
+                    raise RuntimeError("Session not found")
+                session = latest_session
             return await self._bootstrap_chat_task_locked(
-                session=latest_session,
+                session=session,
                 user_id=user_id,
                 message=message,
                 timestamp=timestamp,
@@ -339,11 +526,9 @@ class AgentDomainService:
                         await self._resume_claimed_chat_task(session.id, task)
                         return task
 
-                    # Claims survive a backend restart, while Task instances do
-                    # not. Under the per-session bootstrap lock, a missing task
-                    # for a still-running session is no longer an in-flight local
-                    # creation, so the retry may safely take over the orphaned
-                    # claim and create a replacement task/queue.
+                    # Claims are persisted, while in-process Task instances are
+                    # lost on a backend restart. Reclaim the orphaned claim while
+                    # holding the per-session bootstrap lock.
                     logger.warning(
                         "Reclaiming client message %s for session %s after task registry loss",
                         client_message_id,
@@ -376,6 +561,12 @@ class AgentDomainService:
             if effective_dataset_ids != session.dataset_ids:
                 session.dataset_ids = effective_dataset_ids
                 await self._session_repository.save(session)
+
+            if task is not None and not getattr(task, "accepting_input", True):
+                wait_closed = getattr(task, "wait_closed", None)
+                if callable(wait_closed):
+                    await wait_closed()
+                task = None
 
             if task is None or task.done:
                 if session.task_id and task is None:
@@ -415,16 +606,38 @@ class AgentDomainService:
                     client_message_id,
                 )
 
+            payload = message_event.model_dump_json()
+            enqueue_input = getattr(task, "enqueue_input", None)
+
             if client_message_id:
-                # Persist the idempotent user event before making it executable.
-                # If queueing fails, a retry upserts this same event ID instead of
-                # adding a duplicate history entry.
+                # Persist the stable event before making it executable. A retry
+                # upserts the same history entry instead of duplicating it.
                 await self._session_repository.add_event(session.id, message_event)
-                queued_event_id = await task.input_stream.put(message_event.model_dump_json())
-            else:
-                # Preserve the legacy event-ID contract for callers that do not
-                # provide an idempotency key.
-                queued_event_id = await task.input_stream.put(message_event.model_dump_json())
+            try:
+                queued_event_id = (
+                    await enqueue_input(payload)
+                    if callable(enqueue_input)
+                    else await task.input_stream.put(payload)
+                )
+            except TaskInputClosedError:
+                # The previous runner won the atomic close-vs-enqueue race.
+                # Wait until its browser cleanup and sandbox pause finish, then
+                # create one fresh runner on the same session environment.
+                wait_closed = getattr(task, "wait_closed", None)
+                if callable(wait_closed):
+                    await wait_closed()
+                task = (
+                    await self._create_task(session, effective_dataset_ids)
+                    if effective_dataset_ids
+                    else await self._create_task(session)
+                )
+                enqueue_input = getattr(task, "enqueue_input", None)
+                queued_event_id = (
+                    await enqueue_input(payload)
+                    if callable(enqueue_input)
+                    else await task.input_stream.put(payload)
+                )
+            if not client_message_id:
                 message_event.id = queued_event_id
                 await self._session_repository.add_event(session.id, message_event)
 
@@ -439,8 +652,8 @@ class AgentDomainService:
                         await task.input_stream.delete_message(queued_event_id)
                     )
                 except Exception:
-                    # Keep the claim when queue cleanup is uncertain. A duplicate
-                    # request can restart this same task without enqueueing again.
+                    # Keep the claim when queue cleanup is uncertain. A retry can
+                    # resume the same queued task without enqueueing a duplicate.
                     logger.exception(
                         "Failed to remove queued client message %s from task %s",
                         client_message_id,

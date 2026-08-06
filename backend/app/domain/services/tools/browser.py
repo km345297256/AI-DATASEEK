@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Awaitable, Callable, Optional
 from app.domain.external.browser import Browser
 from app.domain.services.tools.base import BaseToolkit
 from app.domain.models.tool_result import ToolResult
@@ -9,7 +9,11 @@ class BrowserToolkit(BaseToolkit):
 
     name: str = "browser"
     
-    def __init__(self, browser: Browser):
+    def __init__(
+        self,
+        browser: Browser,
+        readiness_check: Optional[Callable[[], Awaitable[None]]] = None,
+    ):
         """Initialize browser tool class
         
         Args:
@@ -17,11 +21,17 @@ class BrowserToolkit(BaseToolkit):
         """
         super().__init__()
         self.browser = browser
+        self._readiness_check = readiness_check
+
+    async def _ensure_ready(self) -> None:
+        if self._readiness_check:
+            await self._readiness_check()
     
     @tool(parse_docstring=True)
     async def browser_view(self) -> ToolResult:
         """View content of the current browser page. Use for checking the latest state of previously opened pages.
         """
+        await self._ensure_ready()
         return await self.browser.view_page()
     
     @tool(parse_docstring=True)
@@ -31,6 +41,7 @@ class BrowserToolkit(BaseToolkit):
         Args:
             url: Complete URL to visit. Must include protocol prefix.
         """
+        await self._ensure_ready()
         return await self.browser.navigate(url)
     
     @tool(parse_docstring=True)
@@ -40,6 +51,7 @@ class BrowserToolkit(BaseToolkit):
         Args:
             url: Complete URL to visit after restart. Must include protocol prefix.
         """
+        await self._ensure_ready()
         return await self.browser.restart(url)
     
     @tool(parse_docstring=True)
@@ -56,6 +68,7 @@ class BrowserToolkit(BaseToolkit):
             coordinate_x: (Optional) X coordinate of click position
             coordinate_y: (Optional) Y coordinate of click position
         """
+        await self._ensure_ready()
         return await self.browser.click(index, coordinate_x, coordinate_y)
     
     @tool(parse_docstring=True)
@@ -76,6 +89,7 @@ class BrowserToolkit(BaseToolkit):
             text: Complete text content to overwrite
             press_enter: Whether to press Enter key after input
         """
+        await self._ensure_ready()
         return await self.browser.input(text, press_enter, index, coordinate_x, coordinate_y)
     
     @tool(parse_docstring=True)
@@ -90,6 +104,7 @@ class BrowserToolkit(BaseToolkit):
             coordinate_x: X coordinate of target cursor position
             coordinate_y: Y coordinate of target cursor position
         """
+        await self._ensure_ready()
         return await self.browser.move_mouse(coordinate_x, coordinate_y)
     
     @tool(parse_docstring=True)
@@ -102,6 +117,7 @@ class BrowserToolkit(BaseToolkit):
         Args:
             key: Key name to simulate (e.g., Enter, Tab, ArrowUp), supports key combinations (e.g., Control+Enter).
         """
+        await self._ensure_ready()
         return await self.browser.press_key(key)
     
     @tool(parse_docstring=True)
@@ -116,6 +132,7 @@ class BrowserToolkit(BaseToolkit):
             index: Index number of the dropdown list element
             option: Option number to select, starting from 0.
         """
+        await self._ensure_ready()
         return await self.browser.select_option(index, option)
     
     @tool(parse_docstring=True)
@@ -128,6 +145,7 @@ class BrowserToolkit(BaseToolkit):
         Args:
             to_top: (Optional) Whether to scroll directly to page top instead of one viewport up.
         """
+        await self._ensure_ready()
         return await self.browser.scroll_up(to_top)
     
     @tool(parse_docstring=True)
@@ -140,6 +158,7 @@ class BrowserToolkit(BaseToolkit):
         Args:
             to_bottom: (Optional) Whether to scroll directly to page bottom instead of one viewport down.
         """
+        await self._ensure_ready()
         return await self.browser.scroll_down(to_bottom)
     
     @tool(parse_docstring=True)
@@ -152,6 +171,7 @@ class BrowserToolkit(BaseToolkit):
         Args:
             javascript: JavaScript code to execute. Note that the runtime environment is browser console.
         """
+        await self._ensure_ready()
         return await self.browser.console_exec(javascript)
     
     @tool(parse_docstring=True)
@@ -164,4 +184,5 @@ class BrowserToolkit(BaseToolkit):
         Args:
             max_lines: (Optional) Maximum number of log lines to return.
         """
-        return await self.browser.console_view(max_lines) 
+        await self._ensure_ready()
+        return await self.browser.console_view(max_lines)

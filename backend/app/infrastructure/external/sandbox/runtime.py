@@ -1,10 +1,14 @@
 from typing import Optional, Type, Sequence
+import asyncio
 import logging
 from datetime import datetime, UTC
+import time
 
 import httpx
+import docker
 
 from app.domain.external.sandbox import Sandbox
+from app.domain.external.sandbox_runtime import SandboxNotFoundError
 from app.domain.models.execution_node import ExecutionNodeCapacity, ExecutionNodeStatus, ExecutionNodeType, SandboxAllocationStatus
 from app.core.config import get_settings
 from app.domain.models.session import Session
@@ -14,6 +18,11 @@ from app.infrastructure.external.sandbox.docker_sandbox import DockerSandbox
 from app.infrastructure.external.sandbox.node_health import LOCAL_DEFAULT_NODE_ID, check_execution_node, ensure_local_default_node, mark_execution_node_unhealthy, resolve_node_credential
 
 logger = logging.getLogger(__name__)
+_SANDBOX_ADMISSION_LOCK = asyncio.Lock()
+
+
+class SandboxCapacityError(RuntimeError):
+    """Raised when no execution slot becomes available within the queue window."""
 
 
 async def _ensure_local_default_node() -> None:
@@ -50,8 +59,39 @@ async def _list_execution_node_candidates(required_node_ids: set[str] | None = N
 
     candidates = sorted(candidates, key=score, reverse=True)
     if candidates[0].capacity.max_sandboxes <= candidates[0].health.running_sandboxes:
-        raise RuntimeError("All execution nodes are at sandbox capacity")
+        raise SandboxCapacityError("All execution nodes are at sandbox capacity")
     return [node for node in candidates if node.capacity.max_sandboxes > node.health.running_sandboxes]
+
+
+async def _wait_for_execution_node_candidates(
+    required_node_ids: set[str] | None = None,
+) -> list[ExecutionNodeDocument]:
+    settings = get_settings()
+    wait_seconds = max(0.0, float(settings.sandbox_capacity_wait_seconds))
+    poll_seconds = max(0.1, float(settings.sandbox_capacity_poll_seconds))
+    deadline = time.monotonic() + wait_seconds
+    logged_wait = False
+    while True:
+        try:
+            return (
+                await _list_execution_node_candidates(required_node_ids)
+                if required_node_ids is not None
+                else await _list_execution_node_candidates()
+            )
+        except SandboxCapacityError as exc:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                raise SandboxCapacityError(
+                    "Analysis environments are busy; no sandbox slot became available "
+                    f"within {wait_seconds:.0f} seconds"
+                ) from exc
+            if not logged_wait:
+                logger.info(
+                    "Sandbox capacity is full; queueing allocation for up to %.1fs",
+                    wait_seconds,
+                )
+                logged_wait = True
+            await asyncio.sleep(min(poll_seconds, remaining))
 
 
 async def _select_execution_node() -> ExecutionNodeDocument:
@@ -89,6 +129,14 @@ class NodeBoundSandbox:
     @property
     def base_url(self) -> str:
         return getattr(self.sandbox, "base_url", "")
+
+    async def resume(self) -> bool:
+        # A resumed container consumes the same active slot as a newly-created
+        # one. Serialize both paths so concurrent requests cannot overcommit a
+        # node after observing the same stale health snapshot.
+        async with _SANDBOX_ADMISSION_LOCK:
+            await _wait_for_execution_node_candidates({self.node.node_id})
+            return await self.sandbox.resume()
 
 
 async def _worker_headers(node: ExecutionNodeDocument) -> dict[str, str]:
@@ -304,31 +352,28 @@ class LocalDockerRuntime:
                 user_id=session.user_id if session else None,
             )
         last_error: Optional[Exception] = None
-        candidates = (
-            await _list_execution_node_candidates(required_node_ids)
-            if required_node_ids is not None
-            else await _list_execution_node_candidates()
-        )
-        for node in candidates:
-            try:
-                mounts = (
-                    await dataset_service.resolve_mounts(
-                        dataset_ids,
-                        node.node_id,
-                        user_id=session.user_id if session else None,
+        async with _SANDBOX_ADMISSION_LOCK:
+            candidates = await _wait_for_execution_node_candidates(required_node_ids)
+            for node in candidates:
+                try:
+                    mounts = (
+                        await dataset_service.resolve_mounts(
+                            dataset_ids,
+                            node.node_id,
+                            user_id=session.user_id if session else None,
+                        )
+                        if dataset_service
+                        else []
                     )
-                    if dataset_service
-                    else []
-                )
-                return await self._allocate_on_node(node, session, mounts)
-            except Exception as exc:
-                last_error = exc
-                logger.warning("Sandbox allocation failed on node %s: %s", node.node_id, exc)
-                # A missing/rejected user-provided dataset path does not mean
-                # the execution node itself is unhealthy. Marking it unhealthy
-                # here would let one bad submission disrupt other users.
-                if dataset_service is None:
-                    await mark_execution_node_unhealthy(node.node_id, f"Sandbox allocation failed: {exc}")
+                    return await self._allocate_on_node(node, session, mounts)
+                except Exception as exc:
+                    last_error = exc
+                    logger.warning("Sandbox allocation failed on node %s: %s", node.node_id, exc)
+                    # A missing/rejected user-provided dataset path does not mean
+                    # the execution node itself is unhealthy. Marking it unhealthy
+                    # here would let one bad submission disrupt other users.
+                    if dataset_service is None:
+                        await mark_execution_node_unhealthy(node.node_id, f"Sandbox allocation failed: {exc}")
         raise RuntimeError(f"Failed to allocate sandbox on all execution nodes: {last_error}")
 
     async def _allocate_on_node(
@@ -364,17 +409,50 @@ class LocalDockerRuntime:
             await _upsert_allocation(sandbox=sandbox, node_id=node.node_id, session=session)
         return NodeBoundSandbox(sandbox, node)
 
+    async def allocate_local_warm(self) -> Sandbox:
+        """Allocate a warm-pool sandbox only on this backend's Docker node."""
+
+        async with _SANDBOX_ADMISSION_LOCK:
+            node = (await _wait_for_execution_node_candidates({LOCAL_DEFAULT_NODE_ID}))[0]
+            sandbox = await self._allocate_on_node(node)
+            await _upsert_allocation(
+                sandbox=sandbox,
+                node_id=node.node_id,
+                status=SandboxAllocationStatus.RUNNING,
+            )
+            return sandbox
+
     async def restore(self, sandbox_id: str) -> Sandbox:
         allocation = await _restore_allocation_for_sandbox(sandbox_id)
         node = None
         if allocation:
             node = await ExecutionNodeDocument.find_one(ExecutionNodeDocument.node_id == allocation.node_id)
         if node and node.type == ExecutionNodeType.WORKER_AGENT:
-            return await _get_worker_sandbox(node, sandbox_id)
+            try:
+                return await _get_worker_sandbox(node, sandbox_id)
+            except httpx.HTTPStatusError as exc:
+                if exc.response.status_code == 404:
+                    raise SandboxNotFoundError(
+                        f"Sandbox {sandbox_id} no longer exists"
+                    ) from exc
+                raise
         if node and node.type == ExecutionNodeType.REMOTE_DOCKER and node.base_url:
-            return await DockerSandbox.get_on_host(sandbox_id, node.base_url)
+            try:
+                remote_sandbox = await DockerSandbox.get_on_host(sandbox_id, node.base_url)
+                return NodeBoundSandbox(remote_sandbox, node)
+            except docker.errors.NotFound as exc:
+                raise SandboxNotFoundError(
+                    f"Sandbox {sandbox_id} no longer exists"
+                ) from exc
         if allocation and allocation.node_id == LOCAL_DEFAULT_NODE_ID:
-            return await DockerSandbox.get(sandbox_id)
+            try:
+                local_sandbox = await DockerSandbox.get(sandbox_id)
+            except docker.errors.NotFound as exc:
+                raise SandboxNotFoundError(
+                    f"Sandbox {sandbox_id} no longer exists"
+                ) from exc
+            node = node or await ensure_local_default_node()
+            return NodeBoundSandbox(local_sandbox, node)
         if allocation and allocation.api_url and allocation.vnc_url and allocation.cdp_url:
             headers = await _worker_headers(node) if node else {}
             logger.warning(
@@ -397,7 +475,23 @@ class LocalDockerRuntime:
                 status=SandboxAllocationStatus.RUNNING,
             )
             return worker_sandbox
-        return await DockerSandbox.get(sandbox_id)
+        try:
+            local_sandbox = await DockerSandbox.get(sandbox_id)
+        except docker.errors.NotFound as exc:
+            raise SandboxNotFoundError(
+                f"Sandbox {sandbox_id} no longer exists"
+            ) from exc
+        node = await ensure_local_default_node()
+        await _upsert_allocation(
+            sandbox=local_sandbox,
+            node_id=node.node_id,
+            status=(
+                SandboxAllocationStatus.PAUSED
+                if await local_sandbox.is_paused()
+                else SandboxAllocationStatus.RUNNING
+            ),
+        )
+        return NodeBoundSandbox(local_sandbox, node)
 
     async def assign(self, sandbox: Sandbox, session: Session, task_id: Optional[str] = None) -> None:
         node = sandbox.node if isinstance(sandbox, NodeBoundSandbox) else None
