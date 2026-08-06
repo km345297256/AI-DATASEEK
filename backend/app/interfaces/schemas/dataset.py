@@ -212,39 +212,6 @@ class DataCenterDatasetCatalogResponse(BaseModel):
     total: int = 0
 
 
-class DatasetCreateRequest(BaseModel):
-    name: str = Field(min_length=1, max_length=200)
-    data_center_id: str = Field(min_length=1, max_length=100)
-    data_center_name: str = Field(min_length=1, max_length=200)
-    description: str = ""
-    temporal_coverage: str = ""
-    spatial_coverage: str = ""
-    data_type: str = ""
-    tags: List[str] = Field(default_factory=list)
-    metadata: Dict[str, Any] = Field(default_factory=dict)
-    enabled: bool = True
-
-
-class DatasetUpdateRequest(BaseModel):
-    name: str | None = Field(default=None, min_length=1, max_length=200)
-    data_center_id: str | None = None
-    data_center_name: str | None = None
-    description: str | None = None
-    temporal_coverage: str | None = None
-    spatial_coverage: str | None = None
-    data_type: str | None = None
-    tags: List[str] | None = None
-    metadata: Dict[str, Any] | None = None
-    enabled: bool | None = None
-
-
-class DatasetLocationCreateRequest(BaseModel):
-    node_id: str
-    storage_type: DatasetStorageType = DatasetStorageType.HOST_PATH
-    source_path: str
-    version: str = "1"
-
-
 class DatasetSubmissionRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 

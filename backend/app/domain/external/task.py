@@ -3,6 +3,10 @@ from abc import ABC, abstractmethod
 from app.domain.external.message_queue import MessageQueue
 
 
+class TaskInputClosedError(RuntimeError):
+    """The task has atomically stopped accepting new input for cleanup."""
+
+
 class TaskRunner(ABC):
     """Abstract base class defining the interface for task runners.
     

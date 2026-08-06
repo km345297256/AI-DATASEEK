@@ -1,24 +1,13 @@
-from datetime import UTC, datetime
-from types import SimpleNamespace
-
 from app.domain.models.dataset import (
     DataCenterDataset,
     DatasetFile,
     DatasetLocation,
     DatasetStorageType,
 )
-from app.domain.models.execution_node import (
-    ExecutionNodeAuthType,
-    ExecutionNodeCapacity,
-    ExecutionNodeHealth,
-    ExecutionNodeStatus,
-    ExecutionNodeType,
-)
-from app.interfaces.api.admin_routes import _execution_node_response
 from app.interfaces.schemas.dataset import dataset_response
 
 
-def test_admin_dataset_response_never_serializes_host_paths_or_mount_names():
+def test_dataset_response_never_serializes_host_paths_or_mount_names():
     source_path = "/srv/private/tenant-a"
     mount_name = "tenant-a"
     location = DatasetLocation(
@@ -156,50 +145,3 @@ def test_dataset_metadata_becomes_empty_when_every_value_is_private():
     payload = dataset_response(dataset).model_dump(mode="json")
 
     assert payload["metadata"] == {}
-
-
-def test_execution_node_picker_strips_host_configuration_and_raw_health_details():
-    now = datetime.now(UTC)
-    doc = SimpleNamespace(
-        node_id="worker-private",
-        name="Private worker",
-        description="Dataset worker",
-        type=ExecutionNodeType.WORKER_AGENT,
-        status=ExecutionNodeStatus.HEALTHY,
-        enabled=True,
-        base_url="https://worker.internal.example",
-        auth_type=ExecutionNodeAuthType.BEARER,
-        credential_ref="WORKER_PRIVATE_TOKEN",
-        runtime_config={
-            "dataset_allowed_roots": ["/srv/private/tenant-a"],
-            "docker_host": "tcp://docker.internal:2376",
-        },
-        capacity=ExecutionNodeCapacity(max_sandboxes=4),
-        labels={"region": "local"},
-        taints={},
-        health=ExecutionNodeHealth(
-            running_sandboxes=1,
-            raw={
-                "dataset_allowed_roots": ["/srv/private/tenant-a"],
-                "credential": "should-not-be-public",
-            },
-        ),
-        last_heartbeat_at=now,
-        last_checked_at=now,
-        failure_reason="Cannot inspect /srv/private/tenant-a",
-        created_by="system",
-        created_at=now,
-        updated_at=now,
-    )
-
-    response = _execution_node_response(doc)
-    serialized = response.model_dump_json()
-
-    assert response.base_url is None
-    assert response.credential_ref is None
-    assert response.runtime_config == {}
-    assert response.health.raw == {}
-    assert response.failure_reason == "Execution node health check failed"
-    assert "/srv/private" not in serialized
-    assert "WORKER_PRIVATE_TOKEN" not in serialized
-    assert "should-not-be-public" not in serialized

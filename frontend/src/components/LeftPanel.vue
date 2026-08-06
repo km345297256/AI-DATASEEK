@@ -58,19 +58,6 @@
           </div>
         </div>
 
-        <!-- 科学数据探查 -->
-        <div
-          @click="handleDatasetChatClick"
-          class="flex items-center rounded-[10px] cursor-pointer transition-colors w-full gap-[12px] h-11 sm:h-[36px] ps-[9px] pe-[2px]"
-          :class="route.path.startsWith('/dataset/') ? 'bg-[var(--fill-tsp-white-main)]' : 'hover:bg-[var(--fill-tsp-white-light)]'">
-          <div class="shrink-0 size-[18px] flex items-center justify-center">
-            <MessageSquareText :size="18" class="text-[var(--text-primary)]" />
-          </div>
-          <div class="flex-1 min-w-0 flex gap-[4px] items-center text-[14px] text-[var(--text-primary)]">
-            <span class="truncate">{{ t('Scientific Data Exploration') }}</span>
-          </div>
-        </div>
-
         <div
           v-if="isAdmin"
           @click="handleAdminClick"
@@ -81,20 +68,6 @@
           </div>
           <div class="flex-1 min-w-0 flex gap-[4px] items-center text-[14px] text-[var(--text-primary)]">
             <span class="truncate">{{ t('System Admin') }}</span>
-          </div>
-        </div>
-
-        <!-- 独立数据集管理入口 -->
-        <div
-          v-if="isAdmin"
-          @click="handleDatasetAdminClick"
-          class="flex items-center rounded-[10px] cursor-pointer transition-colors w-full gap-[12px] h-11 sm:h-[36px] ps-[9px] pe-[2px]"
-          :class="route.path === '/chat/datasets' ? 'bg-[var(--fill-tsp-white-main)]' : 'hover:bg-[var(--fill-tsp-white-light)]'">
-          <div class="shrink-0 size-[18px] flex items-center justify-center">
-            <Database :size="18" class="text-[var(--text-primary)]" />
-          </div>
-          <div class="flex-1 min-w-0 flex gap-[4px] items-center text-[14px] text-[var(--text-primary)]">
-            <span class="truncate">{{ t('Dataset Management') }}</span>
           </div>
         </div>
 
@@ -186,14 +159,8 @@
         <button class="flex h-11 w-11 items-center justify-center rounded-lg hover:bg-[var(--fill-tsp-white-light)]" :class="route.path === '/chat/plugins' ? 'bg-[var(--fill-tsp-white-main)]' : ''" @click="handlePluginsClick" title="Plugins">
           <Puzzle :size="18" class="text-[var(--text-primary)]" />
         </button>
-        <button class="flex h-11 w-11 items-center justify-center rounded-lg hover:bg-[var(--fill-tsp-white-light)]" :class="route.path.startsWith('/dataset/') ? 'bg-[var(--fill-tsp-white-main)]' : ''" @click="handleDatasetChatClick" :title="t('Scientific Data Exploration')">
-          <MessageSquareText :size="18" class="text-[var(--text-primary)]" />
-        </button>
         <button v-if="isAdmin" class="flex h-11 w-11 items-center justify-center rounded-lg hover:bg-[var(--fill-tsp-white-light)]" :class="route.path === '/chat/admin' ? 'bg-[var(--fill-tsp-white-main)]' : ''" @click="handleAdminClick" title="System Admin">
           <ShieldCheck :size="18" class="text-[var(--text-primary)]" />
-        </button>
-        <button v-if="isAdmin" class="flex h-11 w-11 items-center justify-center rounded-lg hover:bg-[var(--fill-tsp-white-light)]" :class="route.path === '/chat/datasets' ? 'bg-[var(--fill-tsp-white-main)]' : ''" @click="handleDatasetAdminClick" :title="t('Dataset Management')">
-          <Database :size="18" class="text-[var(--text-primary)]" />
         </button>
       </div>
       <div class="mt-auto flex items-center justify-center pb-1">
@@ -221,7 +188,7 @@
 </template>
 
 <script setup lang="ts">
-import { PanelLeft, SquarePen, Command, MessageSquareDashed, ChevronUp, Puzzle, ShieldCheck, Database, MessageSquareText } from 'lucide-vue-next';
+import { PanelLeft, SquarePen, Command, MessageSquareDashed, ChevronUp, Puzzle, ShieldCheck } from 'lucide-vue-next';
 import SessionItem from './SessionItem.vue';
 import UserMenu from './UserMenu.vue';
 import { useLeftPanel } from '../composables/useLeftPanel';
@@ -306,16 +273,8 @@ const handlePluginsClick = () => {
   router.push('/chat/plugins')
 }
 
-const handleDatasetChatClick = () => {
-  router.push('/dataset/setup')
-}
-
 const handleAdminClick = () => {
   router.push('/chat/admin')
-}
-
-const handleDatasetAdminClick = () => {
-  router.push('/chat/datasets')
 }
 
 const handleSessionDeleted = (sessionId: string) => {

@@ -275,7 +275,7 @@ async def test_dataset_fast_path_uses_its_independent_bounded_budget():
     assert '"required_dimension_checklist":["comparison","quantitative_metrics","limitations"]' in captured["request"]
     assert "check coverage of every requested analytical dimension" in captured["request"]
     assert "single aggregate layer" in captured["request"]
-    assert "downloadable Markdown, CSV, JSON, or chart artifact" in captured["request"]
+    assert "Do not create or reread a file solely" in captured["request"]
 
 
 @pytest.mark.asyncio
@@ -413,7 +413,8 @@ async def test_quicklook_first_dataset_path_is_one_tool_plus_one_no_tool_synthes
     assert "grid-cell proportions rather than study-area coverage" in synthesis_messages[3].content
     assert "not `valid observations` / `有效像元`" in synthesis_messages[3].content
     assert "栅格快视图" in synthesis_messages[3].content
-    assert '"prefer_quicklook_evidence":true' in synthesis_messages[0].content
+    assert '"task":"synthesize_verified_quicklook_evidence"' in synthesis_messages[0].content
+    assert '"required_dimension_checklist":["spatial_pattern","data_quality"]' in synthesis_messages[0].content
     tool_events = [event for event in events if isinstance(event, ToolEvent)]
     assert [event.status for event in tool_events] == [
         ToolStatus.CALLING,
@@ -1016,3 +1017,202 @@ async def test_runtime_package_install_is_blocked_without_invoking_the_shell():
 def test_execution_prompt_does_not_require_progress_notification_round_trips():
     assert "Do not call `message_notify_user` for routine progress" in EXECUTION_PROMPT
     assert "You must use message_notify_user" not in EXECUTION_PROMPT
+
+
+@pytest.mark.asyncio
+async def test_catalog_metadata_step_returns_exact_inventory_without_model_or_tool():
+    agent = object.__new__(ExecutionAgent)
+    agent.reset_context = AsyncMock()
+
+    async def parse_json(value):
+        return json.loads(value)
+
+    async def forbidden_execute(*_args, **_kwargs):
+        raise AssertionError("complete catalog metadata must not call the model")
+        yield  # pragma: no cover
+
+    agent._parse_json = parse_json
+    agent.execute = forbidden_execute
+    dataset = MountedDataset(
+        dataset_id="tds_catalog",
+        name="Catalog dataset",
+        data_center_id="center",
+        data_center_name="Center",
+        sandbox_path="/home/ubuntu/datasets/tds_catalog",
+        files=[
+            DatasetFile(path="rain.tif", size=2048),
+            DatasetFile(path="table.csv", size=1024),
+        ],
+        metadata={"recursive_file_count": 2, "total_size_bytes": 3072},
+    )
+    step = Step(
+        id="dataset-fast-path",
+        description="Read catalog metadata",
+        inputs={
+            "execution_mode": "dataset_fast_path",
+            "dataset_intent": "catalog_metadata",
+            "artifact_policy": "optional",
+        },
+    )
+
+    events = [
+        event
+        async for event in agent.execute_step(
+            Plan(language="zh", steps=[step]),
+            step,
+            Message(message="这个数据集有多大？", datasets=[dataset]),
+        )
+    ]
+
+    assert not [event for event in events if isinstance(event, ToolEvent)]
+    assert "2 个已登记文件" in step.result
+    assert "3 KiB" in step.result
+    assert ".csv: 1" in step.result
+    assert ".tif: 1" in step.result
+    assert step.attachments == []
+
+
+def test_catalog_metadata_requires_verified_count_and_size_provenance():
+    dataset = MountedDataset(
+        dataset_id="tds_placeholder",
+        name="Placeholder directory",
+        data_center_id="center",
+        data_center_name="Center",
+        sandbox_path="/home/ubuntu/datasets/tds_placeholder",
+        files=[DatasetFile(path="sources/dsl_placeholder/data", size=0)],
+        metadata={},
+    )
+
+    assert ExecutionAgent._catalog_inventory_is_complete(dataset) is False
+
+
+@pytest.mark.asyncio
+async def test_required_catalog_export_falls_back_instead_of_dropping_artifact():
+    agent = object.__new__(ExecutionAgent)
+    fallback_calls = []
+
+    async def fallback(*args, **kwargs):
+        fallback_calls.append((args, kwargs))
+        yield MessageEvent(message="exported")
+
+    agent._execute_with_tool_scope = fallback
+    dataset = MountedDataset(
+        dataset_id="tds_catalog",
+        name="Catalog dataset",
+        data_center_id="center",
+        data_center_name="Center",
+        sandbox_path="/home/ubuntu/datasets/tds_catalog",
+        files=[DatasetFile(path="table.csv", size=1024)],
+        metadata={"recursive_file_count": 1, "total_size_bytes": 1024},
+    )
+
+    events = [
+        event
+        async for event in agent._execute_catalog_metadata(
+            "导出数据集大小 CSV",
+            message=Message(message="导出数据集大小 CSV", datasets=[dataset]),
+            language="zh",
+            artifact_policy="required",
+        )
+    ]
+
+    assert [event.message for event in events] == ["exported"]
+    assert len(fallback_calls) == 1
+
+
+@pytest.mark.asyncio
+async def test_single_archive_inventory_locates_and_unpacks_without_model():
+    agent = object.__new__(ExecutionAgent)
+    agent.reset_context = AsyncMock()
+    agent._dataset_fast_path_mode = False
+    agent._dataset_intent = ExecutionAgent.DATASET_INTENT_ANALYSIS
+
+    async def parse_json(value):
+        return json.loads(value)
+
+    async def forbidden_execute(*_args, **_kwargs):
+        raise AssertionError("successful deterministic inventory must not call the model")
+        yield  # pragma: no cover
+
+    agent._parse_json = parse_json
+    agent.execute = forbidden_execute
+    find_tool = SimpleNamespace(
+        name="file_find_by_name",
+        toolkit=SimpleNamespace(name="file"),
+    )
+    unpack_tool = SimpleNamespace(
+        name="dataset_unpack",
+        toolkit=SimpleNamespace(name="shell"),
+    )
+    agent.get_tool = lambda name: {
+        "file_find_by_name": find_tool,
+        "dataset_unpack": unpack_tool,
+    }.get(name)
+    archive_path = "/home/ubuntu/datasets/tds_archive/sources/dsl_safe/data.zip"
+    find_result = ToolMessage(
+        tool_call_id="",
+        name="file_find_by_name",
+        content=json.dumps({"files": [archive_path]}),
+        artifact=ToolResult(success=True, data={"files": [archive_path]}),
+    )
+    unpack_payload = {
+        "success": True,
+        "source_archive": "data.zip",
+        "summary": {"archive_count": 1, "file_count": 2, "expanded_bytes": 30},
+        "archives": [{"path": "data.zip", "format": "zip", "depth": 0, "extracted_to": "."}],
+        "files": [
+            {"path": "a.csv", "size": 10},
+            {"path": "nested/b.tif", "size": 20},
+        ],
+    }
+    unpack_result = ToolMessage(
+        tool_call_id="",
+        name="dataset_unpack",
+        content=json.dumps(unpack_payload),
+        artifact=ToolResult(
+            success=True,
+            data={
+                "status": "completed",
+                "returncode": 0,
+                "output": json.dumps(unpack_payload),
+            },
+        ),
+    )
+    agent.invoke_tool = AsyncMock(side_effect=[find_result, unpack_result])
+    dataset = MountedDataset(
+        dataset_id="tds_archive",
+        name="Archive dataset",
+        data_center_id="center",
+        data_center_name="Center",
+        sandbox_path="/home/ubuntu/datasets/tds_archive",
+        files=[DatasetFile(path="data.zip", size=100)],
+        metadata={"recursive_file_count": 1, "total_size_bytes": 100},
+    )
+    step = Step(
+        id="dataset-fast-path",
+        description="Inspect archive",
+        inputs={
+            "execution_mode": "dataset_fast_path",
+            "dataset_intent": "inventory",
+        },
+    )
+
+    events = [
+        event
+        async for event in agent.execute_step(
+            Plan(language="zh", steps=[step]),
+            step,
+            Message(message="包含哪些文件？", datasets=[dataset]),
+        )
+    ]
+
+    assert agent.invoke_tool.await_count == 2
+    assert [
+        event.function_name
+        for event in events
+        if isinstance(event, ToolEvent) and event.status == ToolStatus.CALLING
+    ] == ["file_find_by_name", "dataset_unpack"]
+    assert "a.csv" in step.result
+    assert "nested/" in step.result
+    assert "b.tif" in step.result
+    assert step.attachments == []

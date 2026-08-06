@@ -4,21 +4,19 @@ AI-DataSeek 的 Vue 3、TypeScript、Vite、Tailwind 前端。
 
 ## 保留页面
 
-- `/dataset/setup`：第三方临时提交模拟页面。
 - `/dataset/seek/:datasetId`：科学数据探查与分析。
 - `/chat`、`/chat/:sessionId`：通用数据分析探查任务。
 - `/chat/plugins`：Skill、MCP、Renderer 插件。
-- `/chat/datasets`：数据集管理。
-- `/chat/admin`：仅资源用量、任务、MCP、技能、用户五项管理。
+- `/chat/admin`：仅资源用量、任务、MCP、技能四项管理。
 
-## 开发
+## 开发与部署
 
 ```bash
-npm ci
-BACKEND_URL=http://127.0.0.1:8000 npm run dev
+cd ..
+./run.sh up -d --build
 ```
 
-直接运行时开发服务器默认使用 `5173`。根目录开发 Compose 使用 `5174`，避免与原项目冲突。
+前端随根目录唯一的 Compose 服务构建和部署，通过 `http://39.106.98.67:7000` 访问。
 
 ## 检查
 

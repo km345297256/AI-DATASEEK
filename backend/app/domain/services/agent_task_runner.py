@@ -259,6 +259,9 @@ class AgentTaskRunner(TaskRunner):
     
     async def _pop_event(self, task: Task) -> AgentEvent:
         event_id, event_str = await task.input_stream.pop()
+        return self._decode_input_event(event_id, event_str)
+
+    def _decode_input_event(self, event_id, event_str) -> AgentEvent:
         if event_str is None:
             logger.warning(f"Agent {self._agent_id} received empty message")
             return
@@ -635,12 +638,10 @@ class AgentTaskRunner(TaskRunner):
         baseline_paths = await self._list_sandbox_artifacts()
         self._artifact_baseline_paths = set(baseline_paths)
         self._artifact_fingerprints = {}
-        # Session artifact uploads already carry size + sha256 metadata.  Reuse
-        # that metadata instead of downloading every historical output at the
-        # beginning of every task runner invocation.  Legacy session files do
-        # not have this metadata, so hash those bodies once at task start; a
-        # later overwrite can then be distinguished from untouched pre-task
-        # output and delivered normally.
+        # Session artifact uploads already carry size + sha256 metadata. Reuse
+        # that metadata instead of downloading every historical output. Legacy
+        # session files have no metadata, so hash them once at task start; a
+        # later overwrite can then be delivered normally.
         files_by_path: dict[str, FileInfo] = {}
         try:
             session = await self._session_repository.find_by_id(self._session_id)
@@ -662,9 +663,9 @@ class AgentTaskRunner(TaskRunner):
                 try:
                     _, fingerprint = await self._read_artifact_with_fingerprint(file_path)
                 except Exception as exc:
-                    # Keep the path-only compatibility fallback when a legacy
-                    # body cannot be read.  Discovery will observe it without
-                    # publishing once, as before.
+                    # Retain the path-only compatibility fallback when a legacy
+                    # body cannot be read. Discovery will observe it once without
+                    # publishing pre-task output.
                     logger.warning(
                         "Agent %s could not fingerprint legacy baseline artifact %s: %s",
                         self._agent_id,
@@ -883,10 +884,23 @@ class AgentTaskRunner(TaskRunner):
         """Process agent's message queue and run the agent's flow"""
         try:
             logger.info(f"Agent {self._agent_id} message processing task started")
-            await self._sandbox.ensure_sandbox()
+            ensure_api_ready = getattr(self._sandbox, "ensure_api_ready", None)
+            if callable(ensure_api_ready):
+                await ensure_api_ready()
+            else:
+                await self._sandbox.ensure_sandbox()
             artifact_baseline_initialized = False
-            while not await task.input_stream.is_empty():
-                event = await self._pop_event(task)
+            while True:
+                pop_input_or_close = getattr(task, "pop_input_or_close", None)
+                if callable(pop_input_or_close):
+                    event_id, event_str = await pop_input_or_close()
+                    if event_str is None:
+                        break
+                    event = self._decode_input_event(event_id, event_str)
+                else:
+                    if await task.input_stream.is_empty():
+                        break
+                    event = await self._pop_event(task)
                 message = ""
                 metadata = {}
                 if isinstance(event, MessageEvent):
@@ -1047,7 +1061,7 @@ class AgentTaskRunner(TaskRunner):
 
         await self._initialize_mcp_tool(message.mcp_servers, is_admin=message.mcp_access_all)
 
-        artifact_discovery_dirty = False
+        artifact_discovery_dirty = bool(getattr(self, "_generated_files", []))
         artifact_discovery_ran = False
         delivered_file_keys: set[str] = set()
         completed_step_count = 0
@@ -1073,8 +1087,16 @@ class AgentTaskRunner(TaskRunner):
                     artifact_discovery_dirty = True
             elif isinstance(event, StepEvent):
                 explicit_files = await self._sync_step_attachments_to_storage(event)
+                artifact_policy = str(
+                    (event.step.inputs or {}).get("artifact_policy") or "optional"
+                )
+                force_artifact_discovery = artifact_policy in {
+                    "required",
+                    "capability",
+                }
                 if event.status == StepStatus.COMPLETED and (
-                    artifact_discovery_dirty or not artifact_discovery_ran
+                    artifact_discovery_dirty
+                    or (force_artifact_discovery and not artifact_discovery_ran)
                 ):
                     # Explicit step attachments were just downloaded, hashed and
                     # uploaded.  Do not download the same bytes again during the
@@ -1140,9 +1162,7 @@ class AgentTaskRunner(TaskRunner):
                 elif skip_next_step_result is not None and not is_summary:
                     skip_next_step_result = None
 
-                if not suppress_event and is_summary and (
-                    artifact_discovery_dirty or not artifact_discovery_ran
-                ):
+                if not suppress_event and is_summary and artifact_discovery_dirty:
                     summary_discovered_files = await self._sync_discovered_artifacts_to_storage()
                     artifact_discovery_dirty = False
                     artifact_discovery_ran = True
@@ -1175,7 +1195,7 @@ class AgentTaskRunner(TaskRunner):
                 # any durable partial outputs first; otherwise they are uploaded
                 # later at Done time and exist in history, but the connected user
                 # never receives them before the stream closes.
-                if artifact_discovery_dirty or not artifact_discovery_ran:
+                if artifact_discovery_dirty:
                     partial_files = await self._sync_discovered_artifacts_to_storage()
                     artifact_discovery_dirty = False
                     artifact_discovery_ran = True
@@ -1204,7 +1224,7 @@ class AgentTaskRunner(TaskRunner):
                             )
                         )
             elif isinstance(event, WaitEvent):
-                if artifact_discovery_dirty or not artifact_discovery_ran:
+                if artifact_discovery_dirty:
                     late_files = await self._sync_discovered_artifacts_to_storage()
                     artifact_discovery_dirty = False
                     artifact_discovery_ran = True
@@ -1226,7 +1246,7 @@ class AgentTaskRunner(TaskRunner):
                             )
                         )
             elif isinstance(event, DoneEvent):
-                if artifact_discovery_dirty or not artifact_discovery_ran:
+                if artifact_discovery_dirty:
                     late_files = await self._sync_discovered_artifacts_to_storage()
                     artifact_discovery_dirty = False
                     artifact_discovery_ran = True

@@ -161,7 +161,8 @@ class AgentService:
         if not session:
             logger.error(f"Session {session_id} not found for user {user_id}")
             raise RuntimeError("Session not found")
-        
+
+        await self._agent_domain_service.delete_session_resources(session)
         await self._session_repository.delete(session_id)
         logger.info(f"Session {session_id} deleted successfully")
 
@@ -206,7 +207,11 @@ class AgentService:
             logger.info("Session %s sandbox %s is paused; resuming for direct access", session.id, session.sandbox_id)
             if not await sandbox.resume():
                 raise RuntimeError("Failed to resume sandbox environment")
-            await sandbox.ensure_sandbox()
+            ensure_api_ready = getattr(sandbox, "ensure_api_ready", None)
+            if callable(ensure_api_ready):
+                await ensure_api_ready()
+            else:
+                await sandbox.ensure_sandbox()
         return sandbox
 
     async def shell_view(self, session_id: str, shell_session_id: str, user_id: str) -> ShellViewResponse:
@@ -239,7 +244,11 @@ class AgentService:
         sandbox = await self._restore_session_sandbox(session)
         if not sandbox:
             raise RuntimeError("Sandbox environment not found")
-        
+        ensure_vnc_ready = getattr(sandbox, "ensure_vnc_ready", None)
+        if callable(ensure_vnc_ready):
+            await ensure_vnc_ready()
+        else:
+            await sandbox.ensure_sandbox()
         return sandbox.vnc_url
 
     async def file_view(self, session_id: str, file_path: str, user_id: str) -> FileViewResponse:

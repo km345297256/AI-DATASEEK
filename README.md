@@ -6,12 +6,11 @@ AI-DataSeek is a focused AI dataset exploration and analysis platform extracted 
 
 ## Included capabilities
 
-- Temporary dataset setup and third-party submission API.
+- Third-party temporary dataset submission API at `POST /api/v1/datasets/submissions`.
 - Scientific dataset exploration at `/dataset/seek/:datasetId`, with recursive file discovery, model-generated analysis questions, and read-only dataset mounts.
 - General data-exploration tasks (`/chat` and `/chat/:sessionId`).
 - Skill, MCP, and Renderer plugins.
-- Dataset management outside the system-administration area.
-- System administration limited to resource usage, tasks, MCP, and skills.
+- System administration limited to resource usage and configuration, tasks, MCP, and skills.
 - Per-session Docker sandboxes, task history, file results, and previews.
 - Token usage accounting for operations and capacity analysis, without per-user quotas.
 
@@ -26,7 +25,7 @@ Browser -> Frontend -> Backend -> MongoDB / Redis / MinIO
                                   -> dataset directory (read-only)
 ```
 
-The stable integration stack uses port `7000`; the isolated development stack uses port `7100`.
+AI-DataSeek has one supported Compose stack, exposed and updated exclusively on port `7000`.
 
 ## Quick start
 
@@ -38,7 +37,7 @@ cp .env.example .env
 ./run.sh up -d --build
 ```
 
-Open `http://localhost:7000`.
+Open `http://39.106.98.67:7000`.
 
 AI-DataSeek has a fixed no-login access model. Browser and API requests do not
 use Bearer tokens or `X-API-Key`; every caller operates as the same built-in
@@ -53,19 +52,13 @@ DATASET_DOCKER_HOST_ROOT=/var/lib/snapd/hostfs
 
 Allowed dataset roots are controlled by `DATASET_HOST_PATH_ALLOWLIST`. Submitted server directories are validated and mounted read-only into the task sandbox.
 
-## Development
+## Development and updates
+
+All containerized runs and updates target the single port-`7000` service:
 
 ```bash
-cp .env.example .env
-./dev.sh up -d --build
+./run.sh up -d --build
 ```
-
-Development defaults:
-
-- Frontend (development endpoint): `http://localhost:7100`
-- Backend: `http://localhost:8001`
-- MongoDB: `localhost:27018`
-- MinIO API/console: `localhost:9010` / `localhost:9011`
 
 Useful checks:
 
@@ -78,7 +71,7 @@ docker compose config --quiet
 
 ## Third-party integration
 
-The `/dataset/setup` page only simulates a third-party system. Production integrations should call the temporary dataset submission API directly and redirect users to `/dataset/seek/:datasetId`. See [the third-party API guide](docs/dataset-seek-third-party-api.md).
+The manual dataset setup page has been removed. Third-party systems call the temporary dataset submission API directly and redirect users to `/dataset/seek/:datasetId`. See [the third-party API guide](docs/dataset-seek-third-party-api.md).
 
 ## Project layout
 

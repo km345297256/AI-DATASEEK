@@ -129,8 +129,6 @@ export default {
   'Upload large files through backend-proxied multipart upload. The client never receives the object storage address.': 'Upload large files through backend-proxied multipart upload. The client never receives the object storage address.',
   // Plugins
   'Plugins': 'Plugins',
-  'Scientific Data Exploration': 'Scientific Data Exploration',
-  'Dataset Management': 'Dataset Management',
   'Discover official and community plugins, then add them to your personal library.': 'Discover official and community plugins, then add them to your personal library.',
   'Publisher': 'Publisher',
   'All': 'All',

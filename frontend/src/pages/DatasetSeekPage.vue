@@ -78,20 +78,21 @@
             </div>
             <div>
               <dt class="text-[11px] text-[var(--text-tertiary)]">数据集摘要</dt>
-              <dd class="mt-1.5 whitespace-pre-wrap break-words text-xs leading-5 text-[var(--text-secondary)]">{{ dataset.description || '未提供摘要' }}</dd>
-            </div>
-            <div>
-              <dt class="text-[11px] text-[var(--text-tertiary)]">关键词</dt>
-              <dd v-if="dataset.tags.length" class="mt-2 flex flex-wrap gap-1.5">
-                <span
-                  v-for="keyword in dataset.tags"
-                  :key="keyword"
-                  class="max-w-full truncate rounded-md bg-[#e8f3ee] px-2 py-1 text-[10px] text-[#286d52] dark:bg-[#26372f] dark:text-[#9bc8b4]"
-                >
-                  {{ keyword }}
-                </span>
-              </dd>
-              <dd v-else class="mt-1 text-xs text-[var(--text-tertiary)]">未提供关键词</dd>
+              <dd
+                ref="datasetSummaryRef"
+                class="mt-1.5 whitespace-pre-wrap break-words text-xs leading-5 text-[var(--text-secondary)]"
+                :class="datasetSummaryExpanded ? '' : 'line-clamp-5'"
+              >{{ dataset.description || '未提供摘要' }}</dd>
+              <button
+                v-if="datasetSummaryOverflowing"
+                type="button"
+                class="mt-1.5 inline-flex items-center gap-0.5 text-[11px] font-medium text-[#286d52] hover:text-[#194d39]"
+                :aria-expanded="datasetSummaryExpanded"
+                @click="toggleDatasetSummary"
+              >
+                {{ datasetSummaryExpanded ? '收起' : '展开' }}
+                <ChevronDown class="size-3 transition-transform" :class="datasetSummaryExpanded ? 'rotate-180' : ''" />
+              </button>
             </div>
           </dl>
 
@@ -377,6 +378,9 @@ const { selectedProfileId, selectedProfile, refreshProfiles } = useAgentProfile(
 const { showFilePanel } = useFilePanel();
 const dataset = ref<DataCenterDataset>();
 const selectedDatasetId = ref('');
+const datasetSummaryRef = ref<HTMLElement | null>(null);
+const datasetSummaryExpanded = ref(false);
+const datasetSummaryOverflowing = ref(false);
 const visibleFileCount = ref(DATASET_FILE_BATCH_SIZE);
 const visibleDatasetFiles = computed(() => (dataset.value?.files || []).slice(0, visibleFileCount.value));
 const hasMoreDatasetFiles = computed(() => visibleDatasetFiles.value.length < (dataset.value?.files.length || 0));
@@ -411,6 +415,7 @@ const currentPlan = ref<PlanEventData>();
 const lastTool = ref<ToolContent>();
 let cancelChat: (() => void) | null = null;
 let timelineResizeObserver: ResizeObserver | null = null;
+let datasetSummaryResizeObserver: ResizeObserver | null = null;
 let desktopCatalogMediaQuery: MediaQueryList | null = null;
 
 const TIMELINE_BOTTOM_THRESHOLD = 120;
@@ -422,6 +427,19 @@ watch(() => dataset.value?.preview_url, () => {
 watch(() => dataset.value?.dataset_id, () => {
   visibleFileCount.value = DATASET_FILE_BATCH_SIZE;
 }, { flush: 'sync' });
+
+watch(() => dataset.value?.description, async () => {
+  datasetSummaryExpanded.value = false;
+  await nextTick();
+  updateDatasetSummaryOverflow();
+}, { flush: 'post' });
+
+watch(datasetSummaryRef, async (element) => {
+  datasetSummaryResizeObserver?.disconnect();
+  if (element) datasetSummaryResizeObserver?.observe(element);
+  await nextTick();
+  updateDatasetSummaryOverflow();
+}, { flush: 'post' });
 
 function datasetStorageKey() {
   return `${DATASET_STORAGE_KEY_PREFIX}:${selectedDatasetId.value}`;
@@ -464,6 +482,26 @@ watch(messages, async () => {
 
 function handleDatasetCoverError() {
   if (datasetCoverUrl.value !== datasetDefaultCover) datasetCoverFailed.value = true;
+}
+
+function updateDatasetSummaryOverflow() {
+  const element = datasetSummaryRef.value;
+  if (!element || !dataset.value?.description) {
+    datasetSummaryOverflowing.value = false;
+    return;
+  }
+  if (datasetSummaryExpanded.value) {
+    const lineHeight = Number.parseFloat(window.getComputedStyle(element).lineHeight);
+    datasetSummaryOverflowing.value = Number.isFinite(lineHeight) && element.scrollHeight > lineHeight * 5 + 1;
+    return;
+  }
+  datasetSummaryOverflowing.value = element.scrollHeight > element.clientHeight + 1;
+}
+
+async function toggleDatasetSummary() {
+  datasetSummaryExpanded.value = !datasetSummaryExpanded.value;
+  await nextTick();
+  updateDatasetSummaryOverflow();
 }
 
 function displayFileName(name: string) {
@@ -745,6 +783,10 @@ onMounted(async () => {
     timelineResizeObserver = new ResizeObserver(() => scrollTimelineToBottom());
     timelineResizeObserver.observe(timelineContentRef.value);
   }
+  if (typeof ResizeObserver !== 'undefined') {
+    datasetSummaryResizeObserver = new ResizeObserver(updateDatasetSummaryOverflow);
+    if (datasetSummaryRef.value) datasetSummaryResizeObserver.observe(datasetSummaryRef.value);
+  }
   await refreshProfiles().catch(() => undefined);
   const routeDatasetId = Array.isArray(route.params.datasetId) ? route.params.datasetId[0] : route.params.datasetId;
   if (!routeDatasetId) {
@@ -768,6 +810,7 @@ onMounted(async () => {
 onUnmounted(() => {
   cancelChat?.();
   timelineResizeObserver?.disconnect();
+  datasetSummaryResizeObserver?.disconnect();
   desktopCatalogMediaQuery?.removeEventListener('change', handleCatalogViewportChange);
 });
 </script>

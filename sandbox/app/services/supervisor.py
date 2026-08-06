@@ -42,6 +42,7 @@ class SupervisorService:
     def __init__(self):
         self.rpc_url = "/tmp/supervisor.sock"
         self._connect_rpc()
+        self._profile_start_lock = asyncio.Lock()
         
         # Timeout management - enabled based on configuration
         self.timeout_active = settings.SERVICE_TIMEOUT_MINUTES is not None
@@ -124,6 +125,32 @@ class SupervisorService:
             return [ProcessInfo(**process) for process in processes]
         except Exception as e:
             raise ResourceNotFoundException(f"Failed to get process status: {str(e)}")
+
+    async def ensure_profile(self, profile: str) -> List[ProcessInfo]:
+        """Idempotently start one fixed GUI service profile."""
+        profiles = {
+            "browser": ("xvfb", "chrome", "socat"),
+            "vnc": ("xvfb", "chrome", "socat", "x11vnc", "websockify"),
+        }
+        services = profiles.get(profile)
+        if services is None:
+            raise BadRequestException("Unsupported supervisor service profile")
+
+        async with self._profile_start_lock:
+            for service_name in services:
+                process_name = f"services:{service_name}"
+                process = await self._call_rpc(
+                    self.server.supervisor.getProcessInfo,
+                    process_name,
+                )
+                if process.get("statename") in {"RUNNING", "STARTING"}:
+                    continue
+                await self._call_rpc(
+                    self.server.supervisor.startProcess,
+                    process_name,
+                    True,
+                )
+            return await self.get_all_processes()
     
     async def stop_all_services(self) -> SupervisorActionResult:
         """Asynchronously stop all services"""
@@ -250,4 +277,4 @@ class SupervisorService:
 
 
 # Global instance
-supervisor_service = SupervisorService() 
+supervisor_service = SupervisorService()

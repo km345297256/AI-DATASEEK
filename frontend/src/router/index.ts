@@ -8,8 +8,6 @@ const SharePage = () => import('@/pages/SharePage.vue')
 const PluginsPage = () => import('@/pages/PluginsPage.vue')
 const AdminPage = () => import('@/pages/AdminPage.vue')
 const DatasetSeekPage = () => import('@/pages/DatasetSeekPage.vue')
-const DatasetSetupPage = () => import('@/pages/DatasetSetupPage.vue')
-const DatasetAdminPage = () => import('@/pages/DatasetAdminPage.vue')
 
 const routes: RouteRecordRaw[] = [
   {
@@ -31,7 +29,7 @@ const routes: RouteRecordRaw[] = [
       },
       {
         path: 'datasets',
-        component: DatasetAdminPage,
+        redirect: '/chat',
       },
       {
         path: 'admin/tasks/:sessionId/replay',
@@ -46,15 +44,15 @@ const routes: RouteRecordRaw[] = [
   },
   {
     path: '/dataset',
-    redirect: '/dataset/setup',
+    redirect: '/chat',
   },
   {
     path: '/dataset/setup',
-    component: DatasetSetupPage,
+    redirect: '/chat',
   },
   {
     path: '/dataset/seek',
-    redirect: '/dataset/setup',
+    redirect: '/chat',
   },
   {
     path: '/dataset/seek/:datasetId',

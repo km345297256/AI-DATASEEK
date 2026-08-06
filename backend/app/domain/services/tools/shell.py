@@ -65,6 +65,7 @@ class ShellToolkit(BaseToolkit):
         archive_path: str,
         output_dir: str,
         timeout_seconds: int = 120,
+        source_root: Optional[str] = None,
     ) -> ToolResult:
         """Safely extract a ZIP, RAR, or 7z dataset, including nested archives, in one bounded call. Prefer this over manually chaining archive commands. It rejects traversal, links, encrypted members, and excessive expansion, and returns a final-file manifest.
 
@@ -73,10 +74,15 @@ class ShellToolkit(BaseToolkit):
             archive_path: Absolute path to the source archive inside the sandbox
             output_dir: Absolute path to a new output directory under /home/ubuntu/output
             timeout_seconds: Maximum bounded wait in seconds, clamped to 1-120
+            source_root: Optional trusted dataset root; the resolved archive must remain below it
         """
+        source_root_option = (
+            f"--source-root {shlex.quote(source_root)} " if source_root else ""
+        )
         command = (
             f"ai-dataseek-unpack {shlex.quote(archive_path)} "
             f"--output {shlex.quote(output_dir)} "
+            f"{source_root_option}"
             f"--timeout-seconds {max(1, min(timeout_seconds, 120))}"
         )
         return await self._run_bounded_command(

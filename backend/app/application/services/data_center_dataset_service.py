@@ -29,7 +29,6 @@ from app.infrastructure.external.sandbox.dataset_mount_validator import (
 )
 from app.infrastructure.models.documents import (
     DataCenterDatasetDocument,
-    ExecutionNodeDocument,
     TemporaryDatasetDocument,
 )
 
@@ -267,6 +266,8 @@ class DataCenterDatasetService:
             ],
             metadata={
                 "temporary": True,
+                "inventory_complete": True,
+                "inventory_source": "verified_recursive_scan",
                 "recursive_file_count": len(inventory.files),
                 "total_size_bytes": inventory.total_size,
             },
@@ -312,14 +313,7 @@ class DataCenterDatasetService:
         owner_id: str,
         now: datetime,
     ) -> tuple[int, int]:
-        """Reserve bounded owner/global slots for a temporary submission.
-
-        MongoDB unique indexes are the final concurrency guard. Multiple
-        backend replicas may select the same free slots, but only one insert
-        can win; the caller retries after ``DuplicateKeyError``. When a limit
-        is full we preserve the previous registry behavior by evicting the
-        oldest entry first.
-        """
+        """Reserve bounded owner/global slots for a temporary submission."""
 
         expired_documents = await TemporaryDatasetDocument.find({
             "expires_at": {"$lte": now},
@@ -394,137 +388,6 @@ class DataCenterDatasetService:
             if slot not in global_slots
         )
         return owner_slot, global_slot
-
-    async def create_dataset(self, values: dict, created_by: str) -> DataCenterDataset:
-        name = str(values.get("name") or "").strip()
-        if not name:
-            raise BadRequestError("Dataset name is required")
-        payload = dict(values)
-        payload.update(
-            name=name,
-            name_key=_name_key(name),
-            created_by=created_by,
-        )
-        document = DataCenterDatasetDocument(**payload)
-        try:
-            await document.insert()
-        except DuplicateKeyError as exc:
-            raise BadRequestError("A dataset with the same name already exists") from exc
-        return document.to_domain()
-
-    async def update_dataset(self, dataset_id: str, values: dict) -> DataCenterDataset:
-        doc = await self._document(dataset_id)
-        if "name" in values:
-            values["name"] = str(values["name"]).strip()
-            if not values["name"]:
-                raise BadRequestError("Dataset name is required")
-            values["name_key"] = _name_key(values["name"])
-        for key, value in values.items():
-            setattr(doc, key, value)
-        doc.updated_at = datetime.now(UTC)
-        try:
-            await doc.save()
-        except DuplicateKeyError as exc:
-            raise BadRequestError("A dataset with the same name already exists") from exc
-        return doc.to_domain()
-
-    async def delete_dataset(self, dataset_id: str) -> None:
-        doc = await self._document(dataset_id)
-        managed_locations = [item for item in doc.locations if item.storage_type == DatasetStorageType.MANAGED_UPLOAD]
-        await doc.delete()
-        if managed_locations:
-            shutil.rmtree(self._managed_dataset_dir(dataset_id), ignore_errors=True)
-
-    async def add_location(self, dataset_id: str, location: DatasetLocation) -> DataCenterDataset:
-        doc = await self._document(dataset_id)
-        node = await ExecutionNodeDocument.find_one(ExecutionNodeDocument.node_id == location.node_id)
-        if not node:
-            raise BadRequestError("Execution node does not exist")
-        if location.storage_type == DatasetStorageType.HOST_PATH:
-            self._validate_host_path(location.source_path, node.runtime_config.get("dataset_allowed_roots"))
-            if not location.mount_name:
-                existing_names = {item.mount_name for item in doc.locations if item.mount_name}
-                location.mount_name = _unique_mount_names([
-                    *(item.source_path for item in doc.locations if item.mount_name in existing_names),
-                    location.source_path,
-                ])[-1]
-        if any(item.node_id == location.node_id and item.source_path == location.source_path for item in doc.locations):
-            raise BadRequestError("This storage location is already registered")
-        doc.locations.append(location)
-        if location.storage_type == DatasetStorageType.HOST_PATH:
-            doc.files.append(DatasetFile(
-                path=f"sources/{location.location_id}/{location.mount_name}",
-                role="data",
-            ))
-        doc.updated_at = datetime.now(UTC)
-        await doc.save()
-        return doc.to_domain()
-
-    async def remove_location(self, dataset_id: str, location_id: str) -> DataCenterDataset:
-        doc = await self._document(dataset_id)
-        locations = [item for item in doc.locations if item.location_id != location_id]
-        if len(locations) == len(doc.locations):
-            raise NotFoundError("Dataset storage location was not found")
-        removed = next(item for item in doc.locations if item.location_id == location_id)
-        if removed.storage_type == DatasetStorageType.MANAGED_UPLOAD:
-            raise BadRequestError("Managed upload locations are maintained by the platform and cannot be removed directly")
-        doc.locations = locations
-        doc.files = [
-            item for item in doc.files
-            if not item.path.startswith(f"sources/{removed.location_id}/")
-        ]
-        doc.updated_at = datetime.now(UTC)
-        await doc.save()
-        return doc.to_domain()
-
-    async def upload_files(self, dataset_id: str, uploads: Sequence[tuple[str, object]]) -> DataCenterDataset:
-        doc = await self._document(dataset_id)
-        target_root = self._managed_dataset_dir(dataset_id)
-        target_root.mkdir(parents=True, exist_ok=True)
-        file_map = {item.path: item for item in doc.files}
-        for relative_name, upload in uploads:
-            relative = _safe_relative_path(relative_name)
-            target = target_root.joinpath(*relative.parts)
-            target.parent.mkdir(parents=True, exist_ok=True)
-            size = 0
-            with target.open("wb") as output:
-                while chunk := await upload.read(1024 * 1024):
-                    output.write(chunk)
-                    size += len(chunk)
-            file_map[str(relative)] = DatasetFile(
-                path=str(relative),
-                size=size,
-                role="data",
-                content_type=getattr(upload, "content_type", None),
-            )
-        doc.files = sorted(file_map.values(), key=lambda item: item.path)
-        if not any(item.storage_type == DatasetStorageType.MANAGED_UPLOAD for item in doc.locations):
-            doc.locations.append(DatasetLocation(
-                node_id=LOCAL_DEFAULT_NODE_ID,
-                storage_type=DatasetStorageType.MANAGED_UPLOAD,
-                source_path=dataset_id,
-                verified=True,
-                verification_message="Managed upload is available on the local Docker node",
-            ))
-        doc.updated_at = datetime.now(UTC)
-        await doc.save()
-        return doc.to_domain()
-
-    async def upload_preview(self, dataset_id: str, upload: object) -> DataCenterDataset:
-        doc = await self._document(dataset_id)
-        suffix = Path(getattr(upload, "filename", "") or "").suffix.lower()
-        if suffix not in {".png", ".jpg", ".jpeg", ".webp"}:
-            raise BadRequestError("Preview must be PNG, JPEG, or WebP")
-        target_root = self._managed_dataset_dir(dataset_id)
-        target_root.mkdir(parents=True, exist_ok=True)
-        target = target_root / f"preview{suffix}"
-        with target.open("wb") as output:
-            while chunk := await upload.read(1024 * 1024):
-                output.write(chunk)
-        doc.preview_url = f"/api/v1/datasets/{dataset_id}/preview"
-        doc.updated_at = datetime.now(UTC)
-        await doc.save()
-        return doc.to_domain()
 
     async def preview_path(self, dataset_id: str, user_id: str | None = None) -> Path:
         dataset = await self.get_dataset(dataset_id, user_id=user_id)
@@ -603,31 +466,11 @@ class DataCenterDatasetService:
             ))
         return mounted
 
-    async def _document(self, dataset_id: str) -> DataCenterDatasetDocument:
-        doc = await DataCenterDatasetDocument.find_one({"dataset_id": dataset_id})
-        if not doc:
-            raise NotFoundError("Dataset was not found")
-        return doc
-
     def _managed_dataset_dir(self, dataset_id: str) -> Path:
         relative = _safe_relative_path(dataset_id)
         if len(relative.parts) != 1:
             raise BadRequestError("Invalid dataset ID")
         return self._storage_root / dataset_id
-
-    def _validate_host_path(self, source_path: str, configured_roots: object = None) -> None:
-        if any(ord(character) < 32 for character in source_path):
-            raise BadRequestError("Server path contains invalid control characters")
-        path = PurePosixPath(source_path)
-        if not path.is_absolute() or ".." in path.parts:
-            raise BadRequestError("Server path must be an absolute path without '..'")
-        raw_roots = configured_roots if isinstance(configured_roots, list) else self._settings.dataset_host_path_allowlist.split(",")
-        roots = [PurePosixPath(str(item).strip()) for item in raw_roots if str(item).strip()]
-        if not roots:
-            raise BadRequestError("DATASET_HOST_PATH_ALLOWLIST is not configured")
-        if not any(path == root or root in path.parents for root in roots):
-            raise BadRequestError("Server path is outside DATASET_HOST_PATH_ALLOWLIST")
-
 
 def _bounded_context_text(value: object, max_chars: int) -> str:
     text = "" if value is None else str(value)

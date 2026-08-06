@@ -9,8 +9,8 @@ def test_project_specific_sandbox_prefix_is_recognized():
         "ai-dataseek-sandbox",
     )
     assert is_sandbox_container_name(
-        "/ai-dataseek-dev-sandbox-a1b2c3d4",
-        "ai-dataseek-dev-sandbox",
+        "/ai-dataseek-sandbox-b2c3d4e5",
+        "ai-dataseek-sandbox",
     )
 
 

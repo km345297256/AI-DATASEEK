@@ -215,7 +215,7 @@ async def test_done_uses_fast_advice_without_loading_session_history_or_model():
     assert len(events) == 1
     assert events[0].advice["recommendations"][0] == "继续分析"
     assert advice.analyze_called is False
-    assert discovery_calls == 1
+    assert discovery_calls == 0
 
 
 @pytest.mark.asyncio

@@ -109,6 +109,19 @@ class Settings(BaseSettings):
     sandbox_no_proxy: str | None = None
     sandbox_pool_size: int = 0  # 0=disabled, >0=number of pre-warmed containers
     sandbox_docker_create_timeout_seconds: int = 60
+    # The local execution node is system-managed. Keep the limit optional so
+    # existing installations that manage it through the admin API retain their
+    # current value; deployments can opt into an explicit host budget.
+    sandbox_max_concurrent: int | None = None
+    # A short bounded queue absorbs normal bursts instead of surfacing a raw
+    # scheduler capacity error to the user.
+    sandbox_capacity_wait_seconds: float = 60.0
+    sandbox_capacity_poll_seconds: float = 1.0
+    # Paused containers preserve a session filesystem but still retain host
+    # memory and Docker metadata. Reclaim them after an inactivity window.
+    sandbox_paused_destroy_after_minutes: int | None = None
+    sandbox_resume_ready_timeout_seconds: float = 30.0
+    sandbox_hydration_concurrency: int = 3
 
     # Browser engine configuration
     browser_engine: str = "browser_use"  # "playwright" or "browser_use"
