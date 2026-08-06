@@ -25,6 +25,10 @@ RUN apt-get update && apt-get install -y \
     bc \
     curl \
     wget \
+    zip \
+    unzip \
+    unrar \
+    p7zip-full \
     gnupg \
     software-properties-common \
     xvfb \
@@ -36,8 +40,21 @@ RUN apt-get update && apt-get install -y \
     python3-numpy \
     python3-gdal \
     gdal-bin \
+    netcdf-bin \
+    hdf5-tools \
+    proj-bin \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
+
+# Archive inspection is a common dataset operation. Keep it deterministic: the
+# agent must never need to download or compile extractors at task runtime.
+RUN command -v zip && \
+    command -v unzip && \
+    command -v unrar && \
+    command -v 7z && \
+    unzip -v | grep -F 'UnZip' && \
+    unrar | grep -F 'UNRAR' && \
+    7z i | grep -F '7-Zip'
 
 # Create user ubuntu and grant sudo privileges
 RUN useradd -m -d /home/ubuntu -s /bin/bash ubuntu && \
@@ -66,7 +83,7 @@ ENV UV_INDEX_URL=https://mirrors.aliyun.com/pypi/simple/ \
 
 # Keep the distro GDAL binding available while preferring the locked NumPy and
 # visualization stack from the virtual environment.
-ENV PYTHONPATH=/app/.venv/lib/python3.10/site-packages:/usr/lib/python3/dist-packages
+ENV PYTHONPATH=/usr/local/lib/ai-dataseek:/app/.venv/lib/python3.10/site-packages:/usr/lib/python3/dist-packages
 
 # Install Node.js 20.18.0
 RUN mkdir -p /etc/apt/keyrings && \
@@ -121,11 +138,20 @@ WORKDIR /app
 
 # Copy dependency files first to leverage the Docker layer cache.
 COPY pyproject.toml uv.lock ./
-COPY scripts/install_noto_cjk_sc.py scripts/verify_matplotlib_cjk.py /usr/local/lib/ai-dataseek/
+COPY scripts/install_noto_cjk_sc.py scripts/verify_matplotlib_cjk.py scripts/verify_geoscience_stack.py scripts/recursive_unpack.py scripts/dataset_quicklook.py /usr/local/lib/ai-dataseek/
 
 # Install the exact locked runtime, including the common Excel and plotting
 # stack. Avoid retaining uv's download cache in the final image layer.
 RUN uv sync --frozen --no-dev --no-install-project --no-cache
+
+# Give agents one deterministic command for nested dataset archives instead of
+# spending model turns discovering and chaining format-specific extractors.
+RUN install -m 0755 \
+    /usr/local/lib/ai-dataseek/recursive_unpack.py \
+    /usr/local/bin/ai-dataseek-unpack && \
+    install -m 0755 \
+    /usr/local/lib/ai-dataseek/dataset_quicklook.py \
+    /usr/local/bin/ai-dataseek-quicklook
 
 # Debian/Ubuntu ships Noto CJK as a TTC. Matplotlib only indexes the first TTC
 # face, which is JP, even though fontconfig can resolve the SC face. Extract
@@ -138,7 +164,14 @@ RUN python /usr/local/lib/ai-dataseek/install_noto_cjk_sc.py && \
 # Fail the image build if task commands would see a different Python/pip pair
 # or if the preinstalled scientific stack is incomplete.
 RUN python -m pip --version && \
-    python -c "import matplotlib, numpy, openpyxl, pandas, seaborn, xlrd; from PIL import Image; from osgeo import gdal; print('scientific stack ready')" && \
+    python -c "import matplotlib, numpy, openpyxl, pandas, rarfile, rasterio, seaborn, xlrd; from PIL import Image; from osgeo import gdal; assert tuple(map(int, rasterio.__version__.split('.')[:2])) >= (1, 4); assert int(numpy.__version__.split('.')[0]) < 2; assert gdal.VersionInfo(); print('scientific stack ready', 'rasterio=' + rasterio.__version__, 'rasterio_gdal=' + rasterio.__gdal_version__, 'system_gdal=' + gdal.VersionInfo())" && \
+    command -v ncdump && \
+    command -v h5dump && \
+    command -v projinfo && \
+    projinfo EPSG:4326 >/dev/null && \
+    python /usr/local/lib/ai-dataseek/verify_geoscience_stack.py && \
+    ai-dataseek-unpack --help >/dev/null && \
+    ai-dataseek-quicklook --help >/dev/null && \
     python /usr/local/lib/ai-dataseek/verify_matplotlib_cjk.py && \
     install -d -o ubuntu -g ubuntu /home/ubuntu/.cache/matplotlib && \
     sudo -u ubuntu -H env \

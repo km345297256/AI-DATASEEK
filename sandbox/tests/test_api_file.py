@@ -56,3 +56,38 @@ def test_download_nonexistent_file(client):
     logger.info(f"Download response: {response.status_code}")
     
     assert response.status_code == 404 or response.status_code == 500
+
+
+@pytest.mark.file_api
+def test_replace_reports_no_match_as_failure(client, temp_test_file):
+    response = client.post(
+        f"{BASE_URL}/api/v1/file/replace",
+        json={
+            "file": temp_test_file,
+            "old_str": "text that is not present",
+            "new_str": "replacement",
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["success"] is False
+    assert payload["message"] == "Replacement made no changes: target text was not found"
+    assert payload["data"] == {"file": temp_test_file, "replaced_count": 0}
+
+
+@pytest.mark.file_api
+def test_replace_reports_actual_change_as_success(client, temp_test_file):
+    response = client.post(
+        f"{BASE_URL}/api/v1/file/replace",
+        json={
+            "file": temp_test_file,
+            "old_str": "Hello World",
+            "new_str": "Hello Dataset",
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["success"] is True
+    assert payload["data"] == {"file": temp_test_file, "replaced_count": 1}

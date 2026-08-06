@@ -12,7 +12,6 @@ export interface DatasetLocation {
   location_id: string;
   node_id: string;
   storage_type: 'managed_upload' | 'host_path';
-  source_path: string;
   read_only: boolean;
   verified: boolean;
   verification_message: string;

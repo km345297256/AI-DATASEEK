@@ -60,6 +60,31 @@ def test_completion_advice_default_recommendations_are_not_guiding_options():
     assert all(not item.endswith(("吗？", "吗?")) for item in advice.recommendations)
 
 
+def test_completion_advice_fast_path_is_deterministic_and_model_free(monkeypatch):
+    def _unexpected_model(*args, **kwargs):
+        raise AssertionError("fast advice must not create a chat model")
+
+    monkeypatch.setattr(advice_module, "create_chat_model", _unexpected_model)
+    service = CompletionAdviceService()
+    events = [
+        MessageEvent(role="user", message="批量生成图表"),
+        StepEvent(status=StepStatus.COMPLETED, step=Step(description="读取数据", success=True)),
+        StepEvent(
+            status=StepStatus.COMPLETED,
+            step=Step(
+                description="生成图表",
+                success=True,
+                attachments=["/home/ubuntu/output/chart.png"],
+            ),
+        ),
+    ]
+
+    advice = service.analyze_fast(events)
+
+    assert advice.is_skill_candidate is False
+    assert len(advice.recommendations) == 3
+
+
 def test_completion_advice_coerce_normalizes_guiding_options():
     service = CompletionAdviceService()
 

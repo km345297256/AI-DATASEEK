@@ -29,6 +29,7 @@ helper to build the stage-5 context without duplicating the template.
 import asyncio
 import logging
 import json
+import re
 from typing import Any, Optional
 
 from langchain_core.exceptions import OutputParserException
@@ -41,6 +42,11 @@ from langchain_core.utils.json import parse_json_markdown, parse_partial_json
 from langchain_classic.output_parsers.fix import OutputFixingParser
 
 logger = logging.getLogger(__name__)
+
+_EXPLICIT_JSON_FENCE = re.compile(
+    r"```[ \t]*json[ \t]*(?:\r?\n|\s)(.*?)```",
+    re.IGNORECASE | re.DOTALL,
+)
 
 _RETRY_WITH_ERROR_TEMPLATE = (
     "Your previous response contained invalid JSON in the tool call arguments.\n"
@@ -103,24 +109,53 @@ def _escape_unescaped_quotes_in_strings(raw: str) -> str:
 
 def parse_json_lenient(raw: str) -> Any:
     """Parse JSON from LLM output with local repairs for common invalid output."""
+    # LangChain's generic markdown parser selects the first fenced block even
+    # when that block is a file tree, SQL, or Python and a later ``json`` block
+    # contains the actual response object. Prefer every explicitly-labelled JSON
+    # candidate before trying the whole response.
+    for match in _EXPLICIT_JSON_FENCE.finditer(raw):
+        candidate = match.group(1).strip()
+        if not candidate:
+            continue
+        try:
+            parsed = json.loads(candidate)
+            if parsed is not None:
+                return parsed
+        except Exception:
+            pass
+        try:
+            parsed = parse_partial_json(candidate)
+            if parsed is not None:
+                return parsed
+        except Exception:
+            pass
+
     try:
-        return parse_json_markdown(raw)
+        parsed = parse_json_markdown(raw)
+        if parsed is not None:
+            return parsed
     except Exception:
         pass
 
     try:
-        return parse_partial_json(raw)
+        parsed = parse_partial_json(raw)
+        if parsed is not None:
+            return parsed
     except Exception:
         pass
 
     repaired = _escape_unescaped_quotes_in_strings(raw)
     if repaired != raw:
         try:
-            return parse_json_markdown(repaired)
+            parsed = parse_json_markdown(repaired)
+            if parsed is not None:
+                return parsed
         except Exception:
             pass
         try:
-            return json.loads(repaired)
+            parsed = json.loads(repaired)
+            if parsed is not None:
+                return parsed
         except Exception:
             pass
 

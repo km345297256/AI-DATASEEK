@@ -2,18 +2,93 @@ from app.domain.services.prompts.execution import EXECUTION_PROMPT
 from app.domain.services.prompts.system import SYSTEM_PROMPT
 
 
+def _rendered_prompts():
+    execution_prompt = EXECUTION_PROMPT.format(
+        step="Create a chart",
+        message="Visualize the dataset",
+        attachments="[]",
+        language="Chinese",
+        dataset_contract="(No mounted-dataset fast-path contract applies to this step.)",
+    )
+    return SYSTEM_PROMPT, execution_prompt
+
+
 def test_visualization_prompts_define_the_chinese_font_policy():
-    for prompt in (SYSTEM_PROMPT, EXECUTION_PROMPT):
+    for prompt in _rendered_prompts():
         assert "global sans-serif default" in prompt
-        assert "Noto Sans CJK JP" in prompt
-        assert "Noto Sans CJK SC" not in prompt
+        assert "Noto Sans CJK SC" in prompt
         assert "SimHei" in prompt
         assert "Microsoft YaHei" in prompt
         assert "unavailable fonts" in prompt
+        assert "monospace" in prompt
+
+
+def test_execution_prompt_prefers_bounded_shell_and_preinstalled_archives():
+    prompt = _rendered_prompts()[1]
+    assert "shell_run" in prompt
+    assert "dataset_unpack" in prompt
+    for command in ("zip", "unzip", "unrar", "7z"):
+        assert command in prompt
+    assert "Runtime dependency installation is forbidden" in prompt
+
+
+def test_analysis_prompts_forbid_runtime_dependency_installation_and_advertise_raster_stack():
+    system_prompt, execution_prompt = _rendered_prompts()
+    for command in ("apt", "pip", "uv add", "npm install"):
+        assert command in execution_prompt
+    assert "Runtime dependency installation is forbidden" in execution_prompt
+    assert "from osgeo import gdal" in execution_prompt
+    assert "preinstalled rasterio or GDAL" in execution_prompt
+    assert "rasterio" in system_prompt
+    assert "Never run `apt`" in system_prompt
+    assert "Install only uncommon missing dependencies" not in system_prompt
+
+
+def test_analysis_prompts_advertise_the_offline_geoscience_stack():
+    system_prompt, execution_prompt = _rendered_prompts()
+    for package in (
+        "xarray",
+        "Dask",
+        "netCDF4",
+        "h5netcdf",
+        "Zarr",
+        "SciPy",
+        "GeoPandas",
+        "Pyogrio",
+        "Shapely",
+        "PyProj",
+        "rioxarray",
+    ):
+        assert package in system_prompt
+        assert package in execution_prompt
+    for command in ("ncdump", "h5dump", "projinfo"):
+        assert command in system_prompt
+        assert command in execution_prompt
+
+
+def test_analysis_prompts_preserve_zero_nodata_and_unit_semantics():
+    system_prompt, execution_prompt = _rendered_prompts()
+    for prompt in (system_prompt, execution_prompt):
+        assert "numeric zero" in prompt
+        assert "source metadata" in prompt
+        assert "explicit user rule" in prompt
+        assert "Never infer units" in prompt
+    assert "raw/unit-not-declared" in execution_prompt
+
+
+def test_quicklook_policy_uses_returned_evidence_before_manual_probes():
+    system_prompt, execution_prompt = _rendered_prompts()
+    for prompt in (system_prompt, execution_prompt):
+        assert "spatial-zone means" in prompt
+        assert "declared NoData" in prompt
+        assert "mask provenance" in prompt
+        assert "zero counts" in prompt
+    assert "Do not manually unpack" in execution_prompt
+    assert "read sidecars" in execution_prompt
 
 
 def test_visualization_prompts_define_unicode_and_png_output_policy():
-    for prompt in (SYSTEM_PROMPT, EXECUTION_PROMPT):
+    for prompt in _rendered_prompts():
         assert 'matplotlib.rcParams["axes.unicode_minus"] = False' in prompt
         assert "UTF-8" in prompt
         assert "PNG" in prompt
@@ -21,7 +96,7 @@ def test_visualization_prompts_define_unicode_and_png_output_policy():
 
 
 def test_visualization_prompts_avoid_unicode_superscript_units():
-    for prompt in (SYSTEM_PROMPT, EXECUTION_PROMPT):
+    for prompt in _rendered_prompts():
         assert "U+207B" in prompt
         assert "$m^{-2}$" in prompt
         assert "m^-2" in prompt

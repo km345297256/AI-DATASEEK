@@ -2,10 +2,25 @@ import sys
 from datetime import UTC, datetime
 from types import SimpleNamespace
 
+import pytest
+
+import app.domain.services.resource_usage_service as resource_usage_module
+from app.domain.models.execution_node import (
+    ExecutionNodeCapacity,
+    ExecutionNodeHealth,
+    ExecutionNodeStatus,
+    ExecutionNodeType,
+)
 from app.domain.services.resource_usage_service import ResourceUsageService
 
 
 def test_docker_usage_reports_per_sandbox_cpu_and_disk(monkeypatch):
+    monkeypatch.setattr(
+        resource_usage_module,
+        "get_settings",
+        lambda: SimpleNamespace(sandbox_name_prefix="ai-dataseek-sandbox"),
+    )
+
     class FakeContainer:
         def __init__(self, name: str, status: str):
             self.name = name
@@ -98,3 +113,69 @@ def test_sandbox_created_sort_key_accepts_datetime_and_docker_epoch():
     sorted_rows = sorted(rows, key=service._sandbox_created_sort_key, reverse=True)
 
     assert [row["name"] for row in sorted_rows] == ["record-created", "docker-created"]
+
+
+def test_docker_usage_does_not_return_private_exception_details(monkeypatch):
+    private_path = "/var/run/private/docker.sock"
+    monkeypatch.setattr(
+        resource_usage_module,
+        "get_settings",
+        lambda: SimpleNamespace(sandbox_name_prefix="ai-dataseek-sandbox"),
+    )
+
+    def fail_from_env(**_kwargs):
+        raise RuntimeError(f"Cannot connect to {private_path}")
+
+    monkeypatch.setitem(sys.modules, "docker", SimpleNamespace(from_env=fail_from_env))
+
+    usage = ResourceUsageService()._get_docker_usage()
+
+    assert usage == {
+        "available": False,
+        "error": "Docker metrics are unavailable",
+    }
+    assert private_path not in str(usage)
+
+
+@pytest.mark.asyncio
+async def test_execution_node_usage_omits_private_node_details(monkeypatch):
+    now = datetime.now(UTC)
+    node = SimpleNamespace(
+        node_id="worker-private",
+        name="Private worker",
+        type=ExecutionNodeType.WORKER_AGENT,
+        status=ExecutionNodeStatus.UNHEALTHY,
+        enabled=True,
+        base_url="https://worker.internal.example",
+        capacity=ExecutionNodeCapacity(max_sandboxes=4),
+        health=ExecutionNodeHealth(
+            raw={"dataset_allowed_roots": ["/srv/private/tenant-a"]},
+        ),
+        last_checked_at=now,
+        last_heartbeat_at=now,
+        failure_reason="Cannot inspect /srv/private/tenant-a",
+    )
+
+    class FakeQuery:
+        async def to_list(self):
+            return [node]
+
+    class FakeExecutionNodeDocument:
+        @classmethod
+        def find(cls):
+            return FakeQuery()
+
+    monkeypatch.setattr(
+        resource_usage_module,
+        "ExecutionNodeDocument",
+        FakeExecutionNodeDocument,
+    )
+
+    usage = await ResourceUsageService()._get_execution_nodes_usage()
+    serialized = str(usage)
+
+    assert usage[0]["base_url"] is None
+    assert "raw" not in usage[0]["health"]
+    assert usage[0]["failure_reason"] == "Execution node health check failed"
+    assert "/srv/private" not in serialized
+    assert "worker.internal.example" not in serialized

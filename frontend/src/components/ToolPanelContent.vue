@@ -26,7 +26,7 @@
       <div
         class="flex flex-col rounded-[12px] overflow-hidden bg-[var(--background-gray-main)] border border-[var(--border-dark)] dark:border-black/30 shadow-[0px_4px_32px_0px_rgba(0,0,0,0.04)] flex-1 min-h-0 mt-[16px]">
         <component v-if="toolInfo" :is="toolInfo.view" :live="live" :sessionId="sessionId"
-          :toolContent="toolContent" :isShare="isShare" />
+          :toolContent="safeToolContent" :isShare="isShare" />
         <div class="mt-auto flex w-full items-center gap-2 px-4 h-[44px] relative" v-if="!realTime">
           <button
             class="h-10 px-3 border border-[var(--border-main)] flex items-center gap-1 bg-[var(--background-white-main)] hover:bg-[var(--background-gray-main)] shadow-[0px_5px_16px_0px_var(--shadow-S),0px_0px_1.25px_0px_var(--shadow-S)] rounded-full cursor-pointer absolute left-[50%] translate-x-[-50%]"
@@ -41,10 +41,11 @@
 </template>
 
 <script setup lang="ts">
-import { toRef } from 'vue';
+import { computed, toRef } from 'vue';
 import { Minimize2, PlayIcon } from 'lucide-vue-next';
 import type { ToolContent } from '@/types/message';
 import { useToolInfo } from '@/composables/useTool';
+import { safeToolContentForDisplay } from '@/utils/toolDisplay';
 
 const props = defineProps<{
   sessionId?: string;
@@ -55,6 +56,7 @@ const props = defineProps<{
 }>();
 
 const { toolInfo } = useToolInfo(toRef(props, 'toolContent'));
+const safeToolContent = computed(() => safeToolContentForDisplay(props.toolContent));
 
 const emit = defineEmits<{
   (e: 'jumpToRealTime'): void,

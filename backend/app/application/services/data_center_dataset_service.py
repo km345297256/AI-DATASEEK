@@ -5,6 +5,7 @@ import json
 import logging
 import secrets
 import shutil
+from collections import Counter
 from datetime import UTC, datetime, timedelta
 from pathlib import Path, PurePosixPath
 from typing import Iterable, Sequence
@@ -41,6 +42,11 @@ TEMPORARY_DATASET_TTL = timedelta(hours=24)
 TEMPORARY_DATASET_ID_ATTEMPTS = 32
 TEMPORARY_DATASET_MAX_ENTRIES = 128
 TEMPORARY_DATASET_MAX_ENTRIES_PER_OWNER = 16
+DATASET_CONTEXT_FILE_LIMIT = 48
+DATASET_CONTEXT_GROUP_LIMIT = 16
+DATASET_CONTEXT_METADATA_CHARS = 6_000
+DATASET_CONTEXT_FIELD_CHARS = 2_000
+DATASET_CONTEXT_PATH_CHARS = 512
 
 
 def _name_key(value: str) -> str:
@@ -308,9 +314,9 @@ class DataCenterDatasetService:
     ) -> tuple[int, int]:
         """Reserve bounded owner/global slots for a temporary submission.
 
-        MongoDB unique indexes are the final concurrency guard.  Multiple
+        MongoDB unique indexes are the final concurrency guard. Multiple
         backend replicas may select the same free slots, but only one insert
-        can win; the caller retries after ``DuplicateKeyError``.  When a limit
+        can win; the caller retries after ``DuplicateKeyError``. When a limit
         is full we preserve the previous registry behavior by evicting the
         oldest entry first.
         """
@@ -623,24 +629,106 @@ class DataCenterDatasetService:
             raise BadRequestError("Server path is outside DATASET_HOST_PATH_ALLOWLIST")
 
 
+def _bounded_context_text(value: object, max_chars: int) -> str:
+    text = "" if value is None else str(value)
+    if len(text) <= max_chars:
+        return text
+    return f"{text[:max_chars]}\n[truncated from {len(text)} characters]"
+
+
+def _inventory_group(item: DatasetFile) -> tuple[str, str]:
+    role = item.role or "unknown"
+    suffix = PurePosixPath(item.path).suffix.lower() or "[no extension]"
+    return role, suffix
+
+
+def _render_inventory_context(files: list[DatasetFile]) -> str:
+    if not files:
+        return "  Inventory summary: 0 files\n  Inventory sample: (empty)"
+
+    total_size = sum(max(0, item.size) for item in files)
+    all_groups: Counter[tuple[str, str]] = Counter(_inventory_group(item) for item in files)
+
+    # Pick at least one representative of as many role/type groups as possible,
+    # then fill the remaining slots in stable catalog order.
+    selected_indexes: list[int] = []
+    represented_groups: set[tuple[str, str]] = set()
+    for index, item in enumerate(files):
+        group = _inventory_group(item)
+        if group in represented_groups:
+            continue
+        represented_groups.add(group)
+        selected_indexes.append(index)
+        if len(selected_indexes) >= DATASET_CONTEXT_FILE_LIMIT:
+            break
+    if len(selected_indexes) < DATASET_CONTEXT_FILE_LIMIT:
+        selected_set = set(selected_indexes)
+        for index in range(len(files)):
+            if index in selected_set:
+                continue
+            selected_indexes.append(index)
+            if len(selected_indexes) >= DATASET_CONTEXT_FILE_LIMIT:
+                break
+    selected_indexes.sort()
+
+    selected = [files[index] for index in selected_indexes]
+    selected_index_set = set(selected_indexes)
+    omitted = [item for index, item in enumerate(files) if index not in selected_index_set]
+    omitted_groups: Counter[tuple[str, str]] = Counter(_inventory_group(item) for item in omitted)
+    omitted_sizes: Counter[tuple[str, str]] = Counter()
+    for item in omitted:
+        omitted_sizes[_inventory_group(item)] += max(0, item.size)
+
+    group_summary = ", ".join(
+        f"{role}/{suffix}: {count}"
+        for (role, suffix), count in all_groups.most_common(DATASET_CONTEXT_GROUP_LIMIT)
+    )
+    sample = "\n".join(
+        "  - "
+        + _bounded_context_text(item.path, DATASET_CONTEXT_PATH_CHARS)
+        + f" ({item.role}, {item.size} bytes)"
+        for item in selected
+    )
+    lines = [
+        f"  Inventory summary: {len(files)} files, {total_size} bytes total",
+        f"  Inventory groups: {group_summary or '(none)'}",
+        f"  Inventory sample ({len(selected)} of {len(files)} files):",
+        sample or "  - (empty)",
+    ]
+    if omitted:
+        omitted_summary = ", ".join(
+            f"{role}/{suffix}: {count} files, {omitted_sizes[(role, suffix)]} bytes"
+            for (role, suffix), count in omitted_groups.most_common(DATASET_CONTEXT_GROUP_LIMIT)
+        )
+        lines.extend([
+            f"  Omitted from prompt: {len(omitted)} files ({omitted_summary})",
+            "  The sample is representative, not exhaustive. For an exact lookup, inspect the "
+            "read-only mounted directory with one compact find/list command; do not install tools.",
+        ])
+    return "\n".join(lines)
+
+
 def render_dataset_context(datasets: list[MountedDataset]) -> str:
     if not datasets:
         return ""
     blocks = []
     for dataset in datasets:
-        inventory = "\n".join(f"  - {item.path} ({item.role}, {item.size} bytes)" for item in dataset.files)
-        metadata = json.dumps(dataset.metadata, ensure_ascii=False, indent=2)
+        inventory = _render_inventory_context(dataset.files)
+        metadata = _bounded_context_text(
+            json.dumps(dataset.metadata, ensure_ascii=False, indent=2, default=str),
+            DATASET_CONTEXT_METADATA_CHARS,
+        )
         blocks.append(
             f"- Dataset ID: {dataset.dataset_id}\n"
             f"  Data center: {dataset.data_center_name} ({dataset.data_center_id})\n"
-            f"  Name: {dataset.name}\n"
-            f"  Description: {dataset.description}\n"
-            f"  Spatial coverage: {dataset.spatial_coverage}\n"
-            f"  Temporal coverage: {dataset.temporal_coverage}\n"
-            f"  Data type: {dataset.data_type}\n"
+            f"  Name: {_bounded_context_text(dataset.name, DATASET_CONTEXT_FIELD_CHARS)}\n"
+            f"  Description: {_bounded_context_text(dataset.description, DATASET_CONTEXT_FIELD_CHARS)}\n"
+            f"  Spatial coverage: {_bounded_context_text(dataset.spatial_coverage, DATASET_CONTEXT_FIELD_CHARS)}\n"
+            f"  Temporal coverage: {_bounded_context_text(dataset.temporal_coverage, DATASET_CONTEXT_FIELD_CHARS)}\n"
+            f"  Data type: {_bounded_context_text(dataset.data_type, DATASET_CONTEXT_FIELD_CHARS)}\n"
             f"  Read-only mounted directory: {dataset.sandbox_path}\n"
             f"  Write generated outputs to: /home/ubuntu/output\n"
-            f"  Internal file inventory:\n{inventory}\n"
+            f"{inventory}\n"
             f"  Metadata: {metadata}"
         )
     return (

@@ -166,7 +166,11 @@ class FileService:
             sudo: Whether to use sudo privileges
         """
         # First read file content
-        file_result = await self.read_file(file, sudo=sudo)
+        # Replacement must operate on the complete file.  ``read_file`` is
+        # intentionally capped for API display by default; reusing that cap
+        # here would append "(truncated)" and then overwrite large files with
+        # the shortened preview.
+        file_result = await self.read_file(file, sudo=sudo, max_length=None)
         content = file_result.content
         
         # Calculate replacement count
@@ -199,7 +203,9 @@ class FileService:
             sudo: Whether to use sudo privileges
         """
         # Read file
-        file_result = await self.read_file(file, sudo=sudo)
+        # Search the complete file rather than the 10,000-character preview
+        # returned by the public read operation.
+        file_result = await self.read_file(file, sudo=sudo, max_length=None)
         content = file_result.content
         
         # Process line by line

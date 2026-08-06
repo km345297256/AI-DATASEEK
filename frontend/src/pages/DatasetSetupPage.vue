@@ -113,7 +113,7 @@
           >
             <ShieldCheck class="mt-0.5 size-4 shrink-0" />
             <span>
-              这是临时测试请求：提交内容不写入数据集数据库，可使用相同信息重复提交。真实目录只通过本次 POST 请求发送，不会写入 URL、localStorage 或 sessionStorage。
+              这是临时测试请求：服务端会保存一条按所有者隔离、24 小时后过期的提交记录，但不会加入长期数据集目录。真实目录只通过本次 POST 请求发送，不会写入 URL、localStorage 或 sessionStorage，也不会在响应中返回。
             </span>
           </div>
         </section>

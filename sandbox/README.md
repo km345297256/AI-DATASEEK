@@ -41,6 +41,15 @@ The sandbox environment provides the following core features:
    - VNC remote desktop service
    - WebSocket interface
 5. **Process Management**: Manage component processes through Supervisor
+6. **Offline geoscience analysis**:
+   - Multidimensional NetCDF/HDF5 and Zarr analysis with Xarray, Dask and SciPy
+   - Vector, CRS and raster workflows with GeoPandas, Pyogrio, Shapely, PyProj,
+     Rasterio and Rioxarray
+   - Preinstalled `ncdump`, `h5dump`, `projinfo` and GDAL command-line tools
+
+The analysis stack is installed and locked when the image is built. Dataset
+tasks should not run `pip install`; this keeps startup latency and results
+deterministic, including in sandboxes without outbound network access.
 
 ## System Requirements
 

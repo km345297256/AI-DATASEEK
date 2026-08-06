@@ -14,7 +14,7 @@ export const normalizeFilePath = (path: string) => {
 };
 
 const filePathOf = (file: FileInfo) => String(
-  file.file_path || file.metadata?.file_path || file.filename || '',
+  file.relative_path || file.filename || '',
 ).replace(/\\/g, '/');
 
 const basename = (path: string) => path.split('/').pop() || path;

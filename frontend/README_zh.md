@@ -32,7 +32,7 @@ node --test tests/*.test.mjs
 
 ```bash
 docker build -t ai-dataseek-frontend .
-docker run --rm -p 7100:80 -e BACKEND_URL=http://backend:8000 ai-dataseek-frontend
+docker run --rm -p 7000:80 -e BACKEND_URL=http://backend:8000 ai-dataseek-frontend
 ```
 
 完整部署请使用仓库根目录的 `docker-compose.yml`。

@@ -30,6 +30,17 @@ class Memory(BaseModel):
         if len(self.messages) > 0:  
             return self.messages[-1]
         return None
+
+    def reset_context(self, system_message: AnyMessage) -> None:
+        """Start a fresh model context while keeping the agent instructions.
+
+        Execution memories are persisted for recovery, but replaying prior user
+        turns and their shell/tool transcripts into every later step makes model
+        latency grow without bound.  Step-to-step continuity is carried by the
+        structured ``Plan`` results instead, so a new execution boundary should
+        contain only the current system instructions before its request is added.
+        """
+        self.messages = [system_message]
     
     def roll_back(self) -> None:
         """Roll back memory"""

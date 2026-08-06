@@ -108,7 +108,10 @@
             <div class="mt-3 overflow-hidden rounded-md border border-[var(--border-main)] bg-[var(--background-menu-white)]">
               <div v-for="location in selected.locations" :key="location.location_id" class="flex items-start gap-3 border-b border-[var(--border-main)] px-3 py-3 last:border-0">
                 <Server class="mt-0.5 size-4 shrink-0 text-[var(--icon-secondary)]" />
-                <div class="min-w-0 flex-1"><div class="text-sm">{{ nodeName(location.node_id) }} · {{ location.storage_type === 'managed_upload' ? '平台托管' : '服务器路径' }}</div><div class="mt-1 break-all font-mono text-xs text-[var(--text-tertiary)]">{{ location.source_path }}</div></div>
+                <div class="min-w-0 flex-1">
+                  <div class="text-sm">{{ nodeName(location.node_id) }} · {{ location.storage_type === 'managed_upload' ? '平台托管' : '服务器路径' }}</div>
+                  <div class="mt-1 text-xs text-[var(--text-tertiary)]">{{ location.storage_type === 'managed_upload' ? '由平台管理存储位置' : `路径已安全登记 · 版本 ${location.version}` }}</div>
+                </div>
                 <span class="status-chip">只读</span>
                 <button v-if="location.storage_type === 'host_path'" class="icon-button small" title="移除此位置" @click="removeLocation(location.location_id)"><X class="size-4" /></button>
               </div>

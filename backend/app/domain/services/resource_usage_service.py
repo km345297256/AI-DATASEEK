@@ -8,7 +8,9 @@ from typing import Any, Dict, Optional
 
 import httpx
 
+from app.core.config import get_settings
 from app.domain.models.execution_node import ExecutionNodeStatus, ExecutionNodeType
+from app.infrastructure.external.sandbox.container_identity import is_sandbox_container_name
 from app.infrastructure.external.sandbox.node_health import resolve_node_credential
 from app.infrastructure.external.file.factory import get_file_storage
 from app.infrastructure.models.documents import APIKeyDocument, ExecutionNodeDocument, SandboxRecordDocument, SessionDocument, TokenUsageDocument, UserDocument
@@ -119,17 +121,25 @@ class ResourceUsageService:
                 "health": health,
                 "usage": usage,
             }
-        except Exception as exc:
-            return {"available": False, "error": str(exc)}
+        except Exception:
+            return {
+                "available": False,
+                "error": "File storage metrics are unavailable",
+            }
 
     def _get_docker_usage(self, *, include_sandboxes: bool = False) -> Dict[str, Any]:
         try:
             import docker
 
+            name_prefix = get_settings().sandbox_name_prefix
             client = docker.from_env(timeout=3)
             try:
                 containers = client.containers.list(all=True)
-                sandbox_containers = [container for container in containers if container.name.startswith("sandbox-")]
+                sandbox_containers = [
+                    container
+                    for container in containers
+                    if is_sandbox_container_name(container.name, name_prefix)
+                ]
                 sandboxes = self._get_local_sandbox_container_usage(client) if include_sandboxes else []
                 return {
                     "available": True,
@@ -146,18 +156,22 @@ class ResourceUsageService:
                 close = getattr(client, "close", None)
                 if callable(close):
                     close()
-        except Exception as exc:
+        except Exception:
             return {
                 "available": False,
-                "error": str(exc),
+                "error": "Docker metrics are unavailable",
             }
 
     def _get_local_sandbox_container_usage(self, client) -> list[Dict[str, Any]]:
+        name_prefix = get_settings().sandbox_name_prefix
         containers = client.api.containers(all=True, size=True)
         sandbox_containers = [
             container
             for container in containers
-            if any((name or "").lstrip("/").startswith("sandbox-") for name in container.get("Names", []))
+            if any(
+                is_sandbox_container_name(name, name_prefix)
+                for name in container.get("Names", [])
+            )
         ]
         def build_item(container: Dict[str, Any]) -> Dict[str, Any]:
             name = self._container_display_name(container)
@@ -186,8 +200,8 @@ class ResourceUsageService:
                 try:
                     stats = client.api.stats(container_id, stream=False)
                     item.update(self._parse_container_stats(stats))
-                except Exception as exc:
-                    item["stats_error"] = str(exc)
+                except Exception:
+                    item["stats_error"] = "Sandbox metrics are unavailable"
             return item
 
         if not sandbox_containers:
@@ -328,12 +342,16 @@ class ResourceUsageService:
                 "type": node.type,
                 "status": node.status,
                 "enabled": node.enabled,
-                "base_url": node.base_url,
+                "base_url": None,
                 "capacity": node.capacity.model_dump(),
-                "health": node.health.model_dump(),
+                "health": node.health.model_dump(exclude={"raw"}),
                 "last_checked_at": node.last_checked_at,
                 "last_heartbeat_at": node.last_heartbeat_at,
-                "failure_reason": node.failure_reason,
+                "failure_reason": (
+                    "Execution node health check failed"
+                    if node.failure_reason
+                    else None
+                ),
             }
             for node in nodes
         ]
@@ -356,7 +374,7 @@ class ResourceUsageService:
                     response = await client.get(f"{node.base_url.rstrip('/')}/sandboxes", headers=headers)
                     response.raise_for_status()
                     payload = response.json()
-            except Exception as exc:
+            except Exception:
                 usage.append({
                     "id": None,
                     "name": node.name,
@@ -364,7 +382,7 @@ class ResourceUsageService:
                     "node_id": node.node_id,
                     "node_name": node.name,
                     "source": "worker_agent",
-                    "stats_error": str(exc),
+                    "stats_error": "Worker sandbox metrics are unavailable",
                 })
                 continue
             if not isinstance(payload, list):

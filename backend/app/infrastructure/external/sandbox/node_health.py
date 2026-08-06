@@ -8,7 +8,9 @@ import anyio
 import docker
 import httpx
 
+from app.core.config import get_settings
 from app.domain.models.execution_node import ExecutionNodeAuthType, ExecutionNodeHealth, ExecutionNodeStatus, ExecutionNodeType
+from app.infrastructure.external.sandbox.container_identity import is_sandbox_container_name
 from app.infrastructure.models.documents import ExecutionNodeDocument, NodeCredentialDocument, SandboxRecordDocument
 
 
@@ -99,12 +101,13 @@ def _update_capacity_from_usage(doc: ExecutionNodeDocument, usage: dict) -> None
 def _local_sandbox_container_states() -> Optional[dict[str, str]]:
     client = None
     try:
+        name_prefix = get_settings().sandbox_name_prefix
         client = docker.from_env()
         containers = client.containers.list(all=True)
         return {
             container.name: container.status
             for container in containers
-            if container.name.startswith("sandbox-")
+            if is_sandbox_container_name(container.name, name_prefix)
         }
     except Exception:
         return None
@@ -322,7 +325,13 @@ async def _check_remote_docker_node(doc: ExecutionNodeDocument) -> None:
             client.close()
 
     info, containers = await anyio.to_thread.run_sync(inspect)
-    sandbox_containers = [container for container in containers if container.name.startswith("sandbox-")]
+    runtime_config = doc.runtime_config if isinstance(doc.runtime_config, dict) else {}
+    name_prefix = runtime_config.get("name_prefix") or get_settings().sandbox_name_prefix
+    sandbox_containers = [
+        container
+        for container in containers
+        if is_sandbox_container_name(container.name, name_prefix)
+    ]
     running_sandboxes = sum(1 for container in sandbox_containers if container.status == "running")
     paused_sandboxes = sum(1 for container in sandbox_containers if container.status == "paused")
     memory_total = info.get("MemTotal")

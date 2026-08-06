@@ -16,6 +16,7 @@ from app.interfaces.schemas.file import (
     LargeUploadInitResponse,
     LargeUploadPartUploadResponse,
     LargeUploadStatusResponse,
+    public_filename,
 )
 from app.interfaces.schemas.resource import AccessTokenRequest, SignedUrlResponse
 
@@ -173,7 +174,7 @@ async def download_file_with_signature(
     # Encode filename properly for Content-Disposition header
     # Use URL encoding for non-ASCII characters to ensure latin-1 compatibility
     import urllib.parse
-    encoded_filename = urllib.parse.quote(file_info.filename, safe='')
+    encoded_filename = urllib.parse.quote(public_filename(file_info.filename), safe='')
     
     headers = {
         'Content-Disposition': f'attachment; filename*=UTF-8\'\'{encoded_filename}'
@@ -205,7 +206,7 @@ async def download_file(
     # Encode filename properly for Content-Disposition header
     # Use URL encoding for non-ASCII characters to ensure latin-1 compatibility
     import urllib.parse
-    encoded_filename = urllib.parse.quote(file_info.filename, safe='')
+    encoded_filename = urllib.parse.quote(public_filename(file_info.filename), safe='')
     
     headers = {
         'Content-Disposition': f'attachment; filename*=UTF-8\'\'{encoded_filename}'

@@ -23,11 +23,19 @@ async def exec_command(request: ShellExecRequest):
         exec_dir=request.exec_dir,
         command=request.command
     )
-    
+
+    succeeded = result.status != "completed" or result.returncode == 0
+    if result.status == "running":
+        message = "Command started and is still running"
+    elif succeeded:
+        message = "Command completed successfully"
+    else:
+        message = f"Command failed with return code: {result.returncode}"
+
     # Construct response
     return Response(
-        success=True,
-        message="Command executed",
+        success=succeeded,
+        message=message,
         data=result.model_dump()
     )
 
@@ -58,13 +66,16 @@ async def wait_for_process(request: ShellWaitRequest):
         seconds=request.seconds
     )
     
+    succeeded = result.status != "completed" or result.returncode == 0
     if result.status == "running":
         message = "Process is still running"
+    elif succeeded:
+        message = "Process completed successfully"
     else:
-        message = f"Process completed, return code: {result.returncode}"
+        message = f"Process failed with return code: {result.returncode}"
 
     return Response(
-        success=True,
+        success=succeeded,
         message=message,
         data=result.model_dump()
     )

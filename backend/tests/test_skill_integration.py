@@ -436,6 +436,9 @@ async def test_artifact_discovery_syncs_data_files_beyond_old_suffix_and_count_l
         "/home/ubuntu/output/brightness_temperature/array.npy",
         "/home/ubuntu/output/brightness_temperature/report.html",
         "/home/ubuntu/output/.cache/ignored.csv",
+        "/home/ubuntu/output/unpacked/copied-source.tif",
+        "/home/ubuntu/output/unpacked/unpack-manifest.json",
+        "/home/ubuntu/output/unpacked_archives/nested-source.xml",
         "/home/ubuntu/output/brightness_temperature/raw.bin",
         "/home/ubuntu/outside-output.csv",
     ]
@@ -471,6 +474,9 @@ async def test_artifact_discovery_syncs_data_files_beyond_old_suffix_and_count_l
     assert "/home/ubuntu/output/brightness_temperature/array.npy" in synced_paths
     assert "/home/ubuntu/output/brightness_temperature/report.html" in synced_paths
     assert "/home/ubuntu/output/.cache/ignored.csv" not in synced_paths
+    assert "/home/ubuntu/output/unpacked/copied-source.tif" not in synced_paths
+    assert "/home/ubuntu/output/unpacked/unpack-manifest.json" not in synced_paths
+    assert "/home/ubuntu/output/unpacked_archives/nested-source.xml" not in synced_paths
     assert "/home/ubuntu/output/brightness_temperature/raw.bin" not in synced_paths
     assert "/home/ubuntu/outside-output.csv" not in synced_paths
 

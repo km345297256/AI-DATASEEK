@@ -26,7 +26,7 @@ Browser -> Frontend -> Backend -> MongoDB / Redis / MinIO
                                   -> dataset directory (read-only)
 ```
 
-The production stack uses port `7100`; the isolated development and third-party integration stack uses port `7000`.
+The stable integration stack uses port `7000`; the isolated development stack uses port `7100`.
 
 ## Quick start
 
@@ -38,7 +38,7 @@ cp .env.example .env
 ./run.sh up -d --build
 ```
 
-Open `http://localhost:7100`.
+Open `http://localhost:7000`.
 
 AI-DataSeek has a fixed no-login access model. Browser and API requests do not
 use Bearer tokens or `X-API-Key`; every caller operates as the same built-in
@@ -62,7 +62,7 @@ cp .env.example .env
 
 Development defaults:
 
-- Frontend (third-party integration endpoint): `http://localhost:7000`
+- Frontend (development endpoint): `http://localhost:7100`
 - Backend: `http://localhost:8001`
 - MongoDB: `localhost:27018`
 - MinIO API/console: `localhost:9010` / `localhost:9011`

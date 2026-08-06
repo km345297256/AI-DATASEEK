@@ -5,14 +5,14 @@
 本文档用于指导第三方业务系统向 AI-DataSeek 提交服务器数据集目录，并将用户跳转至 `/dataset/seek/:datasetId` 页面开展科学数据探查分析。
 
 - 接口版本：`v1`
-- 示例服务地址：`http://39.106.98.67:7100`
-- API 基础地址：`http://39.106.98.67:7100/api/v1`
+- 示例服务地址：`http://39.106.98.67:7000`
+- API 基础地址：`http://39.106.98.67:7000/api/v1`
 - 请求及响应编码：`UTF-8`
 - 请求数据格式：`application/json`
 
 > `/dataset/setup` 页面仅用于人工联调和模拟第三方调用。它不是正式接入链路的前置步骤。第三方系统应直接调用本文档中的 API，然后自行把浏览器重定向到探查页面。
 
-> `7100` 是 AI-DataSeek 的默认端口，用于与原系统的 `7000` 端口并行运行。实际接入时请统一替换为正式部署域名或地址。
+> `7000` 是 AI-DataSeek 的稳定联测端口；`7100` 是开发端口。第三方联调默认使用稳定端口，实际接入时请统一替换为正式部署域名或地址。
 
 > **安全边界：** AI-DataSeek 固定为免登录系统，不提供应用层调用者认证。任何能够访问服务的客户端都以同一个系统管理员身份操作。本文示例仅适用于可信网络；接入公网前必须在网络边界增加访问控制并启用 HTTPS。
 
@@ -32,7 +32,7 @@
 4. 第三方服务将用户重定向至：
 
    ```text
-   http://39.106.98.67:7100/dataset/seek/{dataset_id}
+   http://39.106.98.67:7000/dataset/seek/{dataset_id}
    ```
 
 5. 页面加载数据集信息和四个简短的分析建议，并在用户发起分析时将整个目录只读挂载到沙箱。
@@ -79,11 +79,11 @@ AI-DataSeek 不提供账号登录，也不区分浏览器用户、第三方系�
 
 ### 3.3 临时数据生命周期
 
-提交元数据会在服务端数据库中临时保存，以保证 7100 后端重启后链接仍然可用；记录到期后自动清理。经安全校验的真实服务器目录只保存在服务端，不会出现在接口响应、URL、`localStorage` 或 `sessionStorage` 中；跳转 URL 中只包含不透明的临时 `dataset_id`，页面可能使用该 ID 在 `localStorage` 中关联当前分析会话。
+提交元数据会在服务端数据库中临时保存，以保证稳定联测后端重启后链接仍然可用；记录到期后自动清理。经安全校验的真实服务器目录只保存在服务端，不会出现在接口响应、URL、`localStorage` 或 `sessionStorage` 中；跳转 URL 中只包含不透明的临时 `dataset_id`，页面可能使用该 ID 在 `localStorage` 中关联当前分析会话。
 
 - 临时数据集默认有效期：24 小时（当前版本不可通过该提交接口调整）；
 - 服务最多保留 128 条临时数据集、每个调用方最多保留 16 条；达到上限后会先淘汰相应范围内最早创建的记录；
-- 7100 后端服务重启不会使未过期的 `dataset_id` 失效；共享同一 MongoDB 的多个后端副本也可以读取同一条临时提交；
+- 稳定联测后端服务重启不会使未过期的 `dataset_id` 失效；共享同一 MongoDB 的多个后端副本也可以读取同一条临时提交；
 - 到达有效期后，读取接口会立即按已过期处理；MongoDB 的 TTL 清理任务随后删除服务端记录；
 - 相同参数可以重复提交，每次都会返回新的 `dataset_id`；
 - `external_id` 仅作为第三方业务标识回显，不做唯一性校验或幂等控制。
@@ -142,7 +142,7 @@ Content-Type: application/json
 
 ```bash
 curl --request POST \
-  'http://39.106.98.67:7100/api/v1/datasets/submissions' \
+  'http://39.106.98.67:7000/api/v1/datasets/submissions' \
   --header 'Content-Type: application/json' \
   --data-raw '{
     "external_id": "7994ef4b-3c3a-48c1-8d85-8c2143d0f76a",
@@ -164,7 +164,7 @@ import express from 'express';
 
 const app = express();
 const AI_DATASEEK_BASE_URL = process.env.AI_DATASEEK_BASE_URL
-  ?? 'http://39.106.98.67:7100';
+  ?? 'http://39.106.98.67:7000';
 
 async function submitDataset() {
   const response = await fetch(
@@ -216,7 +216,7 @@ from flask import Flask, redirect
 
 AI_DATASEEK_BASE_URL = os.getenv(
     "AI_DATASEEK_BASE_URL",
-    "http://39.106.98.67:7100",
+    "http://39.106.98.67:7000",
 ).rstrip("/")
 
 
@@ -308,20 +308,20 @@ HTTP 状态码：`200 OK`
 提交成功后，对 `data.dataset_id` 执行 URL 编码并构造：
 
 ```text
-http://39.106.98.67:7100/dataset/seek/{URL-encoded dataset_id}
+http://39.106.98.67:7000/dataset/seek/{URL-encoded dataset_id}
 ```
 
 示例：
 
 ```text
-http://39.106.98.67:7100/dataset/seek/tds_URLvjM3-64XUXzNkB8q0BDQZ
+http://39.106.98.67:7000/dataset/seek/tds_URLvjM3-64XUXzNkB8q0BDQZ
 ```
 
 第三方 Web 服务可以返回：
 
 ```http
 HTTP/1.1 302 Found
-Location: http://39.106.98.67:7100/dataset/seek/tds_URLvjM3-64XUXzNkB8q0BDQZ
+Location: http://39.106.98.67:7000/dataset/seek/tds_URLvjM3-64XUXzNkB8q0BDQZ
 ```
 
 伪代码：

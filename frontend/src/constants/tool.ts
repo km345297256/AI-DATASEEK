@@ -4,10 +4,14 @@
 export const TOOL_FUNCTION_MAP: {[key: string]: string} = {
   // Shell tools
   "shell_exec": "Executing command",
+  "shell_run": "Executing command",
   "shell_view": "Viewing command output",
   "shell_wait": "Waiting for command completion",
   "shell_write_to_process": "Writing data to process",
   "shell_kill_process": "Terminating process",
+  "dataset_unpack": "Inspecting archive structure",
+  "dataset_inventory": "Inspecting dataset files",
+  "dataset_quicklook": "Exploring dataset",
   
   // File tools
   "file_read": "Reading file",
@@ -43,15 +47,37 @@ export const TOOL_FUNCTION_MAP: {[key: string]: string} = {
   "skill_create_from_session": "Creating skill"
 };
 
+/** Completed tool calls use a terminal label instead of a perpetual "running" label. */
+export const TOOL_FUNCTION_CALLED_MAP: {[key: string]: string} = {
+  "shell_exec": "Command execution finished",
+  "shell_run": "Command execution finished",
+  "shell_view": "Command output updated",
+  "shell_wait": "Command wait finished",
+  "shell_write_to_process": "Process input sent",
+  "shell_kill_process": "Process termination finished",
+  "dataset_unpack": "Archive inspection finished",
+  "dataset_inventory": "Dataset inventory finished",
+  "dataset_quicklook": "Dataset exploration finished",
+  "file_read": "File read finished",
+  "file_write": "File write finished",
+  "file_str_replace": "File replacement finished",
+  "file_find_in_content": "File search finished",
+  "file_find_by_name": "File lookup finished",
+};
+
 /**
  * Display name mapping for tool function parameters
  */
 export const TOOL_FUNCTION_ARG_MAP: {[key: string]: string} = {
   "shell_exec": "command",
+  "shell_run": "command",
   "shell_view": "shell",
   "shell_wait": "shell",
   "shell_write_to_process": "input",
   "shell_kill_process": "shell",
+  "dataset_unpack": "archive_path",
+  "dataset_inventory": "input_path",
+  "dataset_quicklook": "input_path",
   "file_read": "file",
   "file_write": "file",
   "file_str_replace": "file",
