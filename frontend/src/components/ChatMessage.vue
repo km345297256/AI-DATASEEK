@@ -62,7 +62,7 @@
     </div>
     <div v-else
       class="max-w-none p-0 m-0 prose prose-sm sm:prose-base dark:prose-invert [&_pre:not(.shiki)]:!bg-[var(--fill-tsp-white-light)] [&_pre:not(.shiki)]:text-[var(--text-primary)] text-base text-[var(--text-primary)]"
-      v-html="renderMarkdown(messageContent.content)"></div>
+      v-html="renderMarkdown(visibleAssistantContent)"></div>
   </div>
   <ToolUse v-else-if="message.type === 'tool'" :tool="toolContent" @click="handleToolClick(toolContent)" />
   <div v-else-if="message.type === 'step'" class="flex flex-col">
@@ -144,6 +144,7 @@ import { ToolContent, StepContent } from '../types/message';
 import { useRelativeTime } from '../composables/useTime';
 import AttachmentsMessage from './AttachmentsMessage.vue';
 import { copyToClipboard } from '../utils/dom';
+import { stripHiddenDatasetResultNotices } from '../utils/datasetResultPresentation';
 import { showErrorToast } from '../utils/toast';
 
 
@@ -192,6 +193,7 @@ onUnmounted(() => {
 // For backward compatibility, provide the original computed properties
 const stepContent = computed(() => props.message.content as StepContent);
 const messageContent = computed(() => props.message.content as MessageContent);
+const visibleAssistantContent = computed(() => stripHiddenDatasetResultNotices(messageContent.value.content));
 const safetyReview = computed(() => messageContent.value.metadata?.safety_review);
 const safetyUnavailable = computed(() => safetyReview.value?.categories.includes('safety_review_unavailable') ?? false);
 
