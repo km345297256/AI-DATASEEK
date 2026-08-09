@@ -1409,6 +1409,32 @@ async def test_successful_unpack_is_a_terminal_file_inventory_capability():
     agent.ask_with_messages.assert_not_awaited()
 
 
+def test_catalog_inventory_omits_internal_source_and_limit_notices():
+    payload = {
+        "source_kind": "catalog",
+        "source_archive": "Catalog dataset",
+        "summary": {
+            "archive_count": 0,
+            "file_count": 1,
+            "expanded_bytes": 1024,
+        },
+        "archives": [],
+        "files": [{"path": "tables/values.csv", "size": 1024}],
+    }
+
+    rendered_zh = ExecutionAgent._render_unpack_inventory(payload, language="zh")
+    assert "values.csv" in rendered_zh
+    assert "清单包含 1 个文件" in rendered_zh
+    assert "无需调用模型判断" not in rendered_zh
+    assert "方法与限制" not in rendered_zh
+
+    rendered_en = ExecutionAgent._render_unpack_inventory(payload, language="en")
+    assert "values.csv" in rendered_en
+    assert "The inventory contains 1 file(s)" in rendered_en
+    assert "no model decision" not in rendered_en
+    assert "Method and limits" not in rendered_en
+
+
 def test_specific_question_does_not_finish_at_quicklook_before_coverage_answer():
     agent = object.__new__(ExecutionAgent)
     agent._dataset_fast_path_mode = True

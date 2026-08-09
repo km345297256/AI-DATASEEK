@@ -126,6 +126,8 @@ export default {
   'Add content': '添加内容',
   'Upload file': '上传文件',
   'Use skill': '使用技能',
+  'Send message': '发送消息',
+  'Stop task': '停止任务',
   'Upload large files through backend-proxied multipart upload. The client never receives the object storage address.': '通过后端代理分片上传大文件，客户端不会拿到对象存储地址。',
   // Plugins
   'Plugins': '插件',

@@ -78,6 +78,8 @@ import { useI18n } from 'vue-i18n';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { getSkillPreferences, listSkills, uploadSkill, type SkillInfo } from '@/api/skill';
 import { showErrorToast, showSuccessToast } from '@/utils/toast';
+import { eventBus } from '@/utils/eventBus';
+import { EVENT_SKILL_CATALOG_UPDATED } from '@/constants/event';
 
 const props = defineProps<{
   open: boolean;
@@ -139,6 +141,7 @@ const handleUpload = async (event: Event) => {
   try {
     const uploaded = await uploadSkill(file);
     await loadSkills();
+    eventBus.emit(EVENT_SKILL_CATALOG_UPDATED);
     showSuccessToast(t('Skill uploaded'));
     emit('update:selectedSkills', [...new Set([...selectedSkills.value, ...uploaded.map((skill) => skill.name)])]);
   } catch (error) {

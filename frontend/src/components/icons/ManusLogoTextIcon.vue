@@ -5,7 +5,7 @@
     aria-label="AI-DataSeek"
   >
     <img
-      src="/favicon.ico"
+      src="/ai-dataseek-logo.png"
       alt=""
       class="shrink-0 object-contain"
       :style="{ width: iconSize, height: iconSize }"

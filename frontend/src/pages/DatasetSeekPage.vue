@@ -26,7 +26,7 @@
             mobileCatalogOpen ? '' : 'catalog-mobile-header-hidden',
           ]"
         >
-          <ScanSearch class="size-5 shrink-0 text-[#226b51]" aria-hidden="true" />
+          <img src="/ai-dataseek-logo.png" alt="" class="size-5 shrink-0 object-contain" aria-hidden="true" />
           <h1 class="min-w-0 flex-1 truncate text-sm font-semibold">科学数据探查</h1>
         </div>
         <button
@@ -73,10 +73,6 @@
 
           <dl class="space-y-4 border-y border-[var(--border-main)] py-4">
             <div>
-              <dt class="text-[11px] text-[var(--text-tertiary)]">外部数据集 ID</dt>
-              <dd class="mt-1 break-all font-mono text-xs text-[var(--text-secondary)]">{{ dataset.external_id || '未提供' }}</dd>
-            </div>
-            <div>
               <dt class="text-[11px] text-[var(--text-tertiary)]">数据集摘要</dt>
               <dd
                 ref="datasetSummaryRef"
@@ -105,12 +101,22 @@
               <div
                 v-for="(file, index) in visibleDatasetFiles"
                 :key="`${displayFileName(file.name)}-${index}`"
-                class="flex items-center gap-2.5 border-b border-[var(--border-main)] bg-[var(--background-gray-main)] px-3 py-2.5 last:border-b-0"
+                class="group flex items-center gap-2.5 border-b border-[var(--border-main)] bg-[var(--background-gray-main)] px-3 py-2.5 transition-colors last:border-b-0 hover:bg-[var(--fill-tsp-white-light)]"
               >
                 <FileText class="size-4 shrink-0 text-[#2b7659]" />
                 <span class="min-w-0 flex-1 truncate text-xs font-medium" :title="displayFileName(file.name)">
                   {{ displayFileName(file.name) }}
                 </span>
+                <button
+                  type="button"
+                  class="pointer-events-none -my-1.5 flex size-7 shrink-0 items-center justify-center rounded-md text-[var(--icon-secondary)] opacity-0 transition-[color,background-color,opacity] hover:bg-[var(--fill-tsp-white-dark)] hover:text-[var(--icon-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2b7659]/40 group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100 max-sm:pointer-events-auto max-sm:opacity-100"
+                  :title="copiedDatasetFileIndex === index ? `已复制 ${displayFileName(file.name)}` : `复制文件名 ${displayFileName(file.name)}`"
+                  :aria-label="copiedDatasetFileIndex === index ? `已复制 ${displayFileName(file.name)}` : `复制文件名 ${displayFileName(file.name)}`"
+                  @click.stop="copyDatasetFileName(file.name, index)"
+                >
+                  <Check v-if="copiedDatasetFileIndex === index" class="size-3.5 text-[#2b7659]" />
+                  <Copy v-else class="size-3.5" />
+                </button>
               </div>
             </div>
             <button
@@ -125,7 +131,6 @@
             <div v-if="!dataset.files.length" class="mt-2.5 rounded-lg border border-dashed border-[var(--border-main)] px-3 py-6 text-center text-xs text-[var(--text-tertiary)]">
               暂无可展示的文件名
             </div>
-            <p class="mt-2 text-[10px] leading-4 text-[var(--text-tertiary)]">仅显示文件名，服务器存储路径不会在页面中公开。</p>
           </section>
         </div>
 
@@ -143,14 +148,78 @@
       class="flex min-h-0 min-w-0 max-w-full flex-1 flex-col overflow-hidden bg-[var(--background-gray-main)] transition-[padding] duration-200"
       :class="mobileCatalogOpen ? '' : 'catalog-main-with-rail'"
     >
-      <header class="mobile-safe-top flex h-16 shrink-0 items-center gap-3 border-b border-[var(--border-main)] bg-[var(--background-menu-white)] px-3 sm:px-5">
+      <header class="mobile-safe-top relative z-30 flex h-16 shrink-0 items-center gap-3 border-b border-[var(--border-main)] bg-[var(--background-menu-white)] px-3 sm:px-5">
         <div class="min-w-0 flex-1">
           <div class="truncate text-sm font-semibold">{{ dataset?.name || '科学数据探查' }}</div>
           <div class="mt-0.5 flex items-center gap-2 text-[10px] text-[var(--text-tertiary)]">
             <span class="truncate">{{ dataset?.data_type || '正在加载数据集' }}</span><span>·</span><span class="truncate">{{ selectedProfile?.name || 'AI-DataSeek 默认 Agent' }}</span>
           </div>
         </div>
-        <AgentSelector class="hidden sm:block" />
+        <div ref="historyMenuRef" class="relative shrink-0" @keydown.esc="historyOpen = false">
+          <button
+            type="button"
+            class="history-header-button"
+            :class="historyOpen ? 'bg-[var(--fill-tsp-white-main)] text-[var(--text-primary)]' : ''"
+            aria-label="历史任务"
+            title="历史任务"
+            aria-haspopup="dialog"
+            aria-controls="dataset-history-panel"
+            :aria-expanded="historyOpen"
+            @click="toggleHistory"
+          >
+            <History class="size-4 shrink-0" />
+            <span class="hidden max-w-[160px] truncate text-sm font-medium sm:block">历史任务</span>
+            <ChevronDown class="size-3.5 shrink-0 transition-transform" :class="historyOpen ? 'rotate-180' : ''" />
+          </button>
+
+          <div
+            v-if="historyOpen"
+            id="dataset-history-panel"
+            role="dialog"
+            aria-label="历史任务"
+            class="absolute right-0 top-full z-50 mt-2 flex max-h-[min(440px,70vh)] w-[calc(100vw-72px)] max-w-[360px] flex-col overflow-hidden rounded-xl border border-[var(--border-main)] bg-[var(--background-menu-white)] shadow-xl"
+          >
+            <div class="flex items-center justify-between border-b border-[var(--border-main)] px-4 py-3">
+              <div>
+                <div class="text-sm font-semibold">历史任务</div>
+                <div class="mt-0.5 text-[10px] text-[var(--text-tertiary)]">当前数据集的分析记录</div>
+              </div>
+              <button type="button" class="inline-flex h-8 items-center gap-1 rounded-md bg-[#225f48] px-2.5 text-xs text-white hover:bg-[#194d39]" @click="newConversationFromHistory">
+                <Plus class="size-3.5" />新任务
+              </button>
+            </div>
+            <div class="min-h-0 flex-1 overflow-y-auto p-2">
+              <div v-if="historyLoading" class="flex h-28 items-center justify-center text-xs text-[var(--text-tertiary)]">
+                <LoaderCircle class="mr-2 size-4 animate-spin" />正在读取历史任务
+              </div>
+              <div v-else-if="historySessions.length === 0" class="flex h-28 flex-col items-center justify-center gap-2 text-xs text-[var(--text-tertiary)]">
+                <History class="size-5" />暂无历史任务
+              </div>
+              <template v-else>
+                <button
+                  v-for="item in historySessions"
+                  :key="item.session_id"
+                  type="button"
+                  class="group/history mb-1 w-full rounded-lg border px-3 py-2.5 text-left transition-colors last:mb-0"
+                  :class="item.session_id === sessionId ? 'border-[#9bbdad] bg-[#f1f7f4] dark:bg-[#26372f]' : 'border-transparent hover:bg-[var(--fill-tsp-white-light)]'"
+                  @click="openHistorySession(item.session_id)"
+                >
+                  <div class="flex items-start gap-2.5">
+                    <div class="mt-1.5 size-2 shrink-0 rounded-full" :class="historyStatusClass(item.status)" />
+                    <div class="min-w-0 flex-1">
+                      <div class="truncate text-xs font-medium">{{ item.title || '数据集分析任务' }}</div>
+                      <p class="mt-1 line-clamp-2 text-[11px] leading-4 text-[var(--text-tertiary)]">{{ item.latest_message || '任务已创建，暂无回答' }}</p>
+                      <div class="mt-1.5 flex items-center gap-1 text-[10px] text-[var(--text-tertiary)]">
+                        <Clock3 class="size-3" />{{ formatHistoryTime(item.latest_message_at) }}
+                      </div>
+                    </div>
+                    <ChevronRight class="mt-2 size-3.5 shrink-0 text-[var(--icon-tertiary)] transition-transform group-hover/history:translate-x-0.5" />
+                  </div>
+                </button>
+              </template>
+            </div>
+          </div>
+        </div>
       </header>
 
       <div
@@ -164,7 +233,7 @@
         <div ref="timelineContentRef" class="mx-auto flex min-h-full w-full min-w-0 max-w-[800px] flex-col px-4 pb-8 pt-5 sm:px-6 sm:pt-7">
           <div v-if="messages.length === 0" class="flex flex-1 flex-col justify-center py-8 sm:py-12">
             <div v-if="dataset" class="max-w-2xl">
-              <div class="flex size-11 items-center justify-center rounded-lg bg-[#e4f0ea] text-[#226b51]"><ScanSearch class="size-5" /></div>
+              <img src="/ai-dataseek-logo.png" alt="" class="size-11 object-contain" aria-hidden="true" />
               <div class="mt-5 text-xs font-medium text-[#2b7659]">科学数据探查</div>
               <h1 class="mt-2 text-xl font-semibold leading-8 sm:text-2xl">围绕选定数据集开展智能问答</h1>
               <p class="mt-2.5 max-w-xl text-[13px] leading-6 text-[var(--text-secondary)]">Agent 将围绕“{{ dataset.name }}”及其完整数据内容开展分析。</p>
@@ -272,79 +341,23 @@
             <span class="truncate">{{ dataset.name }}</span>
             <span class="ml-auto hidden shrink-0 rounded bg-[#e8f3ee] px-1.5 py-0.5 text-[#286d52] sm:block">已选择</span>
           </div>
-          <div class="relative flex items-end gap-2">
-            <button
-              type="button"
-              class="history-button"
-              :class="historyOpen ? 'border-[#6b927f] bg-[#eef6f2] text-[#225f48] dark:bg-[#26372f]' : ''"
-              aria-label="历史任务"
-              title="历史任务"
-              @click="toggleHistory"
-            >
-              <History class="size-4" />
-              <span class="hidden text-xs font-medium sm:inline">历史任务</span>
-            </button>
-
-            <div
-              v-if="historyOpen"
-              class="absolute bottom-[calc(100%+10px)] left-0 z-30 flex max-h-[420px] w-[min(88vw,360px)] flex-col overflow-hidden rounded-xl border border-[var(--border-main)] bg-[var(--background-menu-white)] shadow-xl"
-            >
-              <div class="flex items-center justify-between border-b border-[var(--border-main)] px-4 py-3">
-                <div>
-                  <div class="text-sm font-semibold">历史任务</div>
-                  <div class="mt-0.5 text-[10px] text-[var(--text-tertiary)]">当前数据集的分析记录</div>
-                </div>
-                <button type="button" class="inline-flex h-8 items-center gap-1 rounded-md bg-[#225f48] px-2.5 text-xs text-white hover:bg-[#194d39]" @click="newConversationFromHistory">
-                  <Plus class="size-3.5" />新任务
-                </button>
-              </div>
-              <div class="min-h-0 flex-1 overflow-y-auto p-2">
-                <div v-if="historyLoading" class="flex h-28 items-center justify-center text-xs text-[var(--text-tertiary)]">
-                  <LoaderCircle class="mr-2 size-4 animate-spin" />正在读取历史任务
-                </div>
-                <div v-else-if="historySessions.length === 0" class="flex h-28 flex-col items-center justify-center gap-2 text-xs text-[var(--text-tertiary)]">
-                  <History class="size-5" />暂无历史任务
-                </div>
-                <template v-else>
-                  <button
-                    v-for="item in historySessions"
-                    :key="item.session_id"
-                    type="button"
-                    class="group/history mb-1 w-full rounded-lg border px-3 py-2.5 text-left transition-colors last:mb-0"
-                    :class="item.session_id === sessionId ? 'border-[#9bbdad] bg-[#f1f7f4] dark:bg-[#26372f]' : 'border-transparent hover:bg-[var(--fill-tsp-white-light)]'"
-                    @click="openHistorySession(item.session_id)"
-                  >
-                    <div class="flex items-start gap-2.5">
-                      <div class="mt-1.5 size-2 shrink-0 rounded-full" :class="historyStatusClass(item.status)" />
-                      <div class="min-w-0 flex-1">
-                        <div class="truncate text-xs font-medium">{{ item.title || '数据集分析任务' }}</div>
-                        <p class="mt-1 line-clamp-2 text-[11px] leading-4 text-[var(--text-tertiary)]">{{ item.latest_message || '任务已创建，暂无回答' }}</p>
-                        <div class="mt-1.5 flex items-center gap-1 text-[10px] text-[var(--text-tertiary)]">
-                          <Clock3 class="size-3" />{{ formatHistoryTime(item.latest_message_at) }}
-                        </div>
-                      </div>
-                      <ChevronRight class="mt-2 size-3.5 shrink-0 text-[var(--icon-tertiary)] transition-transform group-hover/history:translate-x-0.5" />
-                    </div>
-                  </button>
-                </template>
-              </div>
-            </div>
-
-            <div class="flex min-h-[54px] min-w-0 flex-1 items-end gap-2 rounded-xl border border-[var(--border-main)] bg-[var(--background-gray-main)] px-3 py-2 shadow-sm focus-within:border-[#6b927f]">
-              <textarea
-                v-model="inputMessage"
-                rows="1"
-                class="max-h-36 min-h-9 min-w-0 flex-1 resize-none bg-transparent py-1.5 text-sm leading-6 outline-none placeholder:text-[var(--text-tertiary)]"
-                placeholder="针对当前数据集提问..."
-                :disabled="isLoading || !dataset"
-                @compositionstart="inputComposing = true"
-                @compositionend="inputComposing = false"
-                @keydown="handleInputKeydown"
-              />
-              <button v-if="isLoading" type="button" class="send-button" aria-label="停止任务" title="停止任务" @click="stop"><Square class="size-4 fill-current" /></button>
-              <button v-else type="button" class="send-button" :disabled="!inputMessage.trim() || !dataset" aria-label="发送" title="发送" @click="submit"><ArrowUp class="size-4" /></button>
-            </div>
-          </div>
+          <ChatBox
+            class="!bg-transparent !pb-0"
+            v-model="inputMessage"
+            v-model:selected-skills="selectedSkills"
+            :rows="1"
+            :is-running="isLoading"
+            :attachments="datasetChatAttachments"
+            :disabled="isLoading || !dataset"
+            :show-file-actions="false"
+            :show-mcp-actions="false"
+            :placeholder="DATASET_CHAT_PLACEHOLDER"
+            skill-menu-placement="up"
+            submit-on-enter
+            compact-composer
+            @submit="submit"
+            @stop="stop"
+          />
           <p class="mt-1.5 text-center text-[10px] text-[var(--text-tertiary)]">回答由 Agent 基于本次关联数据目录生成，分析结果应结合数据质量与来源信息进行验证。</p>
         </div>
       </div>
@@ -359,25 +372,32 @@
     <FilePanel resizable :reserved-width="catalogCollapsed ? 56 : 304" />
   </div>
   <SessionFileList :session-id="sessionId || undefined" />
+  <SettingsDialog />
 </template>
 
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
-import { ArrowUp, ChevronDown, ChevronRight, CircleAlert, Clock3, Database, FileText, History, Image as ImageIcon, LoaderCircle, PanelLeftClose, PanelLeftOpen, Plus, RefreshCw, ScanSearch, Square } from 'lucide-vue-next';
+import { Check, ChevronDown, ChevronRight, CircleAlert, Clock3, Copy, Database, FileText, History, Image as ImageIcon, LoaderCircle, PanelLeftClose, PanelLeftOpen, Plus, RefreshCw } from 'lucide-vue-next';
 import datasetDefaultCover from '@/assets/dataset-default-cover.png';
-import AgentSelector from '@/components/AgentSelector.vue';
+import ChatBox from '@/components/ChatBox.vue';
 import ChatMessage from '@/components/ChatMessage.vue';
 import FilePanel from '@/components/FilePanel.vue';
 import SessionFileList from '@/components/SessionFileList.vue';
+import SettingsDialog from '@/components/settings/SettingsDialog.vue';
 import ToolPanel from '@/components/ToolPanel.vue';
 import { createSession, getSession, chatWithSession, stopSession } from '@/api/agent';
 import { API_CONFIG } from '@/api/client';
 import { generateDatasetSuggestedQuestions, getDataCenterDataset, listDatasetChatSessions, type DataCenterDataset, type DatasetChatSession } from '@/api/dataset';
 import type { FileInfo } from '@/api/file';
+import { getSkillPreferences } from '@/api/skill';
 import { useAgentProfile } from '@/composables/useAgentProfile';
 import { useFilePanel } from '@/composables/useFilePanel';
-import { showErrorToast } from '@/utils/toast';
+import { EVENT_SKILL_PREFERENCES_UPDATED } from '@/constants/event';
+import { DATASET_CHAT_PLACEHOLDER, buildDatasetChatCapabilities } from '@/utils/datasetCapabilitySelection';
+import { copyToClipboard } from '@/utils/dom';
+import { eventBus } from '@/utils/eventBus';
+import { showErrorToast, showSuccessToast } from '@/utils/toast';
 import { failRunningSteps, findCurrentTurnRunningStep, findCurrentTurnStep } from '@/utils/chatTimeline';
 import { isConsecutiveAssistant, type AttachmentsContent, type Message, type MessageContent, type StepContent, type ToolContent } from '@/types/message';
 import type { AgentSSEEvent, ErrorEventData, MessageEventData, PlanEventData, StepEventData, TitleEventData, ToolEventData } from '@/types/event';
@@ -395,9 +415,9 @@ const datasetSummaryRef = ref<HTMLElement | null>(null);
 const datasetSummaryExpanded = ref(false);
 const datasetSummaryOverflowing = ref(false);
 const visibleFileCount = ref(DATASET_FILE_BATCH_SIZE);
+const copiedDatasetFileIndex = ref<number | null>(null);
 const visibleDatasetFiles = computed(() => (dataset.value?.files || []).slice(0, visibleFileCount.value));
 const hasMoreDatasetFiles = computed(() => visibleDatasetFiles.value.length < (dataset.value?.files.length || 0));
-const inputComposing = ref(false);
 const datasetCoverFailed = ref(false);
 const datasetCoverUrl = computed(() => {
   if (!dataset.value?.preview_url || datasetCoverFailed.value) return datasetDefaultCover;
@@ -405,6 +425,9 @@ const datasetCoverUrl = computed(() => {
 });
 const catalogLoading = ref(true);
 const inputMessage = ref('');
+const datasetChatAttachments: FileInfo[] = [];
+const selectedSkills = ref<string[]>([]);
+const autoEnabledSkillNames = ref(new Set<string>());
 const messages = ref<Message[]>([]);
 const sessionId = ref<string | null>(null);
 const lastEventId = ref<string>();
@@ -419,6 +442,7 @@ const suggestedQuestions = ref<string[]>([]);
 const suggestedQuestionsLoading = ref(false);
 const suggestedQuestionsError = ref('');
 const historyOpen = ref(false);
+const historyMenuRef = ref<HTMLElement>();
 const historyLoading = ref(false);
 const historySessions = ref<DatasetChatSession[]>([]);
 const timelineRef = ref<HTMLElement>();
@@ -433,6 +457,7 @@ let cancelChat: (() => void) | null = null;
 let timelineResizeObserver: ResizeObserver | null = null;
 let datasetSummaryResizeObserver: ResizeObserver | null = null;
 let desktopCatalogMediaQuery: MediaQueryList | null = null;
+let datasetFileCopyTimer: ReturnType<typeof setTimeout> | null = null;
 
 const TIMELINE_BOTTOM_THRESHOLD = 120;
 
@@ -442,6 +467,11 @@ watch(() => dataset.value?.preview_url, () => {
 
 watch(() => dataset.value?.dataset_id, () => {
   visibleFileCount.value = DATASET_FILE_BATCH_SIZE;
+  copiedDatasetFileIndex.value = null;
+  if (datasetFileCopyTimer) {
+    clearTimeout(datasetFileCopyTimer);
+    datasetFileCopyTimer = null;
+  }
 }, { flush: 'sync' });
 
 watch(() => dataset.value?.description, async () => {
@@ -523,6 +553,22 @@ async function toggleDatasetSummary() {
 function displayFileName(name: string) {
   const parts = name.replace(/\\/g, '/').split('/').filter(Boolean);
   return parts[parts.length - 1] || '未命名文件';
+}
+
+async function copyDatasetFileName(name: string, index: number) {
+  const copied = await copyToClipboard(displayFileName(name));
+  if (!copied) {
+    showErrorToast('复制文件名失败，请检查浏览器剪贴板权限');
+    return;
+  }
+
+  copiedDatasetFileIndex.value = index;
+  if (datasetFileCopyTimer) clearTimeout(datasetFileCopyTimer);
+  datasetFileCopyTimer = setTimeout(() => {
+    copiedDatasetFileIndex.value = null;
+    datasetFileCopyTimer = null;
+  }, 1500);
+  showSuccessToast('文件名已复制');
 }
 
 function loadMoreDatasetFiles() {
@@ -682,6 +728,12 @@ function toggleHistory() {
   if (historyOpen.value) void refreshHistory();
 }
 
+function handleHistoryPointerDown(event: PointerEvent) {
+  if (!historyOpen.value) return;
+  const target = event.target as Node;
+  if (!historyMenuRef.value?.contains(target)) historyOpen.value = false;
+}
+
 function historyStatusClass(status: DatasetChatSession['status']) {
   if (status === 'running' || status === 'pending') return 'bg-amber-500';
   if (status === 'waiting') return 'bg-sky-500';
@@ -708,12 +760,27 @@ async function ensureSession() {
   return session.session_id;
 }
 
-function handleInputKeydown(event: KeyboardEvent) {
-  if (event.key !== 'Enter') return;
-  if (event.isComposing || inputComposing.value || event.keyCode === 229) return;
-  if (event.shiftKey || event.ctrlKey || event.metaKey || event.altKey) return;
-  event.preventDefault();
-  void submit();
+function setAutoEnabledSkillNames(names: string[]) {
+  const normalized = new Set(names.map((name) => name.trim().toLocaleLowerCase()));
+  autoEnabledSkillNames.value = normalized;
+  selectedSkills.value = selectedSkills.value.filter(
+    (name) => !normalized.has(name.trim().toLocaleLowerCase()),
+  );
+}
+
+function handleSkillPreferencesUpdated(payload: unknown) {
+  if (Array.isArray(payload) && payload.every((name) => typeof name === 'string')) {
+    setAutoEnabledSkillNames(payload);
+  }
+}
+
+async function loadAutoEnabledSkillNames() {
+  try {
+    setAutoEnabledSkillNames(await getSkillPreferences());
+  } catch (error) {
+    console.error('Failed to load automatic Skill preferences', error);
+    autoEnabledSkillNames.value = new Set();
+  }
 }
 
 async function submit() {
@@ -727,20 +794,21 @@ async function submit() {
   loadingStatus.value = '正在关联数据集...';
   try {
     const activeSessionId = await ensureSession();
+    const capabilities = buildDatasetChatCapabilities(selected.dataset_id, selectedSkills.value);
     cancelChat = await chatWithSession(
       activeSessionId,
       question,
       lastEventId.value,
-      [],
-      [],
-      [],
+      capabilities.attachments,
+      capabilities.skills,
+      capabilities.mcpServers,
       selectedProfileId.value,
       {
         onMessage: ({ event, data }) => handleEvent({ event: event as AgentSSEEvent['event'], data: data as AgentSSEEvent['data'] }),
         onClose: () => { isLoading.value = false; loadingStatus.value = ''; cancelChat = null; },
         onError: (error) => { console.error(error); isLoading.value = false; loadingStatus.value = ''; failRunningSteps(messages.value); },
       },
-      [selected.dataset_id],
+      capabilities.datasetIds,
     );
     loadingStatus.value = 'Agent 正在读取数据集...';
   } catch (error: any) {
@@ -773,11 +841,24 @@ async function loadConversation(targetSessionId: string) {
   cancelChat?.();
   cancelChat = null;
   clearConversationState();
+  selectedSkills.value = [];
   try {
     const session = await getSession(targetSessionId);
     sessionId.value = session.session_id;
     localStorage.setItem(datasetStorageKey(), session.session_id);
-    for (const event of session.events) handleEvent(event);
+    let restoredSkills: string[] = [];
+    for (const event of session.events) {
+      if (event.event === 'message') {
+        const message = event.data as MessageEventData;
+        if (message.role === 'user') {
+          restoredSkills = (message.metadata?.skills || []).filter(
+            (name) => !autoEnabledSkillNames.value.has(name.trim().toLocaleLowerCase()),
+          );
+        }
+      }
+      handleEvent(event);
+    }
+    selectedSkills.value = [...new Set(restoredSkills)];
     if (session.status === SessionStatus.RUNNING || session.status === SessionStatus.PENDING) {
       isLoading.value = true;
       cancelChat = await chatWithSession(session.session_id, '', lastEventId.value, [], [], [], selectedProfileId.value, {
@@ -790,6 +871,7 @@ async function loadConversation(targetSessionId: string) {
     console.error('Failed to restore dataset chat session', error);
     localStorage.removeItem(datasetStorageKey());
     sessionId.value = null;
+    selectedSkills.value = [];
     clearConversationState();
     throw error;
   }
@@ -815,6 +897,7 @@ function newConversationFromHistory() {
   historyOpen.value = false;
   localStorage.removeItem(datasetStorageKey());
   sessionId.value = null;
+  selectedSkills.value = [];
   clearConversationState();
 }
 
@@ -828,6 +911,8 @@ async function stop() {
 }
 
 onMounted(async () => {
+  eventBus.on(EVENT_SKILL_PREFERENCES_UPDATED, handleSkillPreferencesUpdated);
+  document.addEventListener('pointerdown', handleHistoryPointerDown);
   desktopCatalogMediaQuery = window.matchMedia('(min-width: 1024px)');
   desktopCatalogViewport.value = desktopCatalogMediaQuery.matches;
   desktopCatalogMediaQuery.addEventListener('change', handleCatalogViewportChange);
@@ -840,6 +925,7 @@ onMounted(async () => {
     if (datasetSummaryRef.value) datasetSummaryResizeObserver.observe(datasetSummaryRef.value);
   }
   await refreshProfiles().catch(() => undefined);
+  await loadAutoEnabledSkillNames();
   const routeDatasetId = Array.isArray(route.params.datasetId) ? route.params.datasetId[0] : route.params.datasetId;
   if (!routeDatasetId) {
     catalogLoading.value = false;
@@ -861,6 +947,9 @@ onMounted(async () => {
 
 onUnmounted(() => {
   cancelChat?.();
+  eventBus.off(EVENT_SKILL_PREFERENCES_UPDATED, handleSkillPreferencesUpdated);
+  document.removeEventListener('pointerdown', handleHistoryPointerDown);
+  if (datasetFileCopyTimer) clearTimeout(datasetFileCopyTimer);
   closeToolPanel();
   timelineResizeObserver?.disconnect();
   datasetSummaryResizeObserver?.disconnect();
@@ -871,8 +960,7 @@ onUnmounted(() => {
 <style scoped>
 .icon-button { @apply flex size-9 shrink-0 items-center justify-center rounded-md text-[var(--icon-secondary)] transition-colors hover:bg-[var(--fill-tsp-white-light)] hover:text-[var(--icon-primary)]; }
 .secondary-button { @apply h-9 shrink-0 items-center gap-1.5 rounded-md border border-[var(--border-main)] bg-[var(--background-menu-white)] px-3 text-xs text-[var(--text-secondary)] hover:bg-[var(--fill-tsp-white-light)]; }
-.history-button { @apply flex h-[54px] shrink-0 items-center justify-center gap-1.5 rounded-xl border border-[var(--border-main)] bg-[var(--background-gray-main)] px-3 text-[var(--text-secondary)] shadow-sm transition-colors hover:border-[#8eaa9c] hover:text-[#225f48]; }
-.send-button { @apply flex size-9 shrink-0 items-center justify-center rounded-lg bg-[#225f48] text-white transition-colors hover:bg-[#194d39] disabled:cursor-not-allowed disabled:bg-[var(--fill-tsp-white-dark)] disabled:text-[var(--text-disable)]; }
+.history-header-button { @apply flex h-9 max-w-48 items-center gap-1.5 rounded-lg bg-[var(--background-gray-main)] px-2 text-[var(--text-secondary)] transition-colors hover:bg-[var(--fill-tsp-white-light)] hover:text-[var(--text-primary)] sm:h-7; }
 .dataset-chat-list,
 .dataset-chat-message { overflow-x: clip; overflow-y: visible; }
 .dataset-chat-message { min-width: 0; max-width: 100%; overflow-wrap: anywhere; font-size: 14px; line-height: 1.65; }

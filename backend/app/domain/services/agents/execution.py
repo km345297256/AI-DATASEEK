@@ -629,13 +629,13 @@ class ExecutionAgent(BaseAgent):
         hidden_files = max(0, len(safe_files) - len(displayed_files))
 
         if language == "zh":
-            lines = [
-                (
-                    "文件组织直接来自数据中心登记清单，无需调用模型判断。"
-                    if catalog_only
-                    else "文件组织已根据安全递归解包清单生成，无需再次调用模型判断。"
-                ),
-                "",
+            lines = []
+            if not catalog_only:
+                lines.extend([
+                    "文件组织已根据安全递归解包清单生成，无需再次调用模型判断。",
+                    "",
+                ])
+            lines.extend([
                 f"`{source_name}`",
                 "```text",
                 *tree_lines,
@@ -646,7 +646,7 @@ class ExecutionAgent(BaseAgent):
                     if catalog_only
                     else f"共识别 {archive_count} 个压缩包、{total_files} 个最终文件，展开大小 {expanded_bytes}。"
                 ),
-            ]
+            ])
             if hidden_files:
                 lines.append(
                     f"上方为前 {len(displayed_files)} 个文件的目录树，另有 {hidden_files} 个文件因展示上限未显示。"
@@ -670,20 +670,19 @@ class ExecutionAgent(BaseAgent):
                     lines.append(
                         f"- 另有 {len(archives) - cls.DATASET_INVENTORY_MAX_DISPLAY_ARCHIVES} 个压缩包节点未展示。"
                     )
-            lines.append(
-                "方法与限制：仅展示登记清单中的相对路径，不读取文件内容，也不暴露宿主机真实路径。"
-                if catalog_only
-                else "方法与限制：仅展示清单中的相对路径，不暴露宿主机真实路径；解包受文件数、体积、深度和超时安全限制。"
-            )
+            if not catalog_only:
+                lines.append(
+                    "方法与限制：仅展示清单中的相对路径，不暴露宿主机真实路径；解包受文件数、体积、深度和超时安全限制。"
+                )
             return "\n".join(lines)
 
-        lines = [
-            (
-                "The file organization comes directly from the data-center inventory; no model decision was required."
-                if catalog_only
-                else "The file organization below comes directly from the bounded recursive-unpack manifest; no second model decision was required."
-            ),
-            "",
+        lines = []
+        if not catalog_only:
+            lines.extend([
+                "The file organization below comes directly from the bounded recursive-unpack manifest; no second model decision was required.",
+                "",
+            ])
+        lines.extend([
             f"`{source_name}`",
             "```text",
             *tree_lines,
@@ -694,7 +693,7 @@ class ExecutionAgent(BaseAgent):
                 if catalog_only
                 else f"Detected {archive_count} archive(s) and {total_files} final file(s), expanding to {expanded_bytes}."
             ),
-        ]
+        ])
         if hidden_files:
             lines.append(
                 f"The tree shows the first {len(displayed_files)} files; {hidden_files} additional files are omitted by the display limit. "
@@ -718,11 +717,10 @@ class ExecutionAgent(BaseAgent):
                 lines.append(
                     f"- {len(archives) - cls.DATASET_INVENTORY_MAX_DISPLAY_ARCHIVES} additional archive nodes omitted."
                 )
-        lines.append(
-            "Method and limits: only registered relative paths are shown; file contents are not read and real host paths remain private."
-            if catalog_only
-            else "Method and limits: only manifest-relative paths are shown; real host paths remain private, and extraction is bounded by file-count, size, depth, and timeout limits."
-        )
+        if not catalog_only:
+            lines.append(
+                "Method and limits: only manifest-relative paths are shown; real host paths remain private, and extraction is bounded by file-count, size, depth, and timeout limits."
+            )
         return "\n".join(lines)
 
     @staticmethod

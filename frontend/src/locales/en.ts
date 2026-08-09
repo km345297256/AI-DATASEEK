@@ -126,6 +126,8 @@ export default {
   'Add content': 'Add content',
   'Upload file': 'Upload file',
   'Use skill': 'Use skill',
+  'Send message': 'Send message',
+  'Stop task': 'Stop task',
   'Upload large files through backend-proxied multipart upload. The client never receives the object storage address.': 'Upload large files through backend-proxied multipart upload. The client never receives the object storage address.',
   // Plugins
   'Plugins': 'Plugins',

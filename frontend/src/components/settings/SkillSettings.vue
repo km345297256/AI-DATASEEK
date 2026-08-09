@@ -102,7 +102,7 @@ import {
 import { useSettingsDialog } from '@/composables/useSettingsDialog';
 import { showErrorToast, showSuccessToast } from '@/utils/toast';
 import { eventBus } from '@/utils/eventBus';
-import { EVENT_SKILL_PREFERENCES_UPDATED } from '@/constants/event';
+import { EVENT_SKILL_CATALOG_UPDATED, EVENT_SKILL_PREFERENCES_UPDATED } from '@/constants/event';
 
 const { t } = useI18n();
 const router = useRouter();
@@ -168,6 +168,7 @@ const handleUpload = async (event: Event) => {
   try {
     await uploadSkill(file);
     await load();
+    eventBus.emit(EVENT_SKILL_CATALOG_UPDATED);
     showSuccessToast(t('Skill uploaded'));
   } catch (error) {
     console.error('Failed to upload skill:', error);
