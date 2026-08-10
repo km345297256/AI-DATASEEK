@@ -206,6 +206,20 @@ def test_named_tabular_target_uses_targeted_visualization_not_whole_dataset_quic
     assert step.inputs["allow_terminal_quicklook"] is False
 
 
+def test_file_reference_allows_chinese_action_suffix_without_quicklook():
+    path = "data/bcpr_195701.nc"
+    step = _flow()._create_dataset_fast_path_plan(
+        Message(
+            message="bcpr_195701.nc针对这个文件进行可视化",
+            datasets=[_dataset_with_files(path)],
+        )
+    ).steps[0]
+
+    assert step.inputs["target_file"] == path
+    assert step.inputs["prefer_quicklook_evidence"] is False
+    assert step.inputs["allow_terminal_quicklook"] is False
+
+
 def test_unresolved_explicit_filename_is_not_a_broad_quicklook_request():
     step = _flow()._create_dataset_fast_path_plan(
         Message(message="请可视化 missing-image.jpg", datasets=[_dataset()])
@@ -244,7 +258,7 @@ def test_custom_dataset_question_remains_model_assisted_analysis():
     assert step.inputs["require_model_answer"] is True
     assert step.inputs["include_archive_tree"] is False
     assert step.inputs["allow_terminal_quicklook"] is False
-    assert step.inputs["prefer_quicklook_evidence"] is True
+    assert step.inputs["prefer_quicklook_evidence"] is False
     assert step.inputs["user_question"] == "哪一年降水量最高，可能说明了什么？"
     assert "完整保留并回答用户的具体问题" in step.inputs["execution_guidance"]
     assert "可核验的数据证据" in step.inputs["execution_guidance"]
@@ -254,27 +268,29 @@ def test_custom_dataset_question_remains_model_assisted_analysis():
 
 
 @pytest.mark.parametrize(
-    ("question", "expected_dimensions"),
+    ("question", "expected_dimensions", "expected_prefer_quicklook"),
     [
         (
             "综合评判这个科学数据集的价值和用途",
             {"scientific_value", "use_cases", "overall_assessment"},
+            False,
         ),
-        ("这个数据集是否适合用于区域环境研究？", {"applicability"}),
-        ("概述这个数据集并解释它能说明什么", {"overview", "interpretation"}),
-        ("Is this dataset suitable for regional research?", {"applicability"}),
+        ("这个数据集是否适合用于区域环境研究？", {"applicability"}, False),
+        ("概述这个数据集并解释它能说明什么", {"overview", "interpretation"}, True),
+        ("Is this dataset suitable for regional research?", {"applicability"}, False),
     ],
 )
 def test_general_single_dataset_analysis_prefers_quicklook_evidence(
     question,
     expected_dimensions,
+    expected_prefer_quicklook,
 ):
     step = _flow()._create_dataset_fast_path_plan(
         Message(message=question, datasets=[_dataset()])
     ).steps[0]
 
     assert step.inputs["dataset_intent"] == "analysis"
-    assert step.inputs["prefer_quicklook_evidence"] is True
+    assert step.inputs["prefer_quicklook_evidence"] is expected_prefer_quicklook
     assert step.inputs["allow_terminal_quicklook"] is False
     assert expected_dimensions <= set(step.inputs["requested_dimensions"])
 
@@ -331,7 +347,7 @@ def test_pseudocolor_requests_are_recognized_as_specific_visualization(question)
 
     assert step.inputs["dataset_intent"] == "visualization"
     assert "visualization" in step.inputs["requested_dimensions"]
-    assert step.inputs["prefer_quicklook_evidence"] is True
+    assert step.inputs["prefer_quicklook_evidence"] is False
     assert step.inputs["allow_terminal_quicklook"] is False
 
 
@@ -450,7 +466,7 @@ def test_specific_multi_part_visualization_requires_evidence_coverage_model_turn
 
     step = plan.steps[0]
     assert step.inputs["dataset_intent"] == "visualization"
-    assert step.inputs["prefer_quicklook_evidence"] is True
+    assert step.inputs["prefer_quicklook_evidence"] is False
     assert step.inputs["allow_terminal_quicklook"] is False
     assert step.inputs["user_question"] == question
     assert step.inputs["requested_dimensions"] == [

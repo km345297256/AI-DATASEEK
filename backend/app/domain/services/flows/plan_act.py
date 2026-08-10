@@ -102,6 +102,10 @@ class PlanActFlow(BaseFlow):
         "生成",
         "进行",
         "分析",
+        "针对",
+        "基于",
+        "读取",
+        "使用",
         "绘制",
         "制作",
         "计算",
@@ -548,6 +552,8 @@ class PlanActFlow(BaseFlow):
         allow_terminal_quicklook = (
             dataset_intent == "visualization"
             and len(message.datasets or []) == 1
+            and not target_file
+            and not PlanActFlow._message_has_explicit_file_reference(message.message)
             and PlanActFlow._is_broad_quicklook_request(message.message)
         )
         requested_dimensions = PlanActFlow._dataset_requested_dimensions(
@@ -1013,6 +1019,13 @@ class PlanActFlow(BaseFlow):
             "熵",
             "机器学习",
             "变化检测",
+            "伪彩色",
+            "假彩色",
+            "专题图",
+            "等值线",
+            "热力图",
+            "密度图",
+            "小提琴图",
             "regression",
             "correlation coefficient",
             "significance test",
@@ -1030,6 +1043,15 @@ class PlanActFlow(BaseFlow):
             "entropy",
             "machine learning",
             "change detection",
+            "pseudocolor",
+            "pseudo-color",
+            "false color",
+            "false colour",
+            "thematic map",
+            "contour plot",
+            "heatmap",
+            "density plot",
+            "violin plot",
         )
         if any(marker in normalized for marker in custom_method_markers):
             return False
@@ -1037,20 +1059,10 @@ class PlanActFlow(BaseFlow):
         requested_dimensions = set(
             PlanActFlow._dataset_requested_dimensions(normalized)
         )
-        quicklook_evidence_dimensions = {
-            "overview",
-            "spatial_pattern",
-            "temporal_trend",
-            "data_quality",
-            "anomaly",
-            "relationship",
-            "quantitative_metrics",
-            "visualization",
-            "scientific_value",
-            "use_cases",
-            "applicability",
-            "overall_assessment",
-        }
+        # Quicklook is a bounded orientation pass, not an answer engine for
+        # named metrics, variables, time ranges, spatial methods, or claims.
+        # Those requests must compile a targeted analysis program instead.
+        quicklook_evidence_dimensions = {"overview", "visualization"}
         quicklook_modifier_dimensions = {
             "methodology",
             "limitations",

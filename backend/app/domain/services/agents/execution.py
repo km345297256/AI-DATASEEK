@@ -16,6 +16,7 @@ from pydantic import BaseModel, Field, ValidationError
 from app.domain.models.plan import ExecutionResult, Plan, Step, ExecutionStatus
 from app.domain.models.file import FileInfo
 from app.domain.models.message import Message
+from app.domain.models.dataset import DatasetFile
 from app.domain.services.agents.base import BaseAgent
 from app.domain.repositories.agent_repository import AgentRepository
 from app.domain.services.prompts.system import SYSTEM_PROMPT
@@ -3243,18 +3244,38 @@ class ExecutionAgent(BaseAgent):
         result_path: str,
         failure_context: str = "",
     ) -> DatasetAnalysisProgram:
-        dataset_records = [
-            {
-                "dataset_id": dataset.dataset_id,
-                "name": dataset.name,
-                "sandbox_path": dataset.sandbox_path,
-                "files": [
-                    {"path": item.path, "size": item.size, "content_type": item.content_type}
-                    for item in list(dataset.files or [])[:200]
-                ],
-            }
-            for dataset in list(message.datasets or [])[:3]
-        ]
+        request_text = self._truncate_utf8(request, 12 * 1024)
+        request_folded = request_text.casefold()
+        dataset_records = []
+        for dataset in list(message.datasets or [])[:3]:
+            files = list(dataset.files or [])
+            referenced = [
+                item for item in files
+                if item.path.casefold() in request_folded
+                or PurePosixPath(item.path).name.casefold() in request_folded
+            ]
+            selected_files: list[DatasetFile] = []
+            seen_paths: set[str] = set()
+            for item in referenced + files:
+                if item.path in seen_paths:
+                    continue
+                seen_paths.add(item.path)
+                selected_files.append(item)
+                if len(selected_files) >= 24:
+                    break
+            dataset_records.append(
+                {
+                    "dataset_id": dataset.dataset_id,
+                    "name": self._truncate_utf8(dataset.name, 512),
+                    "sandbox_path": dataset.sandbox_path,
+                    "file_count": len(files),
+                    "files": [
+                        {"path": item.path, "size": item.size, "content_type": item.content_type}
+                        for item in selected_files
+                    ],
+                    "files_omitted": max(0, len(files) - len(selected_files)),
+                }
+            )
         prompt = (
             "Compile one complete Python program for the mounted dataset analysis request below. "
             "This is a code-generation stage: do not call tools, do not return a plan, and do not "
@@ -3269,9 +3290,9 @@ class ExecutionAgent(BaseAgent):
             "installed scientific stack. Keep the program bounded and avoid loading an entire large raster "
             "or table when sampling is sufficient. The program itself must be self-contained and must not "
             "expect a later model/tool turn. Return JSON only with one key: `python_code`.\n\n"
-            f"REQUEST:\n{request}\n\n"
+            f"REQUEST:\n{request_text}\n\n"
             f"DATASETS:\n{json.dumps(dataset_records, ensure_ascii=False, separators=(',', ':'))}\n\n"
-            f"FAILURE_CONTEXT:\n{failure_context[:8_000]}\n"
+            f"FAILURE_CONTEXT:\n{failure_context[:4_000]}\n"
         )
         response = await asyncio.wait_for(
             self.ask_with_messages(
