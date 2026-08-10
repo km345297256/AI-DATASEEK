@@ -189,7 +189,7 @@ export const getToolDisplayDetail = (tool: ToolContent): ToolDisplayDetail => {
   const args = isRecord(tool.args) ? tool.args : {};
   let detail = '';
 
-  if (functionName === 'shell_exec' || functionName === 'shell_run') {
+  if (functionName === 'shell_exec' || functionName === 'shell_run' || functionName === 'dataset_analysis_run') {
     detail = safeStringArg(args, 'command');
   } else if (functionName === 'shell_wait') {
     const session = safeStringArg(args, 'id') || safeStringArg(args, 'shell');

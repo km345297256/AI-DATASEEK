@@ -12,6 +12,7 @@ export const TOOL_FUNCTION_MAP: {[key: string]: string} = {
   "dataset_unpack": "Inspecting archive structure",
   "dataset_inventory": "Inspecting dataset files",
   "dataset_quicklook": "Exploring dataset",
+  "dataset_analysis_run": "Analyzing dataset",
   
   // File tools
   "file_read": "Reading file",
@@ -58,6 +59,7 @@ export const TOOL_FUNCTION_CALLED_MAP: {[key: string]: string} = {
   "dataset_unpack": "Archive inspection finished",
   "dataset_inventory": "Dataset inventory finished",
   "dataset_quicklook": "Dataset exploration finished",
+  "dataset_analysis_run": "Dataset analysis command finished",
   "file_read": "File read finished",
   "file_write": "File write finished",
   "file_str_replace": "File replacement finished",
@@ -78,6 +80,7 @@ export const TOOL_FUNCTION_ARG_MAP: {[key: string]: string} = {
   "dataset_unpack": "archive_path",
   "dataset_inventory": "input_path",
   "dataset_quicklook": "input_path",
+  "dataset_analysis_run": "command",
   "file_read": "file",
   "file_write": "file",
   "file_str_replace": "file",

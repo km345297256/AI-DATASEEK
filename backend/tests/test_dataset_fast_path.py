@@ -759,10 +759,7 @@ def test_session_context_budget_retains_newest_messages():
     "failed_status",
     [ExecutionStatus.COMPLETED, ExecutionStatus.FAILED],
 )
-async def test_failed_dataset_fast_path_replans_instead_of_completing(failed_status):
-    class _ExpectedUpdate(RuntimeError):
-        pass
-
+async def test_failed_dataset_fast_path_completes_with_structured_failure(failed_status):
     class _Repository:
         async def find_by_id(self, _session_id):
             return SimpleNamespace(status=SessionStatus.PENDING)
@@ -782,7 +779,7 @@ async def test_failed_dataset_fast_path_replans_instead_of_completing(failed_sta
 
         async def update_plan(self, _plan, _step):
             self.update_called = True
-            raise _ExpectedUpdate
+            raise AssertionError("dataset fast path must not re-enter the general planner")
             yield  # pragma: no cover
 
     class _Executor:
@@ -799,7 +796,7 @@ async def test_failed_dataset_fast_path_replans_instead_of_completing(failed_sta
     flow._session_id = "session-failed-fast"
     flow._agent_id = "agent-failed-fast"
     flow._session_repository = _Repository()
-    flow._dataset_fast_path_active = False
+    flow._dataset_fast_path_active = True
     flow.status = AgentStatus.IDLE
     flow.plan = None
     flow.session_context = ""
@@ -810,15 +807,15 @@ async def test_failed_dataset_fast_path_replans_instead_of_completing(failed_sta
     flow.planner = _Planner()
     flow.executor = _Executor()
 
-    events = []
-    with pytest.raises(_ExpectedUpdate):
+    events = [
+        event
         async for event in flow.run(
             Message(message="请分析数据", datasets=[_dataset()])
-        ):
-            events.append(event)
+        )
+    ]
 
-    assert flow.planner.update_called is True
-    assert not any(
+    assert flow.planner.update_called is False
+    assert any(
         isinstance(event, PlanEvent) and event.status == PlanStatus.COMPLETED
         for event in events
     )

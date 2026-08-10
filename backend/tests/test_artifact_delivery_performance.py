@@ -35,6 +35,32 @@ class _AllowSafetyReviewer:
         )
 
 
+def test_dataset_analysis_tool_renders_safe_result_console_without_program_source():
+    event = ToolEvent(
+        status=ToolStatus.CALLED,
+        tool_call_id="analysis-1",
+        tool_name="shell",
+        function_name="dataset_analysis_run",
+        function_args={"mode": "compiled_dataset_analysis", "command": "分析数据集并生成成果"},
+        function_result={
+            "success": True,
+            "result": "已生成降水趋势图。",
+            "attachments": ["/home/ubuntu/output/chart.png"],
+        },
+    )
+
+    console = AgentTaskRunner._dataset_analysis_console(event)
+
+    assert console == [{
+        "ps1": "$",
+        "command": "分析数据集并生成成果",
+        "output": "已生成降水趋势图。",
+        "status": "completed",
+        "returncode": 0,
+    }]
+    assert "base64" not in str(console).lower()
+
+
 async def _noop(*args, **kwargs):
     return None
 

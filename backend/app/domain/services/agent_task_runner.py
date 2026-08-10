@@ -828,6 +828,22 @@ class AgentTaskRunner(TaskRunner):
             "status": "completed",
             "returncode": result_data.get("returncode"),
         }]
+
+    @staticmethod
+    def _dataset_analysis_console(event: ToolEvent) -> list[dict[str, Any]]:
+        """Render the high-level analysis result without exposing generated code."""
+        result = event.function_result if isinstance(event.function_result, dict) else {}
+        success = bool(result.get("success"))
+        output = result.get("result") if success else result.get("error") or result.get("result")
+        if not isinstance(output, str) or not output.strip():
+            output = "数据集分析已完成。" if success else "数据集分析未能生成有效结果。"
+        return [{
+            "ps1": "$",
+            "command": "分析数据集并生成成果",
+            "output": output.strip(),
+            "status": "completed" if success else "failed",
+            "returncode": 0 if success else 1,
+        }]
     
     async def _sync_message_attachments_to_sandbox(self, event: MessageEvent) -> None:
         """Sync message attachments and update event attachments"""
@@ -864,7 +880,10 @@ class AgentTaskRunner(TaskRunner):
                     logger.debug(f"Search tool results: {search_results}")
                     event.tool_content = SearchToolContent(results=search_results.data.results)
                 elif event.tool_name == "shell":
-                    completed_console = self._completed_shell_console_from_result(event)
+                    if event.function_name == "dataset_analysis_run":
+                        completed_console = self._dataset_analysis_console(event)
+                    else:
+                        completed_console = self._completed_shell_console_from_result(event)
                     if completed_console is not None:
                         event.tool_content = ShellToolContent(console=completed_console)
                     elif "id" in event.function_args:

@@ -36,6 +36,7 @@ import numpy as np
 import pandas as pd
 import rasterio
 from rasterio.enums import Resampling
+import xarray as xr
 
 try:  # Running from sandbox/scripts or from its installed image location.
     from recursive_unpack import Limits as UnpackLimits
@@ -48,7 +49,8 @@ except ImportError:  # Importing as scripts.dataset_quicklook in tests.
 TABULAR_SUFFIXES = {".csv": "csv", ".tsv": "tsv"}
 EXCEL_SUFFIXES = {".xlsx": "excel", ".xlsm": "excel", ".xls": "excel"}
 RASTER_SUFFIXES = {".tif": "geotiff", ".tiff": "geotiff"}
-SUPPORTED_SUFFIXES = {**TABULAR_SUFFIXES, **EXCEL_SUFFIXES, **RASTER_SUFFIXES}
+NETCDF_SUFFIXES = {".nc": "netcdf", ".nc4": "netcdf", ".cdf": "netcdf"}
+SUPPORTED_SUFFIXES = {**TABULAR_SUFFIXES, **EXCEL_SUFFIXES, **RASTER_SUFFIXES, **NETCDF_SUFFIXES}
 ARCHIVE_SUFFIXES = {".zip", ".rar", ".7z"}
 NULL_TEXT = {"", "na", "n/a", "nan", "null", "none", "-"}
 TOOL_EVIDENCE_MAX_DATASETS = 4
@@ -626,6 +628,88 @@ def _plot_table_extras(
                 figure.autofmt_xdate()
                 figure.tight_layout()
                 plots.save(figure, stem=f"{stem}_trend", title=f"{label} · 时间趋势", source=source)
+
+
+def _netcdf_profile_and_plot(
+    candidate: Candidate,
+    plots: PlotCollector,
+    limits: Limits,
+) -> dict[str, Any]:
+    """Profile one NetCDF file with bounded reads and one representative chart."""
+    try:
+        dataset = xr.open_dataset(candidate.path, engine="h5netcdf", chunks={})
+    except Exception as exc:
+        raise QuicklookError(f"无法读取 NetCDF 文件: {type(exc).__name__}: {exc}") from exc
+    try:
+        variables: list[dict[str, Any]] = []
+        numeric_variables: list[str] = []
+        for name, variable in dataset.variables.items():
+            variables.append(
+                {
+                    "name": str(name),
+                    "dimensions": list(variable.dims),
+                    "shape": [int(size) for size in variable.shape],
+                    "dtype": str(variable.dtype),
+                    "units": str(variable.attrs.get("units", ""))[:120],
+                    "long_name": str(variable.attrs.get("long_name", ""))[:200],
+                }
+            )
+            if name not in dataset.coords and np.issubdtype(variable.dtype, np.number):
+                numeric_variables.append(name)
+        if not numeric_variables:
+            raise QuicklookError("NetCDF 文件中没有可分析的数值变量")
+
+        selected = numeric_variables[0]
+        data = dataset[selected]
+        # Bound the product of sampled dimensions, not just each dimension
+        # independently (a 3-D climate cube would otherwise explode).
+        dimensions = list(data.dims)
+        target = max(1, min(limits.max_raster_pixels, limits.max_plot_points * 4))
+        per_dimension = max(1, int(target ** (1 / max(1, len(dimensions)))))
+        for dimension in dimensions:
+            size = int(data.sizes[dimension])
+            sample_size = min(size, per_dimension)
+            if sample_size < size:
+                indexes = np.linspace(0, size - 1, sample_size, dtype=int)
+                data = data.isel({dimension: indexes})
+        values = np.asarray(data.values, dtype=float)
+        finite = values[np.isfinite(values)]
+        if plots.remaining and finite.size:
+            figure, axis = plt.subplots(figsize=(9, 4.8))
+            sampled = finite
+            if sampled.size > limits.max_plot_points:
+                sampled = np.asarray(
+                    _sample_frame(pd.DataFrame({"value": sampled}), limits.max_plot_points)["value"]
+                )
+            axis.hist(
+                sampled,
+                bins=min(40, max(8, int(math.sqrt(sampled.size)))),
+                color="#267a63",
+                alpha=0.85,
+            )
+            axis.set_title(f"{candidate.path.stem}: {selected}")
+            axis.set_xlabel(str(dataset[selected].attrs.get("units", "value")))
+            axis.set_ylabel("频数")
+            axis.grid(alpha=0.2)
+            figure.tight_layout()
+            plots.save(
+                figure,
+                stem=f"{candidate.path.stem}_{selected}_distribution",
+                title=f"{candidate.path.stem}: {selected}",
+                source=candidate.display_path,
+            )
+        return {
+            "path": candidate.display_path,
+            "format": "netcdf",
+            "size": candidate.size,
+            "dimensions": {str(name): int(size) for name, size in dataset.sizes.items()},
+            "variables": variables[: limits.max_columns],
+            "variables_truncated": len(variables) > limits.max_columns,
+            "sampled_variable": selected,
+            "sampled_values": int(finite.size),
+        }
+    finally:
+        dataset.close()
 
 
 def _scaled_shape(height: int, width: int, maximum_pixels: int) -> tuple[int, int]:
@@ -1444,7 +1528,7 @@ def _single_candidate(path: Path, limits: Limits) -> Candidate:
     kind = _kind_for_path(path)
     if kind is None:
         raise QuicklookError(
-            "unsupported input; expected a directory, CSV/TSV, Excel, GeoTIFF, "
+            "unsupported input; expected a directory, CSV/TSV, Excel, NetCDF, GeoTIFF, "
             "ZIP, RAR, or 7z"
         )
     size = path.stat().st_size
@@ -2040,6 +2124,11 @@ def _write_markdown(manifest: dict[str, Any], target: Path) -> None:
         path = str(dataset["path"]).replace("|", "\\|")
         if dataset["format"] == "geotiff":
             detail = f"{dataset['width']} × {dataset['height']}，{dataset['band_count']} 波段"
+        elif dataset["format"] == "netcdf":
+            detail = (
+                f"{len(dataset.get('variables') or [])} 个变量，"
+                f"抽样变量 {dataset.get('sampled_variable') or '未识别'}"
+            )
         elif dataset["format"] == "excel":
             detail = f"{len(dataset['sheets'])} 个工作表已剖析"
         else:
@@ -2114,6 +2203,20 @@ def _write_markdown(manifest: dict[str, Any], target: Path) -> None:
                 f"({_format_statistic(maximum.get('x'))}, "
                 f"{_format_statistic(maximum.get('y'))})。"
             )
+        elif dataset["format"] == "netcdf":
+            lines.append(
+                f"- NetCDF 维度：{_inline_code(dataset.get('dimensions') or {})}。"
+            )
+            lines.append(
+                f"- 抽样变量：{_inline_code(dataset.get('sampled_variable') or '未识别')}，"
+                f"有效抽样值 {dataset.get('sampled_values', 0)} 个。"
+            )
+            for variable in (dataset.get("variables") or [])[:TOOL_EVIDENCE_MAX_COLUMNS]:
+                lines.append(
+                    f"- 变量 {_inline_code(variable.get('name') or '')}："
+                    f"维度 {variable.get('dimensions') or []}，形状 {variable.get('shape') or []}，"
+                    f"单位 {_inline_code(variable.get('units') or '未声明')}。"
+                )
         elif dataset["format"] == "excel":
             for sheet in (dataset.get("sheets") or [])[:TOOL_EVIDENCE_MAX_SHEETS]:
                 lines.append(f"- 工作表：{_inline_code(sheet.get('name') or '未命名')}。")
@@ -2323,7 +2426,7 @@ def generate_quicklook(source: Path, output: Path, limits: Limits | None = None)
             }
             source_description = {"name": source.name, "type": "file"}
         if not candidates:
-            raise QuicklookError("no supported CSV/TSV, Excel, or GeoTIFF files found")
+            raise QuicklookError("no supported CSV/TSV, Excel, NetCDF, or GeoTIFF files found")
 
         plots = PlotCollector(staging, max(1, min(limits.max_plots, 4)))
         datasets: list[dict[str, Any]] = []
@@ -2345,6 +2448,8 @@ def generate_quicklook(source: Path, output: Path, limits: Limits | None = None)
             try:
                 if candidate.kind == "geotiff":
                     datasets.append(_raster_profile_and_plot(candidate, plots, limits))
+                elif candidate.kind == "netcdf":
+                    datasets.append(_netcdf_profile_and_plot(candidate, plots, limits))
                 else:
                     profile, table = _analyze_table_candidate(candidate, plots, limits)
                     datasets.append(profile)
@@ -2472,7 +2577,7 @@ def generate_quicklook(source: Path, output: Path, limits: Limits | None = None)
 def parse_arguments(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(
-            "Generate a bounded CSV/TSV, Excel, or GeoTIFF quicklook with 1-4 PNG "
+            "Generate a bounded CSV/TSV, Excel, NetCDF, or GeoTIFF quicklook with 1-4 PNG "
             "charts plus JSON and Markdown summaries. Archives are unpacked safely."
         )
     )

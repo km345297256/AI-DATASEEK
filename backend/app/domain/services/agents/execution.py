@@ -1,5 +1,6 @@
 import asyncio
 import ast
+import base64
 from collections import Counter
 import glob as globlib
 import json
@@ -11,7 +12,7 @@ import uuid
 from pathlib import PurePosixPath
 from typing import Any, AsyncGenerator, Optional, List, Callable
 from langchain.messages import AIMessage, HumanMessage, ToolMessage
-from pydantic import ValidationError
+from pydantic import BaseModel, Field, ValidationError
 from app.domain.models.plan import ExecutionResult, Plan, Step, ExecutionStatus
 from app.domain.models.file import FileInfo
 from app.domain.models.message import Message
@@ -38,6 +39,12 @@ from app.domain.utils.public_error import public_error_message
 logger = logging.getLogger(__name__)
 
 
+class DatasetAnalysisProgram(BaseModel):
+    """One complete analysis program compiled before any sandbox execution."""
+
+    python_code: str = Field(min_length=1, max_length=256 * 1024)
+
+
 class ExecutionAgent(BaseAgent):
     """
     Execution agent class, defining the basic behavior of execution
@@ -46,12 +53,6 @@ class ExecutionAgent(BaseAgent):
     name: str = "execution"
     system_prompt: str = SYSTEM_PROMPT + EXECUTION_SYSTEM_PROMPT
     format: str = "json_object"
-    # Ordinary custom dataset work stays tight. Explicit chart/export requests
-    # get two additional decision rounds so inspection cannot consume the whole
-    # budget immediately before the requested artifact is rendered.
-    DATASET_FAST_PATH_MAX_ITERATIONS = 4
-    DATASET_DELIVERABLE_MAX_ITERATIONS = 6
-    DATASET_TARGETED_FALLBACK_MAX_ITERATIONS = 5
     # A generic quicklook-first request is orchestrated as exactly one
     # deterministic tool call plus, for a multi-part question, one no-tool model
     # synthesis. This timeout bounds that single synthesis call without forcing
@@ -65,6 +66,9 @@ class ExecutionAgent(BaseAgent):
     DATASET_SYNTHESIS_REPAIR_MAX_TOKENS = 1024
     DATASET_SYNTHESIS_LITERAL_MAX_CHARS = 32 * 1024
     DATASET_SYNTHESIS_RENDERED_MAX_CHARS = 4 * 1024
+    DATASET_PROGRAM_MAX_TOKENS = 8192
+    DATASET_PROGRAM_TIMEOUT_SECONDS = 120
+    DATASET_PROGRAM_REPAIR_TIMEOUT_SECONDS = 120
     EXECUTION_RESULT_REPAIR_TIMEOUT_SECONDS = 30.0
     SHELL_OUTPUT_MAX_CHARS = 8 * 1024
     SHELL_OUTPUT_MAX_BLOCKS = 4
@@ -2083,14 +2087,7 @@ class ExecutionAgent(BaseAgent):
         # A missing or truncated catalog must never be presented as exact. Fall
         # back to the normal bounded professional path so the mounted data can be
         # inspected directly.
-        async for event in self._execute_with_tool_scope(
-            request,
-            dataset_fast_path=True,
-            dataset_intent=self.DATASET_INTENT_ANALYSIS,
-            allow_terminal_quicklook=False,
-            prefer_quicklook_evidence=False,
-            max_iterations=self.DATASET_FAST_PATH_MAX_ITERATIONS,
-        ):
+        async for event in self._execute_compiled_dataset_analysis(request, message=message):
             yield event
 
     async def _execute_catalog_description(
@@ -2119,14 +2116,7 @@ class ExecutionAgent(BaseAgent):
         # A blank description cannot support a deterministic purpose answer.
         # Fall back to one bounded analysis path, but never force quicklook:
         # file statistics alone do not establish a dataset's intended use.
-        async for event in self._execute_with_tool_scope(
-            request,
-            dataset_fast_path=True,
-            dataset_intent=self.DATASET_INTENT_ANALYSIS,
-            allow_terminal_quicklook=False,
-            prefer_quicklook_evidence=False,
-            max_iterations=self.DATASET_FAST_PATH_MAX_ITERATIONS,
-        ):
+        async for event in self._execute_compiled_dataset_analysis(request, message=message):
             yield event
 
     @staticmethod
@@ -2409,13 +2399,9 @@ class ExecutionAgent(BaseAgent):
                 "file-organization question; do not guess paths or archive contents."
                 "</deterministic_inventory_fallback>"
             )
-            async for fallback_event in self._execute_with_tool_scope(
+            async for fallback_event in self._execute_compiled_dataset_analysis(
                 fallback_request,
-                dataset_fast_path=True,
-                dataset_intent=self.DATASET_INTENT_FILE_STRUCTURE,
-                allow_terminal_quicklook=False,
-                prefer_quicklook_evidence=False,
-                max_iterations=self.DATASET_FAST_PATH_MAX_ITERATIONS,
+                message=message,
             ):
                 yield fallback_event
 
@@ -2619,9 +2605,9 @@ class ExecutionAgent(BaseAgent):
                 f"Reason: {reason[:2_000]}\n"
                 "</quicklook_fallback>"
             )
-            async for fallback_event in self.execute(
+            async for fallback_event in self._execute_compiled_dataset_analysis(
                 fallback_request,
-                max_iterations=self.DATASET_TARGETED_FALLBACK_MAX_ITERATIONS,
+                message=message,
             ):
                 yield fallback_event
 
@@ -3248,6 +3234,169 @@ class ExecutionAgent(BaseAgent):
             return None
         return await self._decode_execution_result(repair_message.content)
 
+    async def _compile_dataset_analysis_program(
+        self,
+        request: str,
+        message: Message,
+        *,
+        output_dir: str,
+        result_path: str,
+        failure_context: str = "",
+    ) -> DatasetAnalysisProgram:
+        dataset_records = [
+            {
+                "dataset_id": dataset.dataset_id,
+                "name": dataset.name,
+                "sandbox_path": dataset.sandbox_path,
+                "files": [
+                    {"path": item.path, "size": item.size, "content_type": item.content_type}
+                    for item in list(dataset.files or [])[:200]
+                ],
+            }
+            for dataset in list(message.datasets or [])[:3]
+        ]
+        prompt = (
+            "Compile one complete Python program for the mounted dataset analysis request below. "
+            "This is a code-generation stage: do not call tools, do not return a plan, and do not "
+            "ask for another inspection turn. The program will run once in the preinstalled sandbox.\n\n"
+            "The program must read the exact sandbox paths supplied in DATASETS, perform the requested "
+            "analysis, generate every requested chart/export in the same run, and write one JSON object "
+            f"to {result_path}. The JSON object must contain `success` (boolean), `result` (substantive "
+            "Markdown string), `attachments` (absolute paths of files actually created below "
+            f"{output_dir}), and optional `evidence`. Use {output_dir} for all output files. "
+            "The result must distinguish measured evidence, interpretation, method, and limitations. "
+            "Never install packages, access the network, or invent a file or unit. Use only the already "
+            "installed scientific stack. Keep the program bounded and avoid loading an entire large raster "
+            "or table when sampling is sufficient. The program itself must be self-contained and must not "
+            "expect a later model/tool turn. Return JSON only with one key: `python_code`.\n\n"
+            f"REQUEST:\n{request}\n\n"
+            f"DATASETS:\n{json.dumps(dataset_records, ensure_ascii=False, separators=(',', ':'))}\n\n"
+            f"FAILURE_CONTEXT:\n{failure_context[:8_000]}\n"
+        )
+        response = await asyncio.wait_for(
+            self.ask_with_messages(
+                [HumanMessage(content=prompt)],
+                self.format,
+                allow_tools=False,
+                max_tokens=self.DATASET_PROGRAM_MAX_TOKENS,
+            ),
+            timeout=self.DATASET_PROGRAM_TIMEOUT_SECONDS,
+        )
+        if response.tool_calls:
+            raise ValueError("analysis program compiler returned a tool call")
+        parsed = await self._parse_json(self._message_content_to_text(response.content))
+        program = DatasetAnalysisProgram.model_validate(parsed)
+        if self._blocked_runtime_install_reason(
+            {"name": "shell_run", "args": {"command": program.python_code}}
+        ):
+            raise ValueError("analysis program attempted a runtime dependency installation")
+        return program
+
+    @staticmethod
+    def _analysis_result_from_tool(tool_result: ToolMessage) -> tuple[Optional[ExecutionResult], str]:
+        artifact = tool_result.artifact
+        data = artifact.data if isinstance(artifact, ToolResult) and isinstance(artifact.data, dict) else {}
+        output = str(data.get("output") or tool_result.content or "")
+        for line in reversed(output.splitlines()):
+            try:
+                payload = json.loads(line)
+            except (TypeError, ValueError):
+                continue
+            if not isinstance(payload, dict) or "result" not in payload:
+                continue
+            try:
+                return ExecutionResult.model_validate(payload), ""
+            except ValidationError as exc:
+                return None, f"analysis result validation failed: {exc.errors()[0].get('msg', 'invalid result')}"
+        return None, output[-8_000:] or "analysis runner returned no structured result"
+
+    async def _execute_compiled_dataset_analysis(
+        self,
+        request: str,
+        *,
+        message: Message,
+    ) -> AsyncGenerator[BaseEvent, None]:
+        """Compile one program, run it once, and allow one targeted repair."""
+        output_root = f"/home/ubuntu/output/analysis-{uuid.uuid4().hex[:12]}"
+        failure_context = ""
+        for attempt in range(2):
+            output_dir = output_root if attempt == 0 else f"{output_root}-repair"
+            result_path = f"{output_dir}/result.json"
+            try:
+                program = await self._compile_dataset_analysis_program(
+                    request,
+                    message,
+                    output_dir=output_dir,
+                    result_path=result_path,
+                    failure_context=failure_context,
+                )
+            except Exception as exc:
+                failure_context = f"program compilation failed: {type(exc).__name__}: {exc}"
+                if attempt == 0:
+                    continue
+                yield MessageEvent(message=json.dumps(ExecutionResult(
+                    success=False,
+                    result="分析程序未能生成：" + failure_context,
+                    attachments=[],
+                ).model_dump(), ensure_ascii=False))
+                return
+
+            encoded = base64.b64encode(program.python_code.encode("utf-8")).decode("ascii")
+            command = (
+                "ai-dataseek-analysis "
+                f"--program-base64 {shlex.quote(encoded)} "
+                f"--output-dir {shlex.quote(output_dir)} "
+                f"--result-path {shlex.quote(result_path)}"
+            )
+            tool = self.get_tool("shell_run")
+            if tool is None:
+                failure_context = "sandbox shell_run capability is unavailable"
+                continue
+            call_id = f"dataset-analysis-{uuid.uuid4().hex[:12]}"
+            display_args = {
+                "mode": "compiled_dataset_analysis",
+                "command": "分析数据集并生成成果",
+                "output_dir": output_dir,
+                "timeout_seconds": self.DATASET_PROGRAM_TIMEOUT_SECONDS,
+                "attempt": attempt + 1,
+            }
+            yield ToolEvent(
+                status=ToolStatus.CALLING,
+                tool_call_id=call_id,
+                tool_name=tool.toolkit.name,
+                function_name="dataset_analysis_run",
+                function_args=display_args,
+            )
+            tool_result = await self.invoke_tool(tool, {
+                "name": "shell_run",
+                "args": {
+                    "id": f"dataset-analysis-{uuid.uuid4().hex[:12]}",
+                    "exec_dir": "/home/ubuntu",
+                    "command": command,
+                    "timeout_seconds": self.DATASET_PROGRAM_TIMEOUT_SECONDS,
+                },
+                "id": call_id,
+            })
+            result, runner_error = self._analysis_result_from_tool(tool_result)
+            yield ToolEvent(
+                status=ToolStatus.CALLED,
+                tool_call_id=call_id,
+                tool_name=tool.toolkit.name,
+                function_name="dataset_analysis_run",
+                function_args=display_args,
+                function_result=(result.model_dump() if result else {"success": False, "error": runner_error}),
+            )
+            if result is not None:
+                yield MessageEvent(message=json.dumps(result.model_dump(), ensure_ascii=False))
+                return
+            failure_context = runner_error or "analysis runner failed without a structured error"
+
+        yield MessageEvent(message=json.dumps(ExecutionResult(
+            success=False,
+            result="分析程序执行失败，自动修复后仍未生成可验证成果：" + failure_context,
+            attachments=[],
+        ).model_dump(), ensure_ascii=False))
+
     async def execute_step(self, plan: Plan, step: Step, message: Message) -> AsyncGenerator[BaseEvent, None]:
         self._current_plan = plan
         self._current_message = message
@@ -3351,23 +3500,22 @@ class ExecutionAgent(BaseAgent):
                 dataset_intent=dataset_intent,
                 allow_terminal_quicklook=allow_terminal_quicklook,
             )
-        else:
-            dataset_iteration_budget = (
-                self.DATASET_DELIVERABLE_MAX_ITERATIONS
-                if str(step.inputs.get("artifact_policy") or "optional") == "required"
-                else self.DATASET_FAST_PATH_MAX_ITERATIONS
+        elif dataset_fast_path and dataset_intent in {
+            self.DATASET_INTENT_ANALYSIS,
+            self.DATASET_INTENT_VISUALIZATION,
+        }:
+            execution = self._execute_compiled_dataset_analysis(
+                scoped_request,
+                message=message,
             )
+        else:
             execution = self._execute_with_tool_scope(
                 scoped_request,
                 dataset_fast_path=dataset_fast_path,
                 dataset_intent=dataset_intent,
                 allow_terminal_quicklook=allow_terminal_quicklook,
                 prefer_quicklook_evidence=False,
-                max_iterations=(
-                    dataset_iteration_budget
-                    if dataset_fast_path
-                    else None
-                ),
+                max_iterations=None,
             )
         observed_shell_results: list[ToolMessage] = []
         terminal_result_seen = False

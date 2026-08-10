@@ -417,7 +417,10 @@ class PlanActFlow(BaseFlow):
             step.status == ExecutionStatus.COMPLETED and step.success
         )
         if getattr(self, "_dataset_fast_path_active", False):
-            return step_succeeded
+            # Dataset fast-path execution is terminal by contract. A structured
+            # failure after its bounded execution must be shown to the user, not
+            # handed back to the general planner for an unbounded retry loop.
+            return step.is_done()
         return bool(self.plan and len(self.plan.steps) == 1 and step_succeeded)
 
     def _dynamic_system_prompt(self) -> str:

@@ -63,6 +63,23 @@ def test_csv_quicklook_is_bounded_and_writes_complete_artifact_manifest(tmp_path
     assert evidence["capabilities"]["explicit_temporal_dimensions"][0]["field"] == "年份"
 
 
+def test_netcdf_quicklook_profiles_numeric_variable_without_loading_full_cube(tmp_path):
+    xr = pytest.importorskip("xarray")
+    source = tmp_path / "rain.nc"
+    values = np.arange(24, dtype="float32").reshape(2, 3, 4)
+    xr.Dataset(
+        {"rain": (("time", "lat", "lon"), values, {"units": "mm/day"})},
+        coords={"time": [0, 1], "lat": [30, 31, 32], "lon": [100, 101, 102, 103]},
+    ).to_netcdf(source, engine="h5netcdf")
+
+    manifest = generate_quicklook(source, tmp_path / "output", Limits(max_plots=1))
+
+    dataset = manifest["datasets"][0]
+    assert dataset["format"] == "netcdf"
+    assert dataset["sampled_variable"] == "rain"
+    assert manifest["summary"]["plot_count"] == 1
+
+
 def test_directory_quicklook_recognizes_excel_and_geotiff_without_full_raster_read(tmp_path):
     openpyxl = pytest.importorskip("openpyxl")
     rasterio = pytest.importorskip("rasterio")
