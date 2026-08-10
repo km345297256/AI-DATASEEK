@@ -208,6 +208,46 @@ async def test_dataset_fast_path_uses_its_independent_bounded_budget():
 
 
 @pytest.mark.asyncio
+async def test_dataset_required_artifact_gets_extended_bounded_budget():
+    agent = object.__new__(ExecutionAgent)
+    agent.reset_context = AsyncMock()
+    captured: dict[str, object] = {}
+
+    async def fake_execute(request, _format=None, max_iterations=None):
+        captured["request"] = request
+        captured["max_iterations"] = max_iterations
+        yield MessageEvent(message='{"success":true,"result":"done","attachments":["/home/ubuntu/output/chart.png"]}')
+
+    agent.execute = fake_execute
+    step = Step(
+        id="dataset-plot",
+        description="Render the requested chart",
+        inputs={
+            "execution_mode": "dataset_fast_path",
+            "dataset_intent": "visualization",
+            "artifact_policy": "required",
+            "require_downloadable_result": True,
+            "requested_dimensions": ["visualization"],
+            "user_question": "绘制指定指标的趋势图",
+        },
+    )
+
+    _events = [
+        event
+        async for event in agent.execute_step(
+            Plan(language="zh", steps=[step]),
+            step,
+            Message(message="绘制指定指标的趋势图"),
+        )
+    ]
+
+    assert captured["max_iterations"] == ExecutionAgent.DATASET_DELIVERABLE_MAX_ITERATIONS
+    assert captured["max_iterations"] == 6
+    assert "Prioritize the requested artifact before optional investigation" in captured["request"]
+    assert "Do not postpone plotting or export" in captured["request"]
+
+
+@pytest.mark.asyncio
 async def test_file_preview_copies_exact_inventory_jpg_to_unique_attachment():
     target = "images/field photo's.jpg"
     dataset = _preview_dataset(path=target)

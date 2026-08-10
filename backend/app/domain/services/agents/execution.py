@@ -46,10 +46,12 @@ class ExecutionAgent(BaseAgent):
     name: str = "execution"
     system_prompt: str = SYSTEM_PROMPT + EXECUTION_SYSTEM_PROMPT
     format: str = "json_object"
-    # Custom dataset work may need unpack -> one primary analysis -> one repair,
-    # but must not drift into the former ten-round probe/read/redraw loop.
+    # Ordinary custom dataset work stays tight. Explicit chart/export requests
+    # get two additional decision rounds so inspection cannot consume the whole
+    # budget immediately before the requested artifact is rendered.
     DATASET_FAST_PATH_MAX_ITERATIONS = 4
-    DATASET_TARGETED_FALLBACK_MAX_ITERATIONS = 3
+    DATASET_DELIVERABLE_MAX_ITERATIONS = 6
+    DATASET_TARGETED_FALLBACK_MAX_ITERATIONS = 5
     # A generic quicklook-first request is orchestrated as exactly one
     # deterministic tool call plus, for a multi-part question, one no-tool model
     # synthesis. This timeout bounds that single synthesis call without forcing
@@ -3144,7 +3146,10 @@ class ExecutionAgent(BaseAgent):
             "required": (
                 "The user explicitly requested a downloadable result. Create or reuse at least one "
                 "meaningful Markdown, CSV, JSON, or chart artifact under /home/ubuntu/output in the "
-                "primary analysis run, and return only paths that actually exist."
+                "primary analysis run, and return only paths that actually exist. Prioritize the requested "
+                "artifact before optional investigation: combine the necessary inspection, analysis, and "
+                "rendering in one bounded shell_run whenever they can safely share a script. Do not postpone "
+                "plotting or export until after supplementary probes."
             ),
             "capability": (
                 "Use artifacts already produced by the selected analysis capability. A quicklook manifest "
@@ -3347,6 +3352,11 @@ class ExecutionAgent(BaseAgent):
                 allow_terminal_quicklook=allow_terminal_quicklook,
             )
         else:
+            dataset_iteration_budget = (
+                self.DATASET_DELIVERABLE_MAX_ITERATIONS
+                if str(step.inputs.get("artifact_policy") or "optional") == "required"
+                else self.DATASET_FAST_PATH_MAX_ITERATIONS
+            )
             execution = self._execute_with_tool_scope(
                 scoped_request,
                 dataset_fast_path=dataset_fast_path,
@@ -3354,7 +3364,7 @@ class ExecutionAgent(BaseAgent):
                 allow_terminal_quicklook=allow_terminal_quicklook,
                 prefer_quicklook_evidence=False,
                 max_iterations=(
-                    self.DATASET_FAST_PATH_MAX_ITERATIONS
+                    dataset_iteration_budget
                     if dataset_fast_path
                     else None
                 ),
