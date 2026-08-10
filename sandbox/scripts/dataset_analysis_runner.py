@@ -75,10 +75,13 @@ def _load_result(result_path: Path, output_dir: Path) -> dict:
     if not isinstance(attachments, list) or len(attachments) > MAX_ATTACHMENTS:
         raise ValueError("analysis attachments are invalid")
     validated: list[str] = []
+    resolved_result_path = result_path.resolve()
     for item in attachments:
         path = _safe_output_path(item, output_dir)
         if path is None:
             raise ValueError("analysis attachment is missing or outside the output directory")
+        if path == resolved_result_path:
+            continue
         validated.append(str(path))
     return {
         "success": bool(payload.get("success", True)),

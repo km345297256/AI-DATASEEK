@@ -101,3 +101,25 @@ Path({str(result_path)!r}).write_text(json.dumps({{'success': True, 'result': '�
     payload = json.loads(capsys.readouterr().out)
     assert payload["success"] is True
     assert payload["result"] == "完成分析"
+
+
+def test_runner_never_delivers_its_internal_result_manifest(tmp_path, capsys, monkeypatch):
+    output_root = tmp_path / "output"
+    output_root.mkdir()
+    monkeypatch.setattr(runner, "OUTPUT_ROOT", output_root.resolve())
+    output_dir = output_root / "analysis-manifest"
+    result_path = output_dir / "result.json"
+    source = f"""
+from pathlib import Path
+import json
+result = Path({str(result_path)!r})
+result.write_text(json.dumps({{'success': True, 'result': '完成分析', 'attachments': [str(result)]}}), encoding='utf-8')
+"""
+
+    assert runner.main([
+        "--program-base64", _encoded(source),
+        "--output-dir", str(output_dir),
+        "--result-path", str(result_path),
+    ]) == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["attachments"] == []

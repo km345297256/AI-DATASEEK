@@ -61,6 +61,31 @@ def test_dataset_analysis_tool_renders_safe_result_console_without_program_sourc
     assert "base64" not in str(console).lower()
 
 
+def test_dataset_quicklook_tool_renders_summary_instead_of_full_json():
+    event = ToolEvent(
+        status=ToolStatus.CALLED,
+        tool_call_id="quicklook-1",
+        tool_name="shell",
+        function_name="dataset_quicklook",
+        function_args={"input_path": "/home/ubuntu/datasets/example"},
+        function_result={
+            "success": True,
+            "data": {
+                "status": "completed",
+                "output": '{"success":true,"summary":{"files_analyzed":24,"files_failed":0,"plot_count":4,"elapsed_seconds":6.988},"evidence":{"discovery":{"truncated":true}},"datasets":[{"path":"secret-detail.nc"}]}',
+            },
+        },
+    )
+
+    console = AgentTaskRunner._dataset_quicklook_console(event)
+
+    assert console[0]["command"] == "快速探查数据集"
+    assert "文件：24 个" in console[0]["output"]
+    assert "图表：4 张" in console[0]["output"]
+    assert "有界抽样" in console[0]["output"]
+    assert "secret-detail.nc" not in console[0]["output"]
+
+
 async def _noop(*args, **kwargs):
     return None
 
@@ -347,6 +372,72 @@ async def test_partial_artifact_is_emitted_before_terminal_error():
         "partial": True,
     }
     assert discovery_calls == 1
+
+
+@pytest.mark.asyncio
+async def test_failed_compiled_analysis_does_not_publish_unverified_outputs():
+    failed_step = Step(
+        description="分析数据集",
+        status=ExecutionStatus.COMPLETED,
+        success=False,
+        result="分析程序执行失败",
+        inputs={"execution_mode": "dataset_fast_path"},
+    )
+
+    class _Flow:
+        status = AgentStatus.EXECUTING
+
+        async def run(self, message):
+            yield ToolEvent(
+                tool_call_id="analysis-1",
+                tool_name="shell",
+                function_name="dataset_analysis_run",
+                function_args={"command": "分析数据集并生成成果"},
+                function_result={"success": False, "error": "program failed"},
+                status=ToolStatus.CALLED,
+            )
+            yield StepEvent(status=StepStatus.COMPLETED, step=failed_step)
+            yield MessageEvent(message="分析程序执行失败")
+            yield DoneEvent()
+
+    runner = AgentTaskRunner.__new__(AgentTaskRunner)
+    runner._agent_id = "agent-1"
+    runner._session_id = "session-1"
+    runner._flow = _Flow()
+    runner._safety_reviewer = _AllowSafetyReviewer()
+    runner._generated_files = []
+    runner._record_safety_audit = _noop
+    runner._initialize_mcp_tool = _noop
+    runner._handle_tool_event = _noop
+    runner._sync_message_attachments_to_storage = _noop
+
+    async def _sync_step(event):
+        return []
+
+    runner._sync_step_attachments_to_storage = _sync_step
+    discovery_calls = 0
+
+    async def _discover(*, skip_paths=None):
+        nonlocal discovery_calls
+        discovery_calls += 1
+        return [FileInfo(filename="partial.png", file_path="/home/ubuntu/output/analysis-x/partial.png")]
+
+    runner._sync_discovered_artifacts_to_storage = _discover
+
+    events = [event async for event in runner._run_flow(_message())]
+
+    assert not any(isinstance(event, MessageEvent) and event.attachments for event in events)
+    assert discovery_calls == 0
+
+
+def test_compiled_analysis_manifest_is_not_a_syncable_artifact():
+    runner = AgentTaskRunner.__new__(AgentTaskRunner)
+    runner._protected_dataset_paths = set()
+    runner._protected_dataset_roots = set()
+    runner._private_artifact_roots = set()
+
+    assert runner._is_syncable_artifact("/home/ubuntu/output/analysis-abc/result.json") is False
+    assert runner._is_syncable_artifact("/home/ubuntu/output/analysis-abc/chart.png") is True
 
 
 @pytest.mark.asyncio

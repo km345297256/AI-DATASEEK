@@ -505,6 +505,10 @@ class AgentTaskRunner(TaskRunner):
         if not file_path:
             return False
         path = PurePosixPath(file_path)
+        if path.name == "result.json" and any(
+            part.startswith("analysis-") for part in path.parts
+        ):
+            return False
         if any(part in ARTIFACT_EXCLUDED_PARTS for part in path.parts):
             return False
         if self._is_private_artifact_path(file_path):
@@ -844,6 +848,53 @@ class AgentTaskRunner(TaskRunner):
             "status": "completed" if success else "failed",
             "returncode": 0 if success else 1,
         }]
+
+    @staticmethod
+    def _dataset_quicklook_console(event: ToolEvent) -> list[dict[str, Any]]:
+        """Render quicklook's compact summary instead of its full evidence JSON."""
+        function_result = event.function_result
+        if isinstance(function_result, ToolResult):
+            data = function_result.data if isinstance(function_result.data, dict) else {}
+        elif isinstance(function_result, dict):
+            data = function_result.get("data") if isinstance(function_result.get("data"), dict) else function_result
+        else:
+            data = {}
+        raw_output = data.get("output") or ""
+        payload: dict[str, Any] = {}
+        if isinstance(raw_output, str):
+            try:
+                parsed = json.loads(raw_output)
+                if isinstance(parsed, dict):
+                    payload = parsed
+            except (TypeError, ValueError):
+                pass
+        summary = payload.get("summary") if isinstance(payload.get("summary"), dict) else {}
+        success = bool(payload.get("success", data.get("success", False)))
+        if success:
+            lines = [
+                "数据集快速探查已完成",
+                f"文件：{summary.get('files_analyzed', 0)} 个",
+                f"图表：{summary.get('plot_count', 0)} 张",
+                f"耗时：{summary.get('elapsed_seconds', 0)} 秒",
+            ]
+            failed = summary.get("files_failed", 0)
+            if failed:
+                lines.append(f"失败：{failed} 个文件")
+            evidence = payload.get("evidence") if isinstance(payload.get("evidence"), dict) else {}
+            discovery = evidence.get("discovery") if isinstance(evidence.get("discovery"), dict) else {}
+            if discovery.get("truncated"):
+                lines.append("提示：文件数量较多，结果基于有界抽样")
+            output = "\n".join(lines)
+        else:
+            error = payload.get("error") or data.get("error") or "快速探查未生成有效结果"
+            output = f"数据集快速探查失败：{str(error)[:500]}"
+        return [{
+            "ps1": "$",
+            "command": "快速探查数据集",
+            "output": output,
+            "status": "completed" if success else "failed",
+            "returncode": 0 if success else 1,
+        }]
     
     async def _sync_message_attachments_to_sandbox(self, event: MessageEvent) -> None:
         """Sync message attachments and update event attachments"""
@@ -882,6 +933,8 @@ class AgentTaskRunner(TaskRunner):
                 elif event.tool_name == "shell":
                     if event.function_name == "dataset_analysis_run":
                         completed_console = self._dataset_analysis_console(event)
+                    elif event.function_name == "dataset_quicklook":
+                        completed_console = self._dataset_quicklook_console(event)
                     else:
                         completed_console = self._completed_shell_console_from_result(event)
                     if completed_console is not None:
@@ -1148,9 +1201,15 @@ class AgentTaskRunner(TaskRunner):
                 self._remember_private_tool_output(event)
                 await self._handle_tool_event(event)
                 if event.status == ToolStatus.CALLED:
-                    # Tools may create or replace files.  Defer discovery until
-                    # the step boundary instead of scanning after every event.
-                    artifact_discovery_dirty = True
+                    if event.function_name == "dataset_analysis_run":
+                        # Compiled analysis has an explicit, runner-validated
+                        # attachment contract. Never publish unverified files
+                        # left behind by a failed program or its result.json.
+                        artifact_discovery_dirty = False
+                    else:
+                        # Tools may create or replace files. Defer discovery until
+                        # the step boundary instead of scanning after every event.
+                        artifact_discovery_dirty = True
             elif isinstance(event, StepEvent):
                 explicit_files = await self._sync_step_attachments_to_storage(event)
                 artifact_policy = str(
