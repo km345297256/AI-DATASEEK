@@ -12,7 +12,9 @@ from pathlib import Path
 
 
 MAX_PROGRAM_BYTES = 256 * 1024
-MAX_RESULT_BYTES = 64 * 1024
+MAX_MANIFEST_BYTES = 512 * 1024
+MAX_RESULT_TEXT_BYTES = 32 * 1024
+MAX_EVIDENCE_BYTES = 16 * 1024
 MAX_ATTACHMENTS = 32
 OUTPUT_ROOT = Path("/home/ubuntu/output").resolve()
 
@@ -62,9 +64,20 @@ def _safe_output_path(value: object, output_dir: Path) -> Path | None:
     return resolved if resolved.is_file() else None
 
 
+def _truncate_utf8(value: str, maximum: int) -> str:
+    encoded = value.encode("utf-8")
+    if len(encoded) <= maximum:
+        return value
+    suffix = "\n\n[结果过长，已在交付时截断；完整成果请查看附件。]"
+    available = max(0, maximum - len(suffix.encode("utf-8")))
+    return encoded[:available].decode("utf-8", errors="ignore") + suffix
+
+
 def _load_result(result_path: Path, output_dir: Path) -> dict:
-    if not result_path.is_file() or result_path.stat().st_size > MAX_RESULT_BYTES:
-        raise ValueError("analysis result manifest is missing or too large")
+    if not result_path.is_file():
+        raise ValueError("analysis result manifest is missing")
+    if result_path.stat().st_size > MAX_MANIFEST_BYTES:
+        raise ValueError("analysis result manifest exceeds the 512 KiB safety limit")
     payload = json.loads(result_path.read_text(encoding="utf-8"))
     if not isinstance(payload, dict):
         raise ValueError("analysis result manifest must be an object")
@@ -83,11 +96,24 @@ def _load_result(result_path: Path, output_dir: Path) -> dict:
         if path == resolved_result_path:
             continue
         validated.append(str(path))
+    evidence = payload.get("evidence", {})
+    evidence_bytes = len(json.dumps(
+        evidence,
+        ensure_ascii=False,
+        default=str,
+        separators=(",", ":"),
+    ).encode("utf-8"))
+    if evidence_bytes > MAX_EVIDENCE_BYTES:
+        evidence = {
+            "truncated": True,
+            "original_bytes": evidence_bytes,
+            "message": "Detailed evidence was omitted from the event payload.",
+        }
     return {
         "success": bool(payload.get("success", True)),
-        "result": result,
+        "result": _truncate_utf8(result.strip(), MAX_RESULT_TEXT_BYTES),
         "attachments": validated,
-        "evidence": payload.get("evidence", {}),
+        "evidence": evidence,
     }
 
 

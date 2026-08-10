@@ -123,3 +123,31 @@ result.write_text(json.dumps({{'success': True, 'result': '完成分析', 'attac
     ]) == 0
     payload = json.loads(capsys.readouterr().out)
     assert payload["attachments"] == []
+
+
+def test_runner_bounds_large_result_and_evidence_without_failing_success(tmp_path, capsys, monkeypatch):
+    output_root = tmp_path / "output"
+    output_root.mkdir()
+    monkeypatch.setattr(runner, "OUTPUT_ROOT", output_root.resolve())
+    output_dir = output_root / "analysis-large-result"
+    result_path = output_dir / "result.json"
+    source = f"""
+from pathlib import Path
+import json
+Path({str(result_path)!r}).write_text(json.dumps({{
+    'success': True,
+    'result': '结论' * 6000,
+    'evidence': {{'values': list(range(30000))}},
+    'attachments': [],
+}}), encoding='utf-8')
+"""
+
+    assert runner.main([
+        "--program-base64", _encoded(source),
+        "--output-dir", str(output_dir),
+        "--result-path", str(result_path),
+    ]) == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["success"] is True
+    assert len(payload["result"].encode("utf-8")) <= runner.MAX_RESULT_TEXT_BYTES + 100
+    assert payload["evidence"]["truncated"] is True

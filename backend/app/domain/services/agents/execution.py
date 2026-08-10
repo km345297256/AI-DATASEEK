@@ -3286,6 +3286,8 @@ class ExecutionAgent(BaseAgent):
             "Markdown string), `attachments` (absolute paths of files actually created below "
             f"{output_dir}), and optional `evidence`. Use {output_dir} for all output files. "
             "The result must distinguish measured evidence, interpretation, method, and limitations. "
+            "Keep `result` concise (at most 8000 characters). Keep `evidence` aggregated and JSON-safe; "
+            "never embed raw arrays, full coordinate vectors, complete variable dumps, or repeated metadata. "
             "Never install packages, access the network, or invent a file or unit. Use only the already "
             "installed scientific stack. Keep the program bounded and avoid loading an entire large raster "
             "or table when sampling is sufficient. The program itself must be self-contained and must not "
