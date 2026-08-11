@@ -242,6 +242,7 @@ class AgentDomainService:
             user_id=session.user_id,
             resolution=resolution,
             session_repository=self._session_repository,
+            file_storage=self._file_storage,
         )
         task = self._task_cls.create(runner)
         session.task_id = task.id

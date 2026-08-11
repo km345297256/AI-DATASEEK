@@ -1,8 +1,11 @@
+import io
 import logging
 from typing import Any
 
 from app.application.services.dataset_request_resolver import FrontControllerResolution
 from app.domain.external.task import Task, TaskRunner
+from app.domain.external.file import FileStorage
+from app.domain.models.file import FileInfo
 from app.domain.models.audit import AuditRiskLevel, AuditStatus
 from app.domain.models.event import AgentEvent, DoneEvent, ErrorEvent, MessageEvent
 from app.domain.models.session import SessionStatus
@@ -25,11 +28,13 @@ class LightweightTaskRunner(TaskRunner):
         user_id: str,
         resolution: FrontControllerResolution,
         session_repository: SessionRepository,
+        file_storage: FileStorage,
     ):
         self._session_id = session_id
         self._user_id = user_id
         self._resolution = resolution
         self._session_repository = session_repository
+        self._file_storage = file_storage
         self._audit_service = AuditService()
         self._completion_advice = get_completion_advice_service()
 
@@ -73,7 +78,13 @@ class LightweightTaskRunner(TaskRunner):
                     "execution_mode": "lightweight",
                     "front_controller": self._resolution.controller_metadata,
                 }
-            assistant_event = MessageEvent(role="assistant", message=answer, metadata=metadata)
+            attachments = await self._upload_catalog_artifacts()
+            assistant_event = MessageEvent(
+                role="assistant",
+                message=answer,
+                metadata=metadata,
+                attachments=attachments or None,
+            )
             await self._publish(task, assistant_event)
             await self._session_repository.update_latest_message(self._session_id, answer, assistant_event.timestamp)
             await self._session_repository.increment_unread_message_count(self._session_id)
@@ -84,6 +95,28 @@ class LightweightTaskRunner(TaskRunner):
             logger.exception("Lightweight task failed for session %s", self._session_id)
             await self._publish(task, ErrorEvent(error=public_error_message(exc)))
             await self._session_repository.update_status(self._session_id, SessionStatus.COMPLETED)
+
+    async def _upload_catalog_artifacts(self) -> list[FileInfo]:
+        artifacts = getattr(self._resolution, "artifacts", [])
+        if not artifacts:
+            return []
+        uploaded = []
+        for artifact in artifacts:
+            content = artifact.content.encode("utf-8")
+            file_info = await self._file_storage.upload_file(
+                io.BytesIO(content),
+                artifact.filename,
+                self._user_id,
+                content_type=artifact.content_type,
+                metadata={
+                    "session_id": self._session_id,
+                    "source": "catalog_artifact",
+                    "artifact_size": len(content),
+                },
+            )
+            await self._session_repository.add_file(self._session_id, file_info)
+            uploaded.append(file_info)
+        return uploaded
 
     async def _record_safety_audit(self, review) -> None:
         risk_level = {

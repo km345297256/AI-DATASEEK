@@ -8,7 +8,7 @@ from pathlib import PurePosixPath
 from typing import Any, Literal
 
 from langchain.messages import HumanMessage, SystemMessage
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from app.core.config import get_settings
 from app.domain.models.dataset import DataCenterDataset
@@ -36,6 +36,14 @@ class CatalogQuery(BaseModel):
     limit: int = Field(default=50, ge=1, le=200)
     offset: int = Field(default=0, ge=0)
 
+    @field_validator("limit", mode="before")
+    @classmethod
+    def constrain_limit_to_catalog_capability(cls, value: Any) -> Any:
+        try:
+            return min(int(value), 200)
+        except (TypeError, ValueError):
+            return value
+
 
 @dataclass
 class CatalogArtifact:
@@ -47,6 +55,7 @@ class CatalogArtifact:
 class RequestDecision(BaseModel):
     safety: SafetyReview
     execution: "ExecutionDecision"
+    catalog_goal: Literal["lookup", "page", "random_sample", "complete_export", "summary"] = "lookup"
     answer: str = ""
     catalog_queries: list[CatalogQuery] = Field(default_factory=list)
     reason: str = ""
@@ -107,6 +116,7 @@ Return JSON only:
     "requires_artifacts":false,
     "target_files":["exact registered logical path when one or more files are explicitly targeted"]
   },
+  "catalog_goal":"lookup|page|random_sample|complete_export|summary",
   "answer": "complete answer when mode=direct, otherwise empty",
   "catalog_queries": [
     {"operation":"search_files|list_files|sample_files|export_file_inventory|inventory_summary|dataset_metadata","query":"...","limit":50,"offset":0}
@@ -130,6 +140,9 @@ Rules:
   random subset, and `export_file_inventory` when the user requests every path or
   the complete listing would exceed 200 entries. The export is delivered as an
   artifact, so set requires_artifacts=true.
+- Set catalog_goal consistently: lookup for a named-path search, page for a
+  bounded listing, random_sample for random selection, complete_export for every
+  path, and summary for counts/formats/metadata.
 - Use sandbox when answering requires opening file contents, reading variables or
   rows, statistics, scientific interpretation, plotting, scripts, computation,
   browser access, generated artifacts, or uncertain evidence.
@@ -154,8 +167,9 @@ user's language, and do not expose internal or host filesystem paths. If the
 evidence is insufficient or ambiguous, say so explicitly. Do not claim that
 file contents were inspected. An empty `matches` array means only that the
 specific lookup matched nothing; it never means the inventory is empty when
-`inventory_file_count` is greater than zero. When an inventory artifact is
-present, state that the complete path list is attached.
+`inventory_file_count` is greater than zero. Do not say that a file, attachment,
+artifact, or complete path list is attached; delivery is reported separately by
+the server from the actual generated artifact list.
 """.strip()
 
 
@@ -181,8 +195,6 @@ class DatasetCatalogQueryService:
                             continue
                         if needle and needle not in logical_path.casefold():
                             continue
-                        filename = logical_path.rsplit("/", 1)[-1]
-                        suffix = filename.rsplit(".", 1)[-1] if "." in filename else ""
                         matches.append(self._file_record(dataset, item, logical_path))
                         if len(matches) >= query.limit:
                             break
@@ -400,6 +412,9 @@ class DatasetRequestResolver:
             answer = self._message_text(synthesis).strip()
             if not answer:
                 raise ValueError("catalog synthesis returned an empty answer")
+            if artifacts:
+                filenames = "、".join(artifact.filename for artifact in artifacts)
+                answer = f"{answer}\n\n完整路径清单已作为成果物附上：`{filenames}`"
             return self._resolution(
                 decision,
                 answer=answer,
@@ -427,6 +442,21 @@ class DatasetRequestResolver:
             return None
         if mode == "catalog" and (not has_datasets or not decision.catalog_queries):
             return "catalog decision requires datasets and queries"
+        if mode == "catalog":
+            seed = decision.catalog_queries[0]
+            operation = {
+                "page": "list_files",
+                "random_sample": "sample_files",
+                "complete_export": "export_file_inventory",
+            }.get(decision.catalog_goal)
+            if operation:
+                decision.catalog_queries = [CatalogQuery(
+                    operation=operation,
+                    limit=seed.limit,
+                    offset=seed.offset,
+                )]
+            if decision.catalog_goal == "complete_export":
+                decision.execution.requires_artifacts = True
         decision.answer = ""
         if mode == "sandbox":
             # Some models include a harmless catalog lookup while correctly
@@ -488,15 +518,11 @@ class DatasetRequestResolver:
         ]
         if not rows:
             return []
-        lines = ["dataset\tlogical_path\tsize_bytes"]
-        lines.extend(
-            f"{row['dataset']}\t{row['logical_path']}\t{row['size_bytes']}"
-            for row in rows
-        )
+        lines = [row["logical_path"] for row in rows]
         return [CatalogArtifact(
-            filename="dataset_file_inventory.tsv",
+            filename="dataset_file_paths.txt",
             content="\n".join(lines) + "\n",
-            content_type="text/tab-separated-values",
+            content_type="text/plain",
         )]
 
     @staticmethod

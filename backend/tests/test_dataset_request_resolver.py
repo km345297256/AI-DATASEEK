@@ -5,6 +5,7 @@ import pytest
 from app.application.services import dataset_request_resolver as resolver_module
 from app.application.services.dataset_request_resolver import (
     CatalogQuery,
+    CatalogArtifact,
     DatasetCatalogQueryService,
     DatasetRequestResolver,
     ExecutionDecision,
@@ -200,6 +201,99 @@ def test_catalog_query_service_exposes_only_logical_catalog_metadata():
     assert evidence[0]["matches"][0]["logical_path"] == "monthly/rain_195301.nc"
     assert evidence[0]["matches"][0]["extension"] == ".nc"
     assert "/home/" not in str(evidence)
+
+
+def test_catalog_random_sample_returns_requested_unique_files():
+    evidence = DatasetCatalogQueryService().execute(
+        [_dataset()],
+        [CatalogQuery(operation="sample_files", limit=2)],
+    )
+
+    matches = evidence[0]["matches"]
+    assert len(matches) == 2
+    assert len({item["logical_path"] for item in matches}) == 2
+    assert evidence[0]["inventory_file_count"] == 2
+
+
+@pytest.mark.asyncio
+async def test_catalog_goal_corrects_natural_language_search_to_random_sample(monkeypatch):
+    model = _FakeModel([
+        '{"safety":{"decision":"allow","risk_level":"low"},'
+        '"execution":{"mode":"catalog","required_evidence":"catalog","required_capabilities":[],"requires_artifacts":false},'
+        '"catalog_goal":"random_sample","answer":"",'
+        '"catalog_queries":[{"operation":"search_files","query":"随机挑选文件","limit":2}],"reason":"抽样"}',
+        "随机抽取的两个文件已列出。",
+    ])
+    monkeypatch.setattr(resolver_module, "create_chat_model", lambda *_args, **_kwargs: model)
+    monkeypatch.setattr(resolver_module, "get_settings", lambda: SimpleNamespace(dataset_request_resolver_timeout_seconds=1))
+
+    resolution = await _resolver().resolve(
+        question="从数据集中随机挑选两个文件",
+        datasets=[_dataset()],
+        events=[],
+    )
+
+    assert resolution.mode == "catalog"
+    assert resolution.decision.catalog_queries[0].operation == "sample_files"
+    assert resolution.decision.catalog_queries[0].query == ""
+
+
+@pytest.mark.asyncio
+async def test_complete_inventory_goal_generates_full_catalog_artifact(monkeypatch):
+    model = _FakeModel([
+        '{"safety":{"decision":"allow","risk_level":"low"},'
+        '"execution":{"mode":"catalog","required_evidence":"catalog","required_capabilities":[],"requires_artifacts":true},'
+        '"catalog_goal":"complete_export","answer":"",'
+        '"catalog_queries":[{"operation":"search_files","query":"所有文件路径","limit":50}],"reason":"完整导出"}',
+        "完整文件路径清单已作为附件生成。",
+    ])
+    monkeypatch.setattr(resolver_module, "create_chat_model", lambda *_args, **_kwargs: model)
+    monkeypatch.setattr(resolver_module, "get_settings", lambda: SimpleNamespace(dataset_request_resolver_timeout_seconds=1))
+
+    resolution = await _resolver().resolve(
+        question="枚举所有文件的路径",
+        datasets=[_dataset()],
+        events=[],
+    )
+
+    assert resolution.decision.catalog_queries[0].operation == "export_file_inventory"
+    assert len(resolution.artifacts) == 1
+    assert "monthly/rain_195301.nc" in resolution.artifacts[0].content
+    assert "monthly/snow_195301.nc" in resolution.artifacts[0].content
+    assert "dataset_file_paths.txt" in resolution.answer
+
+
+def test_catalog_query_constrains_model_limit_to_server_capability():
+    query = CatalogQuery(operation="export_file_inventory", limit=4860)
+
+    assert query.limit == 200
+
+
+@pytest.mark.asyncio
+async def test_lightweight_runner_uploads_catalog_artifact():
+    uploaded = []
+
+    class Storage:
+        async def upload_file(self, file_data, filename, user_id, content_type=None, metadata=None):
+            uploaded.append(file_data.read().decode("utf-8"))
+            return SimpleNamespace(filename=filename, file_id="file-1")
+
+    class Repository:
+        async def add_file(self, _session_id, file_info):
+            assert file_info.file_id == "file-1"
+
+    runner = LightweightTaskRunner.__new__(LightweightTaskRunner)
+    runner._session_id = "session-1"
+    runner._user_id = "user-1"
+    runner._file_storage = Storage()
+    runner._session_repository = Repository()
+    runner._resolution = _resolution()
+    runner._resolution.artifacts = [CatalogArtifact("paths.tsv", "a.tif\nb.tif\n")]
+
+    files = await runner._upload_catalog_artifacts()
+
+    assert uploaded == ["a.tif\nb.tif\n"]
+    assert files[0].filename == "paths.tsv"
 
 
 @pytest.mark.asyncio
