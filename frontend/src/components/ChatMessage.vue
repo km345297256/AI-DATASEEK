@@ -114,6 +114,7 @@
       </div>
     </div>
   </div>
+  <TaskExecutionSummary v-else-if="message.type === 'task-summary'" :content="taskSummaryContent" />
   <div v-else-if="message.type === 'attachments' && attachmentsContent.role === 'assistant'" class="flex flex-col gap-2 w-full group" :class="hideAssistantHeader ? 'mt-0' : 'mt-3'">
     <div v-if="!hideAssistantHeader" class="flex items-center justify-between h-7 group">
       <div class="flex items-center gap-[3px]">
@@ -134,7 +135,7 @@
 
 <script setup lang="ts">
 import ManusTextIcon from './icons/ManusTextIcon.vue';
-import { Message, MessageContent, AttachmentsContent } from '../types/message';
+import { Message, MessageContent, AttachmentsContent, TaskSummaryContent } from '../types/message';
 import ToolUse from './ToolUse.vue';
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';
@@ -143,6 +144,7 @@ import { computed, onUnmounted, ref, type Component } from 'vue';
 import { ToolContent, StepContent } from '../types/message';
 import { useRelativeTime } from '../composables/useTime';
 import AttachmentsMessage from './AttachmentsMessage.vue';
+import TaskExecutionSummary from './TaskExecutionSummary.vue';
 import { copyToClipboard } from '../utils/dom';
 import { stripHiddenDatasetResultNotices } from '../utils/datasetResultPresentation';
 import { showErrorToast } from '../utils/toast';
@@ -211,6 +213,7 @@ const safetyCategoryLabels: Record<string, string> = {
 const safetyCategoryLabel = (category: string) => safetyCategoryLabels[category] || category;
 const toolContent = computed(() => props.message.content as ToolContent);
 const attachmentsContent = computed(() => props.message.content as AttachmentsContent);
+const taskSummaryContent = computed(() => props.message.content as TaskSummaryContent);
 
 type DisplayToolItem = {
   tool: ToolContent;

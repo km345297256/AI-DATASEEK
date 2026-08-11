@@ -191,6 +191,7 @@ import {
   failRunningSteps,
   findCurrentTurnRunningStep,
   findCurrentTurnStep,
+  insertTaskExecutionSummary,
 } from '../utils/chatTimeline';
 import { SessionStatus } from '../types/response';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -305,6 +306,8 @@ const failActiveSteps = (currentTurnOnly = true) => {
 };
 
 const startUserTurn = () => {
+  toolPanel.value?.hideToolPanel();
+  realTime.value = false;
   failActiveSteps(false);
   plan.value = undefined;
   lastTool.value = undefined;
@@ -354,9 +357,6 @@ const handleToolEvent = (toolData: ToolEventData) => {
   }
   if (toolContent.name !== 'message') {
     lastNoMessageTool.value = toolContent;
-    if (realTime.value) {
-      toolPanel.value?.showToolPanel(toolContent, true);
-    }
   }
 }
 
@@ -373,6 +373,7 @@ const handleStepEvent = (stepData: StepEventData) => {
         type: 'step',
         content: {
           ...stepData,
+          started_at: stepData.timestamp,
           tools: []
         } as StepContent,
       });
@@ -381,11 +382,13 @@ const handleStepEvent = (stepData: StepEventData) => {
     if (existingStep) {
       existingStep.status = stepData.status;
       existingStep.description = stepData.description;
+      existingStep.ended_at = stepData.timestamp;
     }
   } else if (stepData.status === 'failed') {
     if (existingStep) {
       existingStep.status = stepData.status;
       existingStep.description = stepData.description;
+      existingStep.ended_at = stepData.timestamp;
     }
     isLoading.value = false;
   }
@@ -465,6 +468,7 @@ const handleEvent = (event: AgentSSEEvent) => {
   } else if (event.event === 'done') {
     isLoading.value = false;
     eventBus.emit(EVENT_REFRESH_SESSION_LIST);
+    insertTaskExecutionSummary(messages.value, event.data.timestamp);
     completionAdvice.value = (event.data as any)?.advice;
   } else if (event.event === 'wait') {
     isLoading.value = false;

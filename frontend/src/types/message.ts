@@ -1,7 +1,7 @@
 import type { FileInfo } from '../api/file';
 import type { MessageEventData } from './event';
 
-export type MessageType = "user" | "assistant" | "tool" | "step" | "attachments";
+export type MessageType = "user" | "assistant" | "tool" | "step" | "task-summary" | "attachments";
 
 export interface Message {
   type: MessageType;
@@ -36,6 +36,24 @@ export interface StepContent extends BaseContent {
   description: string;
   status: 'pending' | 'running' | 'completed' | 'failed';
   tools: ToolContent[];
+  started_at?: number;
+  ended_at?: number;
+}
+
+export interface TaskSummaryStep {
+  id: string;
+  description: string;
+  status: StepContent['status'];
+  started_at: number;
+  ended_at: number;
+  duration_seconds: number;
+}
+
+export interface TaskSummaryContent extends BaseContent {
+  started_at: number;
+  ended_at: number;
+  duration_seconds: number;
+  steps: TaskSummaryStep[];
 }
 
 export interface AttachmentsContent extends BaseContent {
@@ -48,5 +66,8 @@ export function isConsecutiveAssistant(messages: Message[], index: number): bool
   const isAst = (m: Message) =>
     m.type === 'assistant' ||
     (m.type === 'attachments' && (m.content as AttachmentsContent).role === 'assistant');
-  return isAst(messages[index]) && isAst(messages[index - 1]);
+  if (!isAst(messages[index])) return false;
+  let previousIndex = index - 1;
+  while (previousIndex >= 0 && messages[previousIndex].type === 'task-summary') previousIndex -= 1;
+  return previousIndex >= 0 && isAst(messages[previousIndex]);
 }

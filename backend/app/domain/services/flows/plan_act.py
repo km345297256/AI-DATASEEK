@@ -15,6 +15,8 @@ from app.domain.models.event import (
     MessageEvent,
     DoneEvent,
     TitleEvent,
+    ToolEvent,
+    ToolStatus,
 )
 from app.domain.models.plan import ExecutionStatus, Plan, Step
 from app.domain.services.agents.planner import PlannerAgent
@@ -35,6 +37,7 @@ from app.domain.services.tools.message import MessageToolkit
 from app.domain.services.tools.search import SearchToolkit
 from app.domain.services.tools.skill import SkillToolkit
 from app.domain.services.skills import SkillRegistry, SkillRenderer
+from app.domain.services.skills.session_skill_creator import is_skill_create_request
 from app.core.config import get_settings
 from app.domain.models.agent_profile import AgentSubAgentConfig, default_subagents
 from app.application.services.data_center_dataset_service import render_dataset_context
@@ -192,6 +195,12 @@ class PlanActFlow(BaseFlow):
             if subagent.enabled
         }
         base_llm_overrides = llm_overrides or {}
+        self.skill_toolkit = SkillToolkit(
+            self.skill_registry,
+            session_id=self._session_id,
+            user_id=self._user_id,
+            session_repository=self._session_repository,
+        )
         tools = [
             ShellToolkit(sandbox),
             BrowserToolkit(
@@ -203,12 +212,7 @@ class PlanActFlow(BaseFlow):
             ),
             FileToolkit(sandbox),
             MessageToolkit(),
-            SkillToolkit(
-                self.skill_registry,
-                session_id=self._session_id,
-                user_id=self._user_id,
-                session_repository=self._session_repository,
-            ),
+            self.skill_toolkit,
             mcp_tool,
         ]
 
@@ -284,6 +288,12 @@ class PlanActFlow(BaseFlow):
             current_user_message=message.message,
         )
         self.dataset_context = render_dataset_context(message.datasets)
+        if is_skill_create_request(message.message):
+            self._dataset_fast_path_active = False
+            async for event in self._run_skill_create_command():
+                yield event
+            self.status = AgentStatus.IDLE
+            return
         active_skills = self._activate_skills(message.skills or [])
         if active_skills:
             logger.info(
@@ -410,6 +420,47 @@ class PlanActFlow(BaseFlow):
     def is_done(self) -> bool:
         return self.status == AgentStatus.IDLE
 
+    async def _run_skill_create_command(self) -> AsyncGenerator[BaseEvent, None]:
+        """Execute the built-in session-to-Skill command without an LLM round trip."""
+        function_name = "skill_create_from_session"
+        tool_call_id = f"skill-create-{self._session_id}"
+        function_args: dict = {}
+        yield TitleEvent(title="保存分析流程")
+        yield ToolEvent(
+            status=ToolStatus.CALLING,
+            tool_call_id=tool_call_id,
+            tool_name=self.skill_toolkit.name,
+            function_name=function_name,
+            function_args=function_args,
+        )
+
+        tool = self.skill_toolkit.get_tool(function_name)
+        if tool is None:
+            raise RuntimeError("Skill creation capability is unavailable")
+        tool_message = await tool.ainvoke({"id": tool_call_id, "args": function_args})
+        result = tool_message.artifact
+        yield ToolEvent(
+            status=ToolStatus.CALLED,
+            tool_call_id=tool_call_id,
+            tool_name=self.skill_toolkit.name,
+            function_name=function_name,
+            function_args=function_args,
+            function_result=result,
+        )
+
+        if not result.success:
+            raise RuntimeError(result.message or "Skill creation failed")
+        skill = result.data or {}
+        name = skill.get("name") or "未命名技能"
+        yield MessageEvent(
+            role="assistant",
+            message=(
+                f"已将当前任务的分析流程保存为技能 `{name}`。"
+                "后续遇到相似数据与分析目标时，可以直接复用该流程。"
+            ),
+        )
+        yield DoneEvent()
+
     @staticmethod
     def _status_after_execution_step(step: Step) -> AgentStatus:
         if step.status == ExecutionStatus.COMPLETED and step.success:
@@ -466,6 +517,7 @@ class PlanActFlow(BaseFlow):
         return bool(
             message.datasets
             and "execution" in self._enabled_subagents()
+            and not is_skill_create_request(message.message)
             and not message.skills
             and not message.mcp_servers
             and not self._message_has_image_attachment(message)
@@ -523,6 +575,15 @@ class PlanActFlow(BaseFlow):
                 "instruction": (
                     "仅使用数据中心已验证的登记清单回答总大小、文件数量和格式分组；"
                     "不读取或推断文件内容，不暴露宿主机真实路径。登记清单不完整时必须回退到挂载数据检查。"
+                ),
+                "include_archive_tree": False,
+                "allow_terminal_quicklook": False,
+            },
+            "file_metadata": {
+                "description": "读取指定文件的目录元数据",
+                "instruction": (
+                    "仅根据数据中心已验证的文件清单回答指定文件的扩展名等目录元数据；"
+                    "不要读取文件内容，不要启动快速探查，不要暴露宿主机真实路径。"
                 ),
                 "include_archive_tree": False,
                 "allow_terminal_quicklook": False,
@@ -624,9 +685,9 @@ class PlanActFlow(BaseFlow):
                         # reconstruct it from a generic step label.
                         "user_question": message.message,
                         "execution_guidance": intent_config["instruction"],
-                        "require_model_answer": dataset_intent not in {"catalog_description", "catalog_metadata", "file_preview", "inventory"},
+                        "require_model_answer": dataset_intent not in {"catalog_description", "catalog_metadata", "file_metadata", "file_preview", "inventory"},
                         "require_evidence": True,
-                        "require_method_and_limitations": dataset_intent not in {"catalog_description", "catalog_metadata", "file_preview", "inventory"},
+                        "require_method_and_limitations": dataset_intent not in {"catalog_description", "catalog_metadata", "file_metadata", "file_preview", "inventory"},
                         "require_downloadable_result": artifact_policy in {"required", "capability"},
                         "artifact_policy": artifact_policy,
                         "include_archive_tree": intent_config["include_archive_tree"],
@@ -728,6 +789,8 @@ class PlanActFlow(BaseFlow):
             return "inventory"
         if PlanActFlow._is_catalog_description_request(normalized):
             return "catalog_description"
+        if PlanActFlow._is_file_metadata_request(normalized):
+            return "file_metadata"
         if PlanActFlow._is_catalog_metadata_request(normalized):
             return "catalog_metadata"
         if any(marker in normalized for marker in visualization_markers):
@@ -902,6 +965,18 @@ class PlanActFlow(BaseFlow):
             r"(?:please )?(?:tell me )?file (?:formats|types)",
         )
         return any(re.fullmatch(pattern, stripped) for pattern in patterns)
+
+    @staticmethod
+    def _is_file_metadata_request(user_message: str) -> bool:
+        normalized = " ".join((user_message or "").casefold().split())
+        if not normalized or len(normalized) > 300:
+            return False
+        has_file_reference = bool(re.search(r"[\w.+-]+\.[a-z0-9]{1,12}", normalized, re.IGNORECASE))
+        has_extension_question = any(
+            marker in normalized
+            for marker in ("后缀", "后缀名", "扩展名", "文件类型", "file extension", "file suffix", "extension")
+        )
+        return has_file_reference and has_extension_question
 
     @staticmethod
     def _is_catalog_description_request(user_message: str) -> bool:

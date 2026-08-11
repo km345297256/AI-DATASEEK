@@ -2515,6 +2515,47 @@ def test_session_skill_name_uses_task_plan_not_skill_create_request():
 
 
 @pytest.mark.asyncio
+async def test_plan_act_executes_skill_create_as_a_builtin_command():
+    from types import SimpleNamespace
+
+    from app.domain.models.event import DoneEvent, MessageEvent, TitleEvent, ToolEvent, ToolStatus
+    from app.domain.models.tool_result import ToolResult
+    from app.domain.services.flows.plan_act import PlanActFlow
+
+    class FakeTool:
+        async def ainvoke(self, payload):
+            assert payload["args"] == {}
+            return SimpleNamespace(
+                artifact=ToolResult(
+                    success=True,
+                    data={"name": "reusable-rainfall-analysis"},
+                )
+            )
+
+    class FakeSkillToolkit:
+        name = "skill"
+
+        def get_tool(self, name):
+            assert name == "skill_create_from_session"
+            return FakeTool()
+
+    flow = PlanActFlow.__new__(PlanActFlow)
+    flow._session_id = "session-1"
+    flow.skill_toolkit = FakeSkillToolkit()
+
+    events = [event async for event in flow._run_skill_create_command()]
+
+    assert isinstance(events[0], TitleEvent)
+    assert isinstance(events[1], ToolEvent)
+    assert events[1].status == ToolStatus.CALLING
+    assert isinstance(events[2], ToolEvent)
+    assert events[2].status == ToolStatus.CALLED
+    assert isinstance(events[3], MessageEvent)
+    assert "reusable-rainfall-analysis" in events[3].message
+    assert isinstance(events[4], DoneEvent)
+
+
+@pytest.mark.asyncio
 async def test_skill_toolkit_creates_private_skill_from_current_session(tmp_path):
     class FakeSessionRepository:
         async def find_by_id_and_user_id(self, session_id, user_id):

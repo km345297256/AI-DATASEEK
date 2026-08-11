@@ -1,10 +1,11 @@
 import json
 import logging
+import re
 from dataclasses import asdict, dataclass
 from typing import Any, Optional
 
 from app.core.config import get_settings
-from app.domain.models.event import MessageEvent, PlanEvent, StepEvent, ToolEvent
+from app.domain.models.event import MessageEvent, PlanEvent, StepEvent, StepStatus, ToolEvent, ToolStatus
 from langchain.messages import HumanMessage
 from app.infrastructure.external.llm import create_chat_model
 from app.domain.utils.robust_json_parser import parse_json_lenient
@@ -20,6 +21,14 @@ class CompletionAdvice:
 
 
 class CompletionAdviceService:
+    _REUSABLE_WORKFLOW_REQUEST = re.compile(
+        r"(批量|逐月|逐年|按月|按年|时序|趋势|对比|比较|关联|回归|聚类|插值|"
+        r"指数|模型|参数|筛选|分组|自动化|工作流|流程|多个|全部|"
+        r"batch|monthly|yearly|time[ -]?series|trend|compare|comparison|"
+        r"correlation|regression|cluster|interpolat|model|parameter|filter|group|workflow|automate)",
+        re.IGNORECASE,
+    )
+
     def __init__(self) -> None:
         self._settings = get_settings()
 
@@ -195,23 +204,30 @@ Conversation trace:
         steps: list[StepEvent],
         tools: list[ToolEvent],
     ) -> CompletionAdvice:
-        tool_names = {tool.tool_name for tool in tools}
-        artifact_steps = [step for step in steps if step.step.attachments or step.step.result]
-        workflow_score = 0
-        if len(user_messages) >= 1:
-            workflow_score += 1
-        if len(plans) > 0:
-            workflow_score += 1
-        if len(steps) >= 2:
-            workflow_score += 1
-        if len(tools) >= 2:
-            workflow_score += 1
-        if artifact_steps:
-            workflow_score += 1
-        if {"shell", "file", "browser"}.intersection(tool_names):
-            workflow_score += 1
-
-        is_skill_candidate = workflow_score >= 4
+        completed_step_ids = {
+            step.step.id
+            for step in steps
+            if step.status == StepStatus.COMPLETED and step.step.success is not False
+        }
+        completed_tool_ids = {
+            tool.tool_call_id
+            for tool in tools
+            if tool.status == ToolStatus.CALLED
+        }
+        artifact_steps = [
+            step
+            for step in steps
+            if step.status == StepStatus.COMPLETED
+            and (step.step.attachments or step.step.result)
+        ]
+        request_text = "\n".join(event.message for event in user_messages)
+        has_reusable_request = bool(self._REUSABLE_WORKFLOW_REQUEST.search(request_text))
+        has_repeatable_execution = bool(
+            (len(completed_step_ids) >= 2 and completed_tool_ids)
+            or len(completed_tool_ids) >= 2
+            or (artifact_steps and completed_tool_ids)
+        )
+        is_skill_candidate = has_reusable_request and has_repeatable_execution
         if is_skill_candidate:
             reason = "该任务具备明确输入、分步执行和可复用产出，适合沉淀为技能。"
             recommendations = [

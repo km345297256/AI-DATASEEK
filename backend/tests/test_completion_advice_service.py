@@ -1,7 +1,7 @@
 import pytest
 from datetime import datetime, UTC
 
-from app.domain.models.event import DoneEvent, MessageEvent, StepEvent, StepStatus
+from app.domain.models.event import DoneEvent, MessageEvent, StepEvent, StepStatus, ToolEvent, ToolStatus
 from app.domain.models.file import FileInfo
 from app.domain.models.plan import Plan, Step
 from app.domain.services import completion_advice_service as advice_module
@@ -83,6 +83,63 @@ def test_completion_advice_fast_path_is_deterministic_and_model_free(monkeypatch
 
     assert advice.is_skill_candidate is False
     assert len(advice.recommendations) == 3
+
+
+def test_completion_advice_does_not_double_count_step_and_tool_lifecycle_events():
+    service = CompletionAdviceService()
+    step = Step(id="analysis", description="分析数据", success=True, attachments=["chart.png"])
+    events = [
+        MessageEvent(role="user", message="快速看一下这个数据集"),
+        StepEvent(status=StepStatus.STARTED, step=step),
+        StepEvent(status=StepStatus.COMPLETED, step=step),
+        ToolEvent(
+            tool_call_id="tool-1",
+            tool_name="shell",
+            function_name="dataset_quicklook",
+            function_args={},
+            status=ToolStatus.CALLING,
+        ),
+        ToolEvent(
+            tool_call_id="tool-1",
+            tool_name="shell",
+            function_name="dataset_quicklook",
+            function_args={},
+            status=ToolStatus.CALLED,
+        ),
+    ]
+
+    advice = service.analyze_fast(events)
+
+    assert advice.is_skill_candidate is False
+    assert "/skill-create" not in advice.recommendations[0]
+
+
+def test_completion_advice_recommends_skill_for_reusable_analysis_workflow():
+    service = CompletionAdviceService()
+    events = [
+        MessageEvent(role="user", message="逐月比较降水和降雪趋势并生成地图"),
+        StepEvent(
+            status=StepStatus.COMPLETED,
+            step=Step(
+                id="analysis",
+                description="逐月分析并绘图",
+                success=True,
+                attachments=["monthly-map.png"],
+            ),
+        ),
+        ToolEvent(
+            tool_call_id="tool-1",
+            tool_name="shell",
+            function_name="dataset_analysis_run",
+            function_args={},
+            status=ToolStatus.CALLED,
+        ),
+    ]
+
+    advice = service.analyze_fast(events)
+
+    assert advice.is_skill_candidate is True
+    assert advice.recommendations[0] == "使用/skill-create将这个流程替保存为可复用的技能"
 
 
 def test_completion_advice_coerce_normalizes_guiding_options():

@@ -367,6 +367,17 @@ def test_catalog_metadata_questions_use_model_free_intent(question):
     ).steps[0]
 
     assert step.inputs["dataset_intent"] == "catalog_metadata"
+
+
+def test_file_extension_question_uses_manifest_metadata_intent():
+    step = _flow()._create_dataset_fast_path_plan(
+        Message(
+            message="bcpr_CMFD_V0200_B-01_01dy_010deg_195301-195312.nc这个文件的后缀名是什么",
+            datasets=[_dataset_with_files("data/bcpr_CMFD_V0200_B-01_01dy_010deg_195301-195312.nc")],
+        )
+    )
+    step = step.steps[0]
+    assert step.inputs["dataset_intent"] == "file_metadata"
     assert step.inputs["require_model_answer"] is False
     assert step.inputs["artifact_policy"] == "optional"
     assert step.inputs["require_downloadable_result"] is False
@@ -577,6 +588,15 @@ def test_dataset_fast_path_keeps_skill_mcp_and_image_requests_on_planner():
             message="analyze",
             datasets=[_dataset()],
             attachments=["/home/ubuntu/upload/chart.png"],
+        )
+    ) is False
+
+
+def test_skill_create_command_is_not_a_dataset_analysis_fast_path_request():
+    assert _flow()._should_use_dataset_fast_path(
+        Message(
+            message="使用/skill-create将这个流程替保存为可复用的技能",
+            datasets=[_dataset()],
         )
     ) is False
 

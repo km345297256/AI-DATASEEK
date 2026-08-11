@@ -134,6 +134,7 @@ import {
   failRunningSteps,
   findCurrentTurnRunningStep,
   findCurrentTurnStep,
+  insertTaskExecutionSummary,
 } from '../utils/chatTimeline';
 
 const router = useRouter()
@@ -222,6 +223,8 @@ const failActiveSteps = (currentTurnOnly = true) => {
 };
 
 const startUserTurn = () => {
+  toolPanel.value?.hideToolPanel();
+  realTime.value = false;
   failActiveSteps(false);
   plan.value = undefined;
   lastTool.value = undefined;
@@ -271,9 +274,6 @@ const handleToolEvent = (toolData: ToolEventData) => {
   }
   if (toolContent.name !== 'message') {
     lastNoMessageTool.value = toolContent;
-    if (realTime.value) {
-      toolPanel.value?.showToolPanel(toolContent, false);
-    }
   }
 }
 
@@ -290,6 +290,7 @@ const handleStepEvent = (stepData: StepEventData) => {
         type: 'step',
         content: {
           ...stepData,
+          started_at: stepData.timestamp,
           tools: []
         } as StepContent,
       });
@@ -298,11 +299,13 @@ const handleStepEvent = (stepData: StepEventData) => {
     if (existingStep) {
       existingStep.status = stepData.status;
       existingStep.description = stepData.description;
+      existingStep.ended_at = stepData.timestamp;
     }
   } else if (stepData.status === 'failed') {
     if (existingStep) {
       existingStep.status = stepData.status;
       existingStep.description = stepData.description;
+      existingStep.ended_at = stepData.timestamp;
     }
     isLoading.value = false;
   }
@@ -370,6 +373,7 @@ const handleEvent = (event: AgentSSEEvent) => {
     handleStepEvent(event.data as StepEventData);
   } else if (event.event === 'done') {
     //isLoading.value = false;
+    insertTaskExecutionSummary(messages.value, event.data.timestamp);
     completionAdvice.value = (event.data as any)?.advice;
   } else if (event.event === 'wait') {
     // TODO: handle wait event

@@ -16,7 +16,7 @@ def _normalize_skill_name(text: str) -> str:
     return normalized[:48].strip("-") or "saved-task-skill"
 
 
-def _is_skill_create_request(text: str) -> bool:
+def is_skill_create_request(text: str) -> bool:
     lowered = (text or "").strip().lower()
     if not lowered:
         return False
@@ -31,16 +31,21 @@ def _is_skill_create_request(text: str) -> bool:
             "save this workflow",
             "save this task",
             "turn this task into a skill",
-            "current session",
             "save-task-skill",
             "saved task skill",
             "保存为可复用的技能",
+            "保存当前分析流程",
+            "固化当前分析流程",
             "保存为skill",
             "保存成skill",
             "创建skill",
             "创建技能",
         )
     )
+
+
+# Keep the private alias for existing internal callers and tests.
+_is_skill_create_request = is_skill_create_request
 
 
 def _derive_skill_metadata(events) -> tuple[str, str, List[str]]:

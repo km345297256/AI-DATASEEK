@@ -325,6 +325,28 @@
                 </div>
               </div>
             </template>
+            <div
+              v-if="completionAdvice && completionAdvice.recommendations.length && !isLoading"
+              class="mt-4 rounded-xl border border-[var(--border-main)] bg-[var(--background-menu-white)] p-4"
+            >
+              <div class="mb-2 text-sm font-medium">推荐追问</div>
+              <div class="flex flex-col gap-2 text-sm text-[var(--text-secondary)]">
+                <button
+                  v-for="(item, index) in completionAdvice.recommendations"
+                  :key="`${item}-${index}`"
+                  type="button"
+                  :disabled="isLoading"
+                  class="group flex w-full items-center justify-between gap-3 rounded-lg bg-[var(--background-gray-main)] px-3 py-2 text-left transition-colors hover:bg-[var(--fill-tsp-white-dark)] disabled:cursor-not-allowed disabled:opacity-60"
+                  @click="askSuggestion(item)"
+                >
+                  <span class="min-w-0 flex-1">{{ item }}</span>
+                  <ChevronRight class="size-4 shrink-0 text-[var(--icon-tertiary)] transition-transform group-hover:translate-x-0.5 group-hover:text-[var(--icon-secondary)]" />
+                </button>
+              </div>
+              <div v-if="completionAdvice.is_skill_candidate && completionAdvice.skill_reason" class="mt-3 text-xs text-[var(--text-tertiary)]">
+                {{ completionAdvice.skill_reason }}
+              </div>
+            </div>
             <div v-if="isLoading" class="mt-3 flex items-center gap-2 text-sm text-[var(--text-tertiary)]">
               <LoaderCircle class="size-4 animate-spin" />
               <span>{{ loadingStatus || 'Agent 正在分析数据集...' }}</span>
@@ -398,9 +420,9 @@ import { DATASET_CHAT_PLACEHOLDER, buildDatasetChatCapabilities } from '@/utils/
 import { copyToClipboard } from '@/utils/dom';
 import { eventBus } from '@/utils/eventBus';
 import { showErrorToast, showSuccessToast } from '@/utils/toast';
-import { failRunningSteps, findCurrentTurnRunningStep, findCurrentTurnStep } from '@/utils/chatTimeline';
+import { failRunningSteps, findCurrentTurnRunningStep, findCurrentTurnStep, insertTaskExecutionSummary } from '@/utils/chatTimeline';
 import { isConsecutiveAssistant, type AttachmentsContent, type Message, type MessageContent, type StepContent, type ToolContent } from '@/types/message';
-import type { AgentSSEEvent, ErrorEventData, MessageEventData, PlanEventData, StepEventData, TitleEventData, ToolEventData } from '@/types/event';
+import type { AgentSSEEvent, CompletionAdviceData, DoneEventData, ErrorEventData, MessageEventData, PlanEventData, StepEventData, TitleEventData, ToolEventData } from '@/types/event';
 import { SessionStatus } from '@/types/response';
 
 const DATASET_STORAGE_KEY_PREFIX = 'ai-dataseek:dataset-seek:session';
@@ -441,6 +463,7 @@ const catalogToggleLabel = computed(() => catalogPanelCollapsed.value ? '展开�
 const suggestedQuestions = ref<string[]>([]);
 const suggestedQuestionsLoading = ref(false);
 const suggestedQuestionsError = ref('');
+const completionAdvice = ref<CompletionAdviceData>();
 const historyOpen = ref(false);
 const historyMenuRef = ref<HTMLElement>();
 const historyLoading = ref(false);
@@ -595,11 +618,12 @@ function startUserTurn() {
   currentPlan.value = undefined;
   lastTool.value = undefined;
   lastNoMessageTool.value = undefined;
+  completionAdvice.value = undefined;
 }
 
 function closeToolPanel() {
   toolPanel.value?.hideToolPanel();
-  toolPanelRealTime.value = true;
+  toolPanelRealTime.value = false;
 }
 
 function handleToolClick(tool: ToolContent) {
@@ -639,19 +663,17 @@ function handleTool(data: ToolEventData) {
   }
   if (tool.name !== 'message') {
     lastNoMessageTool.value = lastTool.value;
-    if (toolPanelRealTime.value && lastNoMessageTool.value) {
-      toolPanel.value?.showToolPanel(
-        lastNoMessageTool.value,
-        lastNoMessageTool.value.status === 'calling',
-      );
-    }
   }
 }
 
 function handleStep(data: StepEventData) {
   const existing = findCurrentTurnStep(messages.value, data.id);
-  if (existing) Object.assign(existing, { status: data.status, description: data.description });
-  else if (data.status === 'running') messages.value.push({ type: 'step', content: { ...data, tools: [] } as StepContent });
+  if (existing) {
+    Object.assign(existing, { status: data.status, description: data.description });
+    if (data.status === 'completed' || data.status === 'failed') existing.ended_at = data.timestamp;
+  } else if (data.status === 'running') {
+    messages.value.push({ type: 'step', content: { ...data, started_at: data.timestamp, tools: [] } as StepContent });
+  }
 }
 
 function handleEvent(event: AgentSSEEvent) {
@@ -664,7 +686,11 @@ function handleEvent(event: AgentSSEEvent) {
     messages.value.push({ type: 'assistant', content: { content: data.error, timestamp: data.timestamp } as MessageContent });
     failRunningSteps(messages.value);
     isLoading.value = false;
-  } else if (event.event === 'done' || event.event === 'wait') isLoading.value = false;
+  } else if (event.event === 'done') {
+    isLoading.value = false;
+    insertTaskExecutionSummary(messages.value, event.data.timestamp);
+    completionAdvice.value = (event.data as DoneEventData).advice;
+  } else if (event.event === 'wait') isLoading.value = false;
   else if (event.event === 'title') void (event.data as TitleEventData);
   lastEventId.value = event.data.event_id;
   if (event.event === 'done' || event.event === 'wait' || event.event === 'error') {
@@ -835,6 +861,7 @@ function clearConversationState() {
   lastNoMessageTool.value = undefined;
   isLoading.value = false;
   loadingStatus.value = '';
+  completionAdvice.value = undefined;
 }
 
 async function loadConversation(targetSessionId: string) {
