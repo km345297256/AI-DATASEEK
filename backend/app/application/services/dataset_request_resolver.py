@@ -1,6 +1,7 @@
 import json
 import logging
 import asyncio
+import secrets
 import time
 from dataclasses import dataclass, field
 from pathlib import PurePosixPath
@@ -23,9 +24,24 @@ logger = logging.getLogger(__name__)
 
 
 class CatalogQuery(BaseModel):
-    operation: Literal["search_files", "inventory_summary", "dataset_metadata"]
+    operation: Literal[
+        "search_files",
+        "list_files",
+        "sample_files",
+        "export_file_inventory",
+        "inventory_summary",
+        "dataset_metadata",
+    ]
     query: str = ""
     limit: int = Field(default=50, ge=1, le=200)
+    offset: int = Field(default=0, ge=0)
+
+
+@dataclass
+class CatalogArtifact:
+    filename: str
+    content: str
+    content_type: str = "text/plain"
 
 
 class RequestDecision(BaseModel):
@@ -53,6 +69,7 @@ class FrontControllerResolution:
     answer: str
     controller_metadata: dict[str, Any]
     target_files: list[str] = field(default_factory=list)
+    artifacts: list[CatalogArtifact] = field(default_factory=list)
 
     @property
     def mode(self) -> Literal["direct", "catalog", "sandbox", "reject"]:
@@ -92,7 +109,7 @@ Return JSON only:
   },
   "answer": "complete answer when mode=direct, otherwise empty",
   "catalog_queries": [
-    {"operation":"search_files|inventory_summary|dataset_metadata","query":"...","limit":50}
+    {"operation":"search_files|list_files|sample_files|export_file_inventory|inventory_summary|dataset_metadata","query":"...","limit":50,"offset":0}
   ],
   "reason": "short reason"
 }
@@ -107,6 +124,12 @@ Rules:
   that the user did not ask to verify.
 - Use catalog when the answer needs only registered dataset names, descriptions,
   tags, file paths, filenames, extensions, sizes, counts, or format groups.
+- `search_files` performs a literal filename/path substring lookup. Its query must
+  be a filename/path fragment, never a natural-language instruction.
+- Use `list_files` for a bounded page of paths, `sample_files` for a genuinely
+  random subset, and `export_file_inventory` when the user requests every path or
+  the complete listing would exceed 200 entries. The export is delivered as an
+  artifact, so set requires_artifacts=true.
 - Use sandbox when answering requires opening file contents, reading variables or
   rows, statistics, scientific interpretation, plotting, scripts, computation,
   browser access, generated artifacts, or uncertain evidence.
@@ -129,7 +152,10 @@ SYNTHESIS_PROMPT = """
 Answer the user using only the catalog evidence below. Be concise, use the
 user's language, and do not expose internal or host filesystem paths. If the
 evidence is insufficient or ambiguous, say so explicitly. Do not claim that
-file contents were inspected.
+file contents were inspected. An empty `matches` array means only that the
+specific lookup matched nothing; it never means the inventory is empty when
+`inventory_file_count` is greater than zero. When an inventory artifact is
+present, state that the complete path list is attached.
 """.strip()
 
 
@@ -157,19 +183,44 @@ class DatasetCatalogQueryService:
                             continue
                         filename = logical_path.rsplit("/", 1)[-1]
                         suffix = filename.rsplit(".", 1)[-1] if "." in filename else ""
-                        matches.append({
-                            "dataset": dataset.name,
-                            "logical_path": logical_path,
-                            "filename": filename,
-                            "extension": f".{suffix.lower()}" if suffix else "",
-                            "size_bytes": max(0, int(item.size)),
-                            "content_type": item.content_type or "",
-                        })
+                        matches.append(self._file_record(dataset, item, logical_path))
                         if len(matches) >= query.limit:
                             break
                     if len(matches) >= query.limit:
                         break
-                results.append({"operation": query.operation, "query": query.query, "matches": matches})
+                results.append({
+                    "operation": query.operation,
+                    "query": query.query,
+                    "matches": matches,
+                    **self._inventory_state(datasets),
+                })
+            elif query.operation in {"list_files", "sample_files", "export_file_inventory"}:
+                records = [
+                    self._file_record(dataset, item, logical_path)
+                    for dataset in datasets
+                    for item in dataset.files
+                    if (logical_path := self._logical_path(item.path))
+                ]
+                if query.operation == "sample_files":
+                    matches = secrets.SystemRandom().sample(records, min(query.limit, len(records)))
+                    results.append({
+                        "operation": query.operation,
+                        "matches": matches,
+                        **self._inventory_state(datasets),
+                    })
+                elif query.operation == "list_files":
+                    results.append({
+                        "operation": query.operation,
+                        "offset": query.offset,
+                        "matches": records[query.offset:query.offset + query.limit],
+                        **self._inventory_state(datasets),
+                    })
+                else:
+                    results.append({
+                        "operation": query.operation,
+                        "export_rows": records,
+                        **self._inventory_state(datasets),
+                    })
             elif query.operation == "inventory_summary":
                 summaries = []
                 for dataset in datasets:
@@ -204,6 +255,29 @@ class DatasetCatalogQueryService:
                     ],
                 })
         return results
+
+    @staticmethod
+    def _file_record(dataset: DataCenterDataset, item: Any, logical_path: str) -> dict[str, Any]:
+        filename = logical_path.rsplit("/", 1)[-1]
+        suffix = filename.rsplit(".", 1)[-1] if "." in filename else ""
+        return {
+            "dataset": dataset.name,
+            "logical_path": logical_path,
+            "filename": filename,
+            "extension": f".{suffix.lower()}" if suffix else "",
+            "size_bytes": max(0, int(item.size)),
+            "content_type": item.content_type or "",
+        }
+
+    @staticmethod
+    def _inventory_state(datasets: list[DataCenterDataset]) -> dict[str, Any]:
+        return {
+            "inventory_file_count": sum(len(dataset.files) for dataset in datasets),
+            "inventory_complete": all(
+                dataset.metadata.get("inventory_complete") is True
+                for dataset in datasets
+            ),
+        }
 
 
 class DatasetRequestResolver:
@@ -310,12 +384,14 @@ class DatasetRequestResolver:
                     target_files=sandbox_target_files,
                 )
             evidence = self._catalog.execute(datasets, decision.catalog_queries)
+            artifacts = self._catalog_artifacts(evidence)
             synthesis = await asyncio.wait_for(
                 model.bind(tool_choice="none").ainvoke([
                     SystemMessage(content=SYNTHESIS_PROMPT),
                     HumanMessage(content=json.dumps({
                         "question": question,
-                        "catalog_evidence": evidence,
+                        "catalog_evidence": self._catalog_synthesis_evidence(evidence),
+                        "artifacts": [artifact.filename for artifact in artifacts],
                     }, ensure_ascii=False, default=str)),
                 ]),
                 timeout=settings.dataset_request_resolver_timeout_seconds,
@@ -330,6 +406,7 @@ class DatasetRequestResolver:
                 started_at=started_at,
                 source="model",
                 llm_overrides=llm_overrides,
+                artifacts=artifacts,
             )
         except Exception as exc:
             logger.error("Front Controller failed closed: %s", exc)
@@ -381,6 +458,7 @@ class DatasetRequestResolver:
         source: str,
         llm_overrides: dict[str, Any] | None,
         target_files: list[str] | None = None,
+        artifacts: list[CatalogArtifact] | None = None,
     ) -> FrontControllerResolution:
         settings = get_settings()
         overrides = llm_overrides or {}
@@ -397,7 +475,39 @@ class DatasetRequestResolver:
                 "execution_mode": "reject" if not decision.safety.allowed else decision.execution.mode,
             },
             target_files=target_files or [],
+            artifacts=artifacts or [],
         )
+
+    @staticmethod
+    def _catalog_artifacts(evidence: list[dict[str, Any]]) -> list[CatalogArtifact]:
+        rows = [
+            row
+            for result in evidence
+            if result.get("operation") == "export_file_inventory"
+            for row in result.get("export_rows", [])
+        ]
+        if not rows:
+            return []
+        lines = ["dataset\tlogical_path\tsize_bytes"]
+        lines.extend(
+            f"{row['dataset']}\t{row['logical_path']}\t{row['size_bytes']}"
+            for row in rows
+        )
+        return [CatalogArtifact(
+            filename="dataset_file_inventory.tsv",
+            content="\n".join(lines) + "\n",
+            content_type="text/tab-separated-values",
+        )]
+
+    @staticmethod
+    def _catalog_synthesis_evidence(evidence: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        bounded = []
+        for result in evidence:
+            item = {key: value for key, value in result.items() if key != "export_rows"}
+            if "export_rows" in result:
+                item["exported_file_count"] = len(result["export_rows"])
+            bounded.append(item)
+        return bounded
 
     def _sandbox_target_files(
         self,
@@ -473,7 +583,14 @@ class DatasetRequestResolver:
                 }
                 for dataset in datasets
             ],
-            "catalog_capabilities": ["search_files", "inventory_summary", "dataset_metadata"],
+            "catalog_capabilities": [
+                "search_files",
+                "list_files",
+                "sample_files",
+                "export_file_inventory",
+                "inventory_summary",
+                "dataset_metadata",
+            ],
             "available_skills": selected_skills,
             "available_mcp_servers": selected_mcp_servers,
             "attachment_names": attachment_names,
