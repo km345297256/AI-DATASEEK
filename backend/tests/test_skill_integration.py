@@ -54,6 +54,28 @@ from app.interfaces.api import file_routes
 from app.interfaces.schemas.file import LargeUploadCompleteRequest, LargeUploadInitRequest, LargeUploadPart
 from app.interfaces.schemas.renderer import RendererRequest
 from app.interfaces.dependencies import get_optional_current_user
+from app.domain.models.safety import SafetyReview
+from app.application.services.dataset_request_resolver import (
+    ExecutionDecision,
+    FrontControllerResolution,
+    RequestDecision,
+)
+
+
+def _sandbox_controller_resolution():
+    return FrontControllerResolution(
+        decision=RequestDecision(
+            safety=SafetyReview(decision="allow", risk_level="low"),
+            execution=ExecutionDecision(mode="sandbox", required_evidence="file_content"),
+        ),
+        answer="",
+        controller_metadata={"prompt_version": "test", "execution_mode": "sandbox"},
+    )
+
+
+class _SandboxResolver:
+    async def resolve(self, **_kwargs):
+        return _sandbox_controller_resolution()
 
 
 def test_skill_registry_selector_and_renderer(tmp_path):
@@ -828,17 +850,6 @@ async def test_file_read_tool_event_does_not_upload_the_file_directly():
 
 @pytest.mark.asyncio
 async def test_flow_does_not_rescan_unchanged_artifacts_at_summary_and_done():
-    class FakeSafetyReviewer:
-        async def review(self, message, excerpts):
-            return SimpleNamespace(
-                allowed=True,
-                decision="allow",
-                risk_level="low",
-                categories=[],
-                reason="",
-                suggestion="",
-            )
-
     class FakeFlow:
         status = AgentStatus.EXECUTING
 
@@ -863,7 +874,7 @@ async def test_flow_does_not_rescan_unchanged_artifacts_at_summary_and_done():
     runner._agent_id = "agent-1"
     runner._session_id = "session-1"
     runner._flow = FakeFlow()
-    runner._safety_reviewer = FakeSafetyReviewer()
+    runner._front_controller_resolution = _sandbox_controller_resolution()
     runner._session_repository = FakeSessionRepository()
     runner._generated_files = []
     discovery_calls = []
@@ -1029,6 +1040,7 @@ async def test_chat_recreates_missing_running_task(monkeypatch):
         file_storage=object(),
         mcp_repository=object(),
     )
+    service._dataset_request_resolver = _SandboxResolver()
 
     events = [
         event async for event in service.chat(
@@ -1126,8 +1138,9 @@ async def test_chat_bootstrap_survives_sse_cancellation(monkeypatch):
         file_storage=object(),
         mcp_repository=object(),
     )
+    service._dataset_request_resolver = _SandboxResolver()
 
-    async def slow_create_task(session):
+    async def slow_create_task(session, *_args, **_kwargs):
         await release_create_task.wait()
         task = FakeTask.create(None)
         session.task_id = task.id
@@ -1198,8 +1211,9 @@ async def test_chat_bootstrap_failure_after_sse_cancellation_is_persisted(monkey
         file_storage=object(),
         mcp_repository=object(),
     )
+    service._dataset_request_resolver = _SandboxResolver()
 
-    async def failing_create_task(session):
+    async def failing_create_task(session, *_args, **_kwargs):
         await release_create_task.wait()
         raise RuntimeError("sandbox failed")
 

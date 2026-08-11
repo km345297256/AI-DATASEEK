@@ -21,18 +21,23 @@ from app.domain.services.agent_task_runner import (
 )
 from app.domain.services.completion_advice_service import CompletionAdvice
 from app.domain.services.flows.plan_act import AgentStatus
+from app.domain.models.safety import SafetyReview
+from app.application.services.dataset_request_resolver import (
+    ExecutionDecision,
+    FrontControllerResolution,
+    RequestDecision,
+)
 
 
-class _AllowSafetyReviewer:
-    async def review(self, message, excerpts):
-        return SimpleNamespace(
-            allowed=True,
-            decision="allow",
-            risk_level="low",
-            categories=[],
-            reason="",
-            suggestion="",
-        )
+def _allow_controller_resolution():
+    return FrontControllerResolution(
+        decision=RequestDecision(
+            safety=SafetyReview(decision="allow", risk_level="low"),
+            execution=ExecutionDecision(mode="sandbox", required_evidence="file_content"),
+        ),
+        answer="",
+        controller_metadata={"prompt_version": "test", "execution_mode": "sandbox"},
+    )
 
 
 def test_dataset_analysis_tool_renders_safe_result_console_without_program_source():
@@ -174,7 +179,7 @@ async def test_completed_step_delivers_artifact_once_before_duplicate_messages()
     runner._agent_id = "agent-1"
     runner._session_id = "session-1"
     runner._flow = _Flow()
-    runner._safety_reviewer = _AllowSafetyReviewer()
+    runner._front_controller_resolution = _allow_controller_resolution()
     runner._generated_files = []
     runner._artifact_fingerprints = {artifact_path: (10, "hash")}
     runner._completion_advice_service = _Advice()
@@ -246,7 +251,7 @@ async def test_done_uses_fast_advice_without_loading_session_history_or_model():
     runner._agent_id = "agent-1"
     runner._session_id = "session-1"
     runner._flow = _Flow()
-    runner._safety_reviewer = _AllowSafetyReviewer()
+    runner._front_controller_resolution = _allow_controller_resolution()
     runner._generated_files = []
     runner._completion_advice_service = advice
     runner._record_safety_audit = _noop
@@ -287,7 +292,7 @@ async def test_late_discovered_artifact_is_emitted_before_done():
     runner._agent_id = "agent-1"
     runner._session_id = "session-1"
     runner._flow = _Flow()
-    runner._safety_reviewer = _AllowSafetyReviewer()
+    runner._front_controller_resolution = _allow_controller_resolution()
     runner._generated_files = [artifact]
     runner._record_safety_audit = _noop
     runner._initialize_mcp_tool = _noop
@@ -337,7 +342,7 @@ async def test_partial_artifact_is_emitted_before_terminal_error():
     runner._agent_id = "agent-1"
     runner._session_id = "session-1"
     runner._flow = _Flow()
-    runner._safety_reviewer = _AllowSafetyReviewer()
+    runner._front_controller_resolution = _allow_controller_resolution()
     runner._generated_files = [artifact]
     runner._record_safety_audit = _noop
     runner._initialize_mcp_tool = _noop
@@ -404,7 +409,7 @@ async def test_failed_compiled_analysis_does_not_publish_unverified_outputs():
     runner._agent_id = "agent-1"
     runner._session_id = "session-1"
     runner._flow = _Flow()
-    runner._safety_reviewer = _AllowSafetyReviewer()
+    runner._front_controller_resolution = _allow_controller_resolution()
     runner._generated_files = []
     runner._record_safety_audit = _noop
     runner._initialize_mcp_tool = _noop

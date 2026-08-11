@@ -14,6 +14,24 @@ from app.infrastructure.repositories.mongo_session_repository import (
     MongoSessionRepository,
 )
 from app.interfaces.schemas.session import ChatRequest
+from app.domain.models.safety import SafetyReview
+from app.application.services.dataset_request_resolver import (
+    ExecutionDecision,
+    FrontControllerResolution,
+    RequestDecision,
+)
+
+
+class SandboxResolver:
+    async def resolve(self, **_kwargs):
+        return FrontControllerResolution(
+            decision=RequestDecision(
+                safety=SafetyReview(decision="allow", risk_level="low"),
+                execution=ExecutionDecision(mode="sandbox", required_evidence="file_content"),
+            ),
+            answer="",
+            controller_metadata={"prompt_version": "test", "execution_mode": "sandbox"},
+        )
 
 
 class FakeQueue:
@@ -117,7 +135,7 @@ class FakeSessionRepository:
 
 
 def make_service(repository):
-    return AgentDomainService(
+    service = AgentDomainService(
         agent_repository=object(),
         session_repository=repository,
         sandbox_cls=object(),
@@ -126,6 +144,8 @@ def make_service(repository):
         mcp_repository=object(),
         sandbox_runtime=object(),
     )
+    service._dataset_request_resolver = SandboxResolver()
+    return service
 
 
 async def bootstrap(service, repository, client_message_id):
@@ -263,7 +283,7 @@ async def test_persisted_claim_is_recovered_after_task_registry_loss():
     replacement = FakeTask()
     replacement.id = "replacement-task"
 
-    async def create_replacement_task(session, _dataset_ids=None):
+    async def create_replacement_task(session, _dataset_ids=None, **_kwargs):
         session.task_id = replacement.id
         repository.session = session
         FakeTask.current = replacement

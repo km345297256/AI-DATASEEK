@@ -911,8 +911,13 @@ async def test_concurrent_session_bootstraps_create_only_one_task():
         mcp_repository=object(),
         sandbox_runtime=object(),
     )
+    class SandboxResolver:
+        async def resolve(self, **_kwargs):
+            return SimpleNamespace(mode="sandbox")
 
-    async def create_task(session, _dataset_ids=None):
+    service._dataset_request_resolver = SandboxResolver()
+
+    async def create_task(session, _dataset_ids=None, **_kwargs):
         nonlocal create_count
         create_count += 1
         await asyncio.sleep(0.01)

@@ -45,11 +45,13 @@ from app.domain.models.tool_result import ToolResult
 from app.domain.models.search import SearchResults
 from app.domain.models.mcp_config import MCPConfig, can_access_mcp
 from app.domain.services.completion_advice_service import get_completion_advice_service
-from app.domain.services.safety import SafetyReviewAgent
+from app.domain.services.safety.policy import deterministic_review
+from app.domain.services.safety.policy_store import get_safety_policy_store
 from app.domain.services.audit_service import AuditService
 from app.domain.models.audit import AuditRiskLevel, AuditStatus
 from app.domain.models.safety import SafetyReview
 from app.application.services.data_center_dataset_service import DataCenterDatasetService
+from app.application.services.dataset_request_resolver import FrontControllerResolution
 
 logger = logging.getLogger(__name__)
 
@@ -149,6 +151,7 @@ class AgentTaskRunner(TaskRunner):
         mcp_repository: MCPRepository,
         search_engine: Optional[SearchEngine] = None,
         llm_overrides: Optional[dict] = None,
+        front_controller_resolution: Optional[FrontControllerResolution] = None,
     ):
         self._session_id = session_id
         self._agent_id = agent_id
@@ -161,9 +164,8 @@ class AgentTaskRunner(TaskRunner):
         self._file_storage = file_storage
         self._mcp_repository = mcp_repository
         self._mcp_tool = MCPToolkit()
-        self._safety_reviewer = SafetyReviewAgent(
-            usage_context={"user_id": user_id, "session_id": session_id},
-        )
+        self._front_controller_resolution = front_controller_resolution
+        self._safety_policy_store = get_safety_policy_store()
         self._audit_service = AuditService()
         self._completion_advice_service = get_completion_advice_service()
         self._flow = PlanActFlow(
@@ -1077,6 +1079,11 @@ class AgentTaskRunner(TaskRunner):
                     skills=metadata.get("skills", []),
                     mcp_servers=metadata.get("mcp_servers", []),
                     datasets=datasets,
+                    controller_target_files=list(
+                        self._front_controller_resolution.target_files
+                        if getattr(self, "_front_controller_resolution", None) is not None
+                        else []
+                    ),
                     mcp_access_all=bool(metadata.get("mcp_access_all", False)),
                 )
 
@@ -1146,10 +1153,43 @@ class AgentTaskRunner(TaskRunner):
             yield ErrorEvent(error="No message")
             return
 
-        review = await self._safety_reviewer.review(
-            message.message,
-            await self._attachment_review_excerpts(message),
+        resolution = getattr(self, "_front_controller_resolution", None)
+        review = resolution.decision.safety if resolution else SafetyReview(
+            decision="reject",
+            risk_level="high",
+            categories=["front_controller_decision_missing"],
+            reason="服务端前置决策缺失，任务未执行。",
+            suggestion="请重新发送该任务。",
         )
+        if review.allowed and resolution.mode != "sandbox":
+            review = SafetyReview(
+                decision="reject",
+                risk_level="high",
+                categories=["front_controller_decision_invalid"],
+                reason="前置决策与执行器不一致，任务未执行。",
+                suggestion="请重新发送该任务。",
+            )
+        if review.allowed and message.attachment_file_infos:
+            try:
+                rules = await self._safety_policy_store.list_enabled()
+                attachment_review = deterministic_review(
+                    json.dumps({
+                        "user_message": message.message[:12000],
+                        "attachments": await self._attachment_review_excerpts(message),
+                    }, ensure_ascii=False),
+                    rules,
+                )
+                if attachment_review:
+                    review = attachment_review
+            except Exception as exc:
+                logger.error("Attachment safety policy check failed closed: %s", exc)
+                review = SafetyReview(
+                    decision="reject",
+                    risk_level="high",
+                    categories=["safety_policy_unavailable"],
+                    reason="附件安全策略暂时不可用，任务未执行。",
+                    suggestion="请稍后重新发送该任务。",
+                )
         await self._record_safety_audit(review)
         if not review.allowed:
             logger.warning(
@@ -1172,7 +1212,8 @@ class AgentTaskRunner(TaskRunner):
                         "categories": review.categories,
                         "reason": review.reason,
                         "suggestion": review.suggestion,
-                    }
+                    },
+                    "front_controller": resolution.controller_metadata if resolution else {},
                 },
             )
             yield DoneEvent()
@@ -1456,6 +1497,11 @@ class AgentTaskRunner(TaskRunner):
                     "categories": review.categories,
                     "reason": review.reason,
                     "suggestion": review.suggestion,
+                    "front_controller": (
+                        self._front_controller_resolution.controller_metadata
+                        if getattr(self, "_front_controller_resolution", None)
+                        else {}
+                    ),
                 },
             )
         except Exception as exc:

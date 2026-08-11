@@ -94,6 +94,23 @@ def test_named_jpeg_visualization_routes_to_exact_file_preview():
     assert "不要对整个数据集执行快速探查" in step.inputs["execution_guidance"]
 
 
+def test_controller_target_file_constrains_visualization_without_keyword_routing():
+    filename = "bcpr_CMFD_V0200_B-01_01dy_010deg_195401-195412.nc"
+    message = Message(
+        message=f"{filename}对这个文件参数进行绘图",
+        datasets=[_dataset_with_files(filename, "another.nc")],
+        controller_target_files=[filename],
+    )
+
+    step = _flow()._create_dataset_fast_path_plan(message).steps[0]
+
+    assert step.inputs["dataset_intent"] == "visualization"
+    assert step.inputs["target_file"] == filename
+    assert step.inputs["target_filename"] == filename
+    assert step.inputs["prefer_quicklook_evidence"] is False
+    assert step.inputs["allow_terminal_quicklook"] is False
+
+
 @pytest.mark.parametrize(
     ("inventory_path", "question"),
     [
@@ -367,20 +384,6 @@ def test_catalog_metadata_questions_use_model_free_intent(question):
     ).steps[0]
 
     assert step.inputs["dataset_intent"] == "catalog_metadata"
-
-
-def test_file_extension_question_uses_manifest_metadata_intent():
-    step = _flow()._create_dataset_fast_path_plan(
-        Message(
-            message="bcpr_CMFD_V0200_B-01_01dy_010deg_195301-195312.nc这个文件的后缀名是什么",
-            datasets=[_dataset_with_files("data/bcpr_CMFD_V0200_B-01_01dy_010deg_195301-195312.nc")],
-        )
-    )
-    step = step.steps[0]
-    assert step.inputs["dataset_intent"] == "file_metadata"
-    assert step.inputs["require_model_answer"] is False
-    assert step.inputs["artifact_policy"] == "optional"
-    assert step.inputs["require_downloadable_result"] is False
 
 
 @pytest.mark.parametrize(

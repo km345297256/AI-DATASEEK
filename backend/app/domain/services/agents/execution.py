@@ -141,7 +141,6 @@ class ExecutionAgent(BaseAgent):
     DATASET_INTENT_FILE_PREVIEW = "file_preview"
     DATASET_INTENT_CATALOG_DESCRIPTION = "catalog_description"
     DATASET_INTENT_CATALOG_METADATA = "catalog_metadata"
-    DATASET_INTENT_FILE_METADATA = "file_metadata"
     DATASET_INTENT_ANALYSIS = "analysis"
 
     _FILE_STRUCTURE_REQUEST = re.compile(
@@ -247,7 +246,6 @@ class ExecutionAgent(BaseAgent):
                 "dataset_purpose": cls.DATASET_INTENT_CATALOG_DESCRIPTION,
                 "use_cases": cls.DATASET_INTENT_CATALOG_DESCRIPTION,
                 "catalog_metadata": cls.DATASET_INTENT_CATALOG_METADATA,
-                "file_metadata": cls.DATASET_INTENT_FILE_METADATA,
                 "metadata": cls.DATASET_INTENT_CATALOG_METADATA,
                 "size": cls.DATASET_INTENT_CATALOG_METADATA,
                 "file_count": cls.DATASET_INTENT_CATALOG_METADATA,
@@ -2074,11 +2072,9 @@ class ExecutionAgent(BaseAgent):
         language: str,
         artifact_policy: str = "optional",
     ) -> AsyncGenerator[BaseEvent, None]:
-        rendered = self._render_file_metadata(
-            list(message.datasets or []), message.message, language=language,
-        )
+        rendered = None
         if artifact_policy != "required":
-            rendered = rendered or self._render_catalog_metadata(
+            rendered = self._render_catalog_metadata(
                 list(message.datasets or []),
                 language=language,
             )
@@ -2095,26 +2091,6 @@ class ExecutionAgent(BaseAgent):
         async for event in self._execute_compiled_dataset_analysis(request, message=message):
             yield event
 
-    @classmethod
-    def _render_file_metadata(cls, datasets: list[Any], request: str, *, language: str) -> Optional[str]:
-        """Answer filename extension questions from the authoritative manifest."""
-        requested = re.findall(r"[\w.+-]+\.[a-z0-9]{1,12}", request or "", re.IGNORECASE)
-        if not requested:
-            return None
-        needle = requested[-1].casefold()
-        matches = [
-            item
-            for dataset in datasets
-            for item in (dataset.files or [])
-            if PurePosixPath(str(item.path).replace("\\", "/")).name.casefold() == needle
-        ]
-        if len(matches) != 1:
-            return None
-        path = PurePosixPath(str(matches[0].path).replace("\\", "/"))
-        suffix = path.suffix.lower() or "[no extension]"
-        if language == "zh":
-            return f"文件 `{path.name}` 的后缀名是 `{suffix}`。该结论来自数据集已登记文件清单，未读取文件内容。"
-        return f"The file `{path.name}` has the extension `{suffix}`. This comes from the registered dataset manifest; file contents were not read."
 
     async def _execute_catalog_description(
         self,
@@ -3533,13 +3509,6 @@ class ExecutionAgent(BaseAgent):
                 message=message,
                 language=plan.language,
                 artifact_policy=str(step.inputs.get("artifact_policy") or "optional"),
-            )
-        elif dataset_fast_path and dataset_intent == self.DATASET_INTENT_FILE_METADATA:
-            execution = self._execute_catalog_metadata(
-                scoped_request,
-                message=message,
-                language=plan.language,
-                artifact_policy="optional",
             )
         elif dataset_fast_path and dataset_intent == self.DATASET_INTENT_FILE_STRUCTURE:
             execution = self._execute_preferred_inventory(

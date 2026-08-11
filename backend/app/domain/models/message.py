@@ -11,4 +11,5 @@ class Message(BaseModel):
     skills: List[str] = []
     mcp_servers: List[str] = []
     datasets: List[MountedDataset] = []
+    controller_target_files: List[str] = []
     mcp_access_all: bool = False

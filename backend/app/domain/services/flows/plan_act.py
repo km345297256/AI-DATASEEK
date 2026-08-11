@@ -579,15 +579,6 @@ class PlanActFlow(BaseFlow):
                 "include_archive_tree": False,
                 "allow_terminal_quicklook": False,
             },
-            "file_metadata": {
-                "description": "读取指定文件的目录元数据",
-                "instruction": (
-                    "仅根据数据中心已验证的文件清单回答指定文件的扩展名等目录元数据；"
-                    "不要读取文件内容，不要启动快速探查，不要暴露宿主机真实路径。"
-                ),
-                "include_archive_tree": False,
-                "allow_terminal_quicklook": False,
-            },
             "catalog_description": {
                 "description": "根据数据集登记说明回答用途问题",
                 "instruction": (
@@ -685,9 +676,9 @@ class PlanActFlow(BaseFlow):
                         # reconstruct it from a generic step label.
                         "user_question": message.message,
                         "execution_guidance": intent_config["instruction"],
-                        "require_model_answer": dataset_intent not in {"catalog_description", "catalog_metadata", "file_metadata", "file_preview", "inventory"},
+                        "require_model_answer": dataset_intent not in {"catalog_description", "catalog_metadata", "file_preview", "inventory"},
                         "require_evidence": True,
-                        "require_method_and_limitations": dataset_intent not in {"catalog_description", "catalog_metadata", "file_metadata", "file_preview", "inventory"},
+                        "require_method_and_limitations": dataset_intent not in {"catalog_description", "catalog_metadata", "file_preview", "inventory"},
                         "require_downloadable_result": artifact_policy in {"required", "capability"},
                         "artifact_policy": artifact_policy,
                         "include_archive_tree": intent_config["include_archive_tree"],
@@ -789,8 +780,6 @@ class PlanActFlow(BaseFlow):
             return "inventory"
         if PlanActFlow._is_catalog_description_request(normalized):
             return "catalog_description"
-        if PlanActFlow._is_file_metadata_request(normalized):
-            return "file_metadata"
         if PlanActFlow._is_catalog_metadata_request(normalized):
             return "catalog_metadata"
         if any(marker in normalized for marker in visualization_markers):
@@ -855,6 +844,18 @@ class PlanActFlow(BaseFlow):
         to the user. A basename shared by multiple files is deliberately
         ambiguous unless the message includes a unique directory-qualified path.
         """
+        controller_targets = {
+            target.replace("\\", "/").casefold()
+            for target in message.controller_target_files
+            if isinstance(target, str) and target.strip()
+        }
+        if len(controller_targets) == 1:
+            for dataset in message.datasets or []:
+                for dataset_file in dataset.files or []:
+                    normalized_path = cls._safe_dataset_file_path(dataset_file)
+                    if normalized_path in controller_targets:
+                        return dataset_file
+
         normalized_message = (message.message or "").replace("\\", "/").casefold()
         matches: list[tuple[DatasetFile, str]] = []
         for dataset in message.datasets or []:
@@ -966,17 +967,6 @@ class PlanActFlow(BaseFlow):
         )
         return any(re.fullmatch(pattern, stripped) for pattern in patterns)
 
-    @staticmethod
-    def _is_file_metadata_request(user_message: str) -> bool:
-        normalized = " ".join((user_message or "").casefold().split())
-        if not normalized or len(normalized) > 300:
-            return False
-        has_file_reference = bool(re.search(r"[\w.+-]+\.[a-z0-9]{1,12}", normalized, re.IGNORECASE))
-        has_extension_question = any(
-            marker in normalized
-            for marker in ("后缀", "后缀名", "扩展名", "文件类型", "file extension", "file suffix", "extension")
-        )
-        return has_file_reference and has_extension_question
 
     @staticmethod
     def _is_catalog_description_request(user_message: str) -> bool:

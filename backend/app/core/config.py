@@ -46,6 +46,9 @@ class Settings(BaseSettings):
     # from provider/network retries and from the dataset quicklook synthesis
     # deadline, which has its own larger professional-analysis budget.
     agent_finalization_timeout_seconds: float = 45.0
+    # Lightweight dataset routing runs before any sandbox allocation. A slow or
+    # unavailable classifier must fall back to the normal Agent path promptly.
+    dataset_request_resolver_timeout_seconds: float = 8.0
 
     # System-owned safety gate. It always runs before Planner and is not part
     # of a user-editable Agent profile. If review is unavailable, it fails closed.

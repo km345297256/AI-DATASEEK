@@ -27,6 +27,9 @@ from app.infrastructure.external.sandbox.runtime import (
     get_default_sandbox_runtime,
 )
 from app.core.config import get_settings
+from app.application.services.data_center_dataset_service import DataCenterDatasetService
+from app.application.services.dataset_request_resolver import DatasetRequestResolver, FrontControllerResolution
+from app.domain.services.lightweight_task_runner import LightweightTaskRunner
 
 # Setup logging
 logger = logging.getLogger(__name__)
@@ -59,6 +62,8 @@ class AgentDomainService:
         self._file_storage = file_storage
         self._mcp_repository = mcp_repository
         self._sandbox_runtime = sandbox_runtime or get_default_sandbox_runtime(sandbox_cls)
+        self._dataset_service = DataCenterDatasetService()
+        self._dataset_request_resolver = DatasetRequestResolver()
         self._chat_bootstrap_tasks: set[asyncio.Task] = set()
         self._session_bootstrap_locks: weakref.WeakValueDictionary[str, asyncio.Lock] = (
             weakref.WeakValueDictionary()
@@ -71,7 +76,12 @@ class AgentDomainService:
         await self._task_cls.destroy()
         logger.info("All agents closed successfully")
 
-    async def _create_task(self, session: Session, dataset_ids: Optional[List[str]] = None) -> Task:
+    async def _create_task(
+        self,
+        session: Session,
+        dataset_ids: Optional[List[str]] = None,
+        front_controller_resolution: Optional[FrontControllerResolution] = None,
+    ) -> Task:
         """Create a new agent task"""
         sandbox_runtime = self._sandbox_runtime
         sandbox = None
@@ -214,6 +224,7 @@ class AgentDomainService:
             agent_repository=self._repository,
             mcp_repository=self._mcp_repository,
             llm_overrides=session.llm_overrides,
+            front_controller_resolution=front_controller_resolution,
         )
 
         task = self._task_cls.create(task_runner)
@@ -223,6 +234,23 @@ class AgentDomainService:
         # Update record with task_id now that we have it
         await sandbox_runtime.assign(sandbox, session, task.id)
 
+        return task
+
+    async def _create_lightweight_task(self, session: Session, resolution: FrontControllerResolution) -> Task:
+        runner = LightweightTaskRunner(
+            session_id=session.id,
+            user_id=session.user_id,
+            resolution=resolution,
+            session_repository=self._session_repository,
+        )
+        task = self._task_cls.create(runner)
+        session.task_id = task.id
+        await self._session_repository.save(session)
+        logger.info(
+            "Session %s selected %s execution without sandbox allocation",
+            session.id,
+            resolution.mode,
+        )
         return task
 
     async def _wait_for_resumed_sandbox(self, sandbox: Sandbox) -> bool:
@@ -568,6 +596,45 @@ class AgentDomainService:
                     await wait_closed()
                 task = None
 
+            if task is not None and not task.done:
+                wait_closed = getattr(task, "wait_closed", None)
+                if callable(wait_closed):
+                    await wait_closed()
+                    task = None
+
+            controller_resolution: FrontControllerResolution | None = None
+            if task is None or task.done:
+                try:
+                    datasets = [
+                        await self._dataset_service.get_dataset(dataset_id, user_id=user_id)
+                        for dataset_id in effective_dataset_ids
+                    ]
+                    get_events = getattr(self._session_repository, "get_events", None)
+                    conversation_events = await get_events(session.id) if callable(get_events) else []
+                    attachment_names = [
+                        str(item.get("filename") or item.get("name") or "")
+                        for item in (attachments or [])
+                        if isinstance(item, dict)
+                    ]
+                    controller_resolution = await self._dataset_request_resolver.resolve(
+                        question=message,
+                        datasets=datasets,
+                        events=conversation_events,
+                        llm_overrides=session.llm_overrides,
+                        user_id=user_id,
+                        session_id=session.id,
+                        selected_skills=skills or [],
+                        selected_mcp_servers=mcp_servers or [],
+                        attachment_names=attachment_names,
+                    )
+                except Exception as exc:
+                    logger.error(
+                        "Session %s Front Controller failed before task creation: %s",
+                        session.id,
+                        exc,
+                    )
+                    raise RuntimeError("The request could not be safely classified") from exc
+
             if task is None or task.done:
                 if session.task_id and task is None:
                     logger.warning(
@@ -576,9 +643,13 @@ class AgentDomainService:
                         session.task_id,
                     )
                 task = (
-                    await self._create_task(session, effective_dataset_ids)
-                    if effective_dataset_ids
-                    else await self._create_task(session)
+                    await self._create_lightweight_task(session, controller_resolution)
+                    if controller_resolution is not None and controller_resolution.mode in {"direct", "catalog", "reject"}
+                    else await self._create_task(
+                        session,
+                        effective_dataset_ids or None,
+                        front_controller_resolution=controller_resolution,
+                    )
                 )
                 if not task:
                     raise RuntimeError("Failed to create task")
@@ -627,9 +698,13 @@ class AgentDomainService:
                 if callable(wait_closed):
                     await wait_closed()
                 task = (
-                    await self._create_task(session, effective_dataset_ids)
-                    if effective_dataset_ids
-                    else await self._create_task(session)
+                    await self._create_lightweight_task(session, controller_resolution)
+                    if controller_resolution is not None and controller_resolution.mode in {"direct", "catalog", "reject"}
+                    else await self._create_task(
+                        session,
+                        effective_dataset_ids or None,
+                        front_controller_resolution=controller_resolution,
+                    )
                 )
                 enqueue_input = getattr(task, "enqueue_input", None)
                 queued_event_id = (
