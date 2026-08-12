@@ -111,6 +111,8 @@
         <div class="flex flex-col w-full gap-[12px] pb-[80px] pt-[12px] flex-1 overflow-y-auto">
           <ChatMessage v-for="(message, index) in messages" :key="index" :message="message"
             :hideHeader="isConsecutiveAssistant(messages, index)"
+            :session-id="sessionId"
+            :show-assistant-actions="!isLoading && isLatestAssistantMessage(messages, index)"
             @toolClick="handleToolClick" />
 
           <div v-if="completionAdvice" class="rounded-xl border border-[var(--border-main)] bg-[var(--background-white-main)] p-4">
@@ -192,6 +194,7 @@ import {
   findCurrentTurnRunningStep,
   findCurrentTurnStep,
   insertTaskExecutionSummary,
+  isLatestAssistantMessage,
 } from '../utils/chatTimeline';
 import { SessionStatus } from '../types/response';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';

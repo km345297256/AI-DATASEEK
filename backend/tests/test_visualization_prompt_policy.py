@@ -76,15 +76,14 @@ def test_analysis_prompts_preserve_zero_nodata_and_unit_semantics():
     assert "raw/unit-not-declared" in execution_prompt
 
 
-def test_quicklook_policy_uses_returned_evidence_before_manual_probes():
+def test_quicklook_policy_requires_matching_scope_and_uses_returned_evidence():
     system_prompt, execution_prompt = _rendered_prompts()
     for prompt in (system_prompt, execution_prompt):
-        assert "spatial-zone means" in prompt
-        assert "declared NoData" in prompt
-        assert "mask provenance" in prompt
-        assert "zero counts" in prompt
+        assert "optional bounded profiling and visualization tool" in prompt
+        assert "scope matches the user's request" in prompt
+        assert "evidence, not" in prompt
     assert "Do not manually unpack" in execution_prompt
-    assert "read sidecars" in execution_prompt
+    assert "recreate quicklook charts" in execution_prompt
 
 
 def test_visualization_prompts_define_unicode_and_png_output_policy():
@@ -100,3 +99,21 @@ def test_visualization_prompts_avoid_unicode_superscript_units():
         assert "U+207B" in prompt
         assert "$m^{-2}$" in prompt
         assert "m^-2" in prompt
+
+
+def test_prompts_prefer_deterministic_scientific_operators():
+    system_prompt, execution_prompt = _rendered_prompts()
+    assert "scientific_*" in system_prompt
+    for prompt in (execution_prompt,):
+        assert "scientific_inspect" in prompt
+        assert "scientific_statistics" in prompt
+        assert "scientific_aggregate" in prompt
+        assert "scientific_visualize" in prompt
+    for tool_name in (
+        "scientific_subset",
+        "scientific_convert_netcdf_to_geotiff",
+        "scientific_transform_raster",
+        "scientific_raster_index",
+        "scientific_terrain",
+    ):
+        assert tool_name in execution_prompt

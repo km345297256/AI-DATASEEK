@@ -57,14 +57,14 @@ def test_visualization_request_uses_chinese_one_step_fast_path():
     assert plan.steps[0].description == "分析当前数据集并生成可视化结果"
     assert plan.steps[0].inputs["execution_mode"] == "dataset_fast_path"
     assert plan.steps[0].inputs["dataset_intent"] == "visualization"
-    assert plan.steps[0].inputs["prefer_quicklook_evidence"] is True
+    assert plan.steps[0].inputs["prefer_quicklook_evidence"] is False
     assert plan.steps[0].inputs["require_model_answer"] is True
-    assert plan.steps[0].inputs["allow_terminal_quicklook"] is True
+    assert plan.steps[0].inputs["allow_terminal_quicklook"] is False
     assert plan.steps[0].inputs["user_question"] == message.message
     assert plan.steps[0].inputs["require_evidence"] is True
     assert plan.steps[0].inputs["require_method_and_limitations"] is True
     assert plan.steps[0].inputs["require_downloadable_result"] is True
-    assert plan.steps[0].inputs["artifact_policy"] == "capability"
+    assert plan.steps[0].inputs["artifact_policy"] == "required"
     assert "解释图表所依据的数据" in plan.steps[0].inputs["execution_guidance"]
 
 
@@ -248,6 +248,20 @@ def test_ambiguous_duplicate_basename_never_uses_whole_dataset_quicklook():
     assert step.inputs["allow_terminal_quicklook"] is False
 
 
+def test_demonstrative_file_visualization_never_preselects_dataset_quicklook():
+    step = _flow()._create_dataset_fast_path_plan(
+        Message(
+            message="这个文件能简单可视化一下吗",
+            datasets=[_dataset_with_files("monthly/rain_195301.nc")],
+        )
+    ).steps[0]
+
+    assert step.inputs["dataset_intent"] == "visualization"
+    assert step.inputs["target_files"] == []
+    assert step.inputs["prefer_quicklook_evidence"] is False
+    assert step.inputs["allow_terminal_quicklook"] is False
+
+
 def test_named_tabular_target_uses_targeted_visualization_not_whole_dataset_quicklook():
     step = _flow()._create_dataset_fast_path_plan(
         Message(
@@ -325,29 +339,27 @@ def test_custom_dataset_question_remains_model_assisted_analysis():
 
 
 @pytest.mark.parametrize(
-    ("question", "expected_dimensions", "expected_prefer_quicklook"),
+    ("question", "expected_dimensions"),
     [
         (
             "综合评判这个科学数据集的价值和用途",
             {"scientific_value", "use_cases", "overall_assessment"},
-            False,
         ),
-        ("这个数据集是否适合用于区域环境研究？", {"applicability"}, False),
-        ("概述这个数据集并解释它能说明什么", {"overview", "interpretation"}, True),
-        ("Is this dataset suitable for regional research?", {"applicability"}, False),
+        ("这个数据集是否适合用于区域环境研究？", {"applicability"}),
+        ("概述这个数据集并解释它能说明什么", {"overview", "interpretation"}),
+        ("Is this dataset suitable for regional research?", {"applicability"}),
     ],
 )
 def test_general_single_dataset_analysis_prefers_quicklook_evidence(
     question,
     expected_dimensions,
-    expected_prefer_quicklook,
 ):
     step = _flow()._create_dataset_fast_path_plan(
         Message(message=question, datasets=[_dataset()])
     ).steps[0]
 
     assert step.inputs["dataset_intent"] == "analysis"
-    assert step.inputs["prefer_quicklook_evidence"] is expected_prefer_quicklook
+    assert step.inputs["prefer_quicklook_evidence"] is False
     assert step.inputs["allow_terminal_quicklook"] is False
     assert expected_dimensions <= set(step.inputs["requested_dimensions"])
 
@@ -542,13 +554,13 @@ def test_specific_multi_part_visualization_requires_evidence_coverage_model_turn
         "Visualize the dataset",
     ],
 )
-def test_broad_quicklook_requests_remain_terminal(question):
+def test_broad_quicklook_requests_leave_tool_selection_to_execution_agent(question):
     plan = _flow()._create_dataset_fast_path_plan(
         Message(message=question, datasets=[_dataset()])
     )
 
-    assert plan.steps[0].inputs["allow_terminal_quicklook"] is True
-    assert plan.steps[0].inputs["prefer_quicklook_evidence"] is True
+    assert plan.steps[0].inputs["allow_terminal_quicklook"] is False
+    assert plan.steps[0].inputs["prefer_quicklook_evidence"] is False
 
 
 @pytest.mark.parametrize(
@@ -584,25 +596,24 @@ def test_multiple_datasets_do_not_force_a_single_input_quicklook():
 
 
 @pytest.mark.parametrize(
-    ("question", "intent", "terminal"),
+    ("question", "intent"),
     [
-        ("这个数据集包含哪些文件？", "inventory", False),
-        ("数据质量怎么样？", "analysis", False),
-        ("数据有哪些趋势或关系？", "analysis", False),
-        ("如何进行数据可视化？", "visualization", True),
+        ("这个数据集包含哪些文件？", "inventory"),
+        ("数据质量怎么样？", "analysis"),
+        ("数据有哪些趋势或关系？", "analysis"),
+        ("如何进行数据可视化？", "visualization"),
     ],
 )
 def test_four_simplified_questions_route_to_their_real_analysis_contract(
     question,
     intent,
-    terminal,
 ):
     step = _flow()._create_dataset_fast_path_plan(
         Message(message=question, datasets=[_dataset()])
     ).steps[0]
 
     assert step.inputs["dataset_intent"] == intent
-    assert step.inputs["allow_terminal_quicklook"] is terminal
+    assert step.inputs["allow_terminal_quicklook"] is False
     assert step.inputs["user_question"] == question
     assert step.inputs["requested_dimensions"]
 

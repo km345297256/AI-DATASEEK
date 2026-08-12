@@ -181,3 +181,28 @@ async def test_dataset_quicklook_uses_one_quoted_bounded_command():
         "ai-dataseek-quicklook '/home/ubuntu/datasets/demo/data; touch nope.zip' "
         "--output '/home/ubuntu/output/quick look' --max-plots 4 --timeout-seconds 120"
     )
+
+
+async def test_scientific_tools_build_one_quoted_bounded_command():
+    sandbox = _Sandbox(returncode=0)
+    toolkit = ShellToolkit(sandbox)
+    subset = toolkit.get_tool("scientific_subset")
+    assert subset is not None
+
+    result = await subset._arun(
+        id="science-1",
+        input_path="/home/ubuntu/datasets/demo/a file; touch nope.nc",
+        output_path="/home/ubuntu/output/subset file.nc",
+        variable="rain rate",
+        bbox=[100, 20, 110, 30],
+        dimension_indices={"time": 0},
+        timeout_seconds=500,
+    )
+
+    assert result.success is True
+    assert sandbox.wait_seconds == 120
+    assert sandbox.command == (
+        "ai-dataseek-scientific subset '/home/ubuntu/datasets/demo/a file; touch nope.nc' "
+        "--variable 'rain rate' --dimension-indices '{\"time\": 0}' "
+        "--output '/home/ubuntu/output/subset file.nc' --bbox '[100, 20, 110, 30]'"
+    )

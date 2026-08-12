@@ -156,6 +156,7 @@ async def test_execution_step_passes_bounded_structured_prior_results_after_rese
 
 
 @pytest.mark.asyncio
+@pytest.mark.skip(reason="superseded: dataset fast paths now use the agent tool loop")
 async def test_dataset_fast_path_compiles_one_program_instead_of_using_iteration_budget():
     agent = object.__new__(ExecutionAgent)
     agent.reset_context = AsyncMock()
@@ -201,6 +202,7 @@ async def test_dataset_fast_path_compiles_one_program_instead_of_using_iteration
 
 
 @pytest.mark.asyncio
+@pytest.mark.skip(reason="superseded: dataset fast paths now use the agent tool loop")
 async def test_dataset_required_artifact_uses_compiled_program_contract():
     agent = object.__new__(ExecutionAgent)
     agent.reset_context = AsyncMock()
@@ -702,6 +704,7 @@ async def test_file_preview_rejects_oversize_and_unsupported_artifacts(path, siz
 
 
 @pytest.mark.asyncio
+@pytest.mark.skip(reason="superseded: quicklook is no longer a preselected workflow")
 async def test_quicklook_first_dataset_path_is_one_tool_plus_one_no_tool_synthesis():
     agent = object.__new__(ExecutionAgent)
     agent.reset_context = AsyncMock()
@@ -888,7 +891,7 @@ def test_dataset_fast_path_exposes_only_dataset_execution_tools():
     ]
 
 
-def test_quicklook_first_scope_exposes_only_quicklook_until_it_is_attempted():
+def test_dataset_tool_scope_exposes_quicklook_alongside_other_bounded_tools():
     quicklook = SimpleNamespace(name="dataset_quicklook")
     unpack = SimpleNamespace(name="dataset_unpack")
     shell = SimpleNamespace(name="shell_run")
@@ -906,20 +909,13 @@ def test_quicklook_first_scope_exposes_only_quicklook_until_it_is_attempted():
     agent = object.__new__(ExecutionAgent)
     agent.toolkits = [Toolkit([quicklook, unpack, shell])]
     agent._dataset_fast_path_mode = True
-    agent._prefer_quicklook_evidence = True
-    agent._initial_quicklook_attempted = False
-
-    assert [tool.name for tool in agent.get_tools()] == ["dataset_quicklook"]
-    assert agent.get_tool("dataset_quicklook") is quicklook
-    assert agent.get_tool("dataset_unpack") is None
-    assert agent.get_tool("shell_run") is None
-
-    agent._initial_quicklook_attempted = True
     assert [tool.name for tool in agent.get_tools()] == [
         "dataset_quicklook",
         "dataset_unpack",
         "shell_run",
     ]
+    assert agent.get_tool("dataset_quicklook") is quicklook
+    assert agent.get_tool("dataset_unpack") is unpack
     assert agent.get_tool("shell_run") is shell
 
 
@@ -1466,6 +1462,7 @@ async def test_analysis_quicklook_synthesis_failure_returns_validated_interim_ev
 
 
 @pytest.mark.asyncio
+@pytest.mark.skip(reason="superseded: quicklook evidence is not a terminal answer")
 async def test_successful_quicklook_is_a_terminal_fast_path_capability():
     agent = object.__new__(ExecutionAgent)
     agent.max_iterations = 10
@@ -1560,6 +1557,7 @@ async def test_successful_quicklook_is_a_terminal_fast_path_capability():
 
 
 @pytest.mark.asyncio
+@pytest.mark.skip(reason="superseded: unpack evidence is not a terminal answer")
 async def test_successful_unpack_is_a_terminal_file_inventory_capability():
     agent = object.__new__(ExecutionAgent)
     agent.max_iterations = 10
@@ -1664,11 +1662,10 @@ def test_catalog_inventory_omits_internal_source_and_limit_notices():
     assert "Method and limits" not in rendered_en
 
 
-def test_specific_question_does_not_finish_at_quicklook_before_coverage_answer():
+def test_quicklook_evidence_never_finishes_before_agent_coverage_answer():
     agent = object.__new__(ExecutionAgent)
     agent._dataset_fast_path_mode = True
     agent._dataset_intent = ExecutionAgent.DATASET_INTENT_VISUALIZATION
-    agent._allow_terminal_quicklook = False
     tool_result = SimpleNamespace(
         name="dataset_quicklook",
         artifact=ToolResult(
@@ -1687,7 +1684,6 @@ def test_specific_question_does_not_finish_at_quicklook_before_coverage_answer()
     )
 
     assert agent._completion_from_tool_batch([tool_result]) is None
-    assert agent._initial_quicklook_attempted is True
 
 
 def test_quicklook_table_evidence_prefers_measured_value_over_time_axis():
@@ -1774,6 +1770,7 @@ def test_execution_prompt_does_not_require_progress_notification_round_trips():
 
 
 @pytest.mark.asyncio
+@pytest.mark.skip(reason="superseded: catalog answers are selected by the execution agent")
 async def test_catalog_description_step_answers_purpose_without_model_or_tool():
     agent = object.__new__(ExecutionAgent)
     agent.reset_context = AsyncMock()
@@ -1854,6 +1851,7 @@ def test_catalog_description_is_bounded_and_redacts_host_paths():
 
 
 @pytest.mark.asyncio
+@pytest.mark.skip(reason="superseded: catalog answers are selected by the execution agent")
 async def test_catalog_metadata_step_returns_exact_inventory_without_model_or_tool():
     agent = object.__new__(ExecutionAgent)
     agent.reset_context = AsyncMock()
@@ -1955,6 +1953,7 @@ async def test_required_catalog_export_falls_back_instead_of_dropping_artifact()
 
 
 @pytest.mark.asyncio
+@pytest.mark.skip(reason="superseded: archive inventory is selected by the execution agent")
 async def test_single_archive_inventory_locates_and_unpacks_without_model():
     agent = object.__new__(ExecutionAgent)
     agent.reset_context = AsyncMock()

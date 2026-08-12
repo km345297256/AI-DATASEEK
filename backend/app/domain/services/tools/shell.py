@@ -1,3 +1,4 @@
+import json
 import shlex
 from typing import Any, Optional
 from app.domain.external.sandbox import Sandbox
@@ -101,7 +102,7 @@ class ShellToolkit(BaseToolkit):
         max_plots: int = 4,
         timeout_seconds: int = 90,
     ) -> ToolResult:
-        """Create a bounded model-free profile, compact evidence, and 1-4 useful PNG charts for a CSV/TSV, Excel, GeoTIFF, directory, or ZIP/RAR/7z dataset in one call. Archives, including archives below a mounted directory and nested archives, are extracted safely. A successful result completes a broad request without another model turn only when the dataset contract allows terminal quicklook; specific multi-part questions must still be answered from the returned evidence. Use a new output directory under /home/ubuntu/output.
+        """Create a bounded model-free profile, compact evidence, and 1-4 useful PNG charts for one selected CSV/TSV, Excel, GeoTIFF, directory, or ZIP/RAR/7z input. Archives, including nested archives, are extracted safely. This returns evidence and artifacts; use it only when its scope directly matches the user's request, then decide whether the evidence fully answers that request. Use a new output directory under /home/ubuntu/output.
 
         Args:
             id: Unique identifier of the target shell session
@@ -122,6 +123,317 @@ class ShellToolkit(BaseToolkit):
             id=id,
             exec_dir="/home/ubuntu",
             command=command,
+            timeout_seconds=bounded_timeout,
+        )
+
+    @tool(parse_docstring=True)
+    async def scientific_inspect(
+        self,
+        id: str,
+        input_path: str,
+        timeout_seconds: int = 30,
+    ) -> ToolResult:
+        """Inspect one NetCDF or GeoTIFF file with deterministic format-aware logic. Returns variables, dimensions, coordinate roles, units, missing-value metadata, CRS, transform, bounds, and ambiguity candidates without loading the full data cube.
+
+        Args:
+            id: Unique identifier of the target shell session
+            input_path: Absolute NetCDF or GeoTIFF path inside the sandbox
+            timeout_seconds: Maximum bounded wait in seconds, clamped to 5-120
+        """
+        return await self._run_scientific_command(
+            id=id,
+            operation="inspect",
+            input_path=input_path,
+            timeout_seconds=timeout_seconds,
+        )
+
+    @tool(parse_docstring=True)
+    async def scientific_statistics(
+        self,
+        id: str,
+        input_path: str,
+        variable: Optional[str] = None,
+        band: int = 1,
+        dimension_indices: Optional[dict[str, int]] = None,
+        timeout_seconds: int = 60,
+    ) -> ToolResult:
+        """Compute bounded, mask-aware statistics for one NetCDF variable or GeoTIFF band. NetCDF is CF-decoded with scale and missing values applied. If a NetCDF contains multiple candidate variables, inspect it and pass an explicit variable instead of guessing.
+
+        Args:
+            id: Unique identifier of the target shell session
+            input_path: Absolute NetCDF or GeoTIFF path inside the sandbox
+            variable: NetCDF data variable name; optional only when exactly one candidate exists
+            band: One-based GeoTIFF band index
+            dimension_indices: Optional NetCDF dimension-to-integer-index selection
+            timeout_seconds: Maximum bounded wait in seconds, clamped to 5-120
+        """
+        return await self._run_scientific_command(
+            id=id,
+            operation="statistics",
+            input_path=input_path,
+            variable=variable,
+            band=band,
+            dimension_indices=dimension_indices,
+            timeout_seconds=timeout_seconds,
+        )
+
+    @tool(parse_docstring=True)
+    async def scientific_aggregate(
+        self,
+        id: str,
+        input_path: str,
+        dimension: str,
+        method: str,
+        variable: Optional[str] = None,
+        start: Optional[str] = None,
+        end: Optional[str] = None,
+        output_path: Optional[str] = None,
+        timeout_seconds: int = 90,
+    ) -> ToolResult:
+        """Apply an explicit labelled time or dimension reduction to one NetCDF variable. Supports mean, sum, min, max, and median; never guesses the variable or dimension and records the selected range and mask/scale provenance.
+
+        Args:
+            id: Unique identifier of the target shell session
+            input_path: Absolute NetCDF path inside the sandbox
+            dimension: Existing NetCDF dimension to reduce, such as time
+            method: Reduction method: mean, sum, min, max, or median
+            variable: NetCDF data variable name; required when multiple numeric variables exist
+            start: Optional inclusive coordinate-range start for the selected dimension
+            end: Optional inclusive coordinate-range end for the selected dimension
+            output_path: Optional NetCDF path below /home/ubuntu/output; use it for non-scalar results
+            timeout_seconds: Maximum bounded wait in seconds, clamped to 5-120
+        """
+        bounded_timeout = max(5, min(timeout_seconds, 120))
+        parts = [
+            "ai-dataseek-scientific", "aggregate", shlex.quote(input_path),
+            "--dimension", shlex.quote(dimension), "--method", shlex.quote(method),
+        ]
+        if variable:
+            parts.extend(["--variable", shlex.quote(variable)])
+        if start:
+            parts.extend(["--start", shlex.quote(start)])
+        if end:
+            parts.extend(["--end", shlex.quote(end)])
+        if output_path:
+            parts.extend(["--output", shlex.quote(output_path)])
+        return await self._run_bounded_command(
+            id=id,
+            exec_dir="/home/ubuntu",
+            command=" ".join(parts),
+            timeout_seconds=bounded_timeout,
+        )
+
+    @tool(parse_docstring=True)
+    async def scientific_subset(
+        self,
+        id: str,
+        input_path: str,
+        output_path: str,
+        variable: Optional[str] = None,
+        bbox: Optional[list[float]] = None,
+        time_start: Optional[str] = None,
+        time_end: Optional[str] = None,
+        dimension_indices: Optional[dict[str, int]] = None,
+        timeout_seconds: int = 90,
+    ) -> ToolResult:
+        """Create a CF-aware NetCDF subset by an explicit longitude/latitude bounding box, time range, and/or dimension indices. It supports ascending or descending coordinates and records the selection; it does not silently handle a dateline-crossing area.
+
+        Args:
+            id: Unique identifier of the target shell session
+            input_path: Absolute NetCDF path inside the sandbox
+            output_path: New NetCDF path below /home/ubuntu/output
+            variable: NetCDF data variable name; required when multiple numeric variables exist
+            bbox: Optional [west, south, east, north] in the dataset longitude/latitude coordinate system
+            time_start: Optional inclusive time-coordinate start
+            time_end: Optional inclusive time-coordinate end
+            dimension_indices: Optional NetCDF dimension-to-integer-index selection
+            timeout_seconds: Maximum bounded wait in seconds, clamped to 5-120
+        """
+        return await self._run_scientific_command(
+            id=id, operation="subset", input_path=input_path, output_path=output_path,
+            variable=variable, dimension_indices=dimension_indices, timeout_seconds=timeout_seconds,
+            extra_args={"--bbox": bbox, "--time-start": time_start, "--time-end": time_end},
+        )
+
+    @tool(parse_docstring=True)
+    async def scientific_convert_netcdf_to_geotiff(
+        self,
+        id: str,
+        input_path: str,
+        output_path: str,
+        variable: Optional[str] = None,
+        dimension_indices: Optional[dict[str, int]] = None,
+        timeout_seconds: int = 90,
+    ) -> ToolResult:
+        """Export a two-dimensional, regularly spaced latitude/longitude NetCDF selection to GeoTIFF. It validates the grid and writes EPSG:4326 only when that interpretation is supported by coordinate metadata.
+
+        Args:
+            id: Unique identifier of the target shell session
+            input_path: Absolute NetCDF path inside the sandbox
+            output_path: New GeoTIFF path below /home/ubuntu/output
+            variable: NetCDF data variable name; required when multiple numeric variables exist
+            dimension_indices: Required selections for non-spatial NetCDF dimensions when applicable
+            timeout_seconds: Maximum bounded wait in seconds, clamped to 5-120
+        """
+        return await self._run_scientific_command(
+            id=id, operation="convert", input_path=input_path, output_path=output_path,
+            variable=variable, dimension_indices=dimension_indices, timeout_seconds=timeout_seconds,
+        )
+
+    @tool(parse_docstring=True)
+    async def scientific_transform_raster(
+        self,
+        id: str,
+        input_path: str,
+        output_path: str,
+        target_crs: Optional[str] = None,
+        resolution: Optional[float] = None,
+        bbox: Optional[list[float]] = None,
+        resampling: str = "nearest",
+        timeout_seconds: int = 120,
+    ) -> ToolResult:
+        """Clip, reproject, and/or resample a GeoTIFF in one deterministic operation. The bbox is interpreted in the source CRS; resampling is explicitly nearest, bilinear, cubic, or average.
+
+        Args:
+            id: Unique identifier of the target shell session
+            input_path: Absolute GeoTIFF path inside the sandbox
+            output_path: New GeoTIFF path below /home/ubuntu/output
+            target_crs: Optional target CRS such as EPSG:4326 or EPSG:3857
+            resolution: Optional positive target resolution in target-CRS units
+            bbox: Optional [left, bottom, right, top] in the source CRS
+            resampling: nearest, bilinear, cubic, or average
+            timeout_seconds: Maximum bounded wait in seconds, clamped to 5-120
+        """
+        return await self._run_scientific_command(
+            id=id, operation="transform", input_path=input_path, output_path=output_path,
+            timeout_seconds=timeout_seconds,
+            extra_args={"--target-crs": target_crs, "--resolution": resolution, "--bbox": bbox, "--resampling": resampling},
+        )
+
+    @tool(parse_docstring=True)
+    async def scientific_raster_index(
+        self,
+        id: str,
+        input_path: str,
+        output_path: str,
+        index_name: str,
+        bands: dict[str, int],
+        timeout_seconds: int = 120,
+    ) -> ToolResult:
+        """Calculate NDVI, EVI, NDWI, or NBR from explicitly mapped one-based GeoTIFF bands. Never infer sensor-specific band meanings from band positions; inspect metadata or ask the user when the mapping is unknown.
+
+        Args:
+            id: Unique identifier of the target shell session
+            input_path: Absolute multiband GeoTIFF path inside the sandbox
+            output_path: New single-band GeoTIFF path below /home/ubuntu/output
+            index_name: ndvi, evi, ndwi, or nbr
+            bands: Exact semantic band mapping, such as {"nir": 4, "red": 3}
+            timeout_seconds: Maximum bounded wait in seconds, clamped to 5-120
+        """
+        return await self._run_scientific_command(
+            id=id, operation="raster-index", input_path=input_path, output_path=output_path,
+            timeout_seconds=timeout_seconds,
+            extra_args={"--index": index_name, "--bands": bands},
+        )
+
+    @tool(parse_docstring=True)
+    async def scientific_terrain(
+        self,
+        id: str,
+        input_path: str,
+        output_path: str,
+        operation: str,
+        band: int = 1,
+        timeout_seconds: int = 120,
+    ) -> ToolResult:
+        """Calculate slope or aspect from one projected GeoTIFF DEM band. Geographic-degree rasters are rejected because terrain derivatives require projected linear cell units.
+
+        Args:
+            id: Unique identifier of the target shell session
+            input_path: Absolute projected GeoTIFF DEM path inside the sandbox
+            output_path: New single-band GeoTIFF path below /home/ubuntu/output
+            operation: slope or aspect
+            band: One-based DEM band index
+            timeout_seconds: Maximum bounded wait in seconds, clamped to 5-120
+        """
+        return await self._run_scientific_command(
+            id=id, operation="terrain", input_path=input_path, output_path=output_path,
+            timeout_seconds=timeout_seconds,
+            extra_args={"--terrain-operation": operation, "--band": max(1, band)},
+        )
+
+    @tool(parse_docstring=True)
+    async def scientific_visualize(
+        self,
+        id: str,
+        input_path: str,
+        output_path: str,
+        variable: Optional[str] = None,
+        band: int = 1,
+        dimension_indices: Optional[dict[str, int]] = None,
+        timeout_seconds: int = 90,
+    ) -> ToolResult:
+        """Create one coordinate-aware PNG from a two-dimensional NetCDF selection or a GeoTIFF band. Provide dimension indices for non-spatial NetCDF dimensions. The operator applies declared masks and geospatial coordinates and returns a verifiable artifact record.
+
+        Args:
+            id: Unique identifier of the target shell session
+            input_path: Absolute NetCDF or GeoTIFF path inside the sandbox
+            output_path: Absolute PNG path below /home/ubuntu/output
+            variable: NetCDF data variable name; optional only when exactly one candidate exists
+            band: One-based GeoTIFF band index
+            dimension_indices: Optional NetCDF dimension-to-integer-index selection
+            timeout_seconds: Maximum bounded wait in seconds, clamped to 5-120
+        """
+        return await self._run_scientific_command(
+            id=id,
+            operation="visualize",
+            input_path=input_path,
+            output_path=output_path,
+            variable=variable,
+            band=band,
+            dimension_indices=dimension_indices,
+            timeout_seconds=timeout_seconds,
+        )
+
+    async def _run_scientific_command(
+        self,
+        *,
+        id: str,
+        operation: str,
+        input_path: str,
+        timeout_seconds: int,
+        output_path: Optional[str] = None,
+        variable: Optional[str] = None,
+        band: int = 1,
+        dimension_indices: Optional[dict[str, int]] = None,
+        extra_args: Optional[dict[str, Any]] = None,
+    ) -> ToolResult:
+        bounded_timeout = max(5, min(timeout_seconds, 120))
+        parts = [
+            "ai-dataseek-scientific",
+            operation,
+            shlex.quote(input_path),
+        ]
+        if operation in {"statistics", "subset", "convert", "visualize"}:
+            if variable:
+                parts.extend(["--variable", shlex.quote(variable)])
+            parts.extend([
+                "--dimension-indices",
+                shlex.quote(json.dumps(dimension_indices or {}, ensure_ascii=True)),
+            ])
+        if operation in {"statistics", "visualize"}:
+            parts.extend(["--band", str(max(1, band))])
+        if output_path:
+            parts.extend(["--output", shlex.quote(output_path)])
+        for flag, value in (extra_args or {}).items():
+            if value is None:
+                continue
+            rendered = json.dumps(value, ensure_ascii=True) if isinstance(value, (dict, list)) else str(value)
+            parts.extend([flag, shlex.quote(rendered)])
+        return await self._run_bounded_command(
+            id=id,
+            exec_dir="/home/ubuntu",
+            command=" ".join(parts),
             timeout_seconds=bounded_timeout,
         )
 

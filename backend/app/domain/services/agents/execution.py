@@ -55,10 +55,8 @@ class ExecutionAgent(BaseAgent):
     name: str = "execution"
     system_prompt: str = SYSTEM_PROMPT + EXECUTION_SYSTEM_PROMPT
     format: str = "json_object"
-    # A generic quicklook-first request is orchestrated as exactly one
-    # deterministic tool call plus, for a multi-part question, one no-tool model
-    # synthesis. This timeout bounds that single synthesis call without forcing
-    # an unrealistically short ten-second provider deadline.
+    # These limits protect synthesis after a tool call; quicklook itself is an
+    # ordinary tool chosen by the agent, never a preselected terminal workflow.
     DATASET_SYNTHESIS_TIMEOUT_SECONDS = 75.0
     DATASET_SYNTHESIS_REPAIR_TIMEOUT_SECONDS = 45.0
     # The professional synthesis is a concise user report, not another data
@@ -120,6 +118,15 @@ class ExecutionAgent(BaseAgent):
     DATASET_FAST_PATH_TOOL_NAMES = {
         "dataset_unpack",
         "dataset_quicklook",
+        "scientific_inspect",
+        "scientific_statistics",
+        "scientific_aggregate",
+        "scientific_subset",
+        "scientific_convert_netcdf_to_geotiff",
+        "scientific_transform_raster",
+        "scientific_raster_index",
+        "scientific_terrain",
+        "scientific_visualize",
         "shell_run",
         "shell_exec",
         "shell_wait",
@@ -130,6 +137,9 @@ class ExecutionAgent(BaseAgent):
         "file_str_replace",
         "file_find_in_content",
         "file_find_by_name",
+        "list_dataset_files",
+        "resolve_dataset_file",
+        "inspect_dataset_catalog",
         "message_ask_user",
     }
     MAX_COMPLETED_STEPS_IN_CONTEXT = 12
@@ -211,10 +221,6 @@ class ExecutionAgent(BaseAgent):
         self._current_message: Optional[Message] = None
         self._dataset_fast_path_mode = False
         self._dataset_intent = self.DATASET_INTENT_ANALYSIS
-        self._allow_terminal_quicklook = False
-        self._prefer_quicklook_evidence = False
-        self._initial_quicklook_attempted = False
-        self._disable_quicklook_retry = False
 
     @classmethod
     def _resolve_dataset_intent(cls, step: Step, message: Message) -> str:
@@ -270,31 +276,10 @@ class ExecutionAgent(BaseAgent):
         tools = super().get_tools()
         if not getattr(self, "_dataset_fast_path_mode", False):
             return tools
-        allowed = [tool for tool in tools if tool.name in self.DATASET_FAST_PATH_TOOL_NAMES]
-        if getattr(self, "_disable_quicklook_retry", False):
-            allowed = [tool for tool in allowed if tool.name != "dataset_quicklook"]
-        if (
-            getattr(self, "_prefer_quicklook_evidence", False)
-            and not getattr(self, "_initial_quicklook_attempted", False)
-        ):
-            return [tool for tool in allowed if tool.name == "dataset_quicklook"]
-        return allowed
+        return [tool for tool in tools if tool.name in self.DATASET_FAST_PATH_TOOL_NAMES]
 
     def get_tool(self, name: str):
         if getattr(self, "_dataset_fast_path_mode", False) and name not in self.DATASET_FAST_PATH_TOOL_NAMES:
-            return None
-        if (
-            getattr(self, "_dataset_fast_path_mode", False)
-            and getattr(self, "_disable_quicklook_retry", False)
-            and name == "dataset_quicklook"
-        ):
-            return None
-        if (
-            getattr(self, "_dataset_fast_path_mode", False)
-            and getattr(self, "_prefer_quicklook_evidence", False)
-            and not getattr(self, "_initial_quicklook_attempted", False)
-            and name != "dataset_quicklook"
-        ):
             return None
         return super().get_tool(name)
 
@@ -1770,106 +1755,12 @@ class ExecutionAgent(BaseAgent):
         ).model_dump_json()
 
     def _completion_from_tool_batch(self, tool_results) -> Optional[str]:
-        """Finish a broad dataset fast path when quicklook has delivered artifacts.
+        """Never turn a dataset tool result into a final answer automatically.
 
-        Calling ``dataset_quicklook`` is a capability-level decision: its contract
-        says the bounded profile and charts satisfy the ordinary exploration task.
-        Once it succeeds, another model turn can only add latency or duplicate the
-        same analysis. Custom requests remain model-driven because their tool path
-        does not terminate through this capability.
+        Tools provide evidence. The agent remains responsible for deciding whether
+        that evidence answers the user's exact question and for producing the
+        final response.
         """
-        if not getattr(self, "_dataset_fast_path_mode", False):
-            return None
-
-        if (
-            getattr(self, "_dataset_intent", self.DATASET_INTENT_ANALYSIS)
-            == self.DATASET_INTENT_FILE_STRUCTURE
-        ):
-            for tool_result in tool_results:
-                payload = self._successful_unpack_payload(tool_result)
-                if payload is None:
-                    continue
-                language = getattr(
-                    getattr(self, "_current_plan", None),
-                    "language",
-                    "",
-                )
-                return json.dumps(
-                    {
-                        "success": True,
-                        "result": self._render_unpack_inventory(
-                            payload,
-                            language=language,
-                        ),
-                        "attachments": [],
-                    },
-                    ensure_ascii=False,
-                )
-
-        if any(
-            getattr(tool_result, "name", None) == "dataset_quicklook"
-            for tool_result in tool_results
-        ):
-            # Whether it succeeded or not, the required first attempt happened.
-            # A failed/unsupported quicklook restores the normal bounded tools so
-            # the next model turn can choose one custom analysis path.
-            self._initial_quicklook_attempted = True
-        if not getattr(self, "_allow_terminal_quicklook", True):
-            return None
-        if (
-            getattr(self, "_dataset_intent", self.DATASET_INTENT_ANALYSIS)
-            != self.DATASET_INTENT_VISUALIZATION
-        ):
-            return None
-
-        for tool_result in tool_results:
-            payload = self._successful_quicklook_payload(tool_result)
-            if payload is None:
-                continue
-            summary = payload.get("summary")
-            attachments = self._quicklook_attachment_paths(payload)
-            if not attachments:
-                continue
-
-            summary = summary if isinstance(summary, dict) else {}
-            files_analyzed = summary.get("files_analyzed", 0)
-            files_failed = summary.get("files_failed", 0)
-            plot_count = summary.get("plot_count", 0)
-            elapsed = summary.get("elapsed_seconds", 0)
-            language = getattr(getattr(self, "_current_plan", None), "language", "")
-            evidence_summary = self._quicklook_evidence_summary(
-                payload,
-                language=language,
-            )
-            if language == "zh":
-                result = (
-                    f"数据集快速探查与可视化已完成：分析 {files_analyzed} 个文件，"
-                    f"生成 {plot_count} 张图表（数据处理耗时 {elapsed} 秒）。"
-                    + (f"另有 {files_failed} 个文件未能剖析。" if files_failed else "")
-                    + " 方法采用有界抽样剖析，覆盖文件结构、字段或波段统计与代表性图表；"
-                    "快速结果可能基于样本，不能替代全量验证或据此作因果推断。"
-                    "附件包含图表、带方法和限制说明的摘要，以及机器可读证据清单。"
-                    f"{evidence_summary}"
-                )
-            else:
-                result = (
-                    f"Dataset quicklook completed: analyzed {files_analyzed} file(s) and "
-                    f"generated {plot_count} chart(s) in {elapsed} seconds. "
-                    + (f"{files_failed} file(s) could not be profiled. " if files_failed else "")
-                    + "The method uses bounded sampling for file structure, field or band statistics, "
-                    "and representative charts; sampled quicklook results do not replace full-data "
-                    "validation and do not establish causality. The attachments include charts, a "
-                    "method-and-limitations summary, and a machine-readable evidence manifest."
-                    f"{evidence_summary}"
-                )
-            return json.dumps(
-                {
-                    "success": True,
-                    "result": result,
-                    "attachments": attachments,
-                },
-                ensure_ascii=False,
-            )
         return None
 
     @classmethod
@@ -2898,8 +2789,6 @@ class ExecutionAgent(BaseAgent):
         *,
         dataset_fast_path: bool,
         dataset_intent: str,
-        allow_terminal_quicklook: bool,
-        prefer_quicklook_evidence: bool,
         max_iterations: Optional[int],
     ) -> AsyncGenerator[BaseEvent, None]:
         previous_mode = getattr(self, "_dataset_fast_path_mode", False)
@@ -2908,32 +2797,8 @@ class ExecutionAgent(BaseAgent):
             "_dataset_intent",
             self.DATASET_INTENT_ANALYSIS,
         )
-        previous_terminal_quicklook = getattr(
-            self,
-            "_allow_terminal_quicklook",
-            False,
-        )
-        previous_prefer_quicklook = getattr(
-            self,
-            "_prefer_quicklook_evidence",
-            False,
-        )
-        previous_quicklook_attempted = getattr(
-            self,
-            "_initial_quicklook_attempted",
-            False,
-        )
-        previous_disable_quicklook_retry = getattr(
-            self,
-            "_disable_quicklook_retry",
-            False,
-        )
         self._dataset_fast_path_mode = dataset_fast_path
         self._dataset_intent = dataset_intent
-        self._allow_terminal_quicklook = allow_terminal_quicklook
-        self._prefer_quicklook_evidence = prefer_quicklook_evidence
-        self._initial_quicklook_attempted = False
-        self._disable_quicklook_retry = False
         try:
             execution = (
                 self.execute(request)
@@ -2945,10 +2810,6 @@ class ExecutionAgent(BaseAgent):
         finally:
             self._dataset_fast_path_mode = previous_mode
             self._dataset_intent = previous_intent
-            self._allow_terminal_quicklook = previous_terminal_quicklook
-            self._prefer_quicklook_evidence = previous_prefer_quicklook
-            self._initial_quicklook_attempted = previous_quicklook_attempted
-            self._disable_quicklook_retry = previous_disable_quicklook_retry
 
     @staticmethod
     def _truncate_utf8(value: Any, max_bytes: int) -> str:
@@ -3061,9 +2922,6 @@ class ExecutionAgent(BaseAgent):
             for value in requested_dimensions[:16]
             if isinstance(value, str) and value.strip()
         ]
-        prefer_quicklook_evidence = bool(
-            step.inputs.get("prefer_quicklook_evidence", False)
-        )
         artifact_policy = step.inputs.get("artifact_policy")
         if artifact_policy not in {"required", "capability", "optional"}:
             artifact_policy = (
@@ -3105,10 +2963,6 @@ class ExecutionAgent(BaseAgent):
                 guidance,
                 cls.MAX_STEP_FIELD_BYTES,
             ),
-            "allow_terminal_quicklook": bool(
-                step.inputs.get("allow_terminal_quicklook", False)
-            ),
-            "prefer_quicklook_evidence": prefer_quicklook_evidence,
             "artifact_policy": artifact_policy,
             "target_files": [
                 cls._truncate_utf8(value, cls.MAX_STEP_FIELD_BYTES)
@@ -3119,17 +2973,6 @@ class ExecutionAgent(BaseAgent):
                 for value in target_filenames
             ],
         }
-        quicklook_instruction = (
-            "This request is covered by deterministic quicklook evidence. In the first tool batch, "
-            "call `dataset_quicklook` exactly once and call no other tool. It already handles nested "
-            "archives and returns charts plus compact statistics, quality, spatial-zone, and explicit-"
-            "time-dimension evidence. On the next turn, answer directly from that evidence when it covers "
-            "the checklist. Do not unpack, run gdalinfo, read sidecars, recreate its charts, or reread its "
-            "manifest. Only if quicklook fails or explicitly lacks a requested supported calculation may "
-            "you use one custom bounded analysis path.\n"
-            if prefer_quicklook_evidence
-            else ""
-        )
         target_instruction = (
             "The router resolved `target_files` to an ordered set of registered inventory paths. Restrict "
             "all file reads, calculations, comparisons, and generated charts to exactly this set. When the "
@@ -3168,7 +3011,13 @@ class ExecutionAgent(BaseAgent):
             "temporal trend, comparison, relationship, metric, or chart) and label each one supported, "
             "partially supported, or unsupported by the inspected data. Never silently omit a requested "
             "dimension.\n"
-            f"{quicklook_instruction}"
+            "`dataset_quicklook` is an optional bounded visualization capability, not a required workflow. "
+            "Use it only when its scope and output directly fit the question. For a file-scoped request, first "
+            "resolve or use the exact target and never silently enlarge the scope to the whole dataset. For a "
+            "catalog question, use the read-only dataset catalog tools before opening files. A demonstrative "
+            "such as 'this file' is not a dataset-wide target: resolve it from the supplied target files or "
+            "conversation first; when it remains ambiguous, ask which file the user means rather than invoking "
+            "a whole-dataset operation.\n"
             f"{target_instruction}"
             "Base quantitative claims on actual mounted-file evidence. Name the source file and relevant "
             "field, sheet, coordinate, or raster band; state filters, population/sample coverage, units when "
@@ -3483,15 +3332,6 @@ class ExecutionAgent(BaseAgent):
             return public_step
 
         dataset_fast_path = step.inputs.get("execution_mode") == "dataset_fast_path"
-        allow_terminal_quicklook = bool(
-            step.inputs.get(
-                "allow_terminal_quicklook",
-                dataset_intent == self.DATASET_INTENT_VISUALIZATION,
-            )
-        )
-        prefer_quicklook_evidence = bool(
-            step.inputs.get("prefer_quicklook_evidence", False)
-        )
         target_files = step.inputs.get("target_files")
         if not isinstance(target_files, list):
             target_files = []
@@ -3538,50 +3378,11 @@ class ExecutionAgent(BaseAgent):
                     else None
                 ),
             )
-        elif dataset_fast_path and dataset_intent == self.DATASET_INTENT_CATALOG_DESCRIPTION:
-            execution = self._execute_catalog_description(
-                scoped_request,
-                message=message,
-                language=plan.language,
-                artifact_policy=str(step.inputs.get("artifact_policy") or "optional"),
-            )
-        elif dataset_fast_path and dataset_intent == self.DATASET_INTENT_CATALOG_METADATA:
-            execution = self._execute_catalog_metadata(
-                scoped_request,
-                message=message,
-                language=plan.language,
-                artifact_policy=str(step.inputs.get("artifact_policy") or "optional"),
-            )
-        elif dataset_fast_path and dataset_intent == self.DATASET_INTENT_FILE_STRUCTURE:
-            execution = self._execute_preferred_inventory(
-                scoped_request,
-                message=message,
-                language=plan.language,
-                artifact_policy=str(step.inputs.get("artifact_policy") or "optional"),
-            )
-        elif dataset_fast_path and prefer_quicklook_evidence:
-            execution = self._execute_preferred_quicklook(
-                scoped_request,
-                message=message,
-                dataset_intent=dataset_intent,
-                allow_terminal_quicklook=allow_terminal_quicklook,
-            )
-        elif dataset_fast_path and dataset_intent in {
-            self.DATASET_INTENT_ANALYSIS,
-            self.DATASET_INTENT_VISUALIZATION,
-        }:
-            execution = self._execute_compiled_dataset_analysis(
-                scoped_request,
-                message=message,
-                target_files=target_files,
-            )
         else:
             execution = self._execute_with_tool_scope(
                 scoped_request,
                 dataset_fast_path=dataset_fast_path,
                 dataset_intent=dataset_intent,
-                allow_terminal_quicklook=allow_terminal_quicklook,
-                prefer_quicklook_evidence=False,
                 max_iterations=None,
             )
         observed_shell_results: list[ToolMessage] = []

@@ -138,7 +138,7 @@ WORKDIR /app
 
 # Copy dependency files first to leverage the Docker layer cache.
 COPY pyproject.toml uv.lock ./
-COPY scripts/install_noto_cjk_sc.py scripts/verify_matplotlib_cjk.py scripts/verify_geoscience_stack.py scripts/recursive_unpack.py scripts/dataset_quicklook.py scripts/dataset_analysis_runner.py /usr/local/lib/ai-dataseek/
+COPY scripts/install_noto_cjk_sc.py scripts/verify_matplotlib_cjk.py scripts/verify_geoscience_stack.py scripts/recursive_unpack.py scripts/dataset_quicklook.py scripts/dataset_analysis_runner.py scripts/scientific_data_ops.py /usr/local/lib/ai-dataseek/
 
 # Install the exact locked runtime, including the common Excel and plotting
 # stack. Avoid retaining uv's download cache in the final image layer.
@@ -154,7 +154,10 @@ RUN install -m 0755 \
     /usr/local/bin/ai-dataseek-quicklook && \
     install -m 0755 \
     /usr/local/lib/ai-dataseek/dataset_analysis_runner.py \
-    /usr/local/bin/ai-dataseek-analysis
+    /usr/local/bin/ai-dataseek-analysis && \
+    install -m 0755 \
+    /usr/local/lib/ai-dataseek/scientific_data_ops.py \
+    /usr/local/bin/ai-dataseek-scientific
 
 # Debian/Ubuntu ships Noto CJK as a TTC. Matplotlib only indexes the first TTC
 # face, which is JP, even though fontconfig can resolve the SC face. Extract
@@ -176,6 +179,7 @@ RUN python -m pip --version && \
     ai-dataseek-unpack --help >/dev/null && \
     ai-dataseek-quicklook --help >/dev/null && \
     ai-dataseek-analysis --help >/dev/null && \
+    ai-dataseek-scientific --help >/dev/null && \
     python /usr/local/lib/ai-dataseek/verify_matplotlib_cjk.py && \
     install -d -o ubuntu -g ubuntu /home/ubuntu/.cache/matplotlib && \
     sudo -u ubuntu -H env \

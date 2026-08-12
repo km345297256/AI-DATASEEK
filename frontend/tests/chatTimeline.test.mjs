@@ -6,6 +6,7 @@ import {
   findCurrentTurnRunningStep,
   findCurrentTurnStep,
   insertTaskExecutionSummary,
+  isLatestAssistantMessage,
 } from '../src/utils/chatTimeline.ts';
 
 const message = (type, content) => ({
@@ -85,4 +86,18 @@ test('replayed task summary falls back to event timestamps in milliseconds', () 
   const summary = insertTaskExecutionSummary(messages, 13);
 
   assert.equal(summary.duration_ms, 3000);
+});
+
+test('only the latest assistant message owns task-level actions', () => {
+  const messages = [
+    message('user', { content: 'analyze' }),
+    message('assistant', { content: 'working' }),
+    message('step', { id: '1', description: 'inspect', status: 'completed', tools: [] }),
+    message('assistant', { content: 'final result' }),
+    message('task-summary', { duration_ms: 1200 }),
+  ];
+
+  assert.equal(isLatestAssistantMessage(messages, 1), false);
+  assert.equal(isLatestAssistantMessage(messages, 3), true);
+  assert.equal(isLatestAssistantMessage(messages, 4), false);
 });

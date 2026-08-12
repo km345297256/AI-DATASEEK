@@ -427,6 +427,7 @@ class DatasetRequestResolver:
         selected_skills: list[str] | None = None,
         selected_mcp_servers: list[str] | None = None,
         attachment_names: list[str] | None = None,
+        delegate_dataset_requests: bool = False,
     ) -> FrontControllerResolution:
         started_at = time.perf_counter()
         if not question.strip():
@@ -458,6 +459,25 @@ class DatasetRequestResolver:
         except Exception as exc:
             logger.error("Front Controller deterministic safety check failed closed: %s", exc)
             return self._failed_closed("安全策略暂时不可用，任务未执行。", started_at=started_at)
+        if datasets and delegate_dataset_requests:
+            # Mounted-data requests belong to the execution agent. The Front
+            # Controller only establishes the safety and mount boundary here;
+            # it must not make an irreversible semantic plan such as turning a
+            # demonstrative file request into a whole-dataset quicklook.
+            return self._resolution(
+                RequestDecision(
+                    safety=SafetyReview(decision="allow", risk_level="low"),
+                    execution=ExecutionDecision(
+                        mode="sandbox",
+                        required_evidence="file_content",
+                    ),
+                    reason="dataset request delegated to execution agent",
+                ),
+                answer="",
+                started_at=started_at,
+                source="dataset_execution_boundary",
+                llm_overrides=llm_overrides,
+            )
         context = self._context_payload(
             question,
             datasets,

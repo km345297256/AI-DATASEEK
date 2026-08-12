@@ -36,6 +36,7 @@ from app.domain.services.tools.file import FileToolkit
 from app.domain.services.tools.message import MessageToolkit
 from app.domain.services.tools.search import SearchToolkit
 from app.domain.services.tools.skill import SkillToolkit
+from app.domain.services.tools.dataset_catalog import DatasetCatalogToolkit
 from app.domain.services.skills import SkillRegistry, SkillRenderer
 from app.domain.services.skills.session_skill_creator import is_skill_create_request
 from app.core.config import get_settings
@@ -202,6 +203,7 @@ class PlanActFlow(BaseFlow):
             user_id=self._user_id,
             session_repository=self._session_repository,
         )
+        self.dataset_catalog_toolkit = DatasetCatalogToolkit()
         tools = [
             ShellToolkit(sandbox),
             BrowserToolkit(
@@ -214,6 +216,7 @@ class PlanActFlow(BaseFlow):
             FileToolkit(sandbox),
             MessageToolkit(),
             self.skill_toolkit,
+            self.dataset_catalog_toolkit,
             mcp_tool,
         ]
 
@@ -289,6 +292,9 @@ class PlanActFlow(BaseFlow):
             current_user_message=message.message,
         )
         self.dataset_context = render_dataset_context(message.datasets)
+        catalog_toolkit = getattr(self, "dataset_catalog_toolkit", None)
+        if catalog_toolkit is not None:
+            catalog_toolkit.set_datasets(message.datasets)
         if is_skill_create_request(message.message):
             self._dataset_fast_path_active = False
             async for event in self._run_skill_create_command():
@@ -605,33 +611,15 @@ class PlanActFlow(BaseFlow):
                 "allow_terminal_quicklook": False,
             },
         }[dataset_intent]
-        allow_terminal_quicklook = (
-            dataset_intent == "visualization"
-            and len(message.datasets or []) == 1
-            and not target_files
-            and not PlanActFlow._message_has_explicit_file_reference(message.message)
-            and PlanActFlow._is_broad_quicklook_request(message.message)
-        )
         requested_dimensions = PlanActFlow._dataset_requested_dimensions(
             message.message
         )
         if dataset_intent == "file_preview":
             requested_dimensions = ["file_preview"]
-        has_explicit_file_reference = bool(target_files) or (
-            PlanActFlow._message_has_explicit_file_reference(message.message)
-        )
-        prefer_quicklook_evidence = (
-            dataset_intent in {"analysis", "visualization"}
-            and len(message.datasets or []) == 1
-            and not has_explicit_file_reference
-            and PlanActFlow._prefers_quicklook_evidence(message.message)
-        )
         explicit_artifact_request = PlanActFlow._requests_downloadable_result(
             message.message
         )
-        if explicit_artifact_request or (
-            dataset_intent == "visualization" and not prefer_quicklook_evidence
-        ):
+        if explicit_artifact_request or dataset_intent == "visualization":
             artifact_policy = "required"
         elif dataset_intent in {"file_preview", "visualization"}:
             artifact_policy = "capability"
@@ -669,13 +657,17 @@ class PlanActFlow(BaseFlow):
                     id="dataset-fast-path",
                     agent="execution",
                     inputs={
-                        # Keep the execution mode stable because it also selects the
-                        # bounded dataset tool scope. The separate intent tells the
-                        # executor whether a quicklook result may end the turn.
+                        # This selects a bounded, dataset-only tool scope. It does
+                        # not select a workflow: the execution agent chooses whether
+                        # catalog inspection, quicklook, or custom analysis is needed.
                         "execution_mode": "dataset_fast_path",
                         "dataset_intent": dataset_intent,
                         "requested_dimensions": requested_dimensions,
-                        "prefer_quicklook_evidence": prefer_quicklook_evidence,
+                        # Compatibility fields for persisted clients/plans. They
+                        # are deliberately inert: no request may preselect or
+                        # terminally complete through quicklook.
+                        "prefer_quicklook_evidence": False,
+                        "allow_terminal_quicklook": False,
                         "target_files": [item.path for item in target_files],
                         "target_filenames": [
                             PlanActFlow._dataset_file_basename(item)
@@ -703,11 +695,6 @@ class PlanActFlow(BaseFlow):
                         "require_downloadable_result": artifact_policy in {"required", "capability"},
                         "artifact_policy": artifact_policy,
                         "include_archive_tree": intent_config["include_archive_tree"],
-                        # Only an unconstrained broad quicklook can finish without
-                        # a second model decision. A request for named dimensions,
-                        # metrics, comparisons, or explanations must inspect the
-                        # compact manifest evidence and answer every requested part.
-                        "allow_terminal_quicklook": allow_terminal_quicklook,
                     },
                     # Plan descriptions are streamed into the conversation UI. Keep
                     # them brief and Chinese; internal execution detail belongs above.

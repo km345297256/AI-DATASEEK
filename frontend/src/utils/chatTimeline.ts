@@ -32,6 +32,14 @@ export const findCurrentTurnRunningStep = (messages: Message[]): StepContent | u
   return undefined;
 };
 
+export const isLatestAssistantMessage = (messages: Message[], index: number): boolean => {
+  if (messages[index]?.type !== 'assistant') return false;
+  for (let candidate = index + 1; candidate < messages.length; candidate += 1) {
+    if (messages[candidate].type === 'assistant') return false;
+  }
+  return true;
+};
+
 export const failRunningSteps = (
   messages: Message[],
   currentTurnOnly = true,

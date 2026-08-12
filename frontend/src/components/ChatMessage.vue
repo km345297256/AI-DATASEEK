@@ -52,7 +52,7 @@
       <div
         class="max-w-none p-0 m-0 prose prose-sm sm:prose-base dark:prose-invert [&_pre:not(.shiki)]:!bg-[var(--fill-tsp-white-light)] [&_pre:not(.shiki)]:text-[var(--text-primary)] text-base text-[var(--text-primary)]"
         v-html="renderMarkdown(visibleAssistantContent)"></div>
-      <div class="flex h-8 items-center gap-1">
+      <div v-if="showAssistantActions" class="flex h-8 items-center gap-1">
         <button
           type="button"
           class="flex h-8 w-8 items-center justify-center rounded-md text-[var(--icon-secondary)] transition-colors hover:bg-[var(--fill-tsp-white-light)] hover:text-[var(--icon-primary)] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--border-dark)]"
@@ -179,7 +179,7 @@ import ToolUse from './ToolUse.vue';
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';
 import { CheckIcon, Copy as CopyIcon, Share2 as Share2Icon, ShieldAlert, ThumbsDown, ThumbsUp, X } from 'lucide-vue-next';
-import { computed, onMounted, onUnmounted, ref, type Component } from 'vue';
+import { computed, onMounted, onUnmounted, ref, watch, type Component } from 'vue';
 import { ToolContent, StepContent } from '../types/message';
 import { useRelativeTime } from '../composables/useTime';
 import AttachmentsMessage from './AttachmentsMessage.vue';
@@ -197,6 +197,7 @@ const props = defineProps<{
   assistantName?: string;
   hideAllFilesButton?: boolean;
   hideHeader?: boolean;
+  showAssistantActions?: boolean;
 }>();
 
 const hideAssistantHeader = computed(() => props.hideHeader ?? false);
@@ -354,7 +355,13 @@ const shareTask = async () => {
   showErrorToast('复制任务分享链接失败，请检查浏览器剪贴板权限');
 };
 
-onMounted(loadTaskFeedback);
+onMounted(() => {
+  if (props.showAssistantActions) void loadTaskFeedback();
+});
+
+watch(() => props.showAssistantActions, (visible, wasVisible) => {
+  if (visible && !wasVisible) void loadTaskFeedback();
+});
 
 onUnmounted(() => {
   if (copiedTimer) clearTimeout(copiedTimer);
@@ -449,7 +456,7 @@ const displayTools = computed<DisplayToolItem[]>(() => {
 });
 
 // Control content expand/collapse state
-const isExpanded = ref(true);
+const isExpanded = ref(false);
 
 const { relativeTime } = useRelativeTime();
 

@@ -120,6 +120,24 @@ async def test_resolver_answers_from_user_text_without_catalog_or_sandbox(monkey
 
 
 @pytest.mark.asyncio
+async def test_dataset_request_bypasses_semantic_front_controller_model(monkeypatch):
+    model = _FakeModel([])
+    monkeypatch.setattr(resolver_module, "create_chat_model", lambda *_args, **_kwargs: model)
+
+    resolution = await _resolver().resolve(
+        question="该数据集包含哪些气象要素文件？",
+        datasets=[_dataset()],
+        events=[],
+        delegate_dataset_requests=True,
+    )
+
+    assert resolution.mode == "sandbox"
+    assert resolution.answer == ""
+    assert resolution.controller_metadata["source"] == "dataset_execution_boundary"
+    assert model.calls == 0
+
+
+@pytest.mark.asyncio
 async def test_resolver_uses_generic_catalog_query_selected_by_model(monkeypatch):
     model = _FakeModel([
         '{"safety":{"decision":"allow","risk_level":"low","categories":[],"reason":"","suggestion":""},'
@@ -614,7 +632,7 @@ async def _async_none():
 
 
 @pytest.mark.asyncio
-async def test_agent_domain_selects_lightweight_task_before_sandbox_allocation():
+async def test_agent_domain_uses_agent_task_for_dataset_backed_controller_answer():
     class Repository:
         def __init__(self):
             self.events = []
@@ -663,8 +681,8 @@ async def test_agent_domain_selects_lightweight_task_before_sandbox_allocation()
     service._dataset_request_resolver = Resolver()
     service._get_task = lambda _session: _async_value(None)
     task = Task()
-    service._create_lightweight_task = lambda _session, _resolution: _async_value(task)
-    service._create_task = lambda *_args, **_kwargs: _raise_sandbox_allocation()
+    service._create_lightweight_task = lambda *_args, **_kwargs: _raise_sandbox_allocation()
+    service._create_task = lambda *_args, **_kwargs: _async_value(task)
     service._resolve_message_attachments = lambda *_args, **_kwargs: _async_value([])
     session = Session(
         id="session-1",

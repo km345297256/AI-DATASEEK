@@ -1,0 +1,8 @@
+#!/usr/bin/expect -f
+set timeout 900
+spawn ssh -tt -o StrictHostKeyChecking=no -o PreferredAuthentications=password -o PubkeyAuthentication=no root@39.106.98.67 "cd /root/AI-DataSeek && tar -xzf /root/ai-dataseek-chat-ui-fix.tgz && ./run.sh up -d --build frontend && curl -fsS -o /dev/null -w 'HTTP=%{http_code}\n' http://127.0.0.1:7000/"
+expect {
+  -re {password:} { send -- "Km159870610@\r"; exp_continue }
+  timeout { exit 2 }
+  eof { catch wait result; exit [lindex $result 3] }
+}

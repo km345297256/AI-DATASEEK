@@ -277,6 +277,7 @@
                   :message="message"
                   :session-id="sessionId || undefined"
                   :hide-header="isConsecutiveAssistant(messages, index)"
+                  :show-assistant-actions="!isLoading && isLatestAssistantMessage(messages, index)"
                   @toolClick="handleToolClick"
                 />
               </div>
@@ -401,7 +402,7 @@ import { DATASET_CHAT_PLACEHOLDER, buildDatasetChatCapabilities } from '@/utils/
 import { copyToClipboard } from '@/utils/dom';
 import { eventBus } from '@/utils/eventBus';
 import { showErrorToast, showSuccessToast } from '@/utils/toast';
-import { failRunningSteps, findCurrentTurnRunningStep, findCurrentTurnStep, insertTaskExecutionSummary } from '@/utils/chatTimeline';
+import { failRunningSteps, findCurrentTurnRunningStep, findCurrentTurnStep, insertTaskExecutionSummary, isLatestAssistantMessage } from '@/utils/chatTimeline';
 import { isConsecutiveAssistant, type AttachmentsContent, type Message, type MessageContent, type StepContent, type ToolContent } from '@/types/message';
 import type { AgentSSEEvent, CompletionAdviceData, DoneEventData, ErrorEventData, MessageEventData, PlanEventData, StepEventData, TitleEventData, ToolEventData } from '@/types/event';
 import { SessionStatus } from '@/types/response';
