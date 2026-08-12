@@ -27,18 +27,6 @@
     </div>
   </div>
   <div v-else-if="message.type === 'assistant'" class="flex flex-col gap-2 w-full group" :class="hideAssistantHeader ? 'mt-0' : 'mt-3'">
-    <div v-if="!hideAssistantHeader" class="flex items-center justify-between h-7 group">
-      <div class="flex items-center gap-[3px]">
-        <component v-if="assistantIcon" :is="assistantIcon" :size="24" class="w-6 h-6" />
-        <ManusTextIcon v-else />
-        <span v-if="assistantName" class="text-base text-[var(--text-primary)] tracking-tight leading-none ml-0.5">{{ assistantName }}</span>
-      </div>
-      <div class="flex items-center gap-[2px] invisible group-hover:visible">
-        <div class="float-right transition text-[12px] text-[var(--text-tertiary)] invisible group-hover:visible">
-          {{ relativeTime(message.content.timestamp) }}
-        </div>
-      </div>
-    </div>
     <div v-if="safetyReview" class="w-full max-w-2xl border-l-2 border-amber-500 bg-amber-50/70 px-4 py-3 text-sm dark:bg-amber-950/20">
       <div class="flex items-start gap-2.5">
         <ShieldAlert class="mt-0.5 size-4 shrink-0 text-amber-600 dark:text-amber-400" />
@@ -60,9 +48,73 @@
         </div>
       </div>
     </div>
-    <div v-else
-      class="max-w-none p-0 m-0 prose prose-sm sm:prose-base dark:prose-invert [&_pre:not(.shiki)]:!bg-[var(--fill-tsp-white-light)] [&_pre:not(.shiki)]:text-[var(--text-primary)] text-base text-[var(--text-primary)]"
-      v-html="renderMarkdown(visibleAssistantContent)"></div>
+    <template v-else>
+      <div
+        class="max-w-none p-0 m-0 prose prose-sm sm:prose-base dark:prose-invert [&_pre:not(.shiki)]:!bg-[var(--fill-tsp-white-light)] [&_pre:not(.shiki)]:text-[var(--text-primary)] text-base text-[var(--text-primary)]"
+        v-html="renderMarkdown(visibleAssistantContent)"></div>
+      <div class="flex h-8 items-center gap-1">
+        <button
+          type="button"
+          class="flex h-8 w-8 items-center justify-center rounded-md text-[var(--icon-secondary)] transition-colors hover:bg-[var(--fill-tsp-white-light)] hover:text-[var(--icon-primary)] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--border-dark)]"
+          :aria-label="assistantCopied ? '已复制回答' : '复制回答'"
+          :title="assistantCopied ? '已复制' : '复制回答'"
+          @click="copyAssistantMessage"
+        >
+          <CheckIcon v-if="assistantCopied" :size="17" />
+          <CopyIcon v-else :size="17" />
+        </button>
+        <button
+          v-if="feedbackPreference !== 'dislike'"
+          type="button"
+          class="flex h-8 w-8 items-center justify-center rounded-md transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--border-dark)]"
+          :class="feedbackPreference === 'like' ? 'bg-[#e8f3ee] text-[#247357]' : 'text-[var(--icon-secondary)] hover:bg-[var(--fill-tsp-white-light)] hover:text-[var(--icon-primary)]'"
+          :aria-label="feedbackPreference === 'like' ? '取消喜欢' : '喜欢'"
+          :title="feedbackPreference === 'like' ? '取消喜欢' : '喜欢'"
+          @click="toggleLike"
+        >
+          <ThumbsUp :size="17" :fill="feedbackPreference === 'like' ? 'currentColor' : 'none'" />
+        </button>
+        <button
+          v-if="feedbackPreference !== 'like'"
+          type="button"
+          class="flex h-8 w-8 items-center justify-center rounded-md transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--border-dark)]"
+          :class="feedbackPreference === 'dislike' ? 'bg-[#f7e9e9] text-[#b54141]' : 'text-[var(--icon-secondary)] hover:bg-[var(--fill-tsp-white-light)] hover:text-[var(--icon-primary)]'"
+          :aria-label="feedbackPreference === 'dislike' ? '取消不喜欢' : '不喜欢'"
+          :title="feedbackPreference === 'dislike' ? '取消不喜欢' : '不喜欢'"
+          @click="toggleDislike"
+        >
+          <ThumbsDown :size="17" :fill="feedbackPreference === 'dislike' ? 'currentColor' : 'none'" />
+        </button>
+        <button
+          type="button"
+          class="flex h-8 w-8 items-center justify-center rounded-md text-[var(--icon-secondary)] transition-colors hover:bg-[var(--fill-tsp-white-light)] hover:text-[var(--icon-primary)] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--border-dark)]"
+          aria-label="分享任务"
+          title="分享任务"
+          @click="shareTask"
+        >
+          <Share2Icon :size="17" />
+        </button>
+      </div>
+    </template>
+    <Teleport to="body">
+      <div v-if="feedbackDialogOpen" class="fixed inset-0 z-[100] flex items-center justify-center bg-black/55 p-4" @click.self="closeFeedbackDialog">
+        <section class="w-full max-w-[560px] rounded-lg bg-[#242424] p-4 text-white shadow-2xl" role="dialog" aria-modal="true" aria-label="分享反馈">
+          <div class="flex items-center justify-between gap-4">
+            <h2 class="text-lg font-semibold">分享反馈</h2>
+            <button type="button" class="flex size-8 items-center justify-center rounded text-zinc-300 hover:bg-white/10 hover:text-white" aria-label="关闭" @click="closeFeedbackDialog"><X :size="18" /></button>
+          </div>
+          <div class="mt-4 flex flex-wrap gap-2">
+            <button v-for="reason in dislikeReasonOptions" :key="reason" type="button" class="rounded-full border px-3 py-1.5 text-sm transition-colors" :class="selectedDislikeReasons.includes(reason) ? 'border-[#3b82f6] bg-[#1d4f91]/40 text-white' : 'border-zinc-600 text-zinc-100 hover:bg-white/10'" @click="toggleDislikeReason(reason)">{{ reason }}</button>
+          </div>
+          <textarea v-model="dislikeDetail" rows="4" maxlength="2000" class="mt-4 w-full resize-none rounded-lg border border-[#3b82f6] bg-[#1d1d1d] px-3 py-2 text-sm text-white outline-none placeholder:text-zinc-400 focus:ring-1 focus:ring-[#60a5fa]" placeholder="分享详细信息（可选）" />
+          <p class="mt-3 rounded-md bg-zinc-700 px-3 py-2 text-xs leading-5 text-zinc-200">你的对话内容将随反馈一并提交，以帮助改进 DataSeek。</p>
+          <div class="mt-4 flex justify-end gap-2">
+            <button type="button" class="rounded-md px-3 py-2 text-sm text-zinc-200 hover:bg-white/10" @click="closeFeedbackDialog">取消</button>
+            <button type="button" :disabled="feedbackSaving" class="rounded-md bg-zinc-100 px-4 py-2 text-sm font-medium text-zinc-900 disabled:cursor-not-allowed disabled:opacity-50" @click="submitDislikeFeedback">提交</button>
+          </div>
+        </section>
+      </div>
+    </Teleport>
   </div>
   <ToolUse v-else-if="message.type === 'tool'" :tool="toolContent" @click="handleToolClick(toolContent)" />
   <div v-else-if="message.type === 'step'" class="flex flex-col">
@@ -116,38 +168,26 @@
   </div>
   <TaskExecutionSummary v-else-if="message.type === 'task-summary'" :content="taskSummaryContent" />
   <div v-else-if="message.type === 'attachments' && attachmentsContent.role === 'assistant'" class="flex flex-col gap-2 w-full group" :class="hideAssistantHeader ? 'mt-0' : 'mt-3'">
-    <div v-if="!hideAssistantHeader" class="flex items-center justify-between h-7 group">
-      <div class="flex items-center gap-[3px]">
-        <component v-if="assistantIcon" :is="assistantIcon" :size="24" class="w-6 h-6" />
-        <ManusTextIcon v-else />
-        <span v-if="assistantName" class="text-base text-[var(--text-primary)] tracking-tight leading-none ml-0.5">{{ assistantName }}</span>
-      </div>
-      <div class="flex items-center gap-[2px] invisible group-hover:visible">
-        <div class="float-right transition text-[12px] text-[var(--text-tertiary)] invisible group-hover:visible">
-          {{ relativeTime(attachmentsContent.timestamp) }}
-        </div>
-      </div>
-    </div>
     <AttachmentsMessage :content="attachmentsContent" :hideAllFilesButton="hideAllFilesButton"/>
   </div>
   <AttachmentsMessage v-else-if="message.type === 'attachments'" :content="attachmentsContent" :hideAllFilesButton="hideAllFilesButton"/>
 </template>
 
 <script setup lang="ts">
-import ManusTextIcon from './icons/ManusTextIcon.vue';
 import { Message, MessageContent, AttachmentsContent, TaskSummaryContent } from '../types/message';
 import ToolUse from './ToolUse.vue';
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';
-import { CheckIcon, Copy as CopyIcon, ShieldAlert } from 'lucide-vue-next';
-import { computed, onUnmounted, ref, type Component } from 'vue';
+import { CheckIcon, Copy as CopyIcon, Share2 as Share2Icon, ShieldAlert, ThumbsDown, ThumbsUp, X } from 'lucide-vue-next';
+import { computed, onMounted, onUnmounted, ref, type Component } from 'vue';
 import { ToolContent, StepContent } from '../types/message';
 import { useRelativeTime } from '../composables/useTime';
 import AttachmentsMessage from './AttachmentsMessage.vue';
 import TaskExecutionSummary from './TaskExecutionSummary.vue';
 import { copyToClipboard } from '../utils/dom';
 import { stripHiddenDatasetResultNotices } from '../utils/datasetResultPresentation';
-import { showErrorToast } from '../utils/toast';
+import { showErrorToast, showSuccessToast } from '../utils/toast';
+import { deleteTaskFeedback, getTaskFeedback, saveTaskFeedback, shareSession, type TaskFeedbackPreference } from '../api/agent';
 
 
 const props = defineProps<{
@@ -188,8 +228,137 @@ const copyUserMessage = async () => {
   }, 1500);
 };
 
+const assistantCopied = ref(false);
+let assistantCopiedTimer: ReturnType<typeof setTimeout> | null = null;
+
+const copyAssistantMessage = async () => {
+  const text = visibleAssistantContent.value;
+  if (!text) return;
+  const success = await copyToClipboard(text);
+  if (!success) {
+    showErrorToast('复制失败，请检查浏览器剪贴板权限');
+    return;
+  }
+  assistantCopied.value = true;
+  if (assistantCopiedTimer) clearTimeout(assistantCopiedTimer);
+  assistantCopiedTimer = setTimeout(() => {
+    assistantCopied.value = false;
+    assistantCopiedTimer = null;
+  }, 1500);
+};
+
+const feedbackPreference = ref<TaskFeedbackPreference | null>(null);
+const feedbackDialogOpen = ref(false);
+const feedbackSaving = ref(false);
+const dislikeDetail = ref('');
+const selectedDislikeReasons = ref<string[]>([]);
+const dislikeReasonOptions = ['不正确或不完整', '与期望不符', '速度慢或存在问题', '风格或语气', '安全或法律疑虑', '其他'];
+
+const loadTaskFeedback = async () => {
+  if (!props.sessionId) return;
+  try {
+    const feedback = await getTaskFeedback(props.sessionId);
+    feedbackPreference.value = feedback.preference;
+    selectedDislikeReasons.value = feedback.dislike_reasons;
+    dislikeDetail.value = feedback.detail;
+  } catch {
+    // Feedback availability must not block reading a response.
+  }
+};
+
+const toggleLike = async () => {
+  if (!props.sessionId || feedbackSaving.value) return;
+  feedbackSaving.value = true;
+  try {
+    if (feedbackPreference.value === 'like') {
+      await deleteTaskFeedback(props.sessionId);
+      feedbackPreference.value = null;
+    } else {
+      await saveTaskFeedback(props.sessionId, { preference: 'like' });
+      feedbackPreference.value = 'like';
+      selectedDislikeReasons.value = [];
+      dislikeDetail.value = '';
+    }
+  } catch {
+    showErrorToast('保存反馈失败，请稍后重试');
+  } finally {
+    feedbackSaving.value = false;
+  }
+};
+
+const toggleDislike = async () => {
+  if (!props.sessionId || feedbackSaving.value) return;
+  if (feedbackPreference.value === 'dislike') {
+    feedbackSaving.value = true;
+    try {
+      await deleteTaskFeedback(props.sessionId);
+      feedbackPreference.value = null;
+    } catch {
+      showErrorToast('取消反馈失败，请稍后重试');
+    } finally {
+      feedbackSaving.value = false;
+    }
+    return;
+  }
+  feedbackDialogOpen.value = true;
+};
+
+const toggleDislikeReason = (reason: string) => {
+  selectedDislikeReasons.value = selectedDislikeReasons.value.includes(reason)
+    ? selectedDislikeReasons.value.filter((item) => item !== reason)
+    : [...selectedDislikeReasons.value, reason];
+};
+
+const closeFeedbackDialog = () => { feedbackDialogOpen.value = false; };
+
+const submitDislikeFeedback = async () => {
+  if (!props.sessionId || feedbackSaving.value) return;
+  feedbackSaving.value = true;
+  try {
+    await saveTaskFeedback(props.sessionId, {
+      preference: 'dislike',
+      dislike_reasons: selectedDislikeReasons.value,
+      detail: dislikeDetail.value,
+    });
+    feedbackPreference.value = 'dislike';
+    feedbackDialogOpen.value = false;
+  } catch {
+    showErrorToast('提交反馈失败，请稍后重试');
+  } finally {
+    feedbackSaving.value = false;
+  }
+};
+
+const shareTask = async () => {
+  if (!props.sessionId) return;
+  const url = `${window.location.origin}/share/${props.sessionId}`;
+  try {
+    await shareSession(props.sessionId);
+  } catch {
+    showErrorToast('创建任务分享链接失败，请稍后重试');
+    return;
+  }
+  if (navigator.share) {
+    try {
+      await navigator.share({ title: 'DataSeek 任务', url });
+      return;
+    } catch (error: unknown) {
+      if (error instanceof DOMException && error.name === 'AbortError') return;
+    }
+  }
+  const copiedToClipboard = await copyToClipboard(url);
+  if (copiedToClipboard) {
+    showSuccessToast('任务分享链接已复制');
+    return;
+  }
+  showErrorToast('复制任务分享链接失败，请检查浏览器剪贴板权限');
+};
+
+onMounted(loadTaskFeedback);
+
 onUnmounted(() => {
   if (copiedTimer) clearTimeout(copiedTimer);
+  if (assistantCopiedTimer) clearTimeout(assistantCopiedTimer);
 });
 
 // For backward compatibility, provide the original computed properties

@@ -230,6 +230,7 @@ const createInitialState = () => ({
   linkCopied: false,
   sharingLoading: false, // Loading state for share operations
   completionAdvice: undefined as CompletionAdviceData | undefined,
+  taskStartedAtMs: undefined as number | undefined,
 });
 
 // Create reactive state
@@ -258,6 +259,7 @@ const {
   linkCopied,
   sharingLoading,
   completionAdvice,
+  taskStartedAtMs,
 } = toRefs(state);
 
 // Non-state refs that don't need reset
@@ -397,6 +399,7 @@ const handleStepEvent = (stepData: StepEventData) => {
 // Handle error event
 const handleErrorEvent = (errorData: ErrorEventData) => {
   isLoading.value = false;
+  taskStartedAtMs.value = undefined;
   failActiveSteps();
   eventBus.emit(EVENT_REFRESH_SESSION_LIST);
   messages.value.push({
@@ -468,10 +471,15 @@ const handleEvent = (event: AgentSSEEvent) => {
   } else if (event.event === 'done') {
     isLoading.value = false;
     eventBus.emit(EVENT_REFRESH_SESSION_LIST);
-    insertTaskExecutionSummary(messages.value, event.data.timestamp);
+    const elapsedMs = taskStartedAtMs.value === undefined
+      ? undefined
+      : performance.now() - taskStartedAtMs.value;
+    insertTaskExecutionSummary(messages.value, event.data.timestamp, elapsedMs);
+    taskStartedAtMs.value = undefined;
     completionAdvice.value = (event.data as any)?.advice;
   } else if (event.event === 'wait') {
     isLoading.value = false;
+    taskStartedAtMs.value = undefined;
     eventBus.emit(EVENT_REFRESH_SESSION_LIST);
   } else if (event.event === 'error') {
     handleErrorEvent(event.data as ErrorEventData);
@@ -542,6 +550,7 @@ const chat = async (
   inputMessage.value = '';
   attachments.value = [];
   completionAdvice.value = undefined;
+  taskStartedAtMs.value = performance.now();
   isLoading.value = true;
 
   try {
@@ -574,6 +583,7 @@ const chat = async (
           if (!isCurrentSession(activeSessionId)) return;
           console.log('Chat closed');
           isLoading.value = false;
+          taskStartedAtMs.value = undefined;
           eventBus.emit(EVENT_REFRESH_SESSION_LIST);
           // Clear the cancel function when connection is closed normally
           if (cancelCurrentChat.value) {
@@ -584,6 +594,7 @@ const chat = async (
           if (!isCurrentSession(activeSessionId)) return;
           console.error('Chat error:', error);
           isLoading.value = false;
+          taskStartedAtMs.value = undefined;
           failActiveSteps();
           eventBus.emit(EVENT_REFRESH_SESSION_LIST);
           // Clear the cancel function when there's an error
@@ -597,6 +608,7 @@ const chat = async (
     if (!isCurrentSession(activeSessionId)) return;
     console.error('Chat error:', error);
     isLoading.value = false;
+    taskStartedAtMs.value = undefined;
     failActiveSteps();
     cancelCurrentChat.value = null;
   }

@@ -565,6 +565,25 @@ class SessionEventDocument(Document):
         ]
 
 
+class TaskFeedbackDocument(Document):
+    """Separate, task-scoped user feedback persisted outside session events."""
+    session_id: str
+    user_id: str
+    session_title: Optional[str] = None
+    preference: str
+    dislike_reasons: List[str] = Field(default_factory=list)
+    detail: str = ""
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+
+    class Settings:
+        name = "task_feedback"
+        indexes = [
+            IndexModel([("session_id", ASCENDING), ("user_id", ASCENDING)], unique=True),
+            IndexModel([("user_id", ASCENDING), ("updated_at", DESCENDING)]),
+        ]
+
+
 class MCPConfigDocument(Document):
     """MongoDB document storing the global MCP server configuration"""
     config_id: str = "global"

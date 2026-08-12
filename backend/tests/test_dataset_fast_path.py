@@ -111,6 +111,46 @@ def test_controller_target_file_constrains_visualization_without_keyword_routing
     assert step.inputs["allow_terminal_quicklook"] is False
 
 
+def test_two_named_files_use_joint_target_scope_instead_of_dataset_quicklook():
+    first = "root/bcpr_CMFD_V0200_B-02_03hr_010deg_195109.nc"
+    second = "root/rain_CMFD_V0200_B-02_03hr_010deg_195106.nc"
+    question = (
+        "bcpr_CMFD_V0200_B-02_03hr_010deg_195109.nc、"
+        "rain_CMFD_V0200_B-02_03hr_010deg_195106.nc"
+        "针对这两个文件进行联合分析绘图"
+    )
+
+    plan = _flow()._create_dataset_fast_path_plan(Message(
+        message=question,
+        datasets=[_dataset_with_files(first, second, "root/unrelated.nc")],
+    ))
+    step = plan.steps[0]
+
+    assert step.inputs["target_files"] == [first, second]
+    assert step.inputs["target_filenames"] == [
+        "bcpr_CMFD_V0200_B-02_03hr_010deg_195109.nc",
+        "rain_CMFD_V0200_B-02_03hr_010deg_195106.nc",
+    ]
+    assert "target_file" not in step.inputs
+    assert step.inputs["prefer_quicklook_evidence"] is False
+    assert step.inputs["allow_terminal_quicklook"] is False
+    assert plan.message == "正在联合分析指定的 2 个文件…"
+
+
+def test_multiple_controller_targets_resolve_by_unique_inventory_suffix():
+    first = "one/path/a.nc"
+    second = "two/path/b.nc"
+    step = _flow()._create_dataset_fast_path_plan(Message(
+        message="compare the selected files and plot them",
+        datasets=[_dataset_with_files(first, second, "other.nc")],
+        controller_target_files=["a.nc", "b.nc"],
+    )).steps[0]
+
+    assert step.inputs["target_files"] == [first, second]
+    assert step.inputs["prefer_quicklook_evidence"] is False
+    assert step.inputs["allow_terminal_quicklook"] is False
+
+
 @pytest.mark.parametrize(
     ("inventory_path", "question"),
     [

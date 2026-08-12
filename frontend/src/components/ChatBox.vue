@@ -1,72 +1,6 @@
 <template>
     <div ref="composerRef" class="pb-3 relative bg-[var(--background-gray-main)]">
         <div
-            v-if="slashMenuOpen"
-            class="absolute left-2 right-2 z-50 flex max-h-[min(440px,52vh)] flex-col overflow-hidden rounded-lg border border-[var(--border-main)] bg-[var(--background-menu-white)] shadow-[0_12px_32px_rgba(0,0,0,0.14)] sm:left-4 sm:right-auto sm:w-[390px]"
-            :class="skillMenuPlacement === 'down' ? 'top-full mt-2' : 'bottom-full mb-2'"
-            role="listbox"
-            :aria-label="t('Available skills')">
-            <div class="flex h-10 shrink-0 items-center gap-2 border-b border-[var(--border-main)] px-3">
-                <Search :size="14" class="shrink-0 text-[var(--icon-tertiary)]" />
-                <input
-                    ref="skillSearchInputRef"
-                    v-model="slashQuery"
-                    type="search"
-                    class="h-7 min-w-0 flex-1 bg-transparent text-[13px] text-[var(--text-primary)] outline-none placeholder:text-[var(--text-tertiary)]"
-                    :placeholder="t('Search skills')"
-                    @input="activeSkillIndex = 0"
-                    @keydown="handleSkillSearchKeydown"
-                />
-                <span class="ml-auto shrink-0 rounded border border-[var(--border-main)] px-1.5 py-0.5 text-[10px] text-[var(--text-tertiary)]">ESC</span>
-            </div>
-            <div v-if="skillsLoading" class="min-h-0 flex-1 px-3 py-6 text-center text-sm text-[var(--text-tertiary)]">
-                {{ t('Loading') }}...
-            </div>
-            <div v-else-if="filteredSkills.length === 0" class="min-h-0 flex-1 px-3 py-6 text-center text-sm text-[var(--text-tertiary)]">
-                {{ t('No matching skills') }}
-            </div>
-            <div v-else class="min-h-0 flex-1 overflow-y-auto px-1.5 pb-2 pt-1.5">
-                <button
-                    v-for="(skill, index) in filteredSkills"
-                    :key="skill.name"
-                    type="button"
-                    role="option"
-                    :data-skill-index="index"
-                    :aria-selected="selectedSkills.includes(skill.name)"
-                    class="flex min-h-11 w-full items-start gap-2 rounded-md px-2 py-1.5 text-left"
-                    :class="index === activeSkillIndex ? 'bg-[var(--fill-tsp-white-main)]' : 'hover:bg-[var(--fill-tsp-white-light)]'"
-                    @mouseenter="activeSkillIndex = index"
-                    @mousedown.prevent="selectSlashSkill(skill)">
-                    <Puzzle :size="15" class="mt-0.5 shrink-0 text-[var(--icon-secondary)]" />
-                    <span class="min-w-0 flex-1">
-                        <span class="flex items-center gap-2 text-[13px] font-medium leading-5 text-[var(--text-primary)]">
-                            <span class="truncate">{{ skill.name }}</span>
-                            <Check v-if="selectedSkills.includes(skill.name)" :size="14" class="shrink-0" />
-                        </span>
-                        <span v-if="skill.description" class="block truncate text-[11px] leading-4 text-[var(--text-tertiary)]">
-                            {{ skill.description }}
-                        </span>
-                    </span>
-                </button>
-            </div>
-            <div class="grid shrink-0 grid-cols-2 gap-1 border-t border-[var(--border-main)] p-2">
-                <button
-                    type="button"
-                    class="flex h-8 items-center gap-2 rounded-md px-2 text-[13px] text-[var(--text-secondary)] hover:bg-[var(--fill-tsp-white-light)]"
-                    @mousedown.prevent="openSkillPicker">
-                    <CirclePlus :size="16" />
-                    <span>{{ t('Add skill') }}</span>
-                </button>
-                <button
-                    type="button"
-                    class="flex h-8 items-center gap-2 rounded-md px-2 text-[13px] text-[var(--text-secondary)] hover:bg-[var(--fill-tsp-white-light)]"
-                    @mousedown.prevent="openSkillManagement">
-                    <Settings2 :size="16" />
-                    <span>{{ t('Manage skills') }}</span>
-                </button>
-            </div>
-        </div>
-        <div
             class="relative flex flex-col bg-[var(--fill-input-chat)] shadow-[0px_12px_32px_0px_rgba(0,0,0,0.02)] transition-all border border-black/8 dark:border-[var(--border-main)]"
             :class="compactComposer
                 ? 'min-h-[56px] max-h-[70vh] gap-1 rounded-[18px] py-2'
@@ -101,7 +35,6 @@
                     :rows="rows" :value="modelValue"
                     :disabled="disabled"
                     @input="handleInput"
-                    @compositionstart="handleCompositionStart" @compositionend="handleCompositionEnd"
                     @keydown="handleKeydown" :placeholder="placeholder || t('Give AI-DataSeek a task to work on...')"></textarea>
             </div>
             <footer
@@ -262,27 +195,20 @@ import { showErrorToast } from '../utils/toast';
 import { useSettingsDialog } from '../composables/useSettingsDialog';
 import { eventBus } from '../utils/eventBus';
 import { EVENT_SKILL_CATALOG_UPDATED, EVENT_SKILL_PREFERENCES_UPDATED } from '../constants/event';
-import { findSkillSlashTrigger, removeSkillSlashTrigger } from '../utils/skillSlashTrigger';
 
 const { t } = useI18n();
 const { openSettingsDialog } = useSettingsDialog();
 const hasTextInput = ref(false);
-const isComposing = ref(false);
 const chatBoxFileListRef = ref();
 const skillDialogOpen = ref(false);
 const mcpDialogOpen = ref(false);
 const composerRef = ref<HTMLElement>();
 const textareaRef = ref<HTMLTextAreaElement>();
-const skillSearchInputRef = ref<HTMLInputElement>();
 const actionMenuRef = ref<HTMLElement>();
 const actionSkillSearchInputRef = ref<HTMLInputElement>();
 const availableSkills = ref<SkillInfo[]>([]);
 const skillsLoading = ref(false);
 const skillsLoaded = ref(false);
-const slashMenuOpen = ref(false);
-const slashQuery = ref('');
-const slashRange = ref<{ start: number; end: number } | null>(null);
-const activeSkillIndex = ref(0);
 const autoEnabledSkillNames = ref(new Set<string>());
 const actionMenuOpen = ref(false);
 const actionSkillMenuOpen = ref(false);
@@ -344,18 +270,6 @@ const sendEnabled = computed(() => {
     return hasTextInput.value && (!hasFiles || allUploaded);
 });
 
-const filteredSkills = computed(() => {
-    const query = slashQuery.value.trim().toLocaleLowerCase();
-    const manuallySelectable = availableSkills.value.filter(
-        (skill) => !autoEnabledSkillNames.value.has(skill.name.trim().toLowerCase()),
-    );
-    if (!query) return manuallySelectable;
-    return manuallySelectable.filter((skill) =>
-        [skill.name, skill.description, ...skill.triggers]
-            .some((value) => value?.toLocaleLowerCase().includes(query)),
-    );
-});
-
 const actionFilteredSkills = computed(() => {
     const query = actionSkillQuery.value.trim().toLocaleLowerCase();
     const manuallySelectable = availableSkills.value.filter(
@@ -380,7 +294,7 @@ const handleSkillPreferencesUpdated = (payload: unknown) => {
 
 const handleSkillCatalogUpdated = () => {
     skillsLoaded.value = false;
-    if (slashMenuOpen.value || actionSkillMenuOpen.value) void loadAvailableSkills();
+    if (actionSkillMenuOpen.value) void loadAvailableSkills();
 };
 
 const loadAutoEnabledSkills = async () => {
@@ -402,83 +316,21 @@ const loadAvailableSkills = async () => {
     } catch (error) {
         console.error('Failed to load skills:', error);
         showErrorToast(t('Failed to load skills'));
-        slashMenuOpen.value = false;
         actionSkillMenuOpen.value = false;
     } finally {
         skillsLoading.value = false;
     }
 };
 
-const updateSlashCommand = (value: string, cursor: number | null) => {
-    const trigger = findSkillSlashTrigger(value, cursor, isComposing.value);
-    if (!trigger) {
-        slashMenuOpen.value = false;
-        slashRange.value = null;
-        return;
-    }
-    slashQuery.value = trigger.query;
-    slashRange.value = trigger.range;
-    activeSkillIndex.value = 0;
-    slashMenuOpen.value = true;
-    loadAvailableSkills();
-    nextTick(() => {
-        skillSearchInputRef.value?.focus();
-        skillSearchInputRef.value?.select();
-    });
-};
-
 const handleInput = (event: Event) => {
     const target = event.target as HTMLTextAreaElement;
     emit('update:modelValue', target.value);
-    const inputEvent = event as InputEvent;
-    if (isComposing.value || inputEvent.isComposing) return;
-    updateSlashCommand(target.value, target.selectionStart);
-};
-
-const handleCompositionStart = () => {
-    isComposing.value = true;
-    slashMenuOpen.value = false;
-};
-
-const handleCompositionEnd = (event: CompositionEvent) => {
-    isComposing.value = false;
-    const target = event.target as HTMLTextAreaElement;
-    updateSlashCommand(target.value, target.selectionStart);
 };
 
 const handleKeydown = (event: KeyboardEvent) => {
-    if (event.isComposing || isComposing.value || event.keyCode === 229) {
+    if (event.isComposing || event.keyCode === 229) {
         // Let the input method commit the selected candidate without triggering an action.
         return;
-    }
-
-    if (slashMenuOpen.value) {
-        if (event.key === 'ArrowDown') {
-            event.preventDefault();
-            if (filteredSkills.value.length) {
-                activeSkillIndex.value = (activeSkillIndex.value + 1) % filteredSkills.value.length;
-                scrollActiveSkillIntoView();
-            }
-            return;
-        }
-        if (event.key === 'ArrowUp') {
-            event.preventDefault();
-            if (filteredSkills.value.length) {
-                activeSkillIndex.value = (activeSkillIndex.value - 1 + filteredSkills.value.length) % filteredSkills.value.length;
-                scrollActiveSkillIntoView();
-            }
-            return;
-        }
-        if ((event.key === 'Enter' || event.key === 'Tab') && filteredSkills.value.length) {
-            event.preventDefault();
-            selectSlashSkill(filteredSkills.value[activeSkillIndex.value]);
-            return;
-        }
-        if (event.key === 'Escape') {
-            event.preventDefault();
-            slashMenuOpen.value = false;
-            return;
-        }
     }
 
     if (event.key !== 'Enter') return;
@@ -499,59 +351,12 @@ const handleKeydown = (event: KeyboardEvent) => {
     }
 };
 
-const handleSkillSearchKeydown = (event: KeyboardEvent) => {
-    event.stopPropagation();
-    if (event.key === 'ArrowDown') {
-        event.preventDefault();
-        if (filteredSkills.value.length) {
-            activeSkillIndex.value = (activeSkillIndex.value + 1) % filteredSkills.value.length;
-            scrollActiveSkillIntoView();
-        }
-    } else if (event.key === 'ArrowUp') {
-        event.preventDefault();
-        if (filteredSkills.value.length) {
-            activeSkillIndex.value = (activeSkillIndex.value - 1 + filteredSkills.value.length) % filteredSkills.value.length;
-            scrollActiveSkillIntoView();
-        }
-    } else if ((event.key === 'Enter' || event.key === 'Tab') && filteredSkills.value.length) {
-        event.preventDefault();
-        selectSlashSkill(filteredSkills.value[activeSkillIndex.value]);
-    } else if (event.key === 'Escape') {
-        event.preventDefault();
-        slashMenuOpen.value = false;
-        nextTick(() => textareaRef.value?.focus());
-    }
-};
-
-const scrollActiveSkillIntoView = async () => {
-    await nextTick();
-    composerRef.value
-        ?.querySelector<HTMLElement>(`[data-skill-index="${activeSkillIndex.value}"]`)
-        ?.scrollIntoView({ block: 'nearest' });
-};
-
-const selectSlashSkill = async (skill: SkillInfo) => {
-    const range = slashRange.value;
-    if (!range) return;
-    const consumed = removeSkillSlashTrigger(props.modelValue, range);
-    if (!selectedSkills.value.includes(skill.name)) {
-        selectedSkills.value = [...selectedSkills.value, skill.name];
-    }
-    emit('update:modelValue', consumed.value);
-    slashMenuOpen.value = false;
-    slashRange.value = null;
-    await nextTick();
-    textareaRef.value?.focus();
-    textareaRef.value?.setSelectionRange(consumed.cursor, consumed.cursor);
-};
-
 const removeSkill = (name: string) => {
     selectedSkills.value = selectedSkills.value.filter((skill) => skill !== name);
 };
 
 const toggleActionMenu = () => {
     if (props.disabled) return;
-    slashMenuOpen.value = false;
     actionMenuOpen.value = !actionMenuOpen.value;
     if (!actionMenuOpen.value) closeActionSkillMenu();
 };
@@ -581,25 +386,13 @@ const toggleActionSkill = (skill: SkillInfo) => {
     }
 };
 
-const consumeVisibleSlashRange = () => {
-    const range = slashRange.value;
-    if (!slashMenuOpen.value || !range) return;
-    const consumed = removeSkillSlashTrigger(props.modelValue, range);
-    emit('update:modelValue', consumed.value);
-    slashRange.value = null;
-};
-
 const openSkillPicker = () => {
-    consumeVisibleSlashRange();
-    slashMenuOpen.value = false;
     actionMenuOpen.value = false;
     closeActionSkillMenu();
     skillDialogOpen.value = true;
 };
 
 const openSkillManagement = () => {
-    consumeVisibleSlashRange();
-    slashMenuOpen.value = false;
     actionMenuOpen.value = false;
     closeActionSkillMenu();
     openSettingsDialog('skills');
@@ -607,10 +400,8 @@ const openSkillManagement = () => {
 
 const handleSubmit = () => {
     if (!sendEnabled.value) return;
-    slashMenuOpen.value = false;
     actionMenuOpen.value = false;
     closeActionSkillMenu();
-    slashRange.value = null;
     emit('submit');
 };
 
@@ -642,26 +433,18 @@ watch(() => props.modelValue, (value) => {
     hasTextInput.value = value.trim() !== '';
 });
 
-watch(filteredSkills, () => {
-    if (activeSkillIndex.value >= filteredSkills.value.length) activeSkillIndex.value = 0;
-});
-
 watch(skillDialogOpen, (isOpen, wasOpen) => {
     if (!isOpen && wasOpen) skillsLoaded.value = false;
 });
 
 watch(() => props.disabled, (disabled) => {
     if (!disabled) return;
-    slashMenuOpen.value = false;
     actionMenuOpen.value = false;
     closeActionSkillMenu();
 });
 
 const handleDocumentPointerDown = (event: PointerEvent) => {
     const target = event.target as Node;
-    if (slashMenuOpen.value && !composerRef.value?.contains(target)) {
-        slashMenuOpen.value = false;
-    }
     if (actionMenuOpen.value && !actionMenuRef.value?.contains(target)) {
         actionMenuOpen.value = false;
         closeActionSkillMenu();

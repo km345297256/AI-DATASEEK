@@ -5,6 +5,7 @@ import {
   failRunningSteps,
   findCurrentTurnRunningStep,
   findCurrentTurnStep,
+  insertTaskExecutionSummary,
 } from '../src/utils/chatTimeline.ts';
 
 const message = (type, content) => ({
@@ -63,4 +64,25 @@ test('an error only fails running steps in the current turn', () => {
   assert.equal(failed[0], messages[3].content);
   assert.equal(messages[1].content.status, 'running');
   assert.equal(messages[3].content.status, 'failed');
+});
+
+test('task summary stores only the rounded elapsed milliseconds', () => {
+  const messages = [
+    message('user', { content: 'analyze', timestamp: 10 }),
+    message('assistant', { content: 'done', timestamp: 12 }),
+  ];
+
+  const summary = insertTaskExecutionSummary(messages, 12, 1234.6);
+
+  assert.deepEqual(summary, { timestamp: 12, duration_ms: 1235 });
+  assert.equal(messages.at(-1).type, 'task-summary');
+  assert.deepEqual(Object.keys(messages.at(-1).content).sort(), ['duration_ms', 'timestamp']);
+});
+
+test('replayed task summary falls back to event timestamps in milliseconds', () => {
+  const messages = [message('user', { content: 'analyze', timestamp: 10 })];
+
+  const summary = insertTaskExecutionSummary(messages, 13);
+
+  assert.equal(summary.duration_ms, 3000);
 });

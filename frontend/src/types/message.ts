@@ -40,20 +40,8 @@ export interface StepContent extends BaseContent {
   ended_at?: number;
 }
 
-export interface TaskSummaryStep {
-  id: string;
-  description: string;
-  status: StepContent['status'];
-  started_at: number;
-  ended_at: number;
-  duration_seconds: number;
-}
-
 export interface TaskSummaryContent extends BaseContent {
-  started_at: number;
-  ended_at: number;
-  duration_seconds: number;
-  steps: TaskSummaryStep[];
+  duration_ms: number;
 }
 
 export interface AttachmentsContent extends BaseContent {

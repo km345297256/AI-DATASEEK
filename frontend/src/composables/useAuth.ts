@@ -9,7 +9,7 @@ import type {
 
 const SYSTEM_USER: User = {
   id: 'anonymous',
-  fullname: 'AI-DataSeek System',
+  fullname: 'DataSeek',
   email: 'system@localhost',
   role: 'admin',
   is_active: true,

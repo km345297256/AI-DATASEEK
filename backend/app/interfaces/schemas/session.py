@@ -92,6 +92,28 @@ class ShareSessionResponse(BaseModel):
     is_shared: bool
 
 
+class TaskFeedbackRequest(BaseModel):
+    preference: str = Field(pattern="^(like|dislike)$")
+    dislike_reasons: List[str] = Field(default_factory=list, max_length=6)
+    detail: str = Field(default="", max_length=2000)
+
+    @field_validator("dislike_reasons")
+    @classmethod
+    def validate_dislike_reasons(cls, value: List[str]) -> List[str]:
+        return [reason.strip() for reason in value if reason.strip()][:6]
+
+    @field_validator("detail")
+    @classmethod
+    def validate_detail(cls, value: str) -> str:
+        return value.strip()
+
+
+class TaskFeedbackResponse(BaseModel):
+    preference: Optional[str] = None
+    dislike_reasons: List[str] = Field(default_factory=list)
+    detail: str = ""
+
+
 class SessionCollaboratorUser(BaseModel):
     id: str
     fullname: str

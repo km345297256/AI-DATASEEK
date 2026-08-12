@@ -12,7 +12,7 @@
                     </div>
                     <div class="flex overflow-hidden flex-col justify-center">
                         <div class="flex gap-1 items-center w-full"><span
-                                class="text-[var(--text-primary)] text-base font-semibold leading-[22px] truncate">AI-DataSeek</span></div><span
+                                class="text-[var(--text-primary)] text-base font-semibold leading-[22px] truncate">DataSeek</span></div><span
                             class="text-[var(--text-tertiary)] text-[13px] font-normal leading-[18px] truncate">{{
                                 t('Settings') }}</span>
                     </div>

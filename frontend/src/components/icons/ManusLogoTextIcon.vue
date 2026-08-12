@@ -2,7 +2,7 @@
   <span
     class="inline-flex items-center gap-1.5 font-semibold leading-none text-[var(--logo-color)]"
     :style="{ minWidth: cssWidth, height: cssHeight, fontSize }"
-    aria-label="AI-DataSeek"
+    aria-label="DataSeek"
   >
     <img
       src="/ai-dataseek-logo.png"
@@ -10,7 +10,7 @@
       class="shrink-0 object-contain"
       :style="{ width: iconSize, height: iconSize }"
     />
-    <span class="whitespace-nowrap">AI-DataSeek</span>
+    <span class="whitespace-nowrap">DataSeek</span>
   </span>
 </template>
 

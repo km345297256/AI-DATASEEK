@@ -12,7 +12,7 @@
       </button>
       <div class="min-w-0 flex-1">
         <h1 class="text-2xl font-semibold">系统管理</h1>
-        <p class="mt-1 text-sm text-[var(--text-tertiary)]">管理 AI-DataSeek 的资源、分析任务与插件。</p>
+        <p class="mt-1 text-sm text-[var(--text-tertiary)]">管理 DataSeek 的资源、分析任务与插件。</p>
       </div>
     </header>
 

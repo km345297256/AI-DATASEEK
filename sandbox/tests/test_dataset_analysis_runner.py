@@ -103,6 +103,52 @@ Path({str(result_path)!r}).write_text(json.dumps({{'success': True, 'result': '�
     assert payload["result"] == "完成分析"
 
 
+def test_runner_provides_bounded_write_json_helper(tmp_path, capsys, monkeypatch):
+    output_root = tmp_path / "output"
+    output_root.mkdir()
+    monkeypatch.setattr(runner, "OUTPUT_ROOT", output_root.resolve())
+    output_dir = output_root / "analysis-helper"
+    result_path = output_dir / "result.json"
+    source = f"""
+import numpy as np
+write_json({str(result_path)!r}, {{
+    'success': True,
+    'result': '辅助函数完成分析',
+    'evidence': {{'mean': np.float32(1.25)}},
+    'attachments': [],
+}})
+"""
+
+    assert runner.main([
+        "--program-base64", _encoded(source),
+        "--output-dir", str(output_dir),
+        "--result-path", str(result_path),
+    ]) == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["success"] is True
+    assert payload["result"] == "辅助函数完成分析"
+
+
+def test_runner_write_json_helper_rejects_paths_outside_output(tmp_path, capsys, monkeypatch):
+    output_root = tmp_path / "output"
+    output_root.mkdir()
+    monkeypatch.setattr(runner, "OUTPUT_ROOT", output_root.resolve())
+    output_dir = output_root / "analysis-helper-outside"
+    result_path = output_dir / "result.json"
+    outside = tmp_path / "outside.json"
+    source = f"write_json({str(outside)!r}, {{'success': True, 'result': 'bad'}})"
+
+    assert runner.main([
+        "--program-base64", _encoded(source),
+        "--output-dir", str(output_dir),
+        "--result-path", str(result_path),
+    ]) == 1
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["success"] is False
+    assert "inside the analysis output directory" in payload["error"]
+    assert not outside.exists()
+
+
 def test_runner_never_delivers_its_internal_result_manifest(tmp_path, capsys, monkeypatch):
     output_root = tmp_path / "output"
     output_root.mkdir()

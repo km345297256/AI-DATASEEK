@@ -19,7 +19,7 @@ from app.interfaces.schemas.session import (
     ChatRequest, ShellViewRequest, CreateSessionResponse, GetSessionResponse,
     ListSessionItem, ListSessionResponse, ShellViewResponse,
     ShareSessionResponse, SharedSessionResponse, CreateSessionRequest,
-    UpdateSessionTitleRequest,
+    UpdateSessionTitleRequest, TaskFeedbackRequest, TaskFeedbackResponse,
 )
 from app.interfaces.schemas.file import FileInfoResponse, FileViewRequest, FileViewResponse
 from app.interfaces.schemas.resource import AccessTokenRequest, SignedUrlResponse
@@ -33,6 +33,7 @@ from app.infrastructure.repositories.skill_repository import MongoSkillRepositor
 from app.infrastructure.repositories.mongo_mcp_repository import MongoMCPRepository
 from app.domain.models.mcp_config import can_access_mcp, is_mcp_owned_by
 from app.application.services.data_center_dataset_service import DataCenterDatasetService
+from app.infrastructure.models.documents import TaskFeedbackDocument
 
 logger = logging.getLogger(__name__)
 SESSION_POLL_INTERVAL = 5
@@ -528,6 +529,80 @@ async def unshare_session(
         session_id=session_id,
         is_shared=False
     ))
+
+
+@router.get("/{session_id}/feedback", response_model=APIResponse[TaskFeedbackResponse])
+async def get_task_feedback(
+    session_id: str,
+    current_user: User = Depends(get_current_user),
+    agent_service: AgentService = Depends(get_agent_service),
+) -> APIResponse[TaskFeedbackResponse]:
+    session = await agent_service.get_session(session_id, current_user.id)
+    if not session:
+        raise NotFoundError("Session not found")
+    feedback = await TaskFeedbackDocument.find_one({"session_id": session_id, "user_id": current_user.id})
+    if not feedback:
+        return APIResponse.success(TaskFeedbackResponse())
+    return APIResponse.success(TaskFeedbackResponse(
+        preference=feedback.preference,
+        dislike_reasons=feedback.dislike_reasons,
+        detail=feedback.detail,
+    ))
+
+
+@router.put("/{session_id}/feedback", response_model=APIResponse[TaskFeedbackResponse])
+async def save_task_feedback(
+    session_id: str,
+    request: TaskFeedbackRequest,
+    current_user: User = Depends(get_current_user),
+    agent_service: AgentService = Depends(get_agent_service),
+) -> APIResponse[TaskFeedbackResponse]:
+    session = await agent_service.get_session(session_id, current_user.id)
+    if not session:
+        raise NotFoundError("Session not found")
+    now = datetime.now().astimezone()
+    reasons = request.dislike_reasons if request.preference == "dislike" else []
+    detail = request.detail if request.preference == "dislike" else ""
+    feedback = await TaskFeedbackDocument.find_one({"session_id": session_id, "user_id": current_user.id})
+    if feedback:
+        feedback.session_title = session.title
+        feedback.preference = request.preference
+        feedback.dislike_reasons = reasons
+        feedback.detail = detail
+        feedback.updated_at = now
+        await feedback.save()
+    else:
+        feedback = TaskFeedbackDocument(
+            session_id=session_id,
+            user_id=current_user.id,
+            session_title=session.title,
+            preference=request.preference,
+            dislike_reasons=reasons,
+            detail=detail,
+            created_at=now,
+            updated_at=now,
+        )
+        await feedback.insert()
+    return APIResponse.success(TaskFeedbackResponse(
+        preference=feedback.preference,
+        dislike_reasons=feedback.dislike_reasons,
+        detail=feedback.detail,
+    ))
+
+
+@router.delete("/{session_id}/feedback", response_model=APIResponse[TaskFeedbackResponse])
+async def delete_task_feedback(
+    session_id: str,
+    current_user: User = Depends(get_current_user),
+    agent_service: AgentService = Depends(get_agent_service),
+) -> APIResponse[TaskFeedbackResponse]:
+    session = await agent_service.get_session(session_id, current_user.id)
+    if not session:
+        raise NotFoundError("Session not found")
+    feedback = await TaskFeedbackDocument.find_one({"session_id": session_id, "user_id": current_user.id})
+    if feedback:
+        await feedback.delete()
+    return APIResponse.success(TaskFeedbackResponse())
 
 
 @router.get("/shared/{session_id}", response_model=APIResponse[SharedSessionResponse])

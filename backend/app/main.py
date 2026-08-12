@@ -34,6 +34,7 @@ from app.infrastructure.models.documents import (
     SkillDocument,
     StoredFileDocument,
     TemporaryDatasetDocument,
+    TaskFeedbackDocument,
     TokenUsageDocument,
     UserDocument,
     WorkspaceDocument,
@@ -97,6 +98,7 @@ async def lifespan(app: FastAPI):
             SafetyRuleSeedStateDocument,
             DataCenterDatasetDocument,
             TemporaryDatasetDocument,
+            TaskFeedbackDocument,
         ]
     )
     await ensure_safety_rule_seeds()

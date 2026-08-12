@@ -57,18 +57,8 @@
         </div>
 
         <div v-else-if="dataset" class="space-y-5">
-          <figure class="aspect-[16/10] w-full overflow-hidden rounded-xl border border-[var(--border-main)] bg-[#dfeae5] shadow-sm">
-            <img
-              :src="datasetCoverUrl"
-              :alt="`${dataset.name}数据集封面`"
-              class="h-full w-full object-cover"
-              @error="handleDatasetCoverError"
-            />
-          </figure>
-
           <section>
-            <div class="text-[10px] font-medium uppercase tracking-[0.14em] text-[#2b7659]">Dataset</div>
-            <h2 class="mt-1.5 break-words text-base font-semibold leading-6">{{ dataset.name }}</h2>
+            <h2 class="break-words text-base font-semibold leading-6">{{ dataset.name }}</h2>
           </section>
 
           <dl class="space-y-4 border-y border-[var(--border-main)] py-4">
@@ -97,37 +87,44 @@
               <h3 class="text-xs font-semibold">数据文件</h3>
               <span class="text-[10px] text-[var(--text-tertiary)]">{{ dataset.files.length }} 个</span>
             </div>
-            <div v-if="dataset.files.length" class="mt-2.5 overflow-hidden rounded-lg border border-[var(--border-main)]">
+            <div v-if="dataset.files.length" class="mt-2.5 overflow-hidden rounded-lg border border-[var(--border-main)] bg-[var(--background-gray-main)]">
               <div
-                v-for="(file, index) in visibleDatasetFiles"
-                :key="`${displayFileName(file.name)}-${index}`"
-                class="group flex items-center gap-2.5 border-b border-[var(--border-main)] bg-[var(--background-gray-main)] px-3 py-2.5 transition-colors last:border-b-0 hover:bg-[var(--fill-tsp-white-light)]"
+                v-for="node in datasetFileTreeRows"
+                :key="node.path"
+                class="group flex min-w-0 items-center gap-2 border-b border-[var(--border-main)] px-2 py-1.5 transition-colors last:border-b-0 hover:bg-[var(--fill-tsp-white-light)]"
+                :style="{ paddingLeft: `${8 + node.depth * 16}px` }"
               >
-                <FileText class="size-4 shrink-0 text-[#2b7659]" />
-                <span class="min-w-0 flex-1 truncate text-xs font-medium" :title="displayFileName(file.name)">
-                  {{ displayFileName(file.name) }}
+                <button
+                  v-if="node.kind === 'directory'"
+                  type="button"
+                  class="flex size-6 shrink-0 items-center justify-center rounded text-[var(--icon-secondary)] hover:bg-[var(--fill-tsp-white-dark)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2b7659]/40"
+                  :aria-label="`${isDirectoryExpanded(node.path) ? '收起' : '展开'}目录 ${node.name}`"
+                  :aria-expanded="isDirectoryExpanded(node.path)"
+                  @click="toggleDirectory(node.path)"
+                >
+                  <ChevronDown v-if="isDirectoryExpanded(node.path)" class="size-3.5" />
+                  <ChevronRight v-else class="size-3.5" />
+                </button>
+                <span v-else class="size-6 shrink-0" aria-hidden="true" />
+                <FolderOpen v-if="node.kind === 'directory' && isDirectoryExpanded(node.path)" class="size-4 shrink-0 text-[#2b7659]" />
+                <Folder v-else-if="node.kind === 'directory'" class="size-4 shrink-0 text-[#2b7659]" />
+                <FileText v-else class="size-4 shrink-0 text-[#2b7659]" />
+                <span class="min-w-0 flex-1 truncate text-xs" :class="node.kind === 'directory' ? 'font-medium text-[var(--text-primary)]' : 'text-[var(--text-secondary)]'" :title="node.path">
+                  {{ node.name }}
                 </span>
                 <button
+                  v-if="node.kind === 'file'"
                   type="button"
                   class="pointer-events-none -my-1.5 flex size-7 shrink-0 items-center justify-center rounded-md text-[var(--icon-secondary)] opacity-0 transition-[color,background-color,opacity] hover:bg-[var(--fill-tsp-white-dark)] hover:text-[var(--icon-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2b7659]/40 group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100 max-sm:pointer-events-auto max-sm:opacity-100"
-                  :title="copiedDatasetFileIndex === index ? `已复制 ${displayFileName(file.name)}` : `复制文件名 ${displayFileName(file.name)}`"
-                  :aria-label="copiedDatasetFileIndex === index ? `已复制 ${displayFileName(file.name)}` : `复制文件名 ${displayFileName(file.name)}`"
-                  @click.stop="copyDatasetFileName(file.name, index)"
+                  :title="copiedDatasetFilePath === node.path ? `已复制 ${node.name}` : `复制文件名 ${node.name}`"
+                  :aria-label="copiedDatasetFilePath === node.path ? `已复制 ${node.name}` : `复制文件名 ${node.name}`"
+                  @click.stop="copyDatasetFileName(node.name, node.path)"
                 >
-                  <Check v-if="copiedDatasetFileIndex === index" class="size-3.5 text-[#2b7659]" />
+                  <Check v-if="copiedDatasetFilePath === node.path" class="size-3.5 text-[#2b7659]" />
                   <Copy v-else class="size-3.5" />
                 </button>
               </div>
             </div>
-            <button
-              v-if="hasMoreDatasetFiles"
-              type="button"
-              class="secondary-button mt-2.5 flex w-full justify-center"
-              @click="loadMoreDatasetFiles"
-            >
-              <ChevronDown class="size-3.5" />
-              加载更多（已显示 {{ visibleDatasetFiles.length }} / {{ dataset.files.length }}）
-            </button>
             <div v-if="!dataset.files.length" class="mt-2.5 rounded-lg border border-dashed border-[var(--border-main)] px-3 py-6 text-center text-xs text-[var(--text-tertiary)]">
               暂无可展示的文件名
             </div>
@@ -148,17 +145,18 @@
       class="flex min-h-0 min-w-0 max-w-full flex-1 flex-col overflow-hidden bg-[var(--background-gray-main)] transition-[padding] duration-200"
       :class="mobileCatalogOpen ? '' : 'catalog-main-with-rail'"
     >
-      <header class="mobile-safe-top relative z-30 flex h-16 shrink-0 items-center gap-3 border-b border-[var(--border-main)] bg-[var(--background-menu-white)] px-3 sm:px-5">
-        <div class="min-w-0 flex-1">
-          <div class="truncate text-sm font-semibold">{{ dataset?.name || '科学数据探查' }}</div>
-          <div class="mt-0.5 flex items-center gap-2 text-[10px] text-[var(--text-tertiary)]">
-            <span class="truncate">{{ dataset?.data_type || '正在加载数据集' }}</span><span>·</span><span class="truncate">{{ selectedProfile?.name || 'AI-DataSeek 默认 Agent' }}</span>
-          </div>
-        </div>
+      <div
+        ref="timelineRef"
+        class="timeline-scrollbar-hidden relative min-h-0 min-w-0 max-w-full flex-1 overscroll-contain overflow-x-hidden overflow-y-auto"
+        @wheel.passive="handleTimelineWheel"
+        @pointerdown="handleTimelinePointerDown"
+        @pointerup="handleTimelinePointerUp"
+        @pointercancel="handleTimelinePointerUp"
+      >
         <div ref="historyMenuRef" class="relative shrink-0" @keydown.esc="historyOpen = false">
           <button
             type="button"
-            class="history-header-button"
+            class="history-header-button absolute right-3 top-3 z-20 sm:right-5 sm:top-5"
             :class="historyOpen ? 'bg-[var(--fill-tsp-white-main)] text-[var(--text-primary)]' : ''"
             aria-label="历史任务"
             title="历史任务"
@@ -177,7 +175,7 @@
             id="dataset-history-panel"
             role="dialog"
             aria-label="历史任务"
-            class="absolute right-0 top-full z-50 mt-2 flex max-h-[min(440px,70vh)] w-[calc(100vw-72px)] max-w-[360px] flex-col overflow-hidden rounded-xl border border-[var(--border-main)] bg-[var(--background-menu-white)] shadow-xl"
+            class="absolute right-3 top-12 z-50 flex max-h-[min(440px,70vh)] w-[calc(100vw-72px)] max-w-[360px] flex-col overflow-hidden rounded-xl border border-[var(--border-main)] bg-[var(--background-menu-white)] shadow-xl sm:right-5 sm:top-14"
           >
             <div class="flex items-center justify-between border-b border-[var(--border-main)] px-4 py-3">
               <div>
@@ -220,23 +218,13 @@
             </div>
           </div>
         </div>
-      </header>
-
-      <div
-        ref="timelineRef"
-        class="timeline-scrollbar-hidden min-h-0 min-w-0 max-w-full flex-1 overscroll-contain overflow-x-hidden overflow-y-auto"
-        @wheel.passive="handleTimelineWheel"
-        @pointerdown="handleTimelinePointerDown"
-        @pointerup="handleTimelinePointerUp"
-        @pointercancel="handleTimelinePointerUp"
-      >
         <div ref="timelineContentRef" class="mx-auto flex min-h-full w-full min-w-0 max-w-[800px] flex-col px-4 pb-8 pt-5 sm:px-6 sm:pt-7">
           <div v-if="messages.length === 0" class="flex flex-1 flex-col justify-center py-8 sm:py-12">
             <div v-if="dataset" class="max-w-2xl">
               <img src="/ai-dataseek-logo.png" alt="" class="size-11 object-contain" aria-hidden="true" />
               <div class="mt-5 text-xs font-medium text-[#2b7659]">科学数据探查</div>
               <h1 class="mt-2 text-xl font-semibold leading-8 sm:text-2xl">围绕选定数据集开展智能问答</h1>
-              <p class="mt-2.5 max-w-xl text-[13px] leading-6 text-[var(--text-secondary)]">Agent 将围绕“{{ dataset.name }}”及其完整数据内容开展分析。</p>
+              <p class="mt-2.5 max-w-xl text-[13px] leading-6 text-[var(--text-secondary)]">DataSeek 将围绕当前选定数据集及其完整数据内容开展分析。</p>
               <div class="mt-7">
                 <div class="mb-2.5 flex items-center justify-between gap-3">
                   <span class="text-xs font-medium text-[var(--text-secondary)]">推荐问题</span>
@@ -349,7 +337,7 @@
             </div>
             <div v-if="isLoading" class="mt-3 flex items-center gap-2 text-sm text-[var(--text-tertiary)]">
               <LoaderCircle class="size-4 animate-spin" />
-              <span>{{ loadingStatus || 'Agent 正在分析数据集...' }}</span>
+              <span>{{ loadingStatus || 'DataSeek 正在分析数据集...' }}</span>
             </div>
           </div>
         </div>
@@ -357,12 +345,6 @@
 
       <div class="mobile-safe-bottom shrink-0 border-t border-[var(--border-main)] bg-[var(--background-menu-white)] px-3 py-3 sm:px-6">
         <div class="mx-auto w-full max-w-[800px]">
-          <div v-if="dataset" class="mb-2 flex items-center gap-2 text-[11px] text-[var(--text-tertiary)]">
-            <Database class="size-3.5" />
-            <span class="shrink-0 font-medium text-[var(--text-secondary)]">当前数据集</span>
-            <span class="truncate">{{ dataset.name }}</span>
-            <span class="ml-auto hidden shrink-0 rounded bg-[#e8f3ee] px-1.5 py-0.5 text-[#286d52] sm:block">已选择</span>
-          </div>
           <ChatBox
             class="!bg-transparent !pb-0"
             v-model="inputMessage"
@@ -380,7 +362,7 @@
             @submit="submit"
             @stop="stop"
           />
-          <p class="mt-1.5 text-center text-[10px] text-[var(--text-tertiary)]">回答由 Agent 基于本次关联数据目录生成，分析结果应结合数据质量与来源信息进行验证。</p>
+          <p class="mt-1.5 text-center text-[10px] text-[var(--text-tertiary)]">回答由 DataSeek 基于本次关联数据目录生成，分析结果应结合数据质量与来源信息进行验证。</p>
         </div>
       </div>
     </main>
@@ -400,8 +382,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
-import { Check, ChevronDown, ChevronRight, CircleAlert, Clock3, Copy, Database, FileText, History, Image as ImageIcon, LoaderCircle, PanelLeftClose, PanelLeftOpen, Plus, RefreshCw } from 'lucide-vue-next';
-import datasetDefaultCover from '@/assets/dataset-default-cover.png';
+import { Check, ChevronDown, ChevronRight, CircleAlert, Clock3, Copy, Database, FileText, Folder, FolderOpen, History, Image as ImageIcon, LoaderCircle, PanelLeftClose, PanelLeftOpen, Plus, RefreshCw } from 'lucide-vue-next';
 import ChatBox from '@/components/ChatBox.vue';
 import ChatMessage from '@/components/ChatMessage.vue';
 import FilePanel from '@/components/FilePanel.vue';
@@ -410,7 +391,7 @@ import SettingsDialog from '@/components/settings/SettingsDialog.vue';
 import ToolPanel from '@/components/ToolPanel.vue';
 import { createSession, getSession, chatWithSession, stopSession } from '@/api/agent';
 import { API_CONFIG } from '@/api/client';
-import { generateDatasetSuggestedQuestions, getDataCenterDataset, listDatasetChatSessions, type DataCenterDataset, type DatasetChatSession } from '@/api/dataset';
+import { generateDatasetSuggestedQuestions, getDataCenterDataset, listDatasetChatSessions, type DataCenterDataset, type DataCenterDatasetFile, type DatasetChatSession } from '@/api/dataset';
 import type { FileInfo } from '@/api/file';
 import { getSkillPreferences } from '@/api/skill';
 import { useAgentProfile } from '@/composables/useAgentProfile';
@@ -426,25 +407,17 @@ import type { AgentSSEEvent, CompletionAdviceData, DoneEventData, ErrorEventData
 import { SessionStatus } from '@/types/response';
 
 const DATASET_STORAGE_KEY_PREFIX = 'ai-dataseek:dataset-seek:session';
-const DATASET_FILE_BATCH_SIZE = 200;
 
 const route = useRoute();
-const { selectedProfileId, selectedProfile, refreshProfiles } = useAgentProfile();
+const { selectedProfileId, refreshProfiles } = useAgentProfile();
 const { showFilePanel } = useFilePanel();
 const dataset = ref<DataCenterDataset>();
 const selectedDatasetId = ref('');
 const datasetSummaryRef = ref<HTMLElement | null>(null);
 const datasetSummaryExpanded = ref(false);
 const datasetSummaryOverflowing = ref(false);
-const visibleFileCount = ref(DATASET_FILE_BATCH_SIZE);
-const copiedDatasetFileIndex = ref<number | null>(null);
-const visibleDatasetFiles = computed(() => (dataset.value?.files || []).slice(0, visibleFileCount.value));
-const hasMoreDatasetFiles = computed(() => visibleDatasetFiles.value.length < (dataset.value?.files.length || 0));
-const datasetCoverFailed = ref(false);
-const datasetCoverUrl = computed(() => {
-  if (!dataset.value?.preview_url || datasetCoverFailed.value) return datasetDefaultCover;
-  return dataset.value.preview_url;
-});
+const expandedDirectoryPaths = ref(new Set<string>());
+const copiedDatasetFilePath = ref<string | null>(null);
 const catalogLoading = ref(true);
 const inputMessage = ref('');
 const datasetChatAttachments: FileInfo[] = [];
@@ -454,6 +427,7 @@ const messages = ref<Message[]>([]);
 const sessionId = ref<string | null>(null);
 const lastEventId = ref<string>();
 const isLoading = ref(false);
+const taskStartedAtMs = ref<number>();
 const loadingStatus = ref('');
 const mobileCatalogOpen = ref(false);
 const catalogCollapsed = ref(false);
@@ -484,18 +458,18 @@ let datasetFileCopyTimer: ReturnType<typeof setTimeout> | null = null;
 
 const TIMELINE_BOTTOM_THRESHOLD = 120;
 
-watch(() => dataset.value?.preview_url, () => {
-  datasetCoverFailed.value = false;
-}, { flush: 'sync' });
-
 watch(() => dataset.value?.dataset_id, () => {
-  visibleFileCount.value = DATASET_FILE_BATCH_SIZE;
-  copiedDatasetFileIndex.value = null;
+  expandedDirectoryPaths.value = new Set(datasetFileTree.value.map((node) => node.path));
+  copiedDatasetFilePath.value = null;
   if (datasetFileCopyTimer) {
     clearTimeout(datasetFileCopyTimer);
     datasetFileCopyTimer = null;
   }
 }, { flush: 'sync' });
+
+watch(() => dataset.value?.name, (name) => {
+  document.title = name ? `DataSeek-${name}` : 'DataSeek';
+}, { immediate: true });
 
 watch(() => dataset.value?.description, async () => {
   datasetSummaryExpanded.value = false;
@@ -549,10 +523,6 @@ watch(messages, async () => {
   scrollTimelineToBottom();
 }, { deep: true });
 
-function handleDatasetCoverError() {
-  if (datasetCoverUrl.value !== datasetDefaultCover) datasetCoverFailed.value = true;
-}
-
 function updateDatasetSummaryOverflow() {
   const element = datasetSummaryRef.value;
   if (!element || !dataset.value?.description) {
@@ -573,30 +543,90 @@ async function toggleDatasetSummary() {
   updateDatasetSummaryOverflow();
 }
 
-function displayFileName(name: string) {
-  const parts = name.replace(/\\/g, '/').split('/').filter(Boolean);
-  return parts[parts.length - 1] || '未命名文件';
+type DatasetFileTreeNode = {
+  kind: 'directory' | 'file';
+  name: string;
+  path: string;
+  children: DatasetFileTreeNode[];
+  file?: DataCenterDatasetFile;
+};
+
+type DatasetFileTreeRow = Omit<DatasetFileTreeNode, 'children'> & { depth: number };
+
+function normalizedDatasetPath(file: DataCenterDatasetFile) {
+  return (file.path || file.name).replace(/\\/g, '/').split('/').filter(Boolean).join('/');
 }
 
-async function copyDatasetFileName(name: string, index: number) {
-  const copied = await copyToClipboard(displayFileName(name));
+const datasetFileTree = computed<DatasetFileTreeNode[]>(() => {
+  const root: DatasetFileTreeNode = { kind: 'directory', name: '', path: '', children: [] };
+  const directories = new Map<string, DatasetFileTreeNode>([['', root]]);
+
+  for (const file of dataset.value?.files || []) {
+    const path = normalizedDatasetPath(file);
+    if (!path) continue;
+    const parts = path.split('/');
+    let parent = root;
+    for (let index = 0; index < parts.length - 1; index += 1) {
+      const directoryPath = parts.slice(0, index + 1).join('/');
+      let directory = directories.get(directoryPath);
+      if (!directory) {
+        directory = { kind: 'directory', name: parts[index], path: directoryPath, children: [] };
+        directories.set(directoryPath, directory);
+        parent.children.push(directory);
+      }
+      parent = directory;
+    }
+    parent.children.push({ kind: 'file', name: parts[parts.length - 1] || '未命名文件', path, children: [], file });
+  }
+
+  const sortTree = (nodes: DatasetFileTreeNode[]) => {
+    nodes.sort((left, right) => {
+      if (left.kind !== right.kind) return left.kind === 'directory' ? -1 : 1;
+      return left.name.localeCompare(right.name, 'zh-CN', { numeric: true, sensitivity: 'base' });
+    });
+    nodes.forEach((node) => sortTree(node.children));
+  };
+  sortTree(root.children);
+  return root.children;
+});
+
+const datasetFileTreeRows = computed<DatasetFileTreeRow[]>(() => {
+  const rows: DatasetFileTreeRow[] = [];
+  const visit = (nodes: DatasetFileTreeNode[], depth: number) => {
+    for (const node of nodes) {
+      rows.push({ ...node, depth });
+      if (node.kind === 'directory' && expandedDirectoryPaths.value.has(node.path)) visit(node.children, depth + 1);
+    }
+  };
+  visit(datasetFileTree.value, 0);
+  return rows;
+});
+
+function isDirectoryExpanded(path: string) {
+  return expandedDirectoryPaths.value.has(path);
+}
+
+function toggleDirectory(path: string) {
+  const updated = new Set(expandedDirectoryPaths.value);
+  if (updated.has(path)) updated.delete(path);
+  else updated.add(path);
+  expandedDirectoryPaths.value = updated;
+}
+
+async function copyDatasetFileName(name: string, path: string) {
+  const copied = await copyToClipboard(name);
   if (!copied) {
     showErrorToast('复制文件名失败，请检查浏览器剪贴板权限');
     return;
   }
 
-  copiedDatasetFileIndex.value = index;
+  copiedDatasetFilePath.value = path;
   if (datasetFileCopyTimer) clearTimeout(datasetFileCopyTimer);
   datasetFileCopyTimer = setTimeout(() => {
-    copiedDatasetFileIndex.value = null;
+    copiedDatasetFilePath.value = null;
     datasetFileCopyTimer = null;
   }, 1500);
   showSuccessToast('文件名已复制');
-}
-
-function loadMoreDatasetFiles() {
-  const total = dataset.value?.files.length || 0;
-  visibleFileCount.value = Math.min(visibleFileCount.value + DATASET_FILE_BATCH_SIZE, total);
 }
 
 function toggleCatalogPanel() {
@@ -686,11 +716,19 @@ function handleEvent(event: AgentSSEEvent) {
     messages.value.push({ type: 'assistant', content: { content: data.error, timestamp: data.timestamp } as MessageContent });
     failRunningSteps(messages.value);
     isLoading.value = false;
+    taskStartedAtMs.value = undefined;
   } else if (event.event === 'done') {
     isLoading.value = false;
-    insertTaskExecutionSummary(messages.value, event.data.timestamp);
+    const elapsedMs = taskStartedAtMs.value === undefined
+      ? undefined
+      : performance.now() - taskStartedAtMs.value;
+    insertTaskExecutionSummary(messages.value, event.data.timestamp, elapsedMs);
+    taskStartedAtMs.value = undefined;
     completionAdvice.value = (event.data as DoneEventData).advice;
-  } else if (event.event === 'wait') isLoading.value = false;
+  } else if (event.event === 'wait') {
+    isLoading.value = false;
+    taskStartedAtMs.value = undefined;
+  }
   else if (event.event === 'title') void (event.data as TitleEventData);
   lastEventId.value = event.data.event_id;
   if (event.event === 'done' || event.event === 'wait' || event.event === 'error') {
@@ -816,6 +854,7 @@ async function submit() {
   inputMessage.value = '';
   startUserTurn();
   messages.value.push({ type: 'user', content: { content: question, timestamp: Math.floor(Date.now() / 1000) } as MessageContent });
+  taskStartedAtMs.value = performance.now();
   isLoading.value = true;
   loadingStatus.value = '正在关联数据集...';
   try {
@@ -831,15 +870,16 @@ async function submit() {
       selectedProfileId.value,
       {
         onMessage: ({ event, data }) => handleEvent({ event: event as AgentSSEEvent['event'], data: data as AgentSSEEvent['data'] }),
-        onClose: () => { isLoading.value = false; loadingStatus.value = ''; cancelChat = null; },
-        onError: (error) => { console.error(error); isLoading.value = false; loadingStatus.value = ''; failRunningSteps(messages.value); },
+        onClose: () => { isLoading.value = false; taskStartedAtMs.value = undefined; loadingStatus.value = ''; cancelChat = null; },
+        onError: (error) => { console.error(error); isLoading.value = false; taskStartedAtMs.value = undefined; loadingStatus.value = ''; failRunningSteps(messages.value); },
       },
       capabilities.datasetIds,
     );
-    loadingStatus.value = 'Agent 正在读取数据集...';
+    loadingStatus.value = 'DataSeek 正在读取数据集...';
   } catch (error: any) {
     console.error(error);
     isLoading.value = false;
+    taskStartedAtMs.value = undefined;
     loadingStatus.value = '';
     messages.value.push({ type: 'assistant', content: { content: `数据探查启动失败：${error?.message || '未知错误'}`, timestamp: Math.floor(Date.now() / 1000) } as MessageContent });
     showErrorToast(error?.message || '数据探查启动失败');
@@ -860,6 +900,7 @@ function clearConversationState() {
   lastTool.value = undefined;
   lastNoMessageTool.value = undefined;
   isLoading.value = false;
+  taskStartedAtMs.value = undefined;
   loadingStatus.value = '';
   completionAdvice.value = undefined;
 }
@@ -973,6 +1014,7 @@ onMounted(async () => {
 });
 
 onUnmounted(() => {
+  document.title = 'DataSeek';
   cancelChat?.();
   eventBus.off(EVENT_SKILL_PREFERENCES_UPDATED, handleSkillPreferencesUpdated);
   document.removeEventListener('pointerdown', handleHistoryPointerDown);

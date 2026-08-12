@@ -161,8 +161,9 @@ async def test_dataset_fast_path_compiles_one_program_instead_of_using_iteration
     agent.reset_context = AsyncMock()
     captured: dict[str, object] = {}
 
-    async def fake_compiled(request, *, message):
+    async def fake_compiled(request, *, message, target_files=None):
         captured["request"] = request
+        captured["target_files"] = target_files
         yield MessageEvent(message='{"success":true,"result":"done","attachments":[]}')
     agent._execute_compiled_dataset_analysis = fake_compiled
     step = Step(
@@ -205,8 +206,9 @@ async def test_dataset_required_artifact_uses_compiled_program_contract():
     agent.reset_context = AsyncMock()
     captured: dict[str, object] = {}
 
-    async def fake_compiled(request, *, message):
+    async def fake_compiled(request, *, message, target_files=None):
         captured["request"] = request
+        captured["target_files"] = target_files
         yield MessageEvent(message='{"success":true,"result":"done","attachments":["/home/ubuntu/output/chart.png"]}')
 
     agent._execute_compiled_dataset_analysis = fake_compiled
@@ -234,6 +236,44 @@ async def test_dataset_required_artifact_uses_compiled_program_contract():
 
     assert "Prioritize the requested artifact before optional investigation" in captured["request"]
     assert "Do not postpone plotting or export" in captured["request"]
+
+
+@pytest.mark.asyncio
+async def test_multi_file_scope_reaches_compiler_without_unrelated_inventory():
+    agent = object.__new__(ExecutionAgent)
+    agent.format = None
+    agent.ask_with_messages = AsyncMock(return_value=AIMessage(content='{"python_code":"print(1)"}'))
+    agent._parse_json = AsyncMock(return_value={"python_code": "print(1)"})
+    selected = ["data/a.nc", "data/b.nc"]
+    dataset = MountedDataset(
+        dataset_id="tds_multi",
+        name="Multi-file dataset",
+        data_center_id="center",
+        data_center_name="Center",
+        sandbox_path="/home/ubuntu/datasets/tds_multi",
+        files=[
+            DatasetFile(path="data/a.nc", size=1),
+            DatasetFile(path="data/b.nc", size=2),
+            DatasetFile(path="data/unrelated.nc", size=3),
+        ],
+    )
+
+    await agent._compile_dataset_analysis_program(
+        "joint analysis",
+        Message(message="joint analysis", datasets=[dataset]),
+        output_dir="/home/ubuntu/output/test",
+        result_path="/home/ubuntu/output/test/result.json",
+        target_files=selected,
+    )
+
+    prompt = agent.ask_with_messages.await_args.args[0][0].content
+    datasets_payload = json.loads(prompt.split("DATASETS:\n", 1)[1].split("\n\nFAILURE_CONTEXT:", 1)[0])
+    assert [item["path"] for item in datasets_payload[0]["files"]] == selected
+    assert datasets_payload[0]["scope_restricted_to_targets"] is True
+    assert "unrelated.nc" not in prompt
+    assert "write_json(path, payload)" in prompt
+    assert "Do not call any other undeclared helper function" in prompt
+    assert "recursively inspect that entry's `sandbox_path`" in prompt
 
 
 @pytest.mark.asyncio

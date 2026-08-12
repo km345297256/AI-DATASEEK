@@ -218,6 +218,30 @@ export async function unshareSession(sessionId: string): Promise<ShareSessionRes
   return response.data.data;
 }
 
+export type TaskFeedbackPreference = 'like' | 'dislike';
+export interface TaskFeedbackResponse {
+  preference: TaskFeedbackPreference | null;
+  dislike_reasons: string[];
+  detail: string;
+}
+
+export async function getTaskFeedback(sessionId: string): Promise<TaskFeedbackResponse> {
+  const response = await apiClient.get<ApiResponse<TaskFeedbackResponse>>(`/sessions/${sessionId}/feedback`);
+  return response.data.data;
+}
+
+export async function saveTaskFeedback(
+  sessionId: string,
+  feedback: { preference: TaskFeedbackPreference; dislike_reasons?: string[]; detail?: string },
+): Promise<TaskFeedbackResponse> {
+  const response = await apiClient.put<ApiResponse<TaskFeedbackResponse>>(`/sessions/${sessionId}/feedback`, feedback);
+  return response.data.data;
+}
+
+export async function deleteTaskFeedback(sessionId: string): Promise<void> {
+  await apiClient.delete<ApiResponse<TaskFeedbackResponse>>(`/sessions/${sessionId}/feedback`);
+}
+
 /**
  * Get a shared session without authentication
  * This endpoint allows public access to sessions that have been marked as shared.

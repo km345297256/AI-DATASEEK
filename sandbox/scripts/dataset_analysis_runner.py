@@ -42,6 +42,27 @@ def _install_json_compatibility() -> None:
     encoder.default = default
 
 
+def _write_json(path: object, payload: object, output_dir: Path) -> None:
+    """Persist JSON only inside the analysis output directory."""
+    if not isinstance(path, (str, os.PathLike)):
+        raise TypeError("write_json path must be a string or path-like object")
+    destination = Path(path)
+    if not destination.is_absolute() or destination.is_symlink():
+        raise ValueError("write_json path must be an absolute non-symlink path")
+    resolved = destination.resolve(strict=False)
+    try:
+        resolved.relative_to(output_dir)
+    except ValueError as exc:
+        raise ValueError("write_json path must be inside the analysis output directory") from exc
+    resolved.parent.mkdir(parents=True, exist_ok=True)
+    temporary = resolved.with_name(f".{resolved.name}.tmp")
+    temporary.write_text(
+        json.dumps(payload, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+    os.replace(temporary, resolved)
+
+
 def _error(message: str) -> int:
     print(json.dumps({"success": False, "error": message}, ensure_ascii=False))
     return 2
@@ -147,7 +168,10 @@ def main(argv: list[str] | None = None) -> int:
     os.environ["AI_DATASEEK_RESULT_PATH"] = str(result_path)
     try:
         _install_json_compatibility()
-        namespace = {"__name__": "__main__"}
+        namespace = {
+            "__name__": "__main__",
+            "write_json": lambda path, payload: _write_json(path, payload, output_dir),
+        }
         exec(compile(source, "<dataset-analysis>", "exec"), namespace, namespace)
         return_code = 0
     except Exception as exc:  # The caller receives a repairable, typed failure.

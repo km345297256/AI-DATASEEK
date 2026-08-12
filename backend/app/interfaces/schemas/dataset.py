@@ -275,14 +275,14 @@ def dataset_response(
     value,
     *,
     include_locations: bool = False,
-    include_file_paths: bool = False,
+    include_file_paths: bool = True,
 ) -> DataCenterDatasetResponse:
     payload = value.model_dump()
     public_metadata = _sanitize_public_metadata(value.metadata)
     payload["metadata"] = (
         {} if public_metadata is _OMIT_METADATA_VALUE else public_metadata
     )
-    host_location_roots = set()
+    host_location_roots: list[tuple[PurePosixPath, str]] = []
     for location in value.locations:
         if location.storage_type != DatasetStorageType.HOST_PATH:
             continue
@@ -293,9 +293,10 @@ def dataset_response(
             PurePosixPath(location.source_path.rstrip("/").replace("\\", "/")).name
             or "source"
         )
-        host_location_roots.add(
-            PurePosixPath("sources") / location.location_id / mount_name
-        )
+        host_location_roots.append((
+            PurePosixPath("sources") / location.location_id,
+            mount_name,
+        ))
     files = []
     for item in value.files:
         public_path = PurePosixPath(item.path.replace("\\", "/"))
@@ -316,21 +317,26 @@ def dataset_response(
             # Fail closed for legacy or malformed records.  File paths in an
             # HTTP response must always be dataset-relative.
             continue
-        for host_root in host_location_roots:
-            if public_path == host_root:
-                # A manually registered host directory is represented
-                # internally by a synthetic root entry, not by a real file.
-                # Omitting it also avoids exposing the host directory basename.
+        for source_root, mount_name in host_location_roots:
+            if public_path == source_root:
                 public_path = None
                 break
-            if host_root in public_path.parents:
-                public_path = public_path.relative_to(host_root)
+            if source_root in public_path.parents:
+                relative_to_source = public_path.relative_to(source_root)
+                # New records include the mount name; older records omitted
+                # it. Support both while exposing neither implementation detail.
+                if relative_to_source.parts and relative_to_source.parts[0] == mount_name:
+                    relative_to_source = PurePosixPath(*relative_to_source.parts[1:])
+                public_path = None if str(relative_to_source) in {"", "."} else relative_to_source
                 break
         if public_path is None:
             continue
         file_payload = item.model_dump()
         file_payload.update(
             name=public_path.name,
+            # Public paths are always relative to the selected dataset root.
+            # They retain the original directory hierarchy so browser clients
+            # can render a file tree without ever receiving mount metadata.
             path=str(public_path) if include_file_paths else public_path.name,
         )
         files.append(file_payload)

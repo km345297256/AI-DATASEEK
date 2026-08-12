@@ -20,7 +20,7 @@
       :style="{ left: `${menuPosition.left}px`, top: `${menuPosition.top}px` }">
 
       <div class="px-2 py-1">
-        <div class="text-[11px] font-medium text-[var(--text-tertiary)] px-1 pb-1">{{ t('Agent Profile') }}</div>
+        <div class="text-[11px] font-medium text-[var(--text-tertiary)] px-1 pb-1">{{ t('DataSeek Profile') }}</div>
         <button
           @click="selectProfile(null)"
           class="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-[var(--fill-tsp-white-main)] text-sm transition-colors">
@@ -71,7 +71,7 @@ const buttonRef = ref<HTMLElement | null>(null)
 const menuPosition = ref({ left: 0, top: 0 })
 const clientConfig = ref<ClientConfigResponse | null>(null)
 
-const defaultAgentName = computed(() => clientConfig.value?.default_agent_name || 'AI-DataSeek 默认代理')
+const defaultAgentName = computed(() => clientConfig.value?.default_agent_name || 'DataSeek')
 const defaultModelLabel = computed(() => {
   const provider = clientConfig.value?.default_model_provider
   const model = clientConfig.value?.default_model_name

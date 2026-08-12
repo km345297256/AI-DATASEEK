@@ -210,8 +210,7 @@ def test_public_dataset_response_hides_locations_and_real_storage_paths():
 
     assert payload["locations"] == []
     assert payload["files"][0]["name"] == "report.tif"
-    assert payload["files"][0]["path"] == "report.tif"
-    assert "nested" not in payload["files"][0]["path"]
+    assert payload["files"][0]["path"] == "nested/report.tif"
     assert "source_path" not in serialized
     assert source_path not in serialized
     assert "/srv/private" not in serialized
@@ -294,8 +293,8 @@ async def test_submission_persists_recursive_inventory_and_survives_service_recr
     ]
     assert [item["path"] for item in public_payload["files"]] == [
         "metadata.json",
-        "tile-01.tif",
-        "tile-02.tif",
+        "rasters/tile-01.tif",
+        "rasters/nested/tile-02.tif",
     ]
     assert inventory.canonical_source_directory not in dataset_response(dataset).model_dump_json()
 

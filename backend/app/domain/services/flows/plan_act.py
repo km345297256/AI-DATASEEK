@@ -60,10 +60,11 @@ class PlanActFlow(BaseFlow):
     MAX_SESSION_CONTEXT_MESSAGES = 8
     MAX_SESSION_CONTEXT_MESSAGE_BYTES = 2 * 1024
     MAX_SESSION_CONTEXT_BYTES = 12 * 1024
+    MAX_TARGET_FILES = 48
     _EXPLICIT_FILE_REFERENCE = re.compile(
-        r"[^\W\d_][^\s,，。;；!?！？:：\"'“”‘’<>《》]{0,511}"
+        r"[^\W\d_][^\s,，、。;；!?！？:：\"'“”‘’<>《》]{0,511}"
         r"\.[a-z0-9][a-z0-9+_-]{0,15}"
-        r"(?=$|[\s,，。;；!?！？:：\"'“”‘’()（）\[\]【】<>《》])",
+        r"(?=$|[\s,，、。;；!?！？:：\"'“”‘’()（）\[\]【】<>《》]|[\u3400-\u9fff])",
         re.IGNORECASE,
     )
     _FILE_PREVIEW_ACTION_MARKERS = (
@@ -529,7 +530,10 @@ class PlanActFlow(BaseFlow):
             (dataset.name.strip() for dataset in message.datasets if dataset.name.strip()),
             "dataset",
         )
-        target_file = PlanActFlow._resolve_dataset_file_reference(message)
+        target_files = PlanActFlow._resolve_dataset_file_references(message)[
+            :PlanActFlow.MAX_TARGET_FILES
+        ]
+        target_file = target_files[0] if len(target_files) == 1 else None
         dataset_intent = PlanActFlow._dataset_request_intent(message.message)
         if target_file and PlanActFlow._is_file_preview_request(
             message.message,
@@ -604,7 +608,7 @@ class PlanActFlow(BaseFlow):
         allow_terminal_quicklook = (
             dataset_intent == "visualization"
             and len(message.datasets or []) == 1
-            and not target_file
+            and not target_files
             and not PlanActFlow._message_has_explicit_file_reference(message.message)
             and PlanActFlow._is_broad_quicklook_request(message.message)
         )
@@ -613,7 +617,7 @@ class PlanActFlow(BaseFlow):
         )
         if dataset_intent == "file_preview":
             requested_dimensions = ["file_preview"]
-        has_explicit_file_reference = bool(target_file) or (
+        has_explicit_file_reference = bool(target_files) or (
             PlanActFlow._message_has_explicit_file_reference(message.message)
         )
         prefer_quicklook_evidence = (
@@ -636,11 +640,23 @@ class PlanActFlow(BaseFlow):
         uses_chinese = any("\u3400" <= character <= "\u9fff" for character in message.message)
         if uses_chinese:
             title = f"{dataset_name}分析"
-            progress = "正在快速分析当前数据集…"
+            progress = (
+                f"正在联合分析指定的 {len(target_files)} 个文件…"
+                if len(target_files) > 1
+                else "正在分析指定文件…"
+                if target_files
+                else "正在快速分析当前数据集…"
+            )
             language = "zh"
         else:
             title = f"Analyze {dataset_name}"
-            progress = "Analyzing the current dataset…"
+            progress = (
+                f"Jointly analyzing {len(target_files)} selected files…"
+                if len(target_files) > 1
+                else "Analyzing the selected file…"
+                if target_files
+                else "Analyzing the current dataset…"
+            )
             language = "en"
 
         return Plan(
@@ -660,6 +676,11 @@ class PlanActFlow(BaseFlow):
                         "dataset_intent": dataset_intent,
                         "requested_dimensions": requested_dimensions,
                         "prefer_quicklook_evidence": prefer_quicklook_evidence,
+                        "target_files": [item.path for item in target_files],
+                        "target_filenames": [
+                            PlanActFlow._dataset_file_basename(item)
+                            for item in target_files
+                        ],
                         **(
                             {
                                 "target_file": target_file.path,
@@ -838,54 +859,74 @@ class PlanActFlow(BaseFlow):
 
     @classmethod
     def _resolve_dataset_file_reference(cls, message: Message) -> DatasetFile | None:
-        """Resolve exactly one inventory file named by path or basename.
+        """Compatibility wrapper for operations that require exactly one file."""
+        matches = cls._resolve_dataset_file_references(message)
+        return matches[0] if len(matches) == 1 else None
+
+    @classmethod
+    def _resolve_dataset_file_references(cls, message: Message) -> list[DatasetFile]:
+        """Resolve an ordered set of inventory files named by path or basename.
 
         Matching is case-insensitive and accepts any logical-path suffix exposed
-        to the user. A basename shared by multiple files is deliberately
-        ambiguous unless the message includes a unique directory-qualified path.
+        to the user. Basenames shared by multiple files remain ambiguous unless
+        the message or controller supplies a unique directory-qualified suffix.
         """
-        controller_targets = {
+        inventory: list[tuple[DatasetFile, str]] = []
+        for dataset in message.datasets or []:
+            for dataset_file in dataset.files or []:
+                normalized_path = cls._safe_dataset_file_path(dataset_file)
+                if normalized_path:
+                    inventory.append((dataset_file, normalized_path))
+
+        controller_targets = [
             target.replace("\\", "/").casefold()
             for target in message.controller_target_files
             if isinstance(target, str) and target.strip()
-        }
-        if len(controller_targets) == 1:
-            for dataset in message.datasets or []:
-                for dataset_file in dataset.files or []:
-                    normalized_path = cls._safe_dataset_file_path(dataset_file)
-                    if normalized_path in controller_targets:
-                        return dataset_file
+        ]
+        resolved: list[DatasetFile] = []
+        resolved_paths: set[str] = set()
+
+        def append_unique(dataset_file: DatasetFile, normalized_path: str) -> None:
+            if normalized_path not in resolved_paths:
+                resolved_paths.add(normalized_path)
+                resolved.append(dataset_file)
+
+        for target in controller_targets:
+            exact = [item for item in inventory if item[1] == target]
+            candidates = exact or [
+                item for item in inventory
+                if item[1].endswith(f"/{target}")
+            ]
+            if len(candidates) == 1:
+                append_unique(*candidates[0])
 
         normalized_message = (message.message or "").replace("\\", "/").casefold()
-        matches: list[tuple[DatasetFile, str]] = []
-        for dataset in message.datasets or []:
-            for dataset_file in dataset.files or []:
-                normalized_path = PlanActFlow._safe_dataset_file_path(dataset_file)
-                if not normalized_path:
-                    continue
-                parts = PurePosixPath(normalized_path).parts
-                matched_variants = [
-                    "/".join(parts[index:])
-                    for index in range(len(parts))
-                    if cls._message_contains_file_variant(
-                        normalized_message,
-                        "/".join(parts[index:]),
-                    )
-                ]
-                if matched_variants:
-                    matches.append(
-                        (dataset_file, max(matched_variants, key=len))
-                    )
+        message_matches: list[tuple[DatasetFile, str, str]] = []
+        basename_counts: dict[str, int] = {}
+        for dataset_file, normalized_path in inventory:
+            basename = PurePosixPath(normalized_path).name
+            basename_counts[basename] = basename_counts.get(basename, 0) + 1
+            parts = PurePosixPath(normalized_path).parts
+            matched_variants = [
+                "/".join(parts[index:])
+                for index in range(len(parts))
+                if cls._message_contains_file_variant(
+                    normalized_message,
+                    "/".join(parts[index:]),
+                )
+            ]
+            if matched_variants:
+                message_matches.append((
+                    dataset_file,
+                    normalized_path,
+                    max(matched_variants, key=len),
+                ))
 
-        if not matches:
-            return None
-        directory_qualified = [item for item in matches if "/" in item[1]]
-        if directory_qualified:
-            # A single qualified path safely disambiguates duplicate basenames.
-            if len(directory_qualified) == 1:
-                return directory_qualified[0][0]
-            return None
-        return matches[0][0] if len(matches) == 1 else None
+        for dataset_file, normalized_path, matched_variant in message_matches:
+            basename = PurePosixPath(normalized_path).name
+            if "/" in matched_variant or basename_counts.get(basename) == 1:
+                append_unique(dataset_file, normalized_path)
+        return resolved
 
     @classmethod
     def _message_has_explicit_file_reference(cls, user_message: str) -> bool:

@@ -12,7 +12,7 @@ from app.application.services.dataset_request_resolver import (
     FrontControllerResolution,
     RequestDecision,
 )
-from app.domain.models.dataset import DataCenterDataset, DatasetFile
+from app.domain.models.dataset import DataCenterDataset, DatasetFile, DatasetLocation, DatasetStorageType
 from app.domain.models.event import DoneEvent, MessageEvent
 from app.domain.services.lightweight_task_runner import LightweightTaskRunner
 from app.domain.models.session import Session
@@ -30,6 +30,29 @@ def _dataset() -> DataCenterDataset:
             DatasetFile(path="monthly/rain_195301.nc", size=123),
             DatasetFile(path="monthly/snow_195301.nc", size=456),
         ],
+        metadata={"inventory_complete": True},
+    )
+
+
+def _directory_dataset() -> DataCenterDataset:
+    location = DatasetLocation(
+        location_id="dsl_catalog_root",
+        node_id="node-1",
+        storage_type=DatasetStorageType.HOST_PATH,
+        source_path="/private/datasets/climate",
+        mount_name="climate",
+        verified=True,
+    )
+    return DataCenterDataset(
+        dataset_id="dataset-directory-1",
+        data_center_id="center-1",
+        data_center_name="Center",
+        name="Climate data",
+        files=[DatasetFile(
+            path="sources/dsl_catalog_root/climate/monthly/rain_195301.nc",
+            size=123,
+        )],
+        locations=[location],
         metadata={"inventory_complete": True},
     )
 
@@ -102,7 +125,6 @@ async def test_resolver_uses_generic_catalog_query_selected_by_model(monkeypatch
         '{"safety":{"decision":"allow","risk_level":"low","categories":[],"reason":"","suggestion":""},'
         '"execution":{"mode":"catalog","required_evidence":"catalog","required_capabilities":[],"requires_artifacts":false},'
         '"answer":"","catalog_queries":[{"operation":"search_files","query":"snow_195301.nc","limit":10}],"reason":"需要清单证据"}',
-        "登记清单中存在 `snow_195301.nc`，扩展名为 `.nc`。",
     ])
     monkeypatch.setattr(resolver_module, "create_chat_model", lambda *_args, **_kwargs: model)
     monkeypatch.setattr(resolver_module, "get_settings", lambda: SimpleNamespace(dataset_request_resolver_timeout_seconds=1))
@@ -116,7 +138,28 @@ async def test_resolver_uses_generic_catalog_query_selected_by_model(monkeypatch
     assert resolution is not None
     assert resolution.mode == "catalog"
     assert ".nc" in resolution.answer
-    assert model.calls == 2
+    assert model.calls == 1
+    assert resolution.controller_metadata["source"] == "catalog_executor"
+
+
+@pytest.mark.asyncio
+async def test_catalog_answer_hides_internal_source_mount_prefix(monkeypatch):
+    model = _FakeModel([
+        '{"safety":{"decision":"allow","risk_level":"low","categories":[],"reason":"","suggestion":""},'
+        '"execution":{"mode":"catalog","required_evidence":"catalog","required_capabilities":[],"requires_artifacts":false},'
+        '"answer":"","catalog_queries":[{"operation":"aggregate_files","metrics":["max_size"],"return_files":true}],"reason":"需要清单证据"}',
+    ])
+    monkeypatch.setattr(resolver_module, "create_chat_model", lambda *_args, **_kwargs: model)
+    monkeypatch.setattr(resolver_module, "get_settings", lambda: SimpleNamespace(dataset_request_resolver_timeout_seconds=1))
+
+    resolution = await _resolver().resolve(
+        question="最大文件是什么？",
+        datasets=[_directory_dataset()],
+        events=[],
+    )
+
+    assert "`monthly/rain_195301.nc`" in resolution.answer
+    assert "sources/dsl_catalog_root/climate" not in resolution.answer
 
 
 @pytest.mark.asyncio
@@ -140,6 +183,30 @@ async def test_resolver_defers_content_analysis_to_sandbox(monkeypatch):
     assert resolution.decision.catalog_queries == []
     assert resolution.target_files == ["monthly/rain_195301.nc"]
     assert model.calls == 1
+
+
+@pytest.mark.asyncio
+async def test_resolver_validates_multiple_unique_basename_targets(monkeypatch):
+    model = _FakeModel([
+        '{"safety":{"decision":"allow","risk_level":"low"},'
+        '"execution":{"mode":"sandbox","required_evidence":"file_content",'
+        '"required_capabilities":["python"],"requires_artifacts":true,'
+        '"target_files":["rain_195301.nc","snow_195301.nc"]},'
+        '"answer":"","catalog_queries":[],"reason":"跨文件联合分析"}'
+    ])
+    monkeypatch.setattr(resolver_module, "create_chat_model", lambda *_args, **_kwargs: model)
+    monkeypatch.setattr(resolver_module, "get_settings", lambda: SimpleNamespace(dataset_request_resolver_timeout_seconds=1))
+
+    resolution = await _resolver().resolve(
+        question="联合分析 rain_195301.nc 和 snow_195301.nc",
+        datasets=[_dataset()],
+        events=[],
+    )
+
+    assert resolution.target_files == [
+        "monthly/rain_195301.nc",
+        "monthly/snow_195301.nc",
+    ]
 
 
 @pytest.mark.asyncio
@@ -215,6 +282,134 @@ def test_catalog_random_sample_returns_requested_unique_files():
     assert evidence[0]["inventory_file_count"] == 2
 
 
+def test_catalog_filter_files_counts_generic_size_predicate():
+    dataset = _dataset()
+    dataset.files.append(DatasetFile(path="monthly/large.nc", size=2048))
+    evidence = DatasetCatalogQueryService().execute(
+        [dataset],
+        [CatalogQuery(operation="filter_files", size_greater_than_bytes=1024)],
+    )
+
+    assert evidence[0]["match_count"] == 1
+    assert evidence[0]["matched_total_size_bytes"] == 2048
+    assert evidence[0]["matches"][0]["filename"] == "large.nc"
+    assert evidence[0]["filters"]["size_greater_than_bytes"] == 1024
+
+
+def test_catalog_aggregate_files_computes_extrema_and_ranking_over_full_inventory():
+    evidence = DatasetCatalogQueryService().execute(
+        [_dataset()],
+        [CatalogQuery(
+            operation="aggregate_files",
+            metrics=["min_size", "max_size", "average_size"],
+            order_by="size_bytes",
+            order_direction="desc",
+            return_files=True,
+            limit=1,
+        )],
+    )[0]
+
+    assert evidence["min_size_bytes"] == 123
+    assert evidence["max_size_bytes"] == 456
+    assert evidence["average_size_bytes"] == 289.5
+    assert evidence["matches"][0]["filename"] == "snow_195301.nc"
+    assert evidence["largest_files"][0]["logical_path"] == "monthly/snow_195301.nc"
+
+
+def test_catalog_inventory_summary_starts_with_direct_count_without_template_heading():
+    evidence = DatasetCatalogQueryService().execute(
+        [_dataset()],
+        [CatalogQuery(operation="inventory_summary")],
+    )
+    answer = DatasetRequestResolver._render_catalog_answer(
+        question="有多少个文件",
+        evidence=evidence,
+        artifacts=[],
+    )
+
+    assert answer.startswith("共有 2 个文件")
+    assert "数据集目录统计" not in answer
+    assert "**" not in answer
+
+
+@pytest.mark.asyncio
+async def test_resolver_answers_file_size_predicate_from_catalog(monkeypatch):
+    model = _FakeModel([
+        '{"safety":{"decision":"allow","risk_level":"low"},'
+        '"execution":{"mode":"catalog","required_evidence":"catalog","required_capabilities":[],"requires_artifacts":false},'
+        '"catalog_goal":"filtered_summary","answer":"",'
+        '"catalog_queries":[{"operation":"filter_files","size_greater_than_bytes":1024,"limit":50}],'
+        '"reason":"按逐文件大小过滤并计数"}',
+    ])
+    monkeypatch.setattr(resolver_module, "create_chat_model", lambda *_args, **_kwargs: model)
+    monkeypatch.setattr(resolver_module, "get_settings", lambda: SimpleNamespace(dataset_request_resolver_timeout_seconds=1))
+    dataset = _dataset()
+    dataset.files.append(DatasetFile(path="monthly/large.nc", size=2048))
+
+    resolution = await _resolver().resolve(
+        question="这个数据集里有几个超过1kb的文件",
+        datasets=[dataset],
+        events=[],
+    )
+
+    assert resolution.mode == "catalog"
+    assert "文件数量为 1 个" in resolution.answer
+    assert model.calls == 1
+
+
+@pytest.mark.asyncio
+async def test_resolver_answers_largest_file_with_one_model_call(monkeypatch):
+    model = _FakeModel([
+        '{"safety":{"decision":"allow","risk_level":"low"},'
+        '"execution":{"mode":"catalog","required_evidence":"catalog","required_capabilities":[],"requires_artifacts":false},'
+        '"catalog_goal":"aggregate","answer":"",'
+        '"catalog_queries":[{"operation":"aggregate_files","metrics":["max_size"],'
+        '"order_by":"size_bytes","order_direction":"desc","return_files":true,"limit":1}],'
+        '"reason":"在完整登记清单上计算最大文件"}',
+    ])
+    monkeypatch.setattr(resolver_module, "create_chat_model", lambda *_args, **_kwargs: model)
+    monkeypatch.setattr(resolver_module, "get_settings", lambda: SimpleNamespace(dataset_request_resolver_timeout_seconds=1))
+
+    resolution = await _resolver().resolve(
+        question="最大的文件是多大",
+        datasets=[_dataset()],
+        events=[],
+    )
+
+    assert resolution.mode == "catalog"
+    assert "monthly/snow_195301.nc" in resolution.answer
+    assert "456" in resolution.answer
+    assert "无法" not in resolution.answer
+    assert model.calls == 1
+
+
+@pytest.mark.asyncio
+async def test_incomplete_filtered_inventory_escalates_to_sandbox(monkeypatch):
+    model = _FakeModel([
+        '{"safety":{"decision":"allow","risk_level":"low"},'
+        '"execution":{"mode":"catalog","required_evidence":"catalog","required_capabilities":[],"requires_artifacts":false},'
+        '"catalog_goal":"filtered_summary","answer":"",'
+        '"catalog_queries":[{"operation":"filter_files","size_greater_than_bytes":1024,"limit":50}],'
+        '"reason":"按逐文件大小过滤并计数"}',
+    ])
+    monkeypatch.setattr(resolver_module, "create_chat_model", lambda *_args, **_kwargs: model)
+    monkeypatch.setattr(resolver_module, "get_settings", lambda: SimpleNamespace(dataset_request_resolver_timeout_seconds=1))
+    dataset = _dataset()
+    dataset.metadata["inventory_complete"] = False
+
+    resolution = await _resolver().resolve(
+        question="这个数据集里有几个超过1kb的文件",
+        datasets=[dataset],
+        events=[],
+    )
+
+    assert resolution.mode == "sandbox"
+    assert resolution.decision.execution.required_capabilities == ["recursive_file_inventory"]
+    assert resolution.decision.catalog_queries == []
+    assert resolution.controller_metadata["source"] == "catalog_fallback"
+    assert model.calls == 1
+
+
 @pytest.mark.asyncio
 async def test_catalog_goal_corrects_natural_language_search_to_random_sample(monkeypatch):
     model = _FakeModel([
@@ -222,7 +417,6 @@ async def test_catalog_goal_corrects_natural_language_search_to_random_sample(mo
         '"execution":{"mode":"catalog","required_evidence":"catalog","required_capabilities":[],"requires_artifacts":false},'
         '"catalog_goal":"random_sample","answer":"",'
         '"catalog_queries":[{"operation":"search_files","query":"随机挑选文件","limit":2}],"reason":"抽样"}',
-        "随机抽取的两个文件已列出。",
     ])
     monkeypatch.setattr(resolver_module, "create_chat_model", lambda *_args, **_kwargs: model)
     monkeypatch.setattr(resolver_module, "get_settings", lambda: SimpleNamespace(dataset_request_resolver_timeout_seconds=1))
@@ -236,6 +430,7 @@ async def test_catalog_goal_corrects_natural_language_search_to_random_sample(mo
     assert resolution.mode == "catalog"
     assert resolution.decision.catalog_queries[0].operation == "sample_files"
     assert resolution.decision.catalog_queries[0].query == ""
+    assert model.calls == 1
 
 
 @pytest.mark.asyncio
@@ -245,7 +440,6 @@ async def test_complete_inventory_goal_generates_full_catalog_artifact(monkeypat
         '"execution":{"mode":"catalog","required_evidence":"catalog","required_capabilities":[],"requires_artifacts":true},'
         '"catalog_goal":"complete_export","answer":"",'
         '"catalog_queries":[{"operation":"search_files","query":"所有文件路径","limit":50}],"reason":"完整导出"}',
-        "完整文件路径清单已作为附件生成。",
     ])
     monkeypatch.setattr(resolver_module, "create_chat_model", lambda *_args, **_kwargs: model)
     monkeypatch.setattr(resolver_module, "get_settings", lambda: SimpleNamespace(dataset_request_resolver_timeout_seconds=1))
@@ -261,6 +455,7 @@ async def test_complete_inventory_goal_generates_full_catalog_artifact(monkeypat
     assert "monthly/rain_195301.nc" in resolution.artifacts[0].content
     assert "monthly/snow_195301.nc" in resolution.artifacts[0].content
     assert "dataset_file_paths.txt" in resolution.answer
+    assert model.calls == 1
 
 
 def test_catalog_query_constrains_model_limit_to_server_capability():

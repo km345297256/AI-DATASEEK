@@ -59,7 +59,7 @@
             <div class="flex items-center gap-0.5 w-full sm:flex-1">
               <ManusLogoTextIcon :height="24" :width="128" />
               <div>
-                <p class="text-sm text-[var(--text-primary)]">{{ replayCompleted ? 'AI-DataSeek 任务回放完成。' : 'AI-DataSeek 正在回放任务...' }}</p>
+                <p class="text-sm text-[var(--text-primary)]">{{ replayCompleted ? 'DataSeek 任务回放完成。' : 'DataSeek 正在回放任务...' }}</p>
               </div>
             </div>
             <div class="flex items-center flex-row gap-[8px] max-sm:w-full">

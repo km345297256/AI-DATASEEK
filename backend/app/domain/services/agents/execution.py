@@ -51,6 +51,7 @@ class ExecutionAgent(BaseAgent):
     Execution agent class, defining the basic behavior of execution
     """
 
+    MAX_TARGET_FILES = 48
     name: str = "execution"
     system_prompt: str = SYSTEM_PROMPT + EXECUTION_SYSTEM_PROMPT
     format: str = "json_object"
@@ -3070,16 +3071,25 @@ class ExecutionAgent(BaseAgent):
                 if step.inputs.get("require_downloadable_result", False)
                 else "optional"
             )
-        target_file = step.inputs.get("target_file")
-        if not isinstance(target_file, str) or not target_file.strip():
-            target_file = None
-        target_filename = step.inputs.get("target_filename")
-        if not isinstance(target_filename, str) or not target_filename.strip():
-            target_filename = (
-                PurePosixPath(target_file).name
-                if target_file is not None
-                else None
-            )
+        target_files = step.inputs.get("target_files")
+        if not isinstance(target_files, list):
+            target_files = []
+        target_files = [
+            value.strip()
+            for value in target_files[:cls.MAX_TARGET_FILES]
+            if isinstance(value, str) and value.strip()
+        ]
+        legacy_target = step.inputs.get("target_file")
+        if not target_files and isinstance(legacy_target, str) and legacy_target.strip():
+            target_files = [legacy_target.strip()]
+        target_filenames = step.inputs.get("target_filenames")
+        if not isinstance(target_filenames, list) or len(target_filenames) != len(target_files):
+            target_filenames = [PurePosixPath(value).name for value in target_files]
+        else:
+            target_filenames = [
+                value.strip() if isinstance(value, str) and value.strip() else PurePosixPath(path).name
+                for value, path in zip(target_filenames, target_files)
+            ]
         payload = {
             "intent": dataset_intent,
             "required_dimension_checklist": requested_dimensions,
@@ -3100,16 +3110,14 @@ class ExecutionAgent(BaseAgent):
             ),
             "prefer_quicklook_evidence": prefer_quicklook_evidence,
             "artifact_policy": artifact_policy,
-            "target_file": (
-                cls._truncate_utf8(target_file, cls.MAX_STEP_FIELD_BYTES)
-                if target_file is not None
-                else None
-            ),
-            "target_filename": (
-                cls._truncate_utf8(target_filename, 256)
-                if target_filename is not None
-                else None
-            ),
+            "target_files": [
+                cls._truncate_utf8(value, cls.MAX_STEP_FIELD_BYTES)
+                for value in target_files
+            ],
+            "target_filenames": [
+                cls._truncate_utf8(value, 256)
+                for value in target_filenames
+            ],
         }
         quicklook_instruction = (
             "This request is covered by deterministic quicklook evidence. In the first tool batch, "
@@ -3123,11 +3131,12 @@ class ExecutionAgent(BaseAgent):
             else ""
         )
         target_instruction = (
-            "The router resolved `target_file` to one registered inventory path. Restrict file-level "
-            "inspection and generated charts to that exact target unless the user explicitly asks for "
-            "cross-file comparison. Do not replace it with a whole-dataset scan. In the user-facing answer, "
-            "refer to `target_filename` rather than exposing its inventory directory prefix.\n"
-            if target_file is not None
+            "The router resolved `target_files` to an ordered set of registered inventory paths. Restrict "
+            "all file reads, calculations, comparisons, and generated charts to exactly this set. When the "
+            "set contains multiple files, analyze them jointly as requested; do not replace the set with a "
+            "whole-dataset scan or unrelated samples. In the user-facing answer, refer to "
+            "`target_filenames` rather than exposing inventory directory prefixes.\n"
+            if target_files
             else ""
         )
         artifact_instruction = {
@@ -3244,26 +3253,37 @@ class ExecutionAgent(BaseAgent):
         output_dir: str,
         result_path: str,
         failure_context: str = "",
+        target_files: Optional[list[str]] = None,
     ) -> DatasetAnalysisProgram:
         request_text = self._truncate_utf8(request, 12 * 1024)
         request_folded = request_text.casefold()
+        target_paths = list(dict.fromkeys(
+            value
+            for value in (target_files or [])[:self.MAX_TARGET_FILES]
+            if isinstance(value, str) and value
+        ))
+        found_target_paths: set[str] = set()
         dataset_records = []
         for dataset in list(message.datasets or [])[:3]:
             files = list(dataset.files or [])
-            referenced = [
-                item for item in files
-                if item.path.casefold() in request_folded
-                or PurePosixPath(item.path).name.casefold() in request_folded
-            ]
-            selected_files: list[DatasetFile] = []
-            seen_paths: set[str] = set()
-            for item in referenced + files:
-                if item.path in seen_paths:
-                    continue
-                seen_paths.add(item.path)
-                selected_files.append(item)
-                if len(selected_files) >= 24:
-                    break
+            if target_paths:
+                selected_files = [item for item in files if item.path in target_paths]
+                found_target_paths.update(item.path for item in selected_files)
+            else:
+                referenced = [
+                    item for item in files
+                    if item.path.casefold() in request_folded
+                    or PurePosixPath(item.path).name.casefold() in request_folded
+                ]
+                selected_files = []
+                seen_paths: set[str] = set()
+                for item in referenced + files:
+                    if item.path in seen_paths:
+                        continue
+                    seen_paths.add(item.path)
+                    selected_files.append(item)
+                    if len(selected_files) >= 24:
+                        break
             dataset_records.append(
                 {
                     "dataset_id": dataset.dataset_id,
@@ -3275,8 +3295,12 @@ class ExecutionAgent(BaseAgent):
                         for item in selected_files
                     ],
                     "files_omitted": max(0, len(files) - len(selected_files)),
+                    "scope_restricted_to_targets": bool(target_paths),
                 }
             )
+        missing_targets = [path for path in target_paths if path not in found_target_paths]
+        if missing_targets:
+            raise ValueError("analysis target files are missing from the mounted inventory")
         prompt = (
             "Compile one complete Python program for the mounted dataset analysis request below. "
             "This is a code-generation stage: do not call tools, do not return a plan, and do not "
@@ -3286,9 +3310,15 @@ class ExecutionAgent(BaseAgent):
             f"to {result_path}. The JSON object must contain `success` (boolean), `result` (substantive "
             "Markdown string), `attachments` (absolute paths of files actually created below "
             f"{output_dir}), and optional `evidence`. Use {output_dir} for all output files. "
+            f"The runtime provides exactly one output helper: `write_json(path, payload)`. Use "
+            f"`write_json({result_path!r}, result_payload)` for the final manifest; the path must remain "
+            f"below {output_dir}. Do not call any other undeclared helper function. "
             "The result must distinguish measured evidence, interpretation, method, and limitations. "
             "Keep `result` concise (at most 8000 characters). Keep `evidence` aggregated and JSON-safe; "
             "never embed raw arrays, full coordinate vectors, complete variable dumps, or repeated metadata. "
+            "Each DATASETS entry may contain a bounded file sample: when `files_omitted` is positive and the "
+            "request requires a complete file inventory or file-size predicate, recursively inspect that entry's "
+            "`sandbox_path`; do not calculate an exact count from the sample alone. "
             "Never install packages, access the network, or invent a file or unit. Use only the already "
             "installed scientific stack. Keep the program bounded and avoid loading an entire large raster "
             "or table when sampling is sufficient. The program itself must be self-contained and must not "
@@ -3339,6 +3369,7 @@ class ExecutionAgent(BaseAgent):
         request: str,
         *,
         message: Message,
+        target_files: Optional[list[str]] = None,
     ) -> AsyncGenerator[BaseEvent, None]:
         """Compile one program, run it once, and allow one targeted repair."""
         output_root = f"/home/ubuntu/output/analysis-{uuid.uuid4().hex[:12]}"
@@ -3353,6 +3384,7 @@ class ExecutionAgent(BaseAgent):
                     output_dir=output_dir,
                     result_path=result_path,
                     failure_context=failure_context,
+                    target_files=target_files,
                 )
             except Exception as exc:
                 failure_context = f"program compilation failed: {type(exc).__name__}: {exc}"
@@ -3460,6 +3492,16 @@ class ExecutionAgent(BaseAgent):
         prefer_quicklook_evidence = bool(
             step.inputs.get("prefer_quicklook_evidence", False)
         )
+        target_files = step.inputs.get("target_files")
+        if not isinstance(target_files, list):
+            target_files = []
+        target_files = [
+            value
+            for value in target_files[:self.MAX_TARGET_FILES]
+            if isinstance(value, str) and value
+        ]
+        if not target_files and isinstance(step.inputs.get("target_file"), str):
+            target_files = [step.inputs["target_file"]]
         step_context = self._render_plan_context(plan, step)
         dataset_contract = self._render_dataset_execution_contract(
             plan,
@@ -3531,6 +3573,7 @@ class ExecutionAgent(BaseAgent):
             execution = self._execute_compiled_dataset_analysis(
                 scoped_request,
                 message=message,
+                target_files=target_files,
             )
         else:
             execution = self._execute_with_tool_scope(

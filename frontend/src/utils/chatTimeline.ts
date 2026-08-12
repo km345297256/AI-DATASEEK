@@ -52,6 +52,7 @@ export const failRunningSteps = (
 export const insertTaskExecutionSummary = (
   messages: Message[],
   endedAt: number,
+  elapsedMs?: number,
 ): TaskSummaryContent | undefined => {
   let userMessageIndex = -1;
   for (let index = messages.length - 1; index >= 0; index -= 1) {
@@ -70,36 +71,10 @@ export const insertTaskExecutionSummary = (
     Number(messages[userMessageIndex].content.timestamp) || endedAt,
     endedAt,
   );
-  const steps = messages
-    .slice(userMessageIndex + 1)
-    .filter((message): message is Message & { content: StepContent } => message.type === 'step')
-    .map((message) => {
-      const step = message.content;
-      const stepStartedAt = Math.min(step.started_at || step.timestamp || endedAt, endedAt);
-      const latestToolTimestamp = step.tools.reduce(
-        (latest, tool) => Math.max(latest, tool.timestamp || 0),
-        0,
-      );
-      const stepEndedAt = Math.max(
-        stepStartedAt,
-        Math.min(step.ended_at || latestToolTimestamp || endedAt, endedAt),
-      );
-      return {
-        id: step.id,
-        description: step.description,
-        status: step.status,
-        started_at: stepStartedAt,
-        ended_at: stepEndedAt,
-        duration_seconds: Math.max(0, stepEndedAt - stepStartedAt),
-      };
-    });
 
   const summary: TaskSummaryContent = {
     timestamp: endedAt,
-    started_at: startedAt,
-    ended_at: endedAt,
-    duration_seconds: Math.max(0, endedAt - startedAt),
-    steps,
+    duration_ms: Math.max(0, Math.round(elapsedMs ?? ((endedAt - startedAt) * 1000))),
   };
   const attachmentOffset = messages
     .slice(userMessageIndex + 1)
