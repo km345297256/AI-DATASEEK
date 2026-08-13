@@ -627,7 +627,6 @@ class AgentDomainService:
                         selected_skills=skills or [],
                         selected_mcp_servers=mcp_servers or [],
                         attachment_names=attachment_names,
-                        delegate_dataset_requests=True,
                     )
                 except Exception as exc:
                     logger.error(
@@ -650,7 +649,6 @@ class AgentDomainService:
                         controller_resolution.mode == "reject"
                         or (
                             controller_resolution.mode in {"direct", "catalog"}
-                            and not effective_dataset_ids
                         )
                     )
                     else await self._create_task(
@@ -711,7 +709,6 @@ class AgentDomainService:
                         controller_resolution.mode == "reject"
                         or (
                             controller_resolution.mode in {"direct", "catalog"}
-                            and not effective_dataset_ids
                         )
                     )
                     else await self._create_task(

@@ -120,21 +120,24 @@ async def test_resolver_answers_from_user_text_without_catalog_or_sandbox(monkey
 
 
 @pytest.mark.asyncio
-async def test_dataset_request_bypasses_semantic_front_controller_model(monkeypatch):
-    model = _FakeModel([])
+async def test_dataset_backed_request_uses_semantic_front_controller_model(monkeypatch):
+    model = _FakeModel([
+        '{"safety":{"decision":"allow","risk_level":"low","categories":[],"reason":"","suggestion":""},'
+        '"execution":{"mode":"direct","required_evidence":"user_message","required_capabilities":[],"requires_artifacts":false},'
+        '"answer":"文件后缀名是 `.nc`。","catalog_queries":[],"reason":"答案已在文件名中"}'
+    ])
     monkeypatch.setattr(resolver_module, "create_chat_model", lambda *_args, **_kwargs: model)
+    monkeypatch.setattr(resolver_module, "get_settings", lambda: SimpleNamespace(dataset_request_resolver_timeout_seconds=1))
 
     resolution = await _resolver().resolve(
-        question="该数据集包含哪些气象要素文件？",
+        question="rain_195301.nc 的后缀名是什么？",
         datasets=[_dataset()],
         events=[],
-        delegate_dataset_requests=True,
     )
 
-    assert resolution.mode == "sandbox"
-    assert resolution.answer == ""
-    assert resolution.controller_metadata["source"] == "dataset_execution_boundary"
-    assert model.calls == 0
+    assert resolution.mode == "direct"
+    assert resolution.answer == "文件后缀名是 `.nc`。"
+    assert model.calls == 1
 
 
 @pytest.mark.asyncio
@@ -632,7 +635,14 @@ async def _async_none():
 
 
 @pytest.mark.asyncio
-async def test_agent_domain_uses_agent_task_for_dataset_backed_controller_answer():
+@pytest.mark.parametrize(
+    ("controller_mode", "uses_lightweight"),
+    [("direct", True), ("catalog", True), ("sandbox", False)],
+)
+async def test_agent_domain_selects_task_from_dataset_backed_controller_decision(
+    controller_mode,
+    uses_lightweight,
+):
     class Repository:
         def __init__(self):
             self.events = []
@@ -658,7 +668,7 @@ async def test_agent_domain_uses_agent_task_for_dataset_backed_controller_answer
 
     class Resolver:
         async def resolve(self, **_kwargs):
-            return _resolution()
+            return _resolution(mode=controller_mode)
 
     class Task:
         id = "light-task"
@@ -680,9 +690,10 @@ async def test_agent_domain_uses_agent_task_for_dataset_backed_controller_answer
     service._dataset_service = DatasetService()
     service._dataset_request_resolver = Resolver()
     service._get_task = lambda _session: _async_value(None)
-    task = Task()
-    service._create_lightweight_task = lambda *_args, **_kwargs: _raise_sandbox_allocation()
-    service._create_task = lambda *_args, **_kwargs: _async_value(task)
+    lightweight_task = Task()
+    sandbox_task = Task()
+    service._create_lightweight_task = lambda *_args, **_kwargs: _async_value(lightweight_task)
+    service._create_task = lambda *_args, **_kwargs: _async_value(sandbox_task)
     service._resolve_message_attachments = lambda *_args, **_kwargs: _async_value([])
     session = Session(
         id="session-1",
@@ -704,8 +715,11 @@ async def test_agent_domain_uses_agent_task_for_dataset_backed_controller_answer
         client_message_id=None,
     )
 
-    assert selected is task
-    assert task.started is True
+    expected_task = lightweight_task if uses_lightweight else sandbox_task
+    unexpected_task = sandbox_task if uses_lightweight else lightweight_task
+    assert selected is expected_task
+    assert expected_task.started is True
+    assert unexpected_task.started is False
     assert isinstance(repository.events[0], MessageEvent)
 
 
