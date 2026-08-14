@@ -14,6 +14,7 @@ const TOOLKIT_NAMES = new Set([
   'message',
   'mcp',
   'skill',
+  'scientific',
 ]);
 
 const SECRET_KEY_PATTERN = [
@@ -146,6 +147,7 @@ export const resolveToolName = (tool: Pick<ToolContent, 'name' | 'function'>): s
   if (functionName.startsWith('message_')) return 'message';
   if (functionName.startsWith('mcp_')) return 'mcp';
   if (functionName.startsWith('skill_')) return 'skill';
+  if (functionName.startsWith('scientific_') || functionName.startsWith('geoscience_')) return 'scientific';
   return tool.name || 'tool';
 };
 

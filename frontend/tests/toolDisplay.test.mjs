@@ -118,6 +118,15 @@ test('legacy stored events infer their function and toolkit', () => {
   assert.equal(resolveToolName(historic), 'shell');
 });
 
+test('scientific plugin events resolve to the scientific toolkit', () => {
+  const historic = tool({ name: 'scientific_visualize', function: '' });
+  const current = tool({ name: 'plugin', function: 'geoscience_zonal_statistics' });
+
+  assert.equal(resolveToolFunction(historic), 'scientific_visualize');
+  assert.equal(resolveToolName(historic), 'scientific');
+  assert.equal(resolveToolName(current), 'scientific');
+});
+
 test('display clone sanitizes shell args and console without mutating the event', () => {
   const original = tool({
     args: { command: 'TOKEN=secret python /root/job.py' },

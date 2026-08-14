@@ -1662,6 +1662,70 @@ def test_catalog_inventory_omits_internal_source_and_limit_notices():
     assert "Method and limits" not in rendered_en
 
 
+def test_unpack_inventory_completion_is_deterministic_markdown_tree():
+    agent = object.__new__(ExecutionAgent)
+    agent._current_plan = SimpleNamespace(language="zh")
+    agent._dataset_intent = ExecutionAgent.DATASET_INTENT_FILE_STRUCTURE
+    tool_result = SimpleNamespace(
+        name="dataset_unpack",
+        artifact=ToolResult(
+            success=True,
+            data={
+                "status": "completed",
+                "returncode": 0,
+                "output": json.dumps({
+                    "success": True,
+                    "source_archive": "archive.rar",
+                    "summary": {
+                        "archive_count": 1,
+                        "file_count": 2,
+                        "expanded_bytes": 1536,
+                    },
+                    "archives": [],
+                    "files": [
+                        {"path": "raster/mean.tif", "size": 1024},
+                        {"path": "raster/mean.tif.xml", "size": 512},
+                    ],
+                }),
+            },
+        ),
+    )
+
+    completion = agent._completion_from_tool_batch([tool_result])
+    assert completion is not None
+    payload = json.loads(completion)
+    assert payload["success"] is True
+    assert "```text" in payload["result"]
+    assert "├── raster/" in payload["result"] or "└── raster/" in payload["result"]
+    assert "mean.tif" in payload["result"]
+    assert "mean.tif.xml" in payload["result"]
+
+
+def test_unpack_result_is_not_final_answer_for_analysis_intent():
+    agent = object.__new__(ExecutionAgent)
+    agent._current_plan = SimpleNamespace(language="zh")
+    agent._dataset_intent = ExecutionAgent.DATASET_INTENT_ANALYSIS
+    tool_result = SimpleNamespace(
+        name="dataset_unpack",
+        artifact=ToolResult(
+            success=True,
+            data={
+                "status": "completed",
+                "returncode": 0,
+                "output": json.dumps({
+                    "success": True,
+                    "source_archive": "archive.rar",
+                    "summary": {"archive_count": 1, "file_count": 1, "expanded_bytes": 1024},
+                    "archives": [],
+                    "files": [{"path": "raster/mean.tif", "size": 1024}],
+                }),
+            },
+        ),
+    )
+
+    assert agent._completion_from_tool_batch([tool_result]) is None
+
+
 def test_quicklook_evidence_never_finishes_before_agent_coverage_answer():
     agent = object.__new__(ExecutionAgent)
     agent._dataset_fast_path_mode = True
@@ -1953,7 +2017,6 @@ async def test_required_catalog_export_falls_back_instead_of_dropping_artifact()
 
 
 @pytest.mark.asyncio
-@pytest.mark.skip(reason="superseded: archive inventory is selected by the execution agent")
 async def test_single_archive_inventory_locates_and_unpacks_without_model():
     agent = object.__new__(ExecutionAgent)
     agent.reset_context = AsyncMock()
@@ -2019,7 +2082,10 @@ async def test_single_archive_inventory_locates_and_unpacks_without_model():
         data_center_name="Center",
         sandbox_path="/home/ubuntu/datasets/tds_archive",
         files=[DatasetFile(path="data.zip", size=100)],
-        metadata={"recursive_file_count": 1, "total_size_bytes": 100},
+        # Compressed uploads may not have recursive catalog metadata until the
+        # bounded unpacker inspects them. The single registered archive path is
+        # still sufficient for the deterministic inventory flow.
+        metadata={},
     )
     step = Step(
         id="dataset-fast-path",
@@ -2048,6 +2114,7 @@ async def test_single_archive_inventory_locates_and_unpacks_without_model():
     assert "a.csv" in step.result
     assert "nested/" in step.result
     assert "b.tif" in step.result
+    assert "```text" in step.result
     assert step.attachments == []
 
 

@@ -137,14 +137,18 @@ RUN printf '%s\n' \
 WORKDIR /app
 
 # Copy dependency files first to leverage the Docker layer cache.
-COPY pyproject.toml uv.lock ./
-COPY scripts/install_noto_cjk_sc.py scripts/verify_matplotlib_cjk.py scripts/verify_geoscience_stack.py scripts/recursive_unpack.py scripts/dataset_quicklook.py scripts/dataset_analysis_runner.py scripts/scientific_data_ops.py scripts/scientific_recipe_ops.py /usr/local/lib/ai-dataseek/
-COPY scientific_operators /usr/local/lib/ai-dataseek/scientific_operators
+COPY sandbox/pyproject.toml sandbox/uv.lock ./
+COPY sandbox/scripts/install_noto_cjk_sc.py sandbox/scripts/verify_matplotlib_cjk.py sandbox/scripts/verify_geoscience_stack.py sandbox/scripts/recursive_unpack.py sandbox/scripts/dataset_quicklook.py sandbox/scripts/dataset_analysis_runner.py sandbox/scripts/scientific_data_ops.py sandbox/scripts/scientific_recipe_ops.py sandbox/scripts/tool_plugin_runner.py /usr/local/lib/ai-dataseek/
+COPY sandbox/scientific_operators /usr/local/lib/ai-dataseek/scientific_operators
 
 # Install the exact locked runtime, including the common Excel and plotting
 # stack. Avoid retaining uv's download cache in the final image layer.
 RUN UV_INDEX_URL=https://pypi.org/simple/ \
     uv sync --frozen --no-dev --no-install-project --no-cache
+
+# Tool plugins change frequently and must not invalidate the scientific dependency layer.
+COPY sandbox/scripts/geoscience_ops.py /usr/local/lib/ai-dataseek/
+COPY tools /opt/ai-dataseek/tools
 
 # Give agents one deterministic command for nested dataset archives instead of
 # spending model turns discovering and chaining format-specific extractors.
@@ -161,8 +165,11 @@ RUN install -m 0755 \
     /usr/local/lib/ai-dataseek/scientific_data_ops.py \
     /usr/local/bin/ai-dataseek-scientific && \
     install -m 0755 \
-    /usr/local/lib/ai-dataseek/scientific_recipe_ops.py \
-    /usr/local/bin/ai-dataseek-scientific-recipe
+        /usr/local/lib/ai-dataseek/scientific_recipe_ops.py \
+        /usr/local/bin/ai-dataseek-scientific-recipe && \
+    install -m 0755 \
+        /usr/local/lib/ai-dataseek/tool_plugin_runner.py \
+        /usr/local/bin/ai-dataseek-tool
 
 # Debian/Ubuntu ships Noto CJK as a TTC. Matplotlib only indexes the first TTC
 # face, which is JP, even though fontconfig can resolve the SC face. Extract
@@ -186,6 +193,7 @@ RUN python -m pip --version && \
     ai-dataseek-analysis --help >/dev/null && \
     ai-dataseek-scientific --help >/dev/null && \
     ai-dataseek-scientific-recipe --help >/dev/null && \
+    ai-dataseek-tool list --json | grep -F 'scientific_inspect' && \
     python /usr/local/lib/ai-dataseek/verify_matplotlib_cjk.py && \
     install -d -o ubuntu -g ubuntu /home/ubuntu/.cache/matplotlib && \
     sudo -u ubuntu -H env \
@@ -194,13 +202,13 @@ RUN python -m pip --version && \
         /app/.venv/bin/python /usr/local/lib/ai-dataseek/verify_matplotlib_cjk.py
 
 # Copy remaining project files
-COPY . .
+COPY sandbox/. .
 
 # Ensure application files are writable by app user
 RUN chown -R ubuntu:ubuntu /app
 
 # Configure supervisor
-COPY supervisord.conf /etc/supervisor/conf.d/app.conf
+COPY sandbox/supervisord.conf /etc/supervisor/conf.d/app.conf
 
 # Expose ports
 EXPOSE 8080 9222 5900 5901

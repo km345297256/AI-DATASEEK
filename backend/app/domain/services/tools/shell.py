@@ -1,6 +1,6 @@
 import json
 import shlex
-from typing import Any, Optional
+from typing import Any, ClassVar, Optional
 from app.domain.external.sandbox import Sandbox
 from app.domain.services.tools.base import BaseToolkit
 from langchain.tools import tool
@@ -11,7 +11,24 @@ class ShellToolkit(BaseToolkit):
 
     name: str = "shell"
     
-    def __init__(self, sandbox: Sandbox):
+    PLUGIN_MANAGED_TOOL_NAMES: ClassVar[set[str]] = {
+        "scientific_inspect",
+        "scientific_statistics",
+        "scientific_aggregate",
+        "scientific_subset",
+        "scientific_convert_netcdf_to_geotiff",
+        "scientific_transform_raster",
+        "scientific_raster_index",
+        "scientific_terrain",
+        "scientific_visualize",
+        "scientific_netcdf_visualize",
+        "scientific_point_timeseries",
+        "scientific_region_timeseries",
+        "scientific_region_statistics",
+        "scientific_last_dimension_profile",
+    }
+
+    def __init__(self, sandbox: Sandbox, *, include_plugin_managed_tools: bool = True):
         """Initialize Shell tool class
         
         Args:
@@ -19,6 +36,18 @@ class ShellToolkit(BaseToolkit):
         """
         super().__init__()
         self.sandbox = sandbox
+        self.include_plugin_managed_tools = include_plugin_managed_tools
+
+    def get_tools(self):
+        tools = super().get_tools()
+        if self.include_plugin_managed_tools:
+            return tools
+        return [tool for tool in tools if tool.name not in self.PLUGIN_MANAGED_TOOL_NAMES]
+
+    def get_tool(self, tool_name: str):
+        if not self.include_plugin_managed_tools and tool_name in self.PLUGIN_MANAGED_TOOL_NAMES:
+            return None
+        return super().get_tool(tool_name)
         
     @tool(parse_docstring=True)
     async def shell_exec(

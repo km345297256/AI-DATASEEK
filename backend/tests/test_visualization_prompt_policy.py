@@ -104,17 +104,8 @@ def test_visualization_prompts_avoid_unicode_superscript_units():
 def test_prompts_prefer_deterministic_scientific_operators():
     system_prompt, execution_prompt = _rendered_prompts()
     assert "scientific_*" in system_prompt
-    for prompt in (execution_prompt,):
-        assert "scientific_inspect" in prompt
-        assert "scientific_statistics" in prompt
-        assert "scientific_aggregate" in prompt
-        assert "scientific_visualize" in prompt
-        assert "scientific_netcdf_visualize" in prompt
-    for tool_name in (
-        "scientific_subset",
-        "scientific_convert_netcdf_to_geotiff",
-        "scientific_transform_raster",
-        "scientific_raster_index",
-        "scientific_terrain",
-    ):
-        assert tool_name in execution_prompt
+    for prompt in (system_prompt, execution_prompt):
+        assert "dynamically registered" in prompt
+        assert "schema and description" in prompt
+    assert "newly installed" in execution_prompt
+    assert "without prompt edits" in system_prompt

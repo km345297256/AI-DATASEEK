@@ -1,0 +1,284 @@
+{
+  "plugin": "scientific",
+  "version": "1.0.0",
+  "handler": "handler.py",
+  "tools": [
+    {
+      "name": "scientific_inspect",
+      "description": "Inspect one NetCDF or GeoTIFF file and return variables, dimensions, coordinate roles, units, masks, CRS, transform, and bounds without loading the full data cube.",
+      "scopes": ["dataset_fast_path"],
+      "timeout_seconds": 30,
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "input_path": {"type": "string", "description": "Absolute NetCDF or GeoTIFF path inside the sandbox"},
+          "timeout_seconds": {"type": "integer", "minimum": 5, "maximum": 120, "default": 30}
+        },
+        "required": ["input_path"],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "scientific_statistics",
+      "description": "Compute bounded mask-aware statistics for one NetCDF variable or GeoTIFF band with CF scale and missing values applied.",
+      "scopes": ["dataset_fast_path"],
+      "timeout_seconds": 60,
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "input_path": {"type": "string"},
+          "variable": {"type": ["string", "null"]},
+          "band": {"type": "integer", "minimum": 1, "default": 1},
+          "dimension_indices": {"type": ["object", "null"], "additionalProperties": {"type": "integer"}},
+          "timeout_seconds": {"type": "integer", "minimum": 5, "maximum": 120, "default": 60}
+        },
+        "required": ["input_path"],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "scientific_aggregate",
+      "description": "Reduce one explicit NetCDF dimension using mean, sum, min, max, or median and optionally write the resulting NetCDF artifact.",
+      "scopes": ["dataset_fast_path"],
+      "timeout_seconds": 90,
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "input_path": {"type": "string"},
+          "dimension": {"type": "string"},
+          "method": {"type": "string", "enum": ["mean", "sum", "min", "max", "median"]},
+          "variable": {"type": ["string", "null"]},
+          "start": {"type": ["string", "null"]},
+          "end": {"type": ["string", "null"]},
+          "output_path": {"type": ["string", "null"]},
+          "timeout_seconds": {"type": "integer", "minimum": 5, "maximum": 120, "default": 90}
+        },
+        "required": ["input_path", "dimension", "method"],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "scientific_subset",
+      "description": "Create a CF-aware NetCDF subset using an explicit bounding box, time range, and dimension indices.",
+      "scopes": ["dataset_fast_path"],
+      "timeout_seconds": 90,
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "input_path": {"type": "string"},
+          "output_path": {"type": "string"},
+          "variable": {"type": ["string", "null"]},
+          "bbox": {"type": ["array", "null"], "items": {"type": "number"}, "minItems": 4, "maxItems": 4},
+          "time_start": {"type": ["string", "null"]},
+          "time_end": {"type": ["string", "null"]},
+          "dimension_indices": {"type": ["object", "null"], "additionalProperties": {"type": "integer"}},
+          "timeout_seconds": {"type": "integer", "minimum": 5, "maximum": 120, "default": 90}
+        },
+        "required": ["input_path", "output_path"],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "scientific_convert_netcdf_to_geotiff",
+      "description": "Export a regularly spaced two-dimensional latitude/longitude NetCDF selection to a coordinate-aware GeoTIFF.",
+      "scopes": ["dataset_fast_path"],
+      "timeout_seconds": 90,
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "input_path": {"type": "string"},
+          "output_path": {"type": "string"},
+          "variable": {"type": ["string", "null"]},
+          "dimension_indices": {"type": ["object", "null"], "additionalProperties": {"type": "integer"}},
+          "timeout_seconds": {"type": "integer", "minimum": 5, "maximum": 120, "default": 90}
+        },
+        "required": ["input_path", "output_path"],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "scientific_transform_raster",
+      "description": "Clip, reproject, or resample one GeoTIFF with an explicit CRS, resolution, source-CRS bounding box, and resampling method.",
+      "scopes": ["dataset_fast_path"],
+      "timeout_seconds": 120,
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "input_path": {"type": "string"},
+          "output_path": {"type": "string"},
+          "target_crs": {"type": ["string", "null"]},
+          "resolution": {"type": ["number", "null"], "exclusiveMinimum": 0},
+          "bbox": {"type": ["array", "null"], "items": {"type": "number"}, "minItems": 4, "maxItems": 4},
+          "resampling": {"type": "string", "enum": ["nearest", "bilinear", "cubic", "average"], "default": "nearest"},
+          "timeout_seconds": {"type": "integer", "minimum": 5, "maximum": 120, "default": 120}
+        },
+        "required": ["input_path", "output_path"],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "scientific_raster_index",
+      "description": "Calculate NDVI, EVI, NDWI, or NBR from an explicit semantic mapping of one-based GeoTIFF bands.",
+      "scopes": ["dataset_fast_path"],
+      "timeout_seconds": 120,
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "input_path": {"type": "string"},
+          "output_path": {"type": "string"},
+          "index_name": {"type": "string", "enum": ["ndvi", "evi", "ndwi", "nbr"]},
+          "bands": {"type": "object", "additionalProperties": {"type": "integer", "minimum": 1}},
+          "timeout_seconds": {"type": "integer", "minimum": 5, "maximum": 120, "default": 120}
+        },
+        "required": ["input_path", "output_path", "index_name", "bands"],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "scientific_terrain",
+      "description": "Calculate slope or aspect from one projected GeoTIFF DEM band using projected linear cell units.",
+      "scopes": ["dataset_fast_path"],
+      "timeout_seconds": 120,
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "input_path": {"type": "string"},
+          "output_path": {"type": "string"},
+          "operation": {"type": "string", "enum": ["slope", "aspect"]},
+          "band": {"type": "integer", "minimum": 1, "default": 1},
+          "timeout_seconds": {"type": "integer", "minimum": 5, "maximum": 120, "default": 120}
+        },
+        "required": ["input_path", "output_path", "operation"],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "scientific_visualize",
+      "description": "Render one explicitly selected coordinate-aware NetCDF slice or GeoTIFF band as a PNG artifact.",
+      "scopes": ["dataset_fast_path"],
+      "timeout_seconds": 90,
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "input_path": {"type": "string"},
+          "output_path": {"type": "string"},
+          "variable": {"type": ["string", "null"]},
+          "band": {"type": "integer", "minimum": 1, "default": 1},
+          "dimension_indices": {"type": ["object", "null"], "additionalProperties": {"type": "integer"}},
+          "timeout_seconds": {"type": "integer", "minimum": 5, "maximum": 120, "default": 90}
+        },
+        "required": ["input_path", "output_path"],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "scientific_netcdf_visualize",
+      "description": "Generate up to four representative coordinate-aware PNG charts for one NetCDF variable in one terminal operation.",
+      "scopes": ["dataset_fast_path"],
+      "timeout_seconds": 90,
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "input_path": {"type": "string"},
+          "output_dir": {"type": "string"},
+          "variable": {"type": ["string", "null"]},
+          "max_plots": {"type": "integer", "minimum": 1, "maximum": 4, "default": 4},
+          "dimension_indices": {"type": ["object", "null"], "additionalProperties": {"type": "integer"}},
+          "timeout_seconds": {"type": "integer", "minimum": 5, "maximum": 120, "default": 90}
+        },
+        "required": ["input_path", "output_dir"],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "scientific_point_timeseries",
+      "description": "Extract a NetCDF point time series from a latitude/longitude value or explicit grid indices.",
+      "scopes": ["dataset_fast_path"],
+      "timeout_seconds": 90,
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "input_path": {"type": "string"},
+          "variable": {"type": ["string", "null"]},
+          "latitude": {"type": ["number", "null"]},
+          "longitude": {"type": ["number", "null"]},
+          "latitude_index": {"type": ["integer", "null"], "minimum": 0},
+          "longitude_index": {"type": ["integer", "null"], "minimum": 0},
+          "time_coordinate": {"type": ["string", "null"]},
+          "latitude_coordinate": {"type": ["string", "null"]},
+          "longitude_coordinate": {"type": ["string", "null"]},
+          "dimension_indices": {"type": ["object", "null"], "additionalProperties": {"type": "integer"}},
+          "max_points": {"type": "integer", "minimum": 2, "maximum": 2000, "default": 480},
+          "timeout_seconds": {"type": "integer", "minimum": 5, "maximum": 120, "default": 90}
+        },
+        "required": ["input_path"],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "scientific_region_timeseries",
+      "description": "Compute a mean, maximum, minimum, or median NetCDF time series over a bounding box, polygon, or full grid.",
+      "scopes": ["dataset_fast_path"],
+      "timeout_seconds": 90,
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "input_path": {"type": "string"},
+          "method": {"type": "string", "enum": ["mean", "max", "min", "median"]},
+          "variable": {"type": ["string", "null"]},
+          "bbox": {"type": ["array", "null"], "items": {"type": "number"}, "minItems": 4, "maxItems": 4},
+          "polygon": {"type": ["array", "null"], "items": {"type": "array", "items": {"type": "number"}, "minItems": 2, "maxItems": 2}},
+          "time_coordinate": {"type": ["string", "null"]},
+          "latitude_coordinate": {"type": ["string", "null"]},
+          "longitude_coordinate": {"type": ["string", "null"]},
+          "dimension_indices": {"type": ["object", "null"], "additionalProperties": {"type": "integer"}},
+          "max_points": {"type": "integer", "minimum": 2, "maximum": 2000, "default": 480},
+          "timeout_seconds": {"type": "integer", "minimum": 5, "maximum": 120, "default": 90}
+        },
+        "required": ["input_path", "method"],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "scientific_region_statistics",
+      "description": "Compute a maximum, minimum, or median for one selected two-dimensional NetCDF field and report locations for extrema.",
+      "scopes": ["dataset_fast_path"],
+      "timeout_seconds": 90,
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "input_path": {"type": "string"},
+          "method": {"type": "string", "enum": ["max", "min", "median"]},
+          "variable": {"type": ["string", "null"]},
+          "bbox": {"type": ["array", "null"], "items": {"type": "number"}, "minItems": 4, "maxItems": 4},
+          "polygon": {"type": ["array", "null"], "items": {"type": "array", "items": {"type": "number"}, "minItems": 2, "maxItems": 2}},
+          "latitude_coordinate": {"type": ["string", "null"]},
+          "longitude_coordinate": {"type": ["string", "null"]},
+          "dimension_indices": {"type": ["object", "null"], "additionalProperties": {"type": "integer"}},
+          "timeout_seconds": {"type": "integer", "minimum": 5, "maximum": 120, "default": 90}
+        },
+        "required": ["input_path", "method"],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "scientific_last_dimension_profile",
+      "description": "Create a profile along one explicit NetCDF dimension by averaging all remaining unselected dimensions.",
+      "scopes": ["dataset_fast_path"],
+      "timeout_seconds": 90,
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "input_path": {"type": "string"},
+          "dimension": {"type": "string"},
+          "variable": {"type": ["string", "null"]},
+          "dimension_indices": {"type": ["object", "null"], "additionalProperties": {"type": "integer"}},
+          "max_points": {"type": "integer", "minimum": 2, "maximum": 2000, "default": 480},
+          "timeout_seconds": {"type": "integer", "minimum": 5, "maximum": 120, "default": 90}
+        },
+        "required": ["input_path", "dimension"],
+        "additionalProperties": false
+      }
+    }
+  ]
+}

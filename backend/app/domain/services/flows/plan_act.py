@@ -37,6 +37,7 @@ from app.domain.services.tools.message import MessageToolkit
 from app.domain.services.tools.search import SearchToolkit
 from app.domain.services.tools.skill import SkillToolkit
 from app.domain.services.tools.dataset_catalog import DatasetCatalogToolkit
+from app.domain.services.tools.plugin import PluginToolkit
 from app.domain.services.skills import SkillRegistry, SkillRenderer
 from app.domain.services.skills.session_skill_creator import is_skill_create_request
 from app.core.config import get_settings
@@ -204,8 +205,13 @@ class PlanActFlow(BaseFlow):
             session_repository=self._session_repository,
         )
         self.dataset_catalog_toolkit = DatasetCatalogToolkit()
+        plugin_toolkit = PluginToolkit(
+            sandbox,
+            session_id=self._session_id,
+        )
         tools = [
-            ShellToolkit(sandbox),
+            plugin_toolkit,
+            ShellToolkit(sandbox, include_plugin_managed_tools=False),
             BrowserToolkit(
                 browser,
                 readiness_check=(

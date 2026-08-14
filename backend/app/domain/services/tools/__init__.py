@@ -7,6 +7,7 @@ from app.domain.services.tools.file import FileToolkit
 from app.domain.services.tools.mcp import MCPToolkit
 from app.domain.services.tools.skill import SkillToolkit
 from app.domain.services.tools.dataset_catalog import DatasetCatalogToolkit
+from app.domain.services.tools.plugin import PluginToolkit
 
 __all__ = [
     'BaseToolkit',
@@ -18,4 +19,5 @@ __all__ = [
     'MCPToolkit',
     'SkillToolkit',
     'DatasetCatalogToolkit',
+    'PluginToolkit',
 ]

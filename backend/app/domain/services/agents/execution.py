@@ -118,20 +118,6 @@ class ExecutionAgent(BaseAgent):
     DATASET_FAST_PATH_TOOL_NAMES = {
         "dataset_unpack",
         "dataset_quicklook",
-        "scientific_inspect",
-        "scientific_statistics",
-        "scientific_aggregate",
-        "scientific_subset",
-        "scientific_convert_netcdf_to_geotiff",
-        "scientific_transform_raster",
-        "scientific_raster_index",
-        "scientific_terrain",
-        "scientific_visualize",
-        "scientific_netcdf_visualize",
-        "scientific_point_timeseries",
-        "scientific_region_timeseries",
-        "scientific_region_statistics",
-        "scientific_last_dimension_profile",
         "shell_run",
         "shell_exec",
         "shell_wait",
@@ -281,21 +267,38 @@ class ExecutionAgent(BaseAgent):
         tools = super().get_tools()
         if not getattr(self, "_dataset_fast_path_mode", False):
             return tools
+        allowed_names = self._dataset_fast_path_tool_names()
         return [
             tool for tool in tools
-            if tool.name in self.DATASET_FAST_PATH_TOOL_NAMES
+            if self._tool_name(tool) in allowed_names
             and not (
-                tool.name == "resolve_dataset_file"
+                self._tool_name(tool) == "resolve_dataset_file"
                 and getattr(self, "_authoritative_target_files", False)
             )
         ]
 
     def get_tool(self, name: str):
-        if getattr(self, "_dataset_fast_path_mode", False) and name not in self.DATASET_FAST_PATH_TOOL_NAMES:
+        if (
+            getattr(self, "_dataset_fast_path_mode", False)
+            and name not in self._dataset_fast_path_tool_names()
+        ):
             return None
         if name == "resolve_dataset_file" and getattr(self, "_authoritative_target_files", False):
             return None
         return super().get_tool(name)
+
+    @staticmethod
+    def _tool_name(tool: Any) -> str:
+        if isinstance(tool, dict):
+            function = tool.get("function", {})
+            return str(function.get("name", "")) if isinstance(function, dict) else ""
+        return str(getattr(tool, "name", ""))
+
+    def _dataset_fast_path_tool_names(self) -> set[str]:
+        names = set(self.DATASET_FAST_PATH_TOOL_NAMES)
+        for toolkit in self.toolkits:
+            names.update(getattr(toolkit, "dataset_fast_path_tool_names", set()))
+        return names
 
     @classmethod
     def _quicklook_evidence_summary(cls, payload: dict[str, Any], *, language: str) -> str:
@@ -639,21 +642,26 @@ class ExecutionAgent(BaseAgent):
             lines = []
             if not catalog_only:
                 lines.extend([
-                    "文件组织已根据安全递归解包清单生成，无需再次调用模型判断。",
+                    "### 解压结果",
+                    "",
+                    (
+                        f"已安全解压 `{source_name}`，共识别 {archive_count} 个压缩包、"
+                        f"{total_files} 个最终文件，展开大小 {expanded_bytes}。"
+                    ),
                     "",
                 ])
             lines.extend([
-                f"`{source_name}`",
+                "### 文件列表（目录层级）",
+                "",
+                f"根目录：`{source_name}`",
+                "",
                 "```text",
                 *tree_lines,
                 "```",
                 "",
-                (
-                    f"清单包含 {total_files} 个文件，登记总大小 {expanded_bytes}。"
-                    if catalog_only
-                    else f"共识别 {archive_count} 个压缩包、{total_files} 个最终文件，展开大小 {expanded_bytes}。"
-                ),
             ])
+            if catalog_only:
+                lines.append(f"清单包含 {total_files} 个文件，登记总大小 {expanded_bytes}。")
             if hidden_files:
                 lines.append(
                     f"上方为前 {len(displayed_files)} 个文件的目录树，另有 {hidden_files} 个文件因展示上限未显示。"
@@ -666,7 +674,7 @@ class ExecutionAgent(BaseAgent):
             else:
                 lines.append("目录树未因展示上限而截断。")
             if archives:
-                lines.extend(["", "压缩包层级："])
+                lines.extend(["", "### 压缩包层级", ""])
                 for archive in archives[: cls.DATASET_INVENTORY_MAX_DISPLAY_ARCHIVES]:
                     path = cls._inventory_label(archive.get("path"), fallback="unnamed archive")
                     kind = cls._inventory_label(archive.get("format"), fallback="archive")
@@ -686,21 +694,26 @@ class ExecutionAgent(BaseAgent):
         lines = []
         if not catalog_only:
             lines.extend([
-                "The file organization below comes directly from the bounded recursive-unpack manifest; no second model decision was required.",
+                "### Extraction result",
+                "",
+                (
+                    f"Safely extracted `{source_name}`. Detected {archive_count} archive(s) and "
+                    f"{total_files} final file(s), expanding to {expanded_bytes}."
+                ),
                 "",
             ])
         lines.extend([
-            f"`{source_name}`",
+            "### File list (directory tree)",
+            "",
+            f"Root: `{source_name}`",
+            "",
             "```text",
             *tree_lines,
             "```",
             "",
-            (
-                f"The inventory contains {total_files} file(s), totalling {expanded_bytes}."
-                if catalog_only
-                else f"Detected {archive_count} archive(s) and {total_files} final file(s), expanding to {expanded_bytes}."
-            ),
         ])
+        if catalog_only:
+            lines.append(f"The inventory contains {total_files} file(s), totalling {expanded_bytes}.")
         if hidden_files:
             lines.append(
                 f"The tree shows the first {len(displayed_files)} files; {hidden_files} additional files are omitted by the display limit. "
@@ -713,7 +726,7 @@ class ExecutionAgent(BaseAgent):
         else:
             lines.append("The displayed tree was not truncated by the presentation limit.")
         if archives:
-            lines.extend(["", "Archive hierarchy:"])
+            lines.extend(["", "### Archive hierarchy", ""])
             for archive in archives[: cls.DATASET_INVENTORY_MAX_DISPLAY_ARCHIVES]:
                 path = cls._inventory_label(archive.get("path"), fallback="unnamed archive")
                 kind = cls._inventory_label(archive.get("format"), fallback="archive")
@@ -1770,6 +1783,33 @@ class ExecutionAgent(BaseAgent):
 
     def _completion_from_tool_batch(self, tool_results) -> Optional[str]:
         """Finish when a deterministic capability fully covers the exact request."""
+        # Unpacking is often only a preparation step for analysis of an archive
+        # (for example, a trend request over a TIFF inside a RAR). It is a
+        # terminal capability only for explicit file-structure questions.
+        dataset_intent = getattr(self, "_dataset_intent", self.DATASET_INTENT_ANALYSIS)
+        unpack_payload = None
+        if dataset_intent == self.DATASET_INTENT_FILE_STRUCTURE:
+            unpack_payload = next(
+                (
+                    value
+                    for result in tool_results
+                    if (value := self._successful_unpack_payload(result)) is not None
+                ),
+                None,
+            )
+        if unpack_payload is not None:
+            language = str(
+                getattr(getattr(self, "_current_plan", None), "language", "")
+            )
+            rendered = self._render_unpack_inventory(
+                unpack_payload,
+                language=language,
+            )
+            return ExecutionResult(
+                success=True,
+                result=rendered,
+                attachments=[],
+            ).model_dump_json()
         visualization_completion = self._netcdf_visualization_completion(tool_results)
         if visualization_completion is not None:
             return visualization_completion
@@ -2453,20 +2493,32 @@ class ExecutionAgent(BaseAgent):
                     yield event
                 return
             datasets = list(message.datasets or [])
-            if len(datasets) != 1 or not self._catalog_inventory_is_complete(datasets[0]):
+            if len(datasets) != 1:
                 async for event in fallback("The registered inventory is incomplete or ambiguous."):
                     yield event
                 return
 
             dataset = datasets[0]
             files = list(dataset.files or [])
+            safe_catalog_files = []
+            for item in files:
+                relative = PurePosixPath(str(getattr(item, "path", "") or ""))
+                if not relative.parts or relative.is_absolute() or ".." in relative.parts:
+                    async for event in fallback("The registered inventory contains an unsafe path."):
+                        yield event
+                    return
+                safe_catalog_files.append(item)
             archive_suffixes = {".zip", ".rar", ".7z"}
             archives = [
                 item
-                for item in files
+                for item in safe_catalog_files
                 if PurePosixPath(str(item.path)).suffix.casefold() in archive_suffixes
             ]
             if not archives:
+                if not self._catalog_inventory_is_complete(dataset):
+                    async for event in fallback("The registered inventory is incomplete or ambiguous."):
+                        yield event
+                    return
                 payload = {
                     "success": True,
                     "source_kind": "catalog",
@@ -2489,7 +2541,11 @@ class ExecutionAgent(BaseAgent):
                 ))
                 return
 
-            if len(files) != 1 or len(archives) != 1:
+            # A single registered archive is enough to resolve and inspect the
+            # real mounted file. Catalog-level recursive counts may be absent
+            # for compressed uploads, so do not discard this deterministic path
+            # merely because the archive has not been expanded in the catalog.
+            if len(safe_catalog_files) != 1 or len(archives) != 1:
                 async for event in fallback(
                     "The dataset contains multiple top-level files or archives that require a combined inspection."
                 ):
@@ -3536,6 +3592,13 @@ class ExecutionAgent(BaseAgent):
                         if isinstance(preview_target_file, str)
                         else None
                     ),
+                )
+            elif dataset_intent == self.DATASET_INTENT_FILE_STRUCTURE and message.datasets:
+                execution = self._execute_preferred_inventory(
+                    message.message,
+                    message=message,
+                    language=plan.language,
+                    artifact_policy=str(step.inputs.get("artifact_policy") or "optional"),
                 )
             else:
                 execution = self._execute_with_tool_scope(

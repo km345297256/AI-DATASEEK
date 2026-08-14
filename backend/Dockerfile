@@ -28,14 +28,16 @@ ENV UV_PROJECT_ENVIRONMENT=/opt/venv
 ENV PATH="/opt/venv/bin:${PATH}"
 
 # Install dependencies
-COPY pyproject.toml uv.lock ./
+COPY backend/pyproject.toml backend/uv.lock ./
 RUN uv sync --frozen --no-dev --no-install-project
 
 # Copy project files
-COPY . .
+COPY backend/. .
+COPY tools /opt/ai-dataseek/tools
 
 # Set environment variables
 ENV PYTHONPATH=/app
+ENV TOOL_PLUGINS_DIR=/opt/ai-dataseek/tools
 
 # Expose port
 EXPOSE 8000

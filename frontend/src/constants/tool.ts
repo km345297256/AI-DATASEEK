@@ -45,7 +45,45 @@ export const TOOL_FUNCTION_MAP: {[key: string]: string} = {
   // Skill tools
   "skill_list": "Listing skills",
   "skill_read": "Reading skill",
-  "skill_create_from_session": "Creating skill"
+  "skill_create_from_session": "Creating skill",
+  // Scientific and geoscience plugin tools
+  "scientific_inspect": "Inspecting scientific data file",
+  "scientific_statistics": "Calculating scientific data statistics",
+  "scientific_aggregate": "Aggregating NetCDF dimensions",
+  "scientific_subset": "Subsetting NetCDF data",
+  "scientific_convert_netcdf_to_geotiff": "Converting NetCDF to GeoTIFF",
+  "scientific_transform_raster": "Transforming raster grid",
+  "scientific_raster_index": "Calculating remote sensing index",
+  "scientific_terrain": "Calculating terrain parameters",
+  "scientific_visualize": "Visualizing scientific data",
+  "scientific_netcdf_visualize": "Generating NetCDF visual summary",
+  "scientific_point_timeseries": "Extracting point time series",
+  "scientific_region_timeseries": "Calculating regional time series",
+  "scientific_region_statistics": "Calculating regional statistics",
+  "scientific_last_dimension_profile": "Extracting dimension profile",
+  "geoscience_collection_inspect": "Inspecting geoscience data collection",
+  "geoscience_coordinate_normalize": "Normalizing NetCDF coordinates",
+  "geoscience_grid_compare": "Comparing spatial grids",
+  "geoscience_quality_check": "Checking scientific data quality",
+  "geoscience_unit_convert": "Converting physical units",
+  "geoscience_raster_stack": "Stacking raster bands",
+  "geoscience_raster_mosaic": "Mosaicking raster scenes",
+  "geoscience_sample_raster": "Sampling raster coordinates",
+  "geoscience_qa_mask": "Applying remote sensing quality mask",
+  "geoscience_scene_composite": "Compositing remote sensing scenes",
+  "geoscience_climatology": "Calculating monthly climatology",
+  "geoscience_anomaly": "Calculating temporal anomalies",
+  "geoscience_trend": "Analyzing temporal trend",
+  "geoscience_artifact_validate": "Validating scientific artifact",
+  "geoscience_vector_inspect": "Inspecting vector data",
+  "geoscience_vector_transform": "Transforming vector data",
+  "geoscience_zonal_statistics": "Calculating zonal statistics",
+  "geoscience_rasterize_vector": "Rasterizing vector data",
+  "geoscience_grid_align": "Aligning raster to reference grid",
+  "geoscience_remote_product_inspect": "Identifying remote sensing product",
+  "geoscience_change_detection": "Detecting raster change",
+  "geoscience_spatial_join": "Joining vector layers spatially",
+  "geoscience_transect_profile": "Extracting raster transect profile"
 };
 
 /** Completed tool calls use a terminal label instead of a perpetual "running" label. */
@@ -114,7 +152,8 @@ export const TOOL_NAME_MAP: {[key: string]: string} = {
   "info": "Information",
   "message": "Message",
   "mcp": "MCP Tool",
-  "skill": "Skill"
+  "skill": "Skill",
+  "scientific": "Scientific analysis"
 };
 
 import SearchIcon from '../components/icons/SearchIcon.vue';
@@ -122,6 +161,7 @@ import EditIcon from '../components/icons/EditIcon.vue';
 import BrowserIcon from '../components/icons/BrowserIcon.vue';
 import ShellIcon from '../components/icons/ShellIcon.vue';
 import InfoIcon from '../components/icons/InfoIcon.vue';
+import { Earth } from 'lucide-vue-next';
 
 /**
  * Tool icon mapping
@@ -133,7 +173,8 @@ export const TOOL_ICON_MAP: {[key: string]: any} = {
   "search": SearchIcon,
   "message": "",
   "mcp": SearchIcon,
-  "skill": InfoIcon
+  "skill": InfoIcon,
+  "scientific": Earth
 };
 
 import ShellToolView from '@/components/toolViews/ShellToolView.vue';

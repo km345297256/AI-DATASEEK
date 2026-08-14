@@ -21,8 +21,8 @@ services:
   backend:
     image: ${BACKEND_IMAGE:-ai-dataseek-backend:${IMAGE_TAG:-latest}}
     build:
-      context: ./backend
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: backend/Dockerfile
     env_file:
       - .env
     environment:
@@ -62,8 +62,8 @@ services:
   sandbox-image:
     image: ${SANDBOX_IMAGE:-ai-dataseek-sandbox:${IMAGE_TAG:-latest}}
     build:
-      context: ./sandbox
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: sandbox/Dockerfile
     command: ["/bin/true"]
     restart: "no"
     networks:
