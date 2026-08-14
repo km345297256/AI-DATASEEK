@@ -395,6 +395,203 @@ class ShellToolkit(BaseToolkit):
             timeout_seconds=timeout_seconds,
         )
 
+    @tool(parse_docstring=True)
+    async def scientific_netcdf_visualize(
+        self,
+        id: str,
+        input_path: str,
+        output_dir: str,
+        variable: Optional[str] = None,
+        max_plots: int = 4,
+        dimension_indices: Optional[dict[str, int]] = None,
+        timeout_seconds: int = 90,
+    ) -> ToolResult:
+        """Create a representative coordinate-aware PNG bundle from one NetCDF file in one operation. Use this for a general request to plot or visualize a named NetCDF file. It identifies an unambiguous numeric variable, latitude/longitude axes, and one remaining time-like dimension; generates up to four representative slices including a temporal mean; and returns verified image artifacts. Use scientific_visualize instead when the user specifies one exact slice or custom selection.
+
+        Args:
+            id: Unique identifier of the target shell session
+            input_path: Absolute NetCDF path inside the sandbox
+            output_dir: New output directory below /home/ubuntu/output
+            variable: Optional explicit NetCDF variable; omit only when one numeric candidate exists
+            max_plots: Maximum representative PNG count, clamped to 1-4
+            dimension_indices: Indices for additional non-spatial dimensions that must be fixed
+            timeout_seconds: Maximum bounded wait in seconds, clamped to 5-120
+        """
+        return await self._run_scientific_command(
+            id=id,
+            operation="visualize-bundle",
+            input_path=input_path,
+            output_path=output_dir,
+            variable=variable,
+            dimension_indices=dimension_indices,
+            timeout_seconds=timeout_seconds,
+            extra_args={"--max-plots": max(1, min(max_plots, 4))},
+        )
+
+    @tool(parse_docstring=True)
+    async def scientific_point_timeseries(
+        self, id: str, input_path: str, variable: Optional[str] = None,
+        latitude: Optional[float] = None, longitude: Optional[float] = None,
+        latitude_index: Optional[int] = None, longitude_index: Optional[int] = None,
+        time_coordinate: Optional[str] = None,
+        latitude_coordinate: Optional[str] = None,
+        longitude_coordinate: Optional[str] = None,
+        dimension_indices: Optional[dict[str, int]] = None,
+        max_points: int = 480, timeout_seconds: int = 90,
+    ) -> ToolResult:
+        """Extract a deterministic point time series from a NetCDF variable. Select a grid cell by latitude/longitude values or explicit indices. Inspect first and pass coordinate names when CF roles are ambiguous.
+
+        Args:
+            id: Unique identifier of the target shell session
+            input_path: Absolute NetCDF path inside the sandbox
+            variable: NetCDF data variable name; required when multiple numeric variables exist
+            latitude: Latitude value; the nearest grid coordinate is selected
+            longitude: Longitude value; the nearest grid coordinate is selected
+            latitude_index: Optional explicit latitude index, taking precedence over latitude
+            longitude_index: Optional explicit longitude index, taking precedence over longitude
+            time_coordinate: Optional one-dimensional time coordinate name
+            latitude_coordinate: Optional one-dimensional latitude coordinate name
+            longitude_coordinate: Optional one-dimensional longitude coordinate name
+            dimension_indices: Explicit selections for all extra dimensions
+            max_points: Maximum returned points, clamped to 2-2000
+            timeout_seconds: Maximum bounded wait in seconds, clamped to 5-120
+        """
+        return await self._run_recipe_command(
+            id=id, operation="point-timeseries", input_path=input_path,
+            variable=variable, dimension_indices=dimension_indices,
+            max_points=max_points, timeout_seconds=timeout_seconds,
+            extra_args={
+                "--latitude": latitude, "--longitude": longitude,
+                "--latitude-index": latitude_index, "--longitude-index": longitude_index,
+                "--time-coordinate": time_coordinate,
+                "--latitude-coordinate": latitude_coordinate,
+                "--longitude-coordinate": longitude_coordinate,
+            },
+        )
+
+    @tool(parse_docstring=True)
+    async def scientific_region_timeseries(
+        self, id: str, input_path: str, method: str,
+        variable: Optional[str] = None, bbox: Optional[list[float]] = None,
+        polygon: Optional[list[list[float]]] = None,
+        time_coordinate: Optional[str] = None,
+        latitude_coordinate: Optional[str] = None,
+        longitude_coordinate: Optional[str] = None,
+        dimension_indices: Optional[dict[str, int]] = None,
+        max_points: int = 480, timeout_seconds: int = 90,
+    ) -> ToolResult:
+        """Compute a region or full-grid NetCDF time series using an explicit spatial mean, maximum, minimum, or median at every time step.
+
+        Args:
+            id: Unique identifier of the target shell session
+            input_path: Absolute NetCDF path inside the sandbox
+            method: Spatial reducer: mean, max, min, or median
+            variable: NetCDF data variable name; required when multiple numeric variables exist
+            bbox: Optional [west, south, east, north] in EPSG:4326 coordinates
+            polygon: Optional polygon vertices as [[longitude, latitude], ...], preferred over bbox
+            time_coordinate: Optional one-dimensional time coordinate name
+            latitude_coordinate: Optional one-dimensional latitude coordinate name
+            longitude_coordinate: Optional one-dimensional longitude coordinate name
+            dimension_indices: Explicit selections for all extra dimensions
+            max_points: Maximum returned points, clamped to 2-2000
+            timeout_seconds: Maximum bounded wait in seconds, clamped to 5-120
+        """
+        return await self._run_recipe_command(
+            id=id, operation="region-timeseries", input_path=input_path,
+            variable=variable, dimension_indices=dimension_indices,
+            max_points=max_points, timeout_seconds=timeout_seconds,
+            extra_args={
+                "--method": method, "--bbox": bbox, "--polygon": polygon,
+                "--time-coordinate": time_coordinate,
+                "--latitude-coordinate": latitude_coordinate,
+                "--longitude-coordinate": longitude_coordinate,
+            },
+        )
+
+    @tool(parse_docstring=True)
+    async def scientific_region_statistics(
+        self, id: str, input_path: str, method: str,
+        variable: Optional[str] = None, bbox: Optional[list[float]] = None,
+        polygon: Optional[list[list[float]]] = None,
+        latitude_coordinate: Optional[str] = None,
+        longitude_coordinate: Optional[str] = None,
+        dimension_indices: Optional[dict[str, int]] = None,
+        timeout_seconds: int = 90,
+    ) -> ToolResult:
+        """Compute a maximum, minimum, or median for one explicitly selected two-dimensional NetCDF field. Maximum and minimum include the coordinate location.
+
+        Args:
+            id: Unique identifier of the target shell session
+            input_path: Absolute NetCDF path inside the sandbox
+            method: Statistic: max, min, or median
+            variable: NetCDF data variable name; required when multiple numeric variables exist
+            bbox: Optional [west, south, east, north] in EPSG:4326 coordinates
+            polygon: Optional polygon vertices as [[longitude, latitude], ...], preferred over bbox
+            latitude_coordinate: Optional one-dimensional latitude coordinate name
+            longitude_coordinate: Optional one-dimensional longitude coordinate name
+            dimension_indices: Explicit selections for all non-spatial dimensions
+            timeout_seconds: Maximum bounded wait in seconds, clamped to 5-120
+        """
+        return await self._run_recipe_command(
+            id=id, operation="region-statistics", input_path=input_path,
+            variable=variable, dimension_indices=dimension_indices,
+            timeout_seconds=timeout_seconds,
+            extra_args={
+                "--method": method, "--bbox": bbox, "--polygon": polygon,
+                "--latitude-coordinate": latitude_coordinate,
+                "--longitude-coordinate": longitude_coordinate,
+            },
+        )
+
+    @tool(parse_docstring=True)
+    async def scientific_last_dimension_profile(
+        self, id: str, input_path: str, dimension: str,
+        variable: Optional[str] = None,
+        dimension_indices: Optional[dict[str, int]] = None,
+        max_points: int = 480, timeout_seconds: int = 90,
+    ) -> ToolResult:
+        """Create a profile along one explicit NetCDF dimension by averaging all remaining unselected dimensions.
+
+        Args:
+            id: Unique identifier of the target shell session
+            input_path: Absolute NetCDF path inside the sandbox
+            dimension: Existing dimension to preserve as the profile axis
+            variable: NetCDF data variable name; required when multiple numeric variables exist
+            dimension_indices: Optional dimensions to select before averaging the rest
+            max_points: Maximum returned profile points, clamped to 2-2000
+            timeout_seconds: Maximum bounded wait in seconds, clamped to 5-120
+        """
+        return await self._run_recipe_command(
+            id=id, operation="last-dimension-profile", input_path=input_path,
+            variable=variable, dimension_indices=dimension_indices,
+            max_points=max_points, timeout_seconds=timeout_seconds,
+            extra_args={"--dimension": dimension},
+        )
+
+    async def _run_recipe_command(
+        self, *, id: str, operation: str, input_path: str,
+        timeout_seconds: int, variable: Optional[str] = None,
+        dimension_indices: Optional[dict[str, int]] = None,
+        max_points: Optional[int] = None,
+        extra_args: Optional[dict[str, Any]] = None,
+    ) -> ToolResult:
+        bounded_timeout = max(5, min(timeout_seconds, 120))
+        parts = ["ai-dataseek-scientific-recipe", operation, shlex.quote(input_path)]
+        if variable:
+            parts.extend(["--variable", shlex.quote(variable)])
+        parts.extend(["--dimension-indices", shlex.quote(json.dumps(dimension_indices or {}, ensure_ascii=True))])
+        if max_points is not None:
+            parts.extend(["--max-points", str(max(2, min(max_points, 2000)))])
+        for flag, value in (extra_args or {}).items():
+            if value is None:
+                continue
+            rendered = json.dumps(value, ensure_ascii=True) if isinstance(value, (dict, list)) else str(value)
+            parts.extend([flag, shlex.quote(rendered)])
+        return await self._run_bounded_command(
+            id=id, exec_dir="/home/ubuntu", command=" ".join(parts),
+            timeout_seconds=bounded_timeout,
+        )
+
     async def _run_scientific_command(
         self,
         *,
@@ -414,7 +611,7 @@ class ShellToolkit(BaseToolkit):
             operation,
             shlex.quote(input_path),
         ]
-        if operation in {"statistics", "subset", "convert", "visualize"}:
+        if operation in {"statistics", "subset", "convert", "visualize", "visualize-bundle"}:
             if variable:
                 parts.extend(["--variable", shlex.quote(variable)])
             parts.extend([

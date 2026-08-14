@@ -143,7 +143,10 @@ async def create_session(
         current_user.id,
         llm_overrides=llm_overrides,
     )
-    return APIResponse.success(CreateSessionResponse(session_id=session.id))
+    return APIResponse.success(CreateSessionResponse(
+        session_id=session.id,
+        created_at=int(session.created_at.timestamp()),
+    ))
 
 @router.get("/{session_id}", response_model=APIResponse[GetSessionResponse])
 async def get_session(
@@ -157,6 +160,7 @@ async def get_session(
     events = await agent_service.get_session_events(session_id, current_user.id)
     return APIResponse.success(GetSessionResponse(
         session_id=session.id,
+        created_at=int(session.created_at.timestamp()),
         title=session.title,
         title_manually_set=session.title_manually_set,
         status=session.status,

@@ -14,6 +14,7 @@ from scripts.scientific_data_ops import (
     transform_raster,
     terrain,
     visualize,
+    visualize_netcdf_bundle,
 )
 
 
@@ -35,7 +36,35 @@ def test_netcdf_inspect_exposes_variable_coordinate_roles_and_units(tmp_path):
     assert result["format"] == "netcdf"
     assert result["data_variable_candidates"] == ["rain"]
     assert next(item for item in result["coordinates"] if item["name"] == "lat")["role"] == "latitude"
+    latitude = next(item for item in result["coordinates"] if item["name"] == "lat")
+    assert latitude["summary"]["count"] == 3
+    assert latitude["summary"]["first_values"] == [10.0, 20.0, 30.0]
+    assert latitude["summary"]["step"] == pytest.approx(10.0)
+    assert latitude["summary"]["direction"] == "ascending"
+    longitude = next(item for item in result["coordinates"] if item["name"] == "lon")
+    assert longitude["summary"]["last_values"] == [100.0, 110.0, 120.0, 130.0]
     assert result["variables"][0]["attributes"]["units"] == "mm"
+
+
+def test_netcdf_visualization_bundle_generates_representative_slices_and_mean(tmp_path, monkeypatch):
+    monkeypatch.setenv("AI_DATASEEK_OUTPUT_ROOT", str(tmp_path / "output"))
+    result = visualize_netcdf_bundle(
+        _netcdf(tmp_path),
+        tmp_path / "output" / "visualize-bundle",
+        "rain",
+        4,
+        {},
+    )
+
+    assert result["success"] is True
+    assert result["operation"] == "visualize_bundle"
+    assert result["variable"] == "rain"
+    assert result["spatial_dimensions"] == {"latitude": "lat", "longitude": "lon"}
+    assert len(result["artifacts"]) == 4
+    assert result["selections"][0]["reduction"] == {"dimension": "time", "method": "mean"}
+    assert result["selections"][2]["reduction"]["weighting"] == "cosine_latitude"
+    assert result["selections"][-1]["reduction"]["method"] == "grouped_mean"
+    assert all(Path(item["path"]).stat().st_size > 0 for item in result["artifacts"])
 
 
 def test_netcdf_statistics_requires_explicit_variable_when_ambiguous(tmp_path):

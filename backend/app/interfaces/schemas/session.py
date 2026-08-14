@@ -41,11 +41,13 @@ class ShellViewRequest(BaseModel):
 class CreateSessionResponse(BaseModel):
     """Create session response schema"""
     session_id: str
+    created_at: int
 
 
 class GetSessionResponse(BaseModel):
     """Get session response schema"""
     session_id: str
+    created_at: int
     title: Optional[str] = None
     title_manually_set: bool = False
     status: SessionStatus

@@ -106,6 +106,36 @@ def _range(variable: xr.DataArray) -> dict[str, Any] | None:
         return None
 
 
+def _coordinate_summary(variable: xr.DataArray) -> dict[str, Any] | None:
+    if variable.ndim != 1 or variable.size == 0:
+        return None
+    try:
+        values = np.asarray(variable.values).reshape(-1)
+    except Exception:
+        return None
+    summary: dict[str, Any] = {
+        "count": int(values.size),
+        "first_values": _json_value(values[: min(5, values.size)]),
+        "last_values": _json_value(values[max(0, values.size - 5):]),
+    }
+    if not np.issubdtype(values.dtype, np.number):
+        return summary
+    numeric = values.astype("float64", copy=False)
+    finite = numeric[np.isfinite(numeric)]
+    if finite.size:
+        summary["minimum"] = float(np.min(finite))
+        summary["maximum"] = float(np.max(finite))
+    if numeric.size > 1:
+        differences = np.diff(numeric)
+        finite_differences = differences[np.isfinite(differences)]
+        if finite_differences.size:
+            step = float(np.median(finite_differences))
+            summary["step"] = step
+            summary["direction"] = "ascending" if step > 0 else "descending" if step < 0 else "constant"
+            summary["regular"] = bool(np.allclose(finite_differences, step, rtol=1e-6, atol=1e-10))
+    return summary
+
+
 def _open_netcdf(path: Path) -> xr.Dataset:
     errors: list[str] = []
     for engine in ("h5netcdf", "netcdf4", None):
@@ -130,6 +160,7 @@ def _netcdf_inspect(path: Path) -> dict[str, Any]:
                 "dtype": str(variable.dtype),
                 "role": _coord_role(name, variable),
                 "range": _range(variable),
+                "summary": _coordinate_summary(variable),
                 "attributes": _attrs(variable.attrs),
             })
         variables = []
@@ -383,6 +414,143 @@ def visualize(path: Path, output_path: Path, variable: str | None, band: int, in
         artifacts=[{"path": str(output_path), "type": "image/png", "size_bytes": output_path.stat().st_size}],
         warnings=warnings,
     )
+
+
+def visualize_netcdf_bundle(
+    path: Path,
+    output_dir: Path,
+    variable: str | None,
+    max_plots: int,
+    indices: dict[str, int],
+) -> dict[str, Any]:
+    """Generate a small deterministic map bundle from one NetCDF file.
+
+    The operator performs the common scientific decisions in one process: it
+    identifies the data variable and spatial coordinates, selects representative
+    non-spatial slices, and writes up to four bounded PNGs. It is intentionally
+    limited to a single file and a 2-D spatial grid.
+    """
+    if _format(path) != "netcdf":
+        raise ScientificDataError("NetCDF visualization bundle requires a NetCDF input")
+    output_dir = _validated_output(output_dir / ".output-boundary").parent
+    limit = max(1, min(int(max_plots), 4))
+    with _open_netcdf(path) as dataset:
+        selected_name = _choose_variable(dataset, variable)
+        selected = _select_indices(dataset[selected_name], indices)
+        spatial = _spatial_dimensions(selected)
+        if not spatial:
+            raise ScientificDataError("visualization requires recognizable latitude and longitude dimensions")
+        y_dimension, x_dimension = spatial
+        if selected.ndim < 2:
+            raise ScientificDataError("visualization requires a two-dimensional spatial variable")
+        other_dimensions = [dimension for dimension in selected.dims if dimension not in {y_dimension, x_dimension}]
+        if len(other_dimensions) > 1:
+            raise ScientificDataError(
+                "visualization has multiple non-spatial dimensions; provide dimension_indices for all but one"
+            )
+        time_dimension = other_dimensions[0] if other_dimensions else None
+        coordinate_x = np.asarray(selected.coords[x_dimension].values) if x_dimension in selected.coords else np.arange(selected.sizes[x_dimension])
+        coordinate_y = np.asarray(selected.coords[y_dimension].values) if y_dimension in selected.coords else np.arange(selected.sizes[y_dimension])
+        artifacts: list[dict[str, Any]] = []
+        selections: list[dict[str, Any]] = []
+
+        def render(data: xr.DataArray, stem: str, label: str, selection: dict[str, Any]) -> None:
+            data = data.transpose(y_dimension, x_dimension)
+            values, sampled = _sample_dataarray(data)
+            output_path = output_dir / f"{stem}.png"
+            fig, ax = plt.subplots(figsize=(9, 6), constrained_layout=True)
+            image = ax.pcolormesh(coordinate_x, coordinate_y, values, shading="auto", cmap="viridis")
+            ax.set_xlabel(x_dimension)
+            ax.set_ylabel(y_dimension)
+            ax.set_title(label)
+            unit = data.attrs.get("units")
+            if unit:
+                fig.colorbar(image, ax=ax, label=str(unit))
+            else:
+                fig.colorbar(image, ax=ax)
+            fig.savefig(output_path, dpi=150)
+            plt.close(fig)
+            if output_path.is_file() and output_path.stat().st_size:
+                artifacts.append({"path": str(output_path), "type": "image/png", "size_bytes": output_path.stat().st_size})
+                selections.append({**selection, "sampled": sampled})
+
+        title = str(selected.attrs.get("long_name") or selected_name)
+        if not time_dimension:
+            render(selected, "spatial", title, {"variable": selected_name, "dimension_indices": indices})
+        else:
+            time_size = int(selected.sizes[time_dimension])
+            mean_data = selected.mean(time_dimension, skipna=True)
+            render(mean_data, "01_time_mean", f"{title} ({time_dimension} mean)", {"variable": selected_name, "reduction": {"dimension": time_dimension, "method": "mean"}})
+
+            if len(artifacts) < limit:
+                middle_index = time_size // 2
+                middle = selected.isel({time_dimension: middle_index})
+                coordinate_value = _json_value(selected.coords[time_dimension].values[middle_index])
+                render(middle, "02_middle_slice", f"{title} ({time_dimension}={coordinate_value})", {"variable": selected_name, "dimension_indices": {time_dimension: middle_index}})
+
+            latitude = selected.coords.get(y_dimension)
+            if latitude is not None and _coord_role(y_dimension, latitude) == "latitude":
+                weights = np.cos(np.deg2rad(latitude.astype("float64"))).clip(min=0)
+                spatial_series = selected.weighted(weights).mean((y_dimension, x_dimension), skipna=True)
+                weighting = "cosine_latitude"
+            else:
+                spatial_series = selected.mean((y_dimension, x_dimension), skipna=True)
+                weighting = "unweighted"
+
+            if len(artifacts) < limit:
+                series_values = np.asarray(spatial_series.values, dtype="float64")
+                series_x = np.asarray(spatial_series.coords[time_dimension].values)
+                output_path = output_dir / "03_spatial_mean_series.png"
+                fig, ax = plt.subplots(figsize=(10, 4.5), constrained_layout=True)
+                ax.plot(series_x, series_values, linewidth=0.9, color="#256f91")
+                ax.set_xlabel(time_dimension)
+                ax.set_ylabel(str(selected.attrs.get("units") or selected_name))
+                ax.set_title(f"{title} (spatial mean time series)")
+                ax.grid(alpha=0.25)
+                fig.savefig(output_path, dpi=150)
+                plt.close(fig)
+                artifacts.append({"path": str(output_path), "type": "image/png", "size_bytes": output_path.stat().st_size})
+                selections.append({"variable": selected_name, "reduction": {"dimensions": [y_dimension, x_dimension], "method": "mean", "weighting": weighting}, "sampled": False})
+
+            if len(artifacts) < limit:
+                time_coordinate = spatial_series.coords[time_dimension]
+                if np.issubdtype(time_coordinate.dtype, np.datetime64):
+                    grouped = spatial_series.groupby(f"{time_dimension}.month").mean(time_dimension, skipna=True)
+                    group_dimension = "month"
+                else:
+                    group_count = min(12, time_size)
+                    edges = np.linspace(0, time_size, group_count + 1, dtype=int)
+                    grouped = xr.DataArray(
+                        [float(spatial_series.isel({time_dimension: slice(edges[index], edges[index + 1])}).mean(skipna=True)) for index in range(group_count)],
+                        dims=("group",),
+                        coords={"group": np.arange(1, group_count + 1)},
+                    )
+                    group_dimension = "group"
+                output_path = output_dir / "04_grouped_time_mean.png"
+                fig, ax = plt.subplots(figsize=(8.5, 4.5), constrained_layout=True)
+                ax.bar(np.asarray(grouped.coords[group_dimension].values), np.asarray(grouped.values), color="#2a8068")
+                ax.set_xlabel(group_dimension)
+                ax.set_ylabel(str(selected.attrs.get("units") or selected_name))
+                ax.set_title(f"{title} ({group_dimension} spatial mean)")
+                fig.savefig(output_path, dpi=150)
+                plt.close(fig)
+                artifacts.append({"path": str(output_path), "type": "image/png", "size_bytes": output_path.stat().st_size})
+                selections.append({"variable": selected_name, "reduction": {"dimensions": [time_dimension, y_dimension, x_dimension], "method": "grouped_mean", "group": group_dimension, "weighting": weighting}, "sampled": False})
+
+        if not artifacts:
+            raise ScientificDataError("visualization artifacts were not created")
+        return _result(
+            True,
+            "visualize_bundle",
+            format="netcdf",
+            source={"name": path.name},
+            variable=selected_name,
+            spatial_dimensions={"latitude": y_dimension, "longitude": x_dimension},
+            non_spatial_dimensions=other_dimensions,
+            selections=selections,
+            artifacts=artifacts,
+            warnings=["representative slices were selected automatically"] if time_dimension else [],
+        )
 
 
 def aggregate(
@@ -714,10 +882,10 @@ def _bbox(raw: str | None) -> list[float] | None:
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     subparsers = parser.add_subparsers(dest="operation", required=True)
-    for operation in ("inspect", "statistics", "aggregate", "subset", "convert", "transform", "raster-index", "terrain", "visualize"):
+    for operation in ("inspect", "statistics", "aggregate", "subset", "convert", "transform", "raster-index", "terrain", "visualize", "visualize-bundle"):
         command = subparsers.add_parser(operation)
         command.add_argument("input_path", type=Path)
-        if operation in {"statistics", "aggregate", "subset", "convert", "visualize"}:
+        if operation in {"statistics", "aggregate", "subset", "convert", "visualize", "visualize-bundle"}:
             command.add_argument("--variable")
         if operation == "aggregate":
             command.add_argument("--method", required=True)
@@ -725,7 +893,7 @@ def build_parser() -> argparse.ArgumentParser:
             command.add_argument("--start")
             command.add_argument("--end")
             command.add_argument("--output", type=Path)
-        if operation in {"statistics", "subset", "convert", "visualize"}:
+        if operation in {"statistics", "subset", "convert", "visualize", "visualize-bundle"}:
             if operation in {"statistics", "visualize"}:
                 command.add_argument("--band", type=int, default=1)
             command.add_argument("--dimension-indices", default="{}")
@@ -752,6 +920,9 @@ def build_parser() -> argparse.ArgumentParser:
             command.add_argument("--band", type=int, default=1)
         if operation == "visualize":
             command.add_argument("--output", type=Path, required=True)
+        if operation == "visualize-bundle":
+            command.add_argument("--output", type=Path, required=True)
+            command.add_argument("--max-plots", type=int, default=4)
     return parser
 
 
@@ -776,8 +947,10 @@ def main() -> int:
             payload = raster_index(args.input_path, args.output, args.index, _indices(args.bands))
         elif args.operation == "terrain":
             payload = terrain(args.input_path, args.output, args.terrain_operation, args.band)
-        else:
+        elif args.operation == "visualize":
             payload = visualize(args.input_path, args.output, args.variable, args.band, _indices(args.dimension_indices))
+        else:
+            payload = visualize_netcdf_bundle(args.input_path, args.output, args.variable, args.max_plots, _indices(args.dimension_indices))
     except Exception as exc:
         payload = _result(False, args.operation, error=f"{type(exc).__name__}: {exc}")
     print(json.dumps(payload, ensure_ascii=False, allow_nan=False))

@@ -1,4 +1,4 @@
-import type { AttachmentsContent, Message, StepContent, TaskSummaryContent } from '../types/message';
+import type { Message, StepContent, TaskSummaryContent } from '../types/message';
 
 export const getCurrentTurnStartIndex = (messages: Message[]): number => {
   for (let index = messages.length - 1; index >= 0; index -= 1) {
@@ -83,16 +83,8 @@ export const insertTaskExecutionSummary = (
   const summary: TaskSummaryContent = {
     timestamp: endedAt,
     duration_ms: Math.max(0, Math.round(elapsedMs ?? ((endedAt - startedAt) * 1000))),
+    has_steps: messages.slice(userMessageIndex + 1).some((message) => message.type === 'step'),
   };
-  const attachmentOffset = messages
-    .slice(userMessageIndex + 1)
-    .findIndex((message) => (
-      message.type === 'attachments'
-      && (message.content as AttachmentsContent).role === 'assistant'
-    ));
-  const insertionIndex = attachmentOffset >= 0
-    ? userMessageIndex + 1 + attachmentOffset
-    : messages.length;
-  messages.splice(insertionIndex, 0, { type: 'task-summary', content: summary });
+  messages.splice(userMessageIndex + 1, 0, { type: 'task-summary', content: summary });
   return summary;
 };

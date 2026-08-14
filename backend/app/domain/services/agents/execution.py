@@ -127,6 +127,11 @@ class ExecutionAgent(BaseAgent):
         "scientific_raster_index",
         "scientific_terrain",
         "scientific_visualize",
+        "scientific_netcdf_visualize",
+        "scientific_point_timeseries",
+        "scientific_region_timeseries",
+        "scientific_region_statistics",
+        "scientific_last_dimension_profile",
         "shell_run",
         "shell_exec",
         "shell_wait",
@@ -276,10 +281,19 @@ class ExecutionAgent(BaseAgent):
         tools = super().get_tools()
         if not getattr(self, "_dataset_fast_path_mode", False):
             return tools
-        return [tool for tool in tools if tool.name in self.DATASET_FAST_PATH_TOOL_NAMES]
+        return [
+            tool for tool in tools
+            if tool.name in self.DATASET_FAST_PATH_TOOL_NAMES
+            and not (
+                tool.name == "resolve_dataset_file"
+                and getattr(self, "_authoritative_target_files", False)
+            )
+        ]
 
     def get_tool(self, name: str):
         if getattr(self, "_dataset_fast_path_mode", False) and name not in self.DATASET_FAST_PATH_TOOL_NAMES:
+            return None
+        if name == "resolve_dataset_file" and getattr(self, "_authoritative_target_files", False):
             return None
         return super().get_tool(name)
 
@@ -1755,13 +1769,145 @@ class ExecutionAgent(BaseAgent):
         ).model_dump_json()
 
     def _completion_from_tool_batch(self, tool_results) -> Optional[str]:
-        """Never turn a dataset tool result into a final answer automatically.
-
-        Tools provide evidence. The agent remains responsible for deciding whether
-        that evidence answers the user's exact question and for producing the
-        final response.
-        """
+        """Finish when a deterministic capability fully covers the exact request."""
+        visualization_completion = self._netcdf_visualization_completion(tool_results)
+        if visualization_completion is not None:
+            return visualization_completion
+        coordinate_completion = self._coordinate_inspect_completion(tool_results)
+        if coordinate_completion is not None:
+            return coordinate_completion
         return None
+
+    def _netcdf_visualization_completion(self, tool_results: list[Any]) -> Optional[str]:
+        payload = next((
+            value
+            for result in tool_results
+            if (value := self._successful_scientific_payload(result, "scientific_netcdf_visualize")) is not None
+        ), None)
+        if payload is None or payload.get("operation") != "visualize_bundle":
+            return None
+        artifacts = payload.get("artifacts")
+        if not isinstance(artifacts, list):
+            return None
+        attachments = [
+            path
+            for item in artifacts[:4]
+            if isinstance(item, dict)
+            and (path := self._validated_output_attachment(item.get("path"))) is not None
+        ]
+        if not attachments:
+            return None
+        source = payload.get("source") if isinstance(payload.get("source"), dict) else {}
+        filename = PurePosixPath(str(source.get("name") or "NetCDF 文件")).name
+        variable = str(payload.get("variable") or "数值变量")
+        selections = payload.get("selections") if isinstance(payload.get("selections"), list) else []
+        language = str(getattr(getattr(self, "_current_plan", None), "language", "")).casefold()
+        if language == "zh":
+            result = (
+                f"已为 `{filename}` 的变量 `{variable}` 生成 {len(attachments)} 张经纬度空间图像。"
+                f"图像包含 {len(selections)} 个已记录的代表性切片或聚合结果，具体选择信息可在步骤结果中核验。"
+            )
+        else:
+            result = (
+                f"Generated {len(attachments)} coordinate-aware image(s) for variable `{variable}` "
+                f"in `{filename}`. The tool recorded {len(selections)} representative slice or aggregate selection(s)."
+            )
+        return ExecutionResult(success=True, result=result, attachments=attachments).model_dump_json()
+
+    @staticmethod
+    def _successful_scientific_payload(tool_result: Any, tool_name: str) -> Optional[dict[str, Any]]:
+        if getattr(tool_result, "name", None) != tool_name:
+            return None
+        artifact = getattr(tool_result, "artifact", None)
+        if not isinstance(artifact, ToolResult) or artifact.success is not True:
+            return None
+        data = artifact.data if isinstance(artifact.data, dict) else {}
+        if data.get("status") != "completed" or data.get("returncode") != 0:
+            return None
+        try:
+            payload = json.loads(data.get("output", ""))
+        except (TypeError, ValueError, json.JSONDecodeError):
+            return None
+        if not isinstance(payload, dict) or payload.get("success") is not True:
+            return None
+        return payload
+
+    def _coordinate_inspect_completion(self, tool_results: list[Any]) -> Optional[str]:
+        message = getattr(self, "_current_message", None)
+        request = str(getattr(message, "message", "") or "")
+        requests_coordinates = bool(re.search(
+            r"(?:经纬度|经度.*纬度|纬度.*经度|坐标(?:值|范围|信息)?|"
+            r"lat(?:itude)?\s*(?:and|[,&/])\s*lon(?:gitude)?|"
+            r"lon(?:gitude)?\s*(?:and|[,&/])\s*lat(?:itude)?)",
+            request,
+            re.IGNORECASE,
+        ))
+        requests_artifact = bool(re.search(
+            r"(?:下载|导出|保存|生成\s*(?:csv|文件)|download|export|save(?:\s+as)?|write\s+(?:a\s+)?file)",
+            request,
+            re.IGNORECASE,
+        ))
+        if not requests_coordinates or requests_artifact:
+            return None
+        payload = next((
+            value
+            for result in tool_results
+            if (value := self._successful_scientific_payload(result, "scientific_inspect")) is not None
+        ), None)
+        if payload is None or payload.get("format") != "netcdf":
+            return None
+        coordinates = payload.get("coordinates")
+        if not isinstance(coordinates, list):
+            return None
+        selected = [
+            item for item in coordinates
+            if isinstance(item, dict) and item.get("role") in {"latitude", "longitude"}
+        ]
+        roles = {item.get("role") for item in selected}
+        if roles != {"latitude", "longitude"}:
+            return None
+
+        source = payload.get("source") if isinstance(payload.get("source"), dict) else {}
+        filename = PurePosixPath(str(source.get("name") or "NetCDF 文件")).name
+        language = str(getattr(getattr(self, "_current_plan", None), "language", "")).casefold()
+        chinese = language == "zh"
+        lines = [
+            f"已从 `{filename}` 读取经纬度坐标：" if chinese
+            else f"Coordinates read from `{filename}`:",
+        ]
+        for item in sorted(selected, key=lambda value: 0 if value.get("role") == "latitude" else 1):
+            role = str(item.get("role"))
+            name = str(item.get("name") or role)
+            summary = item.get("summary") if isinstance(item.get("summary"), dict) else {}
+            attributes = item.get("attributes") if isinstance(item.get("attributes"), dict) else {}
+            count = summary.get("count") or (item.get("shape") or [None])[0]
+            minimum = summary.get("minimum")
+            maximum = summary.get("maximum")
+            step = summary.get("step")
+            direction = summary.get("direction")
+            unit = attributes.get("units")
+            label = "纬度" if role == "latitude" and chinese else "经度" if chinese else role.title()
+            facts = [f"{count} 个值" if chinese else f"{count} values"]
+            if minimum is not None and maximum is not None:
+                facts.append(f"范围 {minimum:g} 至 {maximum:g}" if chinese else f"range {minimum:g} to {maximum:g}")
+            if step is not None:
+                facts.append(f"步长 {abs(float(step)):g}" if chinese else f"step {abs(float(step)):g}")
+            if direction:
+                direction_text = {"ascending": "递增", "descending": "递减", "constant": "常量"}.get(str(direction), str(direction)) if chinese else str(direction)
+                facts.append(direction_text)
+            if unit:
+                facts.append(f"单位 {unit}" if chinese else f"unit {unit}")
+            lines.append(f"- {label} `{name}`：" + ("，" if chinese else ", ").join(facts))
+            first_values = summary.get("first_values")
+            last_values = summary.get("last_values")
+            if isinstance(first_values, list) and isinstance(last_values, list):
+                lines.append(
+                    f"  - 前 5 个值：{first_values}；后 5 个值：{last_values}"
+                    if chinese else
+                    f"  - First 5: {first_values}; last 5: {last_values}"
+                )
+        result = "\n".join(lines)
+        return ExecutionResult(success=True, result=result, attachments=[]).model_dump_json()
 
     @classmethod
     def _validated_output_attachment(cls, value: Any) -> Optional[str]:
@@ -3055,8 +3201,16 @@ class ExecutionAgent(BaseAgent):
                 type(exc).__name__,
             )
             return None
-        if not str(result.result or "").strip():
+        result_text = str(result.result or "").strip()
+        if not result_text:
             logger.warning("Execution result omitted the required substantive result")
+            return None
+        if re.fullmatch(
+            r"(?:placeholder|tbd|todo|n/?a|待补充|占位(?:符|文本)?|暂无(?:内容|结果)?)\.?",
+            result_text,
+            re.IGNORECASE,
+        ):
+            logger.warning("Execution result contained only placeholder text")
             return None
         return result
 
@@ -3365,94 +3519,99 @@ class ExecutionAgent(BaseAgent):
         step.status = ExecutionStatus.RUNNING
         yield StepEvent(status=StepStatus.STARTED, step=event_step())
         scoped_request = f"{step_context}\n\n{request}"
-        if dataset_intent == self.DATASET_INTENT_FILE_PREVIEW:
-            # File preview is an inventory-authorized copy operation. It must
-            # run before every model/quicklook/custom branch and never fall
-            # through to model-selected filesystem access.
-            execution = self._execute_file_preview(
-                step=step,
-                message=message,
-                target_file=(
-                    preview_target_file
-                    if isinstance(preview_target_file, str)
-                    else None
-                ),
-            )
-        else:
-            execution = self._execute_with_tool_scope(
-                scoped_request,
-                dataset_fast_path=dataset_fast_path,
-                dataset_intent=dataset_intent,
-                max_iterations=None,
-            )
         observed_shell_results: list[ToolMessage] = []
         terminal_result_seen = False
-        async for event in execution:
-            if isinstance(event, ErrorEvent):
-                step.status = ExecutionStatus.FAILED
-                step.error = event.error
-                yield StepEvent(status=StepStatus.FAILED, step=event_step())
-            elif isinstance(event, MessageEvent):
-                execution_result = await self._decode_execution_result(event.message)
-                if execution_result is None:
-                    logger.warning(
-                        "Execution step %s returned an unusable final response; attempting one repair",
-                        step.id,
-                    )
-                    execution_result = await self._repair_execution_result()
-                if execution_result is None:
-                    shell_fallback = self._shell_output_completion(
-                        observed_shell_results,
-                        direct=self._direct_shell_output_request(message),
-                    )
-                    if shell_fallback is not None:
-                        execution_result = ExecutionResult.model_validate_json(
-                            shell_fallback
-                        )
-                if execution_result is None:
-                    language = (plan.language or "").casefold()
-                    error = (
-                        "模型未返回可用的分析结果；系统已自动修复但仍未成功，请重新提交问题。"
-                        if language == "zh"
-                        else "The model returned no usable analysis result after one automatic repair; please retry the request."
-                    )
+        previous_authoritative_targets = getattr(self, "_authoritative_target_files", False)
+        self._authoritative_target_files = bool(target_files)
+        try:
+            if dataset_intent == self.DATASET_INTENT_FILE_PREVIEW:
+                # File preview is an inventory-authorized copy operation. It must
+                # run before every model/quicklook/custom branch and never fall
+                # through to model-selected filesystem access.
+                execution = self._execute_file_preview(
+                    step=step,
+                    message=message,
+                    target_file=(
+                        preview_target_file
+                        if isinstance(preview_target_file, str)
+                        else None
+                    ),
+                )
+            else:
+                execution = self._execute_with_tool_scope(
+                    scoped_request,
+                    dataset_fast_path=dataset_fast_path,
+                    dataset_intent=dataset_intent,
+                    max_iterations=None,
+                )
+            async for event in execution:
+                if isinstance(event, ErrorEvent):
                     step.status = ExecutionStatus.FAILED
-                    step.success = False
-                    step.error = error
-                    step.result = None
-                    step.attachments = []
+                    step.error = event.error
                     yield StepEvent(status=StepStatus.FAILED, step=event_step())
-                    yield ErrorEvent(error=error)
-                    return
-                terminal_result_seen = True
-                step.status = ExecutionStatus.COMPLETED
-                step.success = execution_result.success
-                step.result = execution_result.result
-                step.attachments = execution_result.attachments
-                yield StepEvent(status=StepStatus.COMPLETED, step=event_step())
-                if step.result:
-                    yield MessageEvent(message=step.result)
-                continue
-            elif isinstance(event, ToolEvent):
-                if (
-                    event.status == ToolStatus.CALLED
-                    and event.function_name in {"shell_run", "shell_exec"}
-                    and isinstance(event.function_result, ToolResult)
-                ):
-                    observed_shell_results.append(ToolMessage(
-                        tool_call_id=event.tool_call_id,
-                        name=event.function_name,
-                        content=event.function_result.model_dump_json(),
-                        artifact=event.function_result,
-                    ))
-                if event.function_name == "message_ask_user":
-                    if event.status == ToolStatus.CALLING:
-                        yield MessageEvent(message=event.function_args.get("text", ""))
-                    elif event.status == ToolStatus.CALLED:
-                        yield WaitEvent()
+                elif isinstance(event, MessageEvent):
+                    execution_result = await self._decode_execution_result(event.message)
+                    if execution_result is None:
+                        logger.warning(
+                            "Execution step %s returned an unusable final response; attempting one repair",
+                            step.id,
+                        )
+                        execution_result = await self._repair_execution_result()
+                    if execution_result is None:
+                        shell_fallback = self._shell_output_completion(
+                            observed_shell_results,
+                            direct=self._direct_shell_output_request(message),
+                        )
+                        if shell_fallback is not None:
+                            execution_result = ExecutionResult.model_validate_json(
+                                shell_fallback
+                            )
+                    if execution_result is None:
+                        language = (plan.language or "").casefold()
+                        error = (
+                            "模型未返回可用的分析结果；系统已自动修复但仍未成功，请重新提交问题。"
+                            if language == "zh"
+                            else "The model returned no usable analysis result after one automatic repair; please retry the request."
+                        )
+                        step.status = ExecutionStatus.FAILED
+                        step.success = False
+                        step.error = error
+                        step.result = None
+                        step.attachments = []
+                        yield StepEvent(status=StepStatus.FAILED, step=event_step())
+                        yield ErrorEvent(error=error)
                         return
+                    terminal_result_seen = True
+                    step.status = ExecutionStatus.COMPLETED
+                    step.success = execution_result.success
+                    step.result = execution_result.result
+                    step.attachments = execution_result.attachments
+                    yield StepEvent(status=StepStatus.COMPLETED, step=event_step())
+                    if step.result:
+                        yield MessageEvent(message=step.result)
                     continue
-            yield event
+                elif isinstance(event, ToolEvent):
+                    if (
+                        event.status == ToolStatus.CALLED
+                        and event.function_name in {"shell_run", "shell_exec"}
+                        and isinstance(event.function_result, ToolResult)
+                    ):
+                        observed_shell_results.append(ToolMessage(
+                            tool_call_id=event.tool_call_id,
+                            name=event.function_name,
+                            content=event.function_result.model_dump_json(),
+                            artifact=event.function_result,
+                        ))
+                    if event.function_name == "message_ask_user":
+                        if event.status == ToolStatus.CALLING:
+                            yield MessageEvent(message=event.function_args.get("text", ""))
+                        elif event.status == ToolStatus.CALLED:
+                            yield WaitEvent()
+                            return
+                        continue
+                yield event
+        finally:
+            self._authoritative_target_files = previous_authoritative_targets
         if step.status == ExecutionStatus.RUNNING:
             shell_fallback = self._shell_output_completion(
                 observed_shell_results,

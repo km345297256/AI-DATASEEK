@@ -9,10 +9,12 @@ export enum SessionStatus {
 
 export interface CreateSessionResponse {
     session_id: string;
+    created_at: number;
 }
 
 export interface GetSessionResponse {
     session_id: string;
+    created_at: number;
     title: string | null;
     title_manually_set: boolean;
     status: SessionStatus;

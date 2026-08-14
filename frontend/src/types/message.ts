@@ -42,6 +42,7 @@ export interface StepContent extends BaseContent {
 
 export interface TaskSummaryContent extends BaseContent {
   duration_ms: number;
+  has_steps: boolean;
 }
 
 export interface AttachmentsContent extends BaseContent {

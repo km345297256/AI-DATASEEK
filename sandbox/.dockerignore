@@ -15,6 +15,8 @@
 !app/**
 !scripts/
 !scripts/**
+!scientific_operators/
+!scientific_operators/**
 !resource/
 !resource/**
 

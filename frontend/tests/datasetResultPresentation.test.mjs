@@ -1,7 +1,10 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { stripHiddenDatasetResultNotices } from '../src/utils/datasetResultPresentation.ts';
+import {
+  isPlaceholderAssistantMessage,
+  stripHiddenDatasetResultNotices,
+} from '../src/utils/datasetResultPresentation.ts';
 
 test('removes legacy dataset inventory notices from restored assistant messages', () => {
   const content = [
@@ -33,4 +36,13 @@ test('removes the English legacy notices and preserves unrelated limitations', (
 
   const unrelated = '方法与限制：压缩包受文件数量和体积限制。';
   assert.equal(stripHiddenDatasetResultNotices(unrelated), unrelated);
+});
+
+test('recognizes only standalone assistant placeholder messages', () => {
+  for (const content of ['placeholder', 'TBD.', '待补充', '占位文本', '暂无结果']) {
+    assert.equal(isPlaceholderAssistantMessage(content), true);
+  }
+
+  assert.equal(isPlaceholderAssistantMessage('The placeholder value is missing.'), false);
+  assert.equal(isPlaceholderAssistantMessage('暂无结果，因为文件无法读取。'), false);
 });

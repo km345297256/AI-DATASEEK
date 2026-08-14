@@ -206,3 +206,60 @@ async def test_scientific_tools_build_one_quoted_bounded_command():
         "--variable 'rain rate' --dimension-indices '{\"time\": 0}' "
         "--output '/home/ubuntu/output/subset file.nc' --bbox '[100, 20, 110, 30]'"
     )
+
+
+async def test_netcdf_visualization_bundle_builds_one_bounded_command():
+    sandbox = _Sandbox(returncode=0)
+    toolkit = ShellToolkit(sandbox)
+    visualize_bundle = toolkit.get_tool("scientific_netcdf_visualize")
+    assert visualize_bundle is not None
+
+    result = await visualize_bundle._arun(
+        id="visualize-1",
+        input_path="/home/ubuntu/datasets/demo/a file; touch nope.nc",
+        output_dir="/home/ubuntu/output/netcdf charts",
+        variable="rain rate",
+        max_plots=99,
+        dimension_indices={"level": 2},
+        timeout_seconds=500,
+    )
+
+    assert result.success is True
+    assert sandbox.wait_seconds == 120
+    assert sandbox.command == (
+        "ai-dataseek-scientific visualize-bundle "
+        "'/home/ubuntu/datasets/demo/a file; touch nope.nc' "
+        "--variable 'rain rate' --dimension-indices '{\"level\": 2}' "
+        "--output '/home/ubuntu/output/netcdf charts' --max-plots 4"
+    )
+
+
+async def test_scientific_recipe_tools_build_one_quoted_bounded_command():
+    sandbox = _Sandbox(returncode=0)
+    toolkit = ShellToolkit(sandbox)
+    region_timeseries = toolkit.get_tool("scientific_region_timeseries")
+    assert region_timeseries is not None
+
+    result = await region_timeseries._arun(
+        id="recipe-1",
+        input_path="/home/ubuntu/datasets/demo/a file; touch nope.nc",
+        variable="rain rate",
+        method="median",
+        polygon=[[100.5, 20.25], [110.5, 20.25], [105.5, 30.25]],
+        time_coordinate="valid time",
+        dimension_indices={"level": 2},
+        max_points=9999,
+        timeout_seconds=500,
+    )
+
+    assert result.success is True
+    assert sandbox.exec_dir == "/home/ubuntu"
+    assert sandbox.wait_seconds == 120
+    assert sandbox.command == (
+        "ai-dataseek-scientific-recipe region-timeseries "
+        "'/home/ubuntu/datasets/demo/a file; touch nope.nc' "
+        "--variable 'rain rate' --dimension-indices '{\"level\": 2}' "
+        "--max-points 2000 --method median "
+        "--polygon '[[100.5, 20.25], [110.5, 20.25], [105.5, 30.25]]' "
+        "--time-coordinate 'valid time'"
+    )

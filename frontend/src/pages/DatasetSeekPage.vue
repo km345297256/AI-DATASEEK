@@ -219,6 +219,9 @@
           </div>
         </div>
         <div ref="timelineContentRef" class="mx-auto flex min-h-full w-full min-w-0 max-w-[800px] flex-col px-4 pb-8 pt-5 sm:px-6 sm:pt-7">
+          <div v-if="sessionCreatedAt" class="mb-4 text-center text-xs text-[var(--text-tertiary)]">
+            {{ formatSessionCreatedAt(sessionCreatedAt) }}
+          </div>
           <div v-if="messages.length === 0" class="flex flex-1 flex-col justify-center py-8 sm:py-12">
             <div v-if="dataset" class="max-w-2xl">
               <img src="/ai-dataseek-logo.png" alt="" class="size-11 object-contain" aria-hidden="true" />
@@ -272,13 +275,18 @@
 
           <div v-else class="dataset-chat-list flex min-w-0 max-w-full flex-col gap-2">
             <template v-for="(message, index) in messages" :key="`${message.type}-${index}`">
-              <div class="dataset-chat-message min-w-0 max-w-full">
+              <div
+                v-if="message.type !== 'step' || shouldShowStep(index)"
+                class="dataset-chat-message min-w-0 max-w-full"
+              >
                 <ChatMessage
                   :message="message"
                   :session-id="sessionId || undefined"
                   :hide-header="isConsecutiveAssistant(messages, index)"
                   :show-assistant-actions="!isLoading && isLatestAssistantMessage(messages, index)"
+                  :task-summary-expanded="isTaskSummaryExpanded(message)"
                   @toolClick="handleToolClick"
+                  @taskSummaryToggle="toggleTaskSummary(message)"
                 />
               </div>
               <div
@@ -336,9 +344,9 @@
                 {{ completionAdvice.skill_reason }}
               </div>
             </div>
-            <div v-if="isLoading" class="mt-3 flex items-center gap-2 text-sm text-[var(--text-tertiary)]">
+            <div v-if="isLoading && !hasRunningStep" class="mt-3 flex items-center gap-2 text-sm text-[var(--text-tertiary)]">
               <LoaderCircle class="size-4 animate-spin" />
-              <span>{{ loadingStatus || 'DataSeek 正在分析数据集...' }}</span>
+              <span>{{ loadingStatus }}</span>
             </div>
           </div>
         </div>
@@ -363,7 +371,7 @@
             @submit="submit"
             @stop="stop"
           />
-          <p class="mt-1.5 text-center text-[10px] text-[var(--text-tertiary)]">回答由 DataSeek 基于本次关联数据目录生成，分析结果应结合数据质量与来源信息进行验证。</p>
+          <p class="mt-1.5 text-center text-[10px] text-[var(--text-tertiary)]">DataSeek 也可能会犯错。请核查重要信息。</p>
         </div>
       </div>
     </main>
@@ -399,6 +407,7 @@ import { useAgentProfile } from '@/composables/useAgentProfile';
 import { useFilePanel } from '@/composables/useFilePanel';
 import { EVENT_SKILL_PREFERENCES_UPDATED } from '@/constants/event';
 import { DATASET_CHAT_PLACEHOLDER, buildDatasetChatCapabilities } from '@/utils/datasetCapabilitySelection';
+import { isPlaceholderAssistantMessage } from '@/utils/datasetResultPresentation';
 import { copyToClipboard } from '@/utils/dom';
 import { eventBus } from '@/utils/eventBus';
 import { showErrorToast, showSuccessToast } from '@/utils/toast';
@@ -426,6 +435,8 @@ const selectedSkills = ref<string[]>([]);
 const autoEnabledSkillNames = ref(new Set<string>());
 const messages = ref<Message[]>([]);
 const sessionId = ref<string | null>(null);
+const sessionCreatedAt = ref<number | null>(null);
+const expandedTaskSummaries = ref(new Set<number>());
 const lastEventId = ref<string>();
 const isLoading = ref(false);
 const taskStartedAtMs = ref<number>();
@@ -677,10 +688,18 @@ function jumpToLatestTool() {
 
 function handleMessage(data: MessageEventData) {
   if (data.role === 'user') startUserTurn();
+  if (
+    data.role === 'assistant'
+    && (isLegacyPlanProgressMessage(data.content) || isPlaceholderAssistantMessage(data.content))
+  ) return;
   messages.value.push({ type: data.role, content: { ...data } as MessageContent });
   if (data.attachments?.length) {
     messages.value.push({ type: 'attachments', content: { ...data } as AttachmentsContent });
   }
+}
+
+function isLegacyPlanProgressMessage(content: string) {
+  return /^(正在(?:联合)?分析指定|正在快速分析当前数据集|Analyzing the selected file|Jointly analyzing \d+ selected files|Analyzing the current dataset)/.test(content.trim());
 }
 
 function handleTool(data: ToolEventData) {
@@ -816,11 +835,51 @@ function formatHistoryTime(timestamp: number | null) {
   ).format(date);
 }
 
+function formatSessionCreatedAt(timestamp: number) {
+  const date = new Date(timestamp * 1000);
+  const today = new Date();
+  const sameDay = date.toDateString() === today.toDateString();
+  const value = new Intl.DateTimeFormat('zh-CN', sameDay
+    ? { hour: '2-digit', minute: '2-digit' }
+    : { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }
+  ).format(date);
+  return sameDay ? `今天 ${value}` : value;
+}
+
+function taskSummaryBefore(stepIndex: number) {
+  for (let index = stepIndex - 1; index >= 0; index -= 1) {
+    const message = messages.value[index];
+    if (message.type === 'user') return undefined;
+    if (message.type === 'task-summary') return message;
+  }
+  return undefined;
+}
+
+function shouldShowStep(index: number) {
+  const summary = taskSummaryBefore(index);
+  return !summary || expandedTaskSummaries.value.has(summary.content.timestamp);
+}
+
+const hasRunningStep = computed(() => Boolean(findCurrentTurnRunningStep(messages.value)));
+
+function isTaskSummaryExpanded(message: Message) {
+  return message.type === 'task-summary' && expandedTaskSummaries.value.has(message.content.timestamp);
+}
+
+function toggleTaskSummary(message: Message) {
+  if (message.type !== 'task-summary') return;
+  const next = new Set(expandedTaskSummaries.value);
+  if (next.has(message.content.timestamp)) next.delete(message.content.timestamp);
+  else next.add(message.content.timestamp);
+  expandedTaskSummaries.value = next;
+}
+
 async function ensureSession() {
   if (sessionId.value) return sessionId.value;
   loadingStatus.value = '正在创建数据分析会话...';
   const session = await createSession(selectedProfileId.value);
   sessionId.value = session.session_id;
+  sessionCreatedAt.value = session.created_at;
   localStorage.setItem(datasetStorageKey(), session.session_id);
   return session.session_id;
 }
@@ -897,6 +956,7 @@ function clearConversationState() {
   shouldFollowTimeline.value = true;
   lastEventId.value = undefined;
   messages.value = [];
+  expandedTaskSummaries.value = new Set();
   currentPlan.value = undefined;
   lastTool.value = undefined;
   lastNoMessageTool.value = undefined;
@@ -914,6 +974,7 @@ async function loadConversation(targetSessionId: string) {
   try {
     const session = await getSession(targetSessionId);
     sessionId.value = session.session_id;
+    sessionCreatedAt.value = session.created_at;
     localStorage.setItem(datasetStorageKey(), session.session_id);
     let restoredSkills: string[] = [];
     for (const event of session.events) {
@@ -940,6 +1001,7 @@ async function loadConversation(targetSessionId: string) {
     console.error('Failed to restore dataset chat session', error);
     localStorage.removeItem(datasetStorageKey());
     sessionId.value = null;
+    sessionCreatedAt.value = null;
     selectedSkills.value = [];
     clearConversationState();
     throw error;
@@ -966,6 +1028,7 @@ function newConversationFromHistory() {
   historyOpen.value = false;
   localStorage.removeItem(datasetStorageKey());
   sessionId.value = null;
+  sessionCreatedAt.value = null;
   selectedSkills.value = [];
   clearConversationState();
 }

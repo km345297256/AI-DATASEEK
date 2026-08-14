@@ -105,6 +105,178 @@ def _completed_shell_result(output: str) -> ToolMessage:
     )
 
 
+def _completed_scientific_inspect_result(*, filename: str = "sample.nc") -> ToolMessage:
+    payload = {
+        "success": True,
+        "status": "completed",
+        "returncode": 0,
+        "format": "netcdf",
+        "source": {"name": filename},
+        "coordinates": [
+            {
+                "name": "lat",
+                "role": "latitude",
+                "shape": [3],
+                "summary": {
+                    "count": 3,
+                    "first_values": [10.0, 20.0, 30.0],
+                    "last_values": [10.0, 20.0, 30.0],
+                    "minimum": 10.0,
+                    "maximum": 30.0,
+                    "step": 10.0,
+                    "direction": "ascending",
+                },
+                "attributes": {"units": "degrees_north"},
+            },
+            {
+                "name": "lon",
+                "role": "longitude",
+                "shape": [4],
+                "summary": {
+                    "count": 4,
+                    "first_values": [100.0, 110.0, 120.0, 130.0],
+                    "last_values": [100.0, 110.0, 120.0, 130.0],
+                    "minimum": 100.0,
+                    "maximum": 130.0,
+                    "step": 10.0,
+                    "direction": "ascending",
+                },
+                "attributes": {"units": "degrees_east"},
+            },
+        ],
+    }
+    return ToolMessage(
+        tool_call_id="call-inspect",
+        name="scientific_inspect",
+        content="completed",
+        artifact=ToolResult(
+            success=True,
+            message="completed",
+            data={
+                "status": "completed",
+                "returncode": 0,
+                "output": json.dumps(payload),
+            },
+        ),
+    )
+
+
+def _completed_netcdf_visualization_result() -> ToolMessage:
+    payload = {
+        "success": True,
+        "operation": "visualize_bundle",
+        "source": {"name": "sample.nc"},
+        "variable": "rain",
+        "selections": [
+            {"dimension_indices": {"time": 0}},
+            {"dimension_indices": {"time": 6}},
+            {"dimension_indices": {"time": 11}},
+            {"reduction": {"dimension": "time", "method": "mean"}},
+        ],
+        "artifacts": [
+            {"path": f"/home/ubuntu/output/netcdf-plot/{index}.png", "type": "image/png"}
+            for index in range(4)
+        ],
+    }
+    return ToolMessage(
+        tool_call_id="call-netcdf-visualize",
+        name="scientific_netcdf_visualize",
+        content="completed",
+        artifact=ToolResult(
+            success=True,
+            message="completed",
+            data={
+                "status": "completed",
+                "returncode": 0,
+                "output": json.dumps(payload),
+            },
+        ),
+    )
+
+
+def test_netcdf_visualization_tool_finishes_with_verified_attachments():
+    agent = object.__new__(ExecutionAgent)
+    agent._current_message = Message(message="绘制 sample.nc 的图像")
+    agent._current_plan = Plan(language="zh")
+
+    completion = agent._completion_from_tool_batch([
+        _completed_netcdf_visualization_result()
+    ])
+
+    assert completion is not None
+    result = ExecutionResult.model_validate_json(completion)
+    assert result.success is True
+    assert "生成 4 张经纬度空间图像" in result.result
+    assert result.attachments == [
+        f"/home/ubuntu/output/netcdf-plot/{index}.png" for index in range(4)
+    ]
+
+
+def test_coordinate_inspect_result_finishes_without_another_model_or_shell_call():
+    agent = object.__new__(ExecutionAgent)
+    agent._current_message = Message(message="请提取 sample.nc 的经纬度")
+    agent._current_plan = Plan(language="zh")
+
+    completion = agent._completion_from_tool_batch([
+        _completed_scientific_inspect_result()
+    ])
+
+    assert completion is not None
+    result = ExecutionResult.model_validate_json(completion)
+    assert result.success is True
+    assert "纬度 `lat`" in result.result
+    assert "经度 `lon`" in result.result
+    assert result.attachments == []
+
+
+def test_coordinate_inspect_result_does_not_finish_export_requests():
+    agent = object.__new__(ExecutionAgent)
+    agent._current_message = Message(message="提取 sample.nc 的经纬度并导出 CSV")
+    agent._current_plan = Plan(language="zh")
+
+    assert agent._completion_from_tool_batch([
+        _completed_scientific_inspect_result()
+    ]) is None
+
+
+def test_coordinate_inspect_result_does_not_finish_non_coordinate_requests():
+    agent = object.__new__(ExecutionAgent)
+    agent._current_message = Message(message="请读取 sample.nc 的变量和单位")
+    agent._current_plan = Plan(language="zh")
+
+    assert agent._completion_from_tool_batch([
+        _completed_scientific_inspect_result()
+    ]) is None
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("placeholder", ["placeholder", "TBD.", "待补充", "暂无结果"])
+async def test_execution_result_rejects_standalone_placeholder_text(placeholder):
+    agent = object.__new__(ExecutionAgent)
+
+    result = await agent._decode_execution_result(json.dumps({
+        "success": True,
+        "result": placeholder,
+        "attachments": [],
+    }))
+
+    assert result is None
+
+
+@pytest.mark.asyncio
+async def test_execution_result_accepts_substantive_text_containing_placeholder_word():
+    agent = object.__new__(ExecutionAgent)
+
+    result = await agent._decode_execution_result(json.dumps({
+        "success": True,
+        "result": "The placeholder attribute is empty in this file.",
+        "attachments": [],
+    }))
+
+    assert result is not None
+    assert result.result == "The placeholder attribute is empty in this file."
+
+
 @pytest.mark.asyncio
 async def test_explicit_stdout_request_finishes_after_one_successful_shell_batch():
     agent = object.__new__(ExecutionAgent)

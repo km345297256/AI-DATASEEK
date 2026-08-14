@@ -326,7 +326,6 @@ class PlanActFlow(BaseFlow):
                         self._agent_id,
                     )
                     yield TitleEvent(title=self.plan.title)
-                    yield MessageEvent(role="assistant", message=self.plan.message or "")
                     yield PlanEvent(status=PlanStatus.CREATED, plan=self.plan)
                 else:
                     self._dataset_fast_path_active = False
@@ -337,7 +336,6 @@ class PlanActFlow(BaseFlow):
                             self._ensure_vision_step_for_image_message(message)
                             logger.info(f"Agent {self._agent_id} created plan successfully with {len(event.plan.steps)} steps")
                             yield TitleEvent(title=event.plan.title)
-                            yield MessageEvent(role="assistant", message=event.plan.message or "")
                         yield event
                 logger.info(f"Agent {self._agent_id} state changed from {AgentStatus.PLANNING} to {AgentStatus.EXECUTING}")
                 self.status = AgentStatus.EXECUTING

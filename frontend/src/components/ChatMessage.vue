@@ -118,40 +118,16 @@
   </div>
   <ToolUse v-else-if="message.type === 'tool'" :tool="toolContent" @click="handleToolClick(toolContent)" />
   <div v-else-if="message.type === 'step'" class="flex flex-col">
-    <div class="text-sm w-full clickable flex gap-2 justify-between group/header truncate text-[var(--text-primary)]"
-      data-event-id="HNtP7XOMUOhPemItd2EkK2">
-      <div class="flex flex-row gap-2 justify-center items-center truncate">
-        <div v-if="stepContent.status !== 'completed'"
-          class="w-4 h-4 flex-shrink-0 flex items-center justify-center border border-[var(--border-dark)] rounded-[15px]">
-        </div>
-        <div v-else
-          class="w-4 h-4 flex-shrink-0 flex items-center justify-center border-[var(--border-dark)] rounded-[15px] bg-[var(--text-disable)] dark:bg-[var(--fill-tsp-white-dark)] border-0">
-          <CheckIcon class="text-[var(--icon-white)] dark:text-[var(--icon-white-tsp)]" :size="10" />
-        </div>
-        <div class="truncate font-medium markdown-content"
-          v-html="stepContent.description ? renderMarkdown(stepContent.description) : ''">
-        </div>
-        <span class="flex-shrink-0 flex" @click="isExpanded = !isExpanded;">
-          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
-            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
-            class="lucide lucide-chevron-down transition-transform duration-300 w-4 h-4"
-            :class="{ 'rotate-180': isExpanded }">
-            <path d="m6 9 6 6 6-6"></path>
-          </svg>
-        </span>
-      </div>
-      <div class="float-right transition text-[12px] text-[var(--text-tertiary)] invisible group-hover/header:visible">
-        {{ relativeTime(message.content.timestamp) }}
-      </div>
+    <div v-if="stepContent.status === 'running'" class="mb-2 flex items-center gap-2 text-sm text-[var(--text-secondary)]">
+      <span class="size-3.5 animate-spin rounded-full border-2 border-[var(--border-dark)] border-t-transparent" aria-hidden="true" />
+      <span>思考中...</span>
     </div>
     <div class="flex">
       <div class="w-[24px] relative">
         <div class="border-l border-dashed border-[var(--border-dark)] absolute start-[8px] top-0 bottom-0"
           style="height: calc(100% + 14px);"></div>
       </div>
-      <div
-        class="flex flex-col gap-3 flex-1 min-w-0 overflow-hidden pt-2 transition-[max-height,opacity] duration-150 ease-in-out"
-        :class="{ 'max-h-[100000px] opacity-100': isExpanded, 'max-h-0 opacity-0': !isExpanded }">
+      <div class="flex flex-col gap-3 flex-1 min-w-0 overflow-hidden pt-2">
         <div v-for="(item, index) in displayTools" :key="`${item.tool.tool_call_id}-${index}`" class="flex flex-col gap-2">
           <ToolUse
             :tool="item.tool"
@@ -166,7 +142,12 @@
       </div>
     </div>
   </div>
-  <TaskExecutionSummary v-else-if="message.type === 'task-summary'" :content="taskSummaryContent" />
+  <TaskExecutionSummary
+    v-else-if="message.type === 'task-summary'"
+    :content="taskSummaryContent"
+    :expanded="taskSummaryExpanded"
+    @toggle="$emit('taskSummaryToggle')"
+  />
   <div v-else-if="message.type === 'attachments' && attachmentsContent.role === 'assistant'" class="flex flex-col gap-2 w-full group" :class="hideAssistantHeader ? 'mt-0' : 'mt-3'">
     <AttachmentsMessage :content="attachmentsContent" :hideAllFilesButton="hideAllFilesButton"/>
   </div>
@@ -198,12 +179,14 @@ const props = defineProps<{
   hideAllFilesButton?: boolean;
   hideHeader?: boolean;
   showAssistantActions?: boolean;
+  taskSummaryExpanded?: boolean;
 }>();
 
 const hideAssistantHeader = computed(() => props.hideHeader ?? false);
 
 const emit = defineEmits<{
   (e: 'toolClick', tool: ToolContent): void;
+  (e: 'taskSummaryToggle'): void;
 }>();
 
 const handleToolClick = (tool: ToolContent) => {
@@ -456,8 +439,6 @@ const displayTools = computed<DisplayToolItem[]>(() => {
 });
 
 // Control content expand/collapse state
-const isExpanded = ref(false);
-
 const { relativeTime } = useRelativeTime();
 
 const renderer = new marked.Renderer();

@@ -17,3 +17,7 @@ export function stripHiddenDatasetResultNotices(text: string): string {
   if (!removed) return text;
   return visibleLines.join('\n').replace(/^\n+|\n+$/g, '').replace(/\n{3,}/g, '\n\n');
 }
+
+export function isPlaceholderAssistantMessage(text: string): boolean {
+  return /^(?:placeholder|tbd|todo|n\/?a|待补充|占位(?:符|文本)?|暂无(?:内容|结果)?)\.?$/i.test(text.trim());
+}

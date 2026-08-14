@@ -109,6 +109,7 @@ def test_prompts_prefer_deterministic_scientific_operators():
         assert "scientific_statistics" in prompt
         assert "scientific_aggregate" in prompt
         assert "scientific_visualize" in prompt
+        assert "scientific_netcdf_visualize" in prompt
     for tool_name in (
         "scientific_subset",
         "scientific_convert_netcdf_to_geotiff",

@@ -147,6 +147,7 @@
           <PlanPanel v-if="plan && plan.steps.length > 0" :plan="plan" />
           <ChatBox v-model="inputMessage" v-model:selected-skills="selectedSkills" v-model:selected-mcp-servers="selectedMcpServers" :rows="1" @submit="handleSubmit" :isRunning="isLoading" @stop="handleStop"
             :attachments="attachments" />
+          <p class="pb-1.5 text-center text-[10px] text-[var(--text-tertiary)]">DataSeek 也可能会犯错。请核查重要信息。</p>
         </div>
       </div>
     </div>
