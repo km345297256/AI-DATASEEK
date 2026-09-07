@@ -6,7 +6,8 @@ from typing import Any
 
 from PIL import Image, ImageDraw, ImageStat, ExifTags
 
-IMAGE_EXTENSIONS={".jpg",".jpeg",".png"}
+IMAGE_EXTENSIONS={".jpg",".jpeg",".png",".tif",".tiff"}
+SIGNATURE_FORMATS={".jpg":"JPEG",".jpeg":"JPEG",".png":"PNG",".tif":"TIFF",".tiff":"TIFF"}
 ROOT=Path(os.environ.get("AI_DATASEEK_OUTPUT_ROOT","/home/ubuntu/output")).resolve()
 
 def safe_output(raw: str) -> Path:
@@ -22,6 +23,17 @@ def files(paths: list[str], max_files: int=20000) -> list[Path]:
         if p.is_dir(): out.extend(sorted(x for x in p.rglob("*") if x.suffix.lower() in IMAGE_EXTENSIONS))
         elif p.suffix.lower() in IMAGE_EXTENSIONS: out.append(p)
     return out[:max_files]
+
+def frame_info(im: Image.Image) -> dict[str,Any]:
+    """Describe the original first frame without converting scientific pixels."""
+    return {"mode":im.mode,"n_frames":int(getattr(im,"n_frames",1)),"frame_index":0}
+
+def preview_info(im: Image.Image, converted_mode: str="L") -> dict[str,Any]:
+    info=frame_info(im)
+    warnings=["Preview conversion is not original scientific intensity quantification."]
+    if info["n_frames"]>1: warnings.append("Only the first frame is used; remaining TIFF/image frames are not analyzed.")
+    if im.mode.startswith("I") or im.mode=="F": warnings.append("Higher-bit-depth or floating-point pixels are converted to an 8-bit preview and may be clipped; original pixel values are not preserved in this result.")
+    return {"source_mode":info["mode"],"n_frames":info["n_frames"],"frame_index":0,"analysis_scope":f"first_frame_8bit_{converted_mode}_preview","quantitative":False,"warnings":warnings}
 
 def exif(path: Path) -> dict[str,Any]:
     try:
@@ -57,7 +69,7 @@ def collection(a):
     ps=files([a["input_dir"]],a.get("max_files",10000)); rows=[]
     for p in ps:
         try:
-            with Image.open(p) as im: row={"path":str(p),"name":p.name,"format":im.format,"width":im.width,"height":im.height,"mode":im.mode,"size_bytes":p.stat().st_size,"has_alpha":im.mode in ("RGBA","LA")}; row.update(exif(p)); rows.append(row)
+            with Image.open(p) as im: row={"path":str(p),"name":p.name,"format":im.format,"width":im.width,"height":im.height,**frame_info(im),"analysis_scope":"first_frame_metadata","size_bytes":p.stat().st_size,"has_alpha":im.mode in ("RGBA","LA")}; row.update(exif(p)); rows.append(row)
         except Exception as e: rows.append({"path":str(p),"error":f"{type(e).__name__}: {e}"})
     return dump({"operation":"image_collection_inspect","file_count":len(rows),"files":rows,"gps_count":sum(bool(gps_coords(x)) for x in rows),"exif_count":sum(x.get("exif_fields",0)>0 for x in rows),"formats":sorted({x.get("format") for x in rows if x.get("format")})},a.get("output_path"))
 
@@ -65,7 +77,7 @@ def metadata(a):
     rows=[]
     for p in files(a["input_paths"]):
         try:
-            with Image.open(p) as im: row={"path":str(p),"name":p.name,"format":im.format,"width":im.width,"height":im.height,"mode":im.mode}; row.update(exif(p)); row["gps_coordinates"]=gps_coords(row); rows.append(row)
+            with Image.open(p) as im: row={"path":str(p),"name":p.name,"format":im.format,"width":im.width,"height":im.height,**frame_info(im),"analysis_scope":"first_frame_metadata"}; row.update(exif(p)); row["gps_coordinates"]=gps_coords(row); rows.append(row)
         except Exception as e: rows.append({"path":str(p),"error":str(e)})
     return dump({"operation":"image_metadata_extract","records":rows},a.get("output_path"))
 
@@ -77,19 +89,22 @@ def integrity(a):
             with Image.open(p) as im:
                 im.verify()
             with Image.open(p) as im:
-                row.update(readable=True,format=im.format,width=im.width,height=im.height,blank=ImageStat.Stat(im.convert("L")).stddev[0]<1e-6,signature_match=im.format.lower() in {"jpeg","png"})
+                im.load()
+                extrema=im.getextrema(); bands=extrema if isinstance(extrema[0],tuple) else [extrema]
+                row.update(readable=True,format=im.format,width=im.width,height=im.height,**frame_info(im),blank=all(low==high for low,high in bands),blank_scope="original_first_frame_values",verification_scope="container_header_and_first_frame",signature_match=im.format==SIGNATURE_FORMATS.get(p.suffix.lower()))
+                if row["n_frames"]>1: row["warnings"]=["Only the first frame is decoded; later frame integrity and blankness are not verified."]
         except Exception as e: row["error"]=f"{type(e).__name__}: {e}"
         rows.append(row)
-    return dump({"operation":"image_integrity_check","records":rows,"invalid_count":sum(not x["readable"] for x in rows)},a.get("output_path"))
+    return dump({"operation":"image_integrity_check","records":rows,"invalid_count":sum(not x["readable"] for x in rows),"signature_mismatch_count":sum(x.get("signature_match") is False for x in rows)},a.get("output_path"))
 
 def phash(im: Image.Image) -> int:
     small=im.convert("L").resize((16,16)); mean=sum(small.getdata())/256; return sum((1<<i) for i,v in enumerate(small.getdata()) if v>=mean)
 def dup(a):
-    rows=[]; exact={}; hashes=[]
+    rows=[]; exact={}; hashes=[]; warnings=set()
     for p in files(a["input_paths"]):
         digest=hashlib.sha256(p.read_bytes()).hexdigest()
         try:
-            with Image.open(p) as im: h=phash(im)
+            with Image.open(p) as im: warnings.update(preview_info(im)["warnings"]); h=phash(im)
         except Exception: continue
         rows.append({"path":str(p),"sha256":digest,"phash":h}); exact.setdefault(digest,[]).append(str(p)); hashes.append((str(p),h))
     similar=[]; distance=a.get("distance",5)
@@ -97,7 +112,7 @@ def dup(a):
         for q,k in hashes[i+1:]:
             d=(h^k).bit_count()
             if d<=distance: similar.append({"left":p,"right":q,"distance":d})
-    return dump({"operation":"image_duplicate_detect","exact_groups":[v for v in exact.values() if len(v)>1],"similar_pairs":similar,"image_count":len(rows)},a.get("output_path"))
+    return dump({"operation":"image_duplicate_detect","exact_groups":[v for v in exact.values() if len(v)>1],"similar_pairs":similar,"image_count":len(rows),"analysis_scope":{"exact_duplicates":"whole_file_sha256","similar_pairs":"first_frame_8bit_grayscale_perceptual_hash"},"warnings":sorted(warnings)},a.get("output_path"))
 
 def quality(a):
     rows=[]
@@ -105,33 +120,34 @@ def quality(a):
         try:
             with Image.open(p) as im:
                 gray=im.convert("L"); stat=ImageStat.Stat(gray); hist=gray.histogram(); total=sum(hist); dark=sum(hist[:8])/total; bright=sum(hist[248:])/total
-                rows.append({"path":str(p),"width":im.width,"height":im.height,"mean":stat.mean[0],"stddev":stat.stddev[0],"dark_ratio":dark,"bright_ratio":bright,"near_blank":stat.stddev[0]<1.0,"sharpness_indicator":stat.stddev[0]})
+                rows.append({"path":str(p),"width":im.width,"height":im.height,**preview_info(im),"mean":stat.mean[0],"stddev":stat.stddev[0],"dark_ratio":dark,"bright_ratio":bright,"near_blank":stat.stddev[0]<1.0,"sharpness_indicator":stat.stddev[0]})
         except Exception as e: rows.append({"path":str(p),"error":str(e)})
     return dump({"operation":"image_quality_assess","records":rows},a.get("output_path"))
 
 def contact(a):
-    outdir=safe_output(a["output_dir"]); outdir.mkdir(parents=True,exist_ok=True); paths=files(a["input_paths"],1000); cols=a.get("columns",4); thumb=a.get("thumb_size",240); per=a.get("per_page",40); artifacts=[]
+    outdir=safe_output(a["output_dir"]); outdir.mkdir(parents=True,exist_ok=True); paths=files(a["input_paths"],1000); cols=a.get("columns",4); thumb=a.get("thumb_size",240); per=a.get("per_page",40); artifacts=[]; warnings=set()
     for page in range(0,len(paths),per):
         group=paths[page:page+per]; cell_h=thumb+48; sheet=Image.new("RGB",(cols*thumb,math.ceil(len(group)/cols)*cell_h),(245,245,245)); draw=ImageDraw.Draw(sheet)
         for i,p in enumerate(group):
             try:
-                with Image.open(p) as im: im=im.convert("RGB"); im.thumbnail((thumb-8,thumb-8)); x=(i%cols)*thumb+(thumb-im.width)//2; y=(i//cols)*cell_h+4; sheet.paste(im,(x,y)); draw.text(((i%cols)*thumb+4,(i//cols)*cell_h+thumb),p.name[:32],fill=(0,0,0))
+                with Image.open(p) as im: warnings.update(preview_info(im,"RGB")["warnings"]); im=im.convert("RGB"); im.thumbnail((thumb-8,thumb-8)); x=(i%cols)*thumb+(thumb-im.width)//2; y=(i//cols)*cell_h+4; sheet.paste(im,(x,y)); draw.text(((i%cols)*thumb+4,(i//cols)*cell_h+thumb),p.name[:32],fill=(0,0,0))
             except Exception: pass
         target=outdir/f"contact-sheet-{page//per+1}.png"; sheet.save(target); artifacts.append({"path":str(target),"size_bytes":target.stat().st_size})
-    return {"success":True,"operation":"image_contact_sheet","image_count":len(paths),"artifacts":artifacts}
+    return {"success":True,"operation":"image_contact_sheet","image_count":len(paths),"artifacts":artifacts,"analysis_scope":"first_frame_8bit_RGB_thumbnail_preview","quantitative":False,"warnings":sorted(warnings)}
 
 def ocr(a):
     rows=[]
     for p in files(a["input_paths"],100):
         try:
+            with Image.open(p) as im: source_info=frame_info(im)
             with tempfile.TemporaryDirectory() as td:
                 base=Path(td)/"ocr"; subprocess.run(["tesseract",str(p),str(base),"-l",a.get("languages","chi_sim+eng"),"tsv"],check=False,capture_output=True,timeout=90)
                 tsv=base.with_suffix(".tsv"); words=[]
                 if tsv.exists():
                     for line in tsv.read_text(errors="ignore").splitlines()[1:]:
                         cols=line.split("\t")
-                        if len(cols)>=12 and cols[11].strip(): words.append({"text":cols[11],"confidence":float(cols[10]),"box":[int(cols[6]),int(cols[7]),int(cols[8]),int(cols[9])]})
-                rows.append({"path":str(p),"text":" ".join(w["text"] for w in words),"words":words})
+                        if len(cols)>=12 and cols[11].strip(): words.append({"text":cols[11],"page_number":int(cols[1]),"confidence":float(cols[10]),"box":[int(cols[6]),int(cols[7]),int(cols[8]),int(cols[9])]})
+                rows.append({"path":str(p),**source_info,"analysis_scope":"ocr_engine_text_not_pixel_quantification","text":" ".join(w["text"] for w in words),"words":words})
         except Exception as e: rows.append({"path":str(p),"error":str(e)})
     return dump({"operation":"image_ocr_text","records":rows},a.get("output_path"))
 
@@ -164,8 +180,9 @@ def derivative(a):
     outdir=safe_output(a["output_dir"]); outdir.mkdir(parents=True,exist_ok=True); artifacts=[]
     for p in files(a["input_paths"],1000):
         with Image.open(p) as im:
+            scope=preview_info(im,"RGB")
             im=im.convert("RGB"); im.thumbnail((a.get("max_dimension",2048),a.get("max_dimension",2048))); target=outdir/(p.stem+"."+a.get("format","jpeg")); savekw={"quality":a.get("quality",88)} if target.suffix==".jpeg" else {}
-            im.save(target,**savekw); artifacts.append({"path":str(target),"size_bytes":target.stat().st_size})
+            im.save(target,**savekw); artifacts.append({"path":str(target),"size_bytes":target.stat().st_size,"source_name":p.name,**scope})
     return {"success":True,"operation":"image_safe_derivative","artifacts":artifacts}
 
 FUNCTIONS={"image_collection_inspect":collection,"image_metadata_extract":metadata,"image_integrity_check":integrity,"image_duplicate_detect":dup,"image_quality_assess":quality,"image_contact_sheet":contact,"image_ocr_text":ocr,"image_gps_map":gps_map,"image_spatial_group":spatial_group,"image_safe_derivative":derivative}

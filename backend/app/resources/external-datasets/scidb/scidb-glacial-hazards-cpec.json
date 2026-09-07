@@ -1,0 +1,1110 @@
+{
+  "dataset_id": "scidb-glacial-hazards-cpec",
+  "external_id": "776016954459684864",
+  "data_center_id": "reviewed-scidb-catalog",
+  "data_center_name": "ScienceDB 科学数据银行",
+  "name": "中巴经济走廊冰川冰湖灾害清单",
+  "description": "中巴经济走廊沿线上游冰川、冰湖、跃动冰川、冰湖溃决、泥石流沟、滑坡及历史地震相关空间数据，可用于多灾种空间分布和风险背景分析。",
+  "domain": "geoscience",
+  "data_type": "zip",
+  "tags": [
+    "geoscience",
+    "ScienceDB 科学数据银行",
+    "公开数据"
+  ],
+  "metadata": {
+    "curated": true,
+    "catalog_version": 1,
+    "source_catalog": "scidb",
+    "publisher": "ScienceDB 科学数据银行",
+    "source_url": "https://www.scidb.cn/en/detail?dataSetId=776016954459684864",
+    "license": "CC BY 4.0",
+    "license_url": "https://creativecommons.org/licenses/by/4.0/",
+    "license_details": "Creative Commons Attribution 4.0；须署名、链接许可并说明修改。",
+    "sample_scope": "完整 V1 dataset.zip（44,966,957字节）；内部实际空间文件和坐标系须下载后逐一核验，不能把包内所有文件预先断言成同一种格式。",
+    "sample_note": "完整 V1 dataset.zip（44,966,957字节）；内部实际空间文件和坐标系须下载后逐一核验，不能把包内所有文件预先断言成同一种格式。",
+    "download_date": "2026-09-07",
+    "provenance": [
+      {
+        "path": "dataset.zip",
+        "size": 44966957,
+        "sha256": "22cffe3151f4fac086e911d83956fb91b147307d67fb3f02fdb53d504d3a5b6a",
+        "role": "data",
+        "content_type": "application/zip",
+        "download_url": "https://china.scidb.cn/download?fileId=5ff6ab1fb49a0c01b402186a",
+        "publisher_md5": "e9d387ed093dfd129378acfece2c6c73"
+      }
+    ],
+    "inventory_complete": true,
+    "recursive_file_count": 151,
+    "total_size_bytes": 128389541,
+    "source_version": "V1",
+    "doi": "https://doi.org/10.11922/sciencedb.j00001.00145",
+    "authors": [
+      "Liu Qiao ",
+      "Nie Yong ",
+      "Wang Xin ",
+      "Shangguan Donghui "
+    ],
+    "source_descriptor_sha256": "e98f523b561aba2687d14c9fda49ffdd0067bbd248813e33e029f84478684f19"
+  },
+  "files": [
+    {
+      "path": "SOURCE.md",
+      "size": 1183,
+      "sha256": "31e2954c1f646101af353909ddded7929dc7b9aa651d9b8cdb79eec9053cef16",
+      "role": "documentation",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "dataset.zip",
+      "size": 44966957,
+      "sha256": "22cffe3151f4fac086e911d83956fb91b147307d67fb3f02fdb53d504d3a5b6a",
+      "role": "data",
+      "content_type": "application/zip"
+    },
+    {
+      "path": "extracted/dataset/1 Background datasets/Chinese_Pakistan Highway.dbf",
+      "size": 76,
+      "sha256": "f1a9caad254d47bcc30bc89f034c82ad3819e0617f7c6cbac399ca5eb260a40e",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/dataset/1 Background datasets/Chinese_Pakistan Highway.prj",
+      "size": 145,
+      "sha256": "a02a27b1d1982c8516d83398e85a3c8b1aef1713c13ef4d84d7bde17430c07c4",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/dataset/1 Background datasets/Chinese_Pakistan Highway.sbn",
+      "size": 132,
+      "sha256": "c22e9d22bfc60e976260575491d85a8ce9d1d3d7cf1bd0c13b3907b36715f026",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/dataset/1 Background datasets/Chinese_Pakistan Highway.sbx",
+      "size": 116,
+      "sha256": "82cf82663d7168f00392053d98d89dd0a596633e18b0645c8bf40cdf8141a383",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/dataset/1 Background datasets/Chinese_Pakistan Highway.shp",
+      "size": 231932,
+      "sha256": "7b4d03c57a29b4baf5d315b2f347a2d829b43cde7e71d9649748ecfc40312c46",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/dataset/1 Background datasets/Chinese_Pakistan Highway.shx",
+      "size": 108,
+      "sha256": "f032fc944655d488f4db5b839844b66d108812786fc7b7a71581dc89d2d83e07",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/dataset/1 Background datasets/Glacial lake_2018.dbf",
+      "size": 1059658,
+      "sha256": "0e9f09d175bf1789def425b0ccd064cfc0f6d3113ba1daff6cd54c1305eb01c5",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/dataset/1 Background datasets/Glacial lake_2018.prj",
+      "size": 440,
+      "sha256": "251a8adef0308c5ddbe270fee04a70de51184907aa086d1e80754e24933c429a",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/dataset/1 Background datasets/Glacial lake_2018.sbn",
+      "size": 26756,
+      "sha256": "891e34a83d2115d7aeda51121aecd452ddb3f57caefc70e48aa0d1781a7c9bc6",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/dataset/1 Background datasets/Glacial lake_2018.sbx",
+      "size": 1244,
+      "sha256": "3241b30b9222a0d9fcc46a217ee4f5fe0e0485f06922f990f3495d8a95efeac1",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/dataset/1 Background datasets/Glacial lake_2018.shp",
+      "size": 1908112,
+      "sha256": "8ab6079b18ae999518ea6df37d5ed7af0637593cf1c5670ba2c1bbd5b1e9fff9",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/dataset/1 Background datasets/Glacial lake_2018.shp.xml",
+      "size": 151947,
+      "sha256": "35c731173b004811d48a254cfce4d6c3f8a20f58d9685b157412fb0f826e13e5",
+      "role": "data",
+      "content_type": "application/xml"
+    },
+    {
+      "path": "extracted/dataset/1 Background datasets/Glacial lake_2018.shx",
+      "size": 21940,
+      "sha256": "48928703c92314becb587bdec2f88e35c8829c2bcedabaf8780ef49616ed2b81",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/dataset/1 Background datasets/Glacier_RGI60.dbf",
+      "size": 3946538,
+      "sha256": "d265192e4f8cfe1adac0477f7c3a28b3134dc18ba99d8361524d491ba1ee55b0",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/dataset/1 Background datasets/Glacier_RGI60.prj",
+      "size": 145,
+      "sha256": "a02a27b1d1982c8516d83398e85a3c8b1aef1713c13ef4d84d7bde17430c07c4",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/dataset/1 Background datasets/Glacier_RGI60.sbn",
+      "size": 214452,
+      "sha256": "d373e4e8ecbef725aba2fea7b396613163d75a972c0ca6535295b39a11cd8a2a",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/dataset/1 Background datasets/Glacier_RGI60.sbx",
+      "size": 8596,
+      "sha256": "38ac64f957e4f53896751ca635e9d9735908a9ec82ce162fc64f2d7bcaf6040a",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/dataset/1 Background datasets/Glacier_RGI60.shp",
+      "size": 52033764,
+      "sha256": "d939a83470ab5ad9c6412def0f8d1b607bce92a2730e928d9ab207daf2bf18f1",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/dataset/1 Background datasets/Glacier_RGI60.shp.xml",
+      "size": 15256,
+      "sha256": "fc5dff6930bc981d68aba653de1cb5ccfc2ccd9e5123ab4c8bb0b87f08c2bf6a",
+      "role": "data",
+      "content_type": "application/xml"
+    },
+    {
+      "path": "extracted/dataset/1 Background datasets/Glacier_RGI60.shx",
+      "size": 174500,
+      "sha256": "6e6316eb4ad8eb23aae2a40ef92570aab2afeef00b6d84379d95845797d6f3dd",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/dataset/1 Background datasets/river network_gt20000.dbf",
+      "size": 1737,
+      "sha256": "02be12935d6eadbd0dc232462148c3199b97229845daa75d94d4f1c6ed1d17c1",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/dataset/1 Background datasets/river network_gt20000.prj",
+      "size": 145,
+      "sha256": "a02a27b1d1982c8516d83398e85a3c8b1aef1713c13ef4d84d7bde17430c07c4",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/dataset/1 Background datasets/river network_gt20000.sbn",
+      "size": 820,
+      "sha256": "b21ee771a92ed40b1fb064459ff864c683bac8adb8682877ad7885e722411645",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/dataset/1 Background datasets/river network_gt20000.sbx",
+      "size": 204,
+      "sha256": "6b848f908158701a7cdedef850eadf2bbeae0c715218655016783007ebf312fc",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/dataset/1 Background datasets/river network_gt20000.shp",
+      "size": 128780,
+      "sha256": "e28101f6ec66a122b8b93fdeee3befda0e366a39dfdd047f00384d24d2c47bdb",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/dataset/1 Background datasets/river network_gt20000.shp.xml",
+      "size": 1092,
+      "sha256": "cdbfabf5cb84462ef13892d0158a64aa9cb6cda97f171a320fcf974405a49daf",
+      "role": "data",
+      "content_type": "application/xml"
+    },
+    {
+      "path": "extracted/dataset/1 Background datasets/river network_gt20000.shx",
+      "size": 604,
+      "sha256": "78b6f08365989f4875be6502389799de81f403d8b46dfcb9538a658d95c49d6a",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/dataset/1 Background datasets/river network_gt4500.dbf",
+      "size": 7887,
+      "sha256": "6c01b3733a96f538548975cc370f8c402e86496df9ada3c7b21483cdd034c5a0",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/dataset/1 Background datasets/river network_gt4500.prj",
+      "size": 145,
+      "sha256": "a02a27b1d1982c8516d83398e85a3c8b1aef1713c13ef4d84d7bde17430c07c4",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/dataset/1 Background datasets/river network_gt4500.sbn",
+      "size": 3404,
+      "sha256": "1819cb8410562bcec49de0f8e92efd55ac25895eb3d07e7e5367e325f46d401d",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/dataset/1 Background datasets/river network_gt4500.sbx",
+      "size": 444,
+      "sha256": "ee527b6f749fa3ed06757bfe2de3f49c214e1412366404bcded9fd50880f1473",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/dataset/1 Background datasets/river network_gt4500.shp",
+      "size": 262748,
+      "sha256": "680c6119fbcc59162c20cd9df95d350e08ac3efbc9c83c94b1f0226053dade12",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/dataset/1 Background datasets/river network_gt4500.shp.xml",
+      "size": 1090,
+      "sha256": "11b4f8fad87f7a015ad837dbe37f893b8861bf9289f172dbfb763f562d5f0f63",
+      "role": "data",
+      "content_type": "application/xml"
+    },
+    {
+      "path": "extracted/dataset/1 Background datasets/river network_gt4500.shx",
+      "size": 2572,
+      "sha256": "73db58e680da5727c49ef1dabf7a89a4602c6f1398b5242b52b23d436ef881d2",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/dataset/1 Background datasets/watershed level 10_Upper_Indus_Tarim.dbf",
+      "size": 350450,
+      "sha256": "2485707e34c5e08f29202d0e9579d3ead6ed81d04c1940db6264bb3fa0bb9de3",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/dataset/1 Background datasets/watershed level 10_Upper_Indus_Tarim.prj",
+      "size": 145,
+      "sha256": "a02a27b1d1982c8516d83398e85a3c8b1aef1713c13ef4d84d7bde17430c07c4",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/dataset/1 Background datasets/watershed level 10_Upper_Indus_Tarim.sbn",
+      "size": 28644,
+      "sha256": "c9b7022a7e3d21b1414fb9bfdce61bd956a23d11c92f3e139831f03f2621df42",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/dataset/1 Background datasets/watershed level 10_Upper_Indus_Tarim.sbx",
+      "size": 2284,
+      "sha256": "433e53fb91c2e8abd70da1b5415c0589f4d316e7dc9fb8dab6624e6e4ad69f51",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/dataset/1 Background datasets/watershed level 10_Upper_Indus_Tarim.shp",
+      "size": 3525156,
+      "sha256": "3e4204b82b4fb945b7cb90201847f9ccec1aec04366a8b29974ac26efdbc82fe",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/dataset/1 Background datasets/watershed level 10_Upper_Indus_Tarim.shp.xml",
+      "size": 4167,
+      "sha256": "0e0ada2de75c6ceaf5de6b7d3f1c7ba566aba68a4f45660a883c280f0c9ef10e",
+      "role": "data",
+      "content_type": "application/xml"
+    },
+    {
+      "path": "extracted/dataset/1 Background datasets/watershed level 10_Upper_Indus_Tarim.shx",
+      "size": 22500,
+      "sha256": "bd0e4920326068192eed38bf4bfd2f0592da5e6508ce07232512c8b4e6a85aba",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/dataset/1 Background datasets/watershed level 11_Upper_Indus_Tarim.dbf",
+      "size": 380592,
+      "sha256": "08a1b202ab1eaaec75f6ce00dfebba7073c305ceb77e57726fa9e762604550ab",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/dataset/1 Background datasets/watershed level 11_Upper_Indus_Tarim.prj",
+      "size": 145,
+      "sha256": "a02a27b1d1982c8516d83398e85a3c8b1aef1713c13ef4d84d7bde17430c07c4",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/dataset/1 Background datasets/watershed level 11_Upper_Indus_Tarim.sbn",
+      "size": 30388,
+      "sha256": "6c7a64309fe52883cbf60d3b5b2d97f7bf255d76bcb83f91a641af01cbcbb57f",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/dataset/1 Background datasets/watershed level 11_Upper_Indus_Tarim.sbx",
+      "size": 2292,
+      "sha256": "819ab529b3dfc5aaf99202c9e2b57f265705473b08d86f4b0ad771daaa0574d9",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/dataset/1 Background datasets/watershed level 11_Upper_Indus_Tarim.shp",
+      "size": 3676620,
+      "sha256": "207de9dbca4308955a43630b5444e36009aa6e8a1457e487c583c1c195ff3625",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/dataset/1 Background datasets/watershed level 11_Upper_Indus_Tarim.shp.xml",
+      "size": 4167,
+      "sha256": "f82a532e691c1823f0c8317d9b2f18db313303b19570129bc91a3cd28352cfd1",
+      "role": "data",
+      "content_type": "application/xml"
+    },
+    {
+      "path": "extracted/dataset/1 Background datasets/watershed level 11_Upper_Indus_Tarim.shx",
+      "size": 24236,
+      "sha256": "4914d87faac659264a46666c57b5dcaccd93e7f78070c11d7eb5e2298da4f1be",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/dataset/1 Background datasets/watershed level 12_Upper_Indus_Tarim.dbf",
+      "size": 384244,
+      "sha256": "e9ec5c56d2fde0200ac0dd8b0c9c80b643285fc529cf3fbe5d1d9f1c02453bb7",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/dataset/1 Background datasets/watershed level 12_Upper_Indus_Tarim.prj",
+      "size": 145,
+      "sha256": "a02a27b1d1982c8516d83398e85a3c8b1aef1713c13ef4d84d7bde17430c07c4",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/dataset/1 Background datasets/watershed level 12_Upper_Indus_Tarim.sbn",
+      "size": 30428,
+      "sha256": "041db64d4a26b3f18bd7cfad824df52205dcde7d871f7cd7cc2c8ef5b76d80cb",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/dataset/1 Background datasets/watershed level 12_Upper_Indus_Tarim.sbx",
+      "size": 2292,
+      "sha256": "b657d3ad2717a0c4ca9307d810e40c3bffe11841306da4c0c1e988ab5f9906b6",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/dataset/1 Background datasets/watershed level 12_Upper_Indus_Tarim.shp",
+      "size": 3679892,
+      "sha256": "e35ac35276b8e62f1ef51cc668e5a1a9b5244b2feae37a8dd7b8a528c6010bb6",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/dataset/1 Background datasets/watershed level 12_Upper_Indus_Tarim.shp.xml",
+      "size": 4167,
+      "sha256": "216ff61c7ef45b025cec0803cdecf1e7d9333bbdeaaafcb84199918e1cd41245",
+      "role": "data",
+      "content_type": "application/xml"
+    },
+    {
+      "path": "extracted/dataset/1 Background datasets/watershed level 12_Upper_Indus_Tarim.shx",
+      "size": 24276,
+      "sha256": "454d71f0750b15b558e4ddcd40f22bb903cd8230d3be93f9914222b5ae96b375",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/dataset/1 Background datasets/watershed level 3_Indus_Tarim.dbf",
+      "size": 828,
+      "sha256": "7b7a283f8a8304f08132193feabf3518029bd8fbea70190859c13d58e2aba504",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/dataset/1 Background datasets/watershed level 3_Indus_Tarim.prj",
+      "size": 145,
+      "sha256": "a02a27b1d1982c8516d83398e85a3c8b1aef1713c13ef4d84d7bde17430c07c4",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/dataset/1 Background datasets/watershed level 3_Indus_Tarim.sbn",
+      "size": 164,
+      "sha256": "7c94725f934c98ed6a7a42c2fed8da0896a8d26ae05c43173b753f414c289701",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/dataset/1 Background datasets/watershed level 3_Indus_Tarim.sbx",
+      "size": 124,
+      "sha256": "abd835522b7df8601e78f7ceffc6d6be77b493037a6a5f7da1629906a5b6b680",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/dataset/1 Background datasets/watershed level 3_Indus_Tarim.shp",
+      "size": 327848,
+      "sha256": "65fc4098e808874fea8609e1aed8c232f8e3d77553a9ab0d4812de0038079a76",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/dataset/1 Background datasets/watershed level 3_Indus_Tarim.shp.xml",
+      "size": 4347,
+      "sha256": "9e15c51d52986f122692353d326867c28c24cbc1a7d9d2d2e0e271dadf0e9214",
+      "role": "data",
+      "content_type": "application/xml"
+    },
+    {
+      "path": "extracted/dataset/1 Background datasets/watershed level 3_Indus_Tarim.shx",
+      "size": 116,
+      "sha256": "ee2a36799159abd33032b99b173a425dfa2852786486d95dcd3a9349d9f89b09",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/dataset/1 Background datasets/watershed level 4_Upper_Indus_Tarim.dbf",
+      "size": 1182,
+      "sha256": "8e056b0fd8b472180831e0eb9f59565a8506140c0012886ceba0923bafc1e1ba",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/dataset/1 Background datasets/watershed level 4_Upper_Indus_Tarim.prj",
+      "size": 145,
+      "sha256": "a02a27b1d1982c8516d83398e85a3c8b1aef1713c13ef4d84d7bde17430c07c4",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/dataset/1 Background datasets/watershed level 4_Upper_Indus_Tarim.sbn",
+      "size": 196,
+      "sha256": "e4e6dab57bcb33fd54f507827dd7d75a32b2a411ea08a42e092ca99945d7d740",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/dataset/1 Background datasets/watershed level 4_Upper_Indus_Tarim.sbx",
+      "size": 124,
+      "sha256": "aa80e3aaea546d5e173278a134d882adbe2c5114f06b45c6ad5b09f01c8dd88f",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/dataset/1 Background datasets/watershed level 4_Upper_Indus_Tarim.shp",
+      "size": 221892,
+      "sha256": "d3fe5cce34fd1864a5b7265c7fc702b310cc30babd79e3ecbfb8446d53f010ae",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/dataset/1 Background datasets/watershed level 4_Upper_Indus_Tarim.shp.xml",
+      "size": 4347,
+      "sha256": "d29e8748985b24008c23511000b758d70af0c56b82ecb079cf92c4eea757421b",
+      "role": "data",
+      "content_type": "application/xml"
+    },
+    {
+      "path": "extracted/dataset/1 Background datasets/watershed level 4_Upper_Indus_Tarim.shx",
+      "size": 148,
+      "sha256": "d191f5375bdf9937b8fb5619965aa338f0b3ba2499013de6de4d872875c18e88",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/dataset/1 Background datasets/watershed level 5_Upper_Indus_Tarim.dbf",
+      "size": 2036,
+      "sha256": "620f99f007a06d091fa5a47324db809c3615f62f10e57f3886d8eb373b989998",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/dataset/1 Background datasets/watershed level 5_Upper_Indus_Tarim.prj",
+      "size": 145,
+      "sha256": "a02a27b1d1982c8516d83398e85a3c8b1aef1713c13ef4d84d7bde17430c07c4",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/dataset/1 Background datasets/watershed level 5_Upper_Indus_Tarim.sbn",
+      "size": 260,
+      "sha256": "f63829cac4a2eebaa52f7a179e8a31f964e5f84fcb9125382493296d3f698d36",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/dataset/1 Background datasets/watershed level 5_Upper_Indus_Tarim.sbx",
+      "size": 132,
+      "sha256": "aa9ec4b1f7caaaa4e6ee1c25a799bcb13a2f20c60c8754a065d003083db513e6",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/dataset/1 Background datasets/watershed level 5_Upper_Indus_Tarim.shp",
+      "size": 290972,
+      "sha256": "9bd2d08289ea32fa0bd60876b6e41ee8df68e986921fdb445ebd05cc867bd812",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/dataset/1 Background datasets/watershed level 5_Upper_Indus_Tarim.shp.xml",
+      "size": 4165,
+      "sha256": "b9bb6b328344d8694404626de27ff7efe081cbff76621206dcfa31166823cc10",
+      "role": "data",
+      "content_type": "application/xml"
+    },
+    {
+      "path": "extracted/dataset/1 Background datasets/watershed level 5_Upper_Indus_Tarim.shx",
+      "size": 204,
+      "sha256": "d12e8e00240ee05c5f414051fc5f1e3ad3abcdcf033dc799c1385282283b7c7c",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/dataset/1 Background datasets/watershed level 6_Upper_Indus_Tarim.dbf",
+      "size": 6184,
+      "sha256": "d09f17692664f64388538b045e9551c4e0913590788e5612895eebdeead79dd3",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/dataset/1 Background datasets/watershed level 6_Upper_Indus_Tarim.prj",
+      "size": 145,
+      "sha256": "a02a27b1d1982c8516d83398e85a3c8b1aef1713c13ef4d84d7bde17430c07c4",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/dataset/1 Background datasets/watershed level 6_Upper_Indus_Tarim.sbn",
+      "size": 588,
+      "sha256": "e5247a3462151d70d38b12e0db0c2082f53d0a440eefb00ebdb148d0f6433f92",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/dataset/1 Background datasets/watershed level 6_Upper_Indus_Tarim.sbx",
+      "size": 156,
+      "sha256": "cafbac8baa221cb5d4ee20d5efa24a3152808c80b161dd288afff9971bb86284",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/dataset/1 Background datasets/watershed level 6_Upper_Indus_Tarim.shp",
+      "size": 522348,
+      "sha256": "10477c53dfde4fd57e801b2121844f1e989ab9cfa670c2d241481960709e4ff6",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/dataset/1 Background datasets/watershed level 6_Upper_Indus_Tarim.shp.xml",
+      "size": 4165,
+      "sha256": "0b471975d71b9f670602335a07b0a84980ff6b6ed9227aa88102d3a02081acd3",
+      "role": "data",
+      "content_type": "application/xml"
+    },
+    {
+      "path": "extracted/dataset/1 Background datasets/watershed level 6_Upper_Indus_Tarim.shx",
+      "size": 476,
+      "sha256": "85250b52bcf28d07d7331bca2fa0d3415adebbfe9f27234d8d00213b1f7bfb70",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/dataset/1 Background datasets/watershed level 7_Upper_Indus_Tarim.dbf",
+      "size": 23142,
+      "sha256": "53d4b6f4a3df80f583e2f090b679ea1f80a9c9c1004742c266f0068ba27d7635",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/dataset/1 Background datasets/watershed level 7_Upper_Indus_Tarim.prj",
+      "size": 145,
+      "sha256": "a02a27b1d1982c8516d83398e85a3c8b1aef1713c13ef4d84d7bde17430c07c4",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/dataset/1 Background datasets/watershed level 7_Upper_Indus_Tarim.sbn",
+      "size": 2020,
+      "sha256": "8efdb30ddbb13dc0765b16a3d244f0bd51dea4cc36e31257bbadf5e7f2568f5f",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/dataset/1 Background datasets/watershed level 7_Upper_Indus_Tarim.sbx",
+      "size": 292,
+      "sha256": "f35f86a5dfb824afe293968b9fc1b3bebd3f091b7529558ca5fe5d6453efb915",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/dataset/1 Background datasets/watershed level 7_Upper_Indus_Tarim.shp",
+      "size": 972676,
+      "sha256": "bfe301c31d4ec13376d0e924a038d52a496cbcf7d4d1a3b00d423c7e58be5306",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/dataset/1 Background datasets/watershed level 7_Upper_Indus_Tarim.shp.xml",
+      "size": 4165,
+      "sha256": "3d952b34f48f7c6d4ebc099dc5e0631d755682b54f69f3daa2fa3cd96c53a936",
+      "role": "data",
+      "content_type": "application/xml"
+    },
+    {
+      "path": "extracted/dataset/1 Background datasets/watershed level 7_Upper_Indus_Tarim.shx",
+      "size": 1588,
+      "sha256": "ac1513625256f3e2257ec159498b2177ba6dac46f4b0f5d20bb5156e96b7fae8",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/dataset/1 Background datasets/watershed level 8_Upper_Indus_Tarim.dbf",
+      "size": 68592,
+      "sha256": "9863277b6b140230ead3db8ff9677ccc7f41959ea015b8f3edb59f420dcda4ae",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/dataset/1 Background datasets/watershed level 8_Upper_Indus_Tarim.prj",
+      "size": 145,
+      "sha256": "a02a27b1d1982c8516d83398e85a3c8b1aef1713c13ef4d84d7bde17430c07c4",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/dataset/1 Background datasets/watershed level 8_Upper_Indus_Tarim.sbn",
+      "size": 6100,
+      "sha256": "fd24574cd52c617e026c2c433341f9b92abcc792a15e40f864d612ab9f2228c5",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/dataset/1 Background datasets/watershed level 8_Upper_Indus_Tarim.sbx",
+      "size": 684,
+      "sha256": "9cb8adde8dfd8775cbfd5ed614b02cc8907415a816714f7aed7fb23c3450a33f",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/dataset/1 Background datasets/watershed level 8_Upper_Indus_Tarim.shp",
+      "size": 1567884,
+      "sha256": "81a825abd20d733ba12d3bac3d756e03638e42494f65d81dd4ffa63911b39e3d",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/dataset/1 Background datasets/watershed level 8_Upper_Indus_Tarim.shp.xml",
+      "size": 4165,
+      "sha256": "76881a8e335db6229469a12ec91dbd5d79b0b50b0ad5c64a333339c0a108b203",
+      "role": "data",
+      "content_type": "application/xml"
+    },
+    {
+      "path": "extracted/dataset/1 Background datasets/watershed level 8_Upper_Indus_Tarim.shx",
+      "size": 4532,
+      "sha256": "ae5ce3da0c7d14fdebc2ae072020a1233099e152bb9010706b7b6b60f87ccc25",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/dataset/1 Background datasets/watershed level 9_Upper_Indus_Tarim.dbf",
+      "size": 194510,
+      "sha256": "75656d2f9ceed84f8d67dc97a87a476a58217c603154afc1e4fd91b338091342",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/dataset/1 Background datasets/watershed level 9_Upper_Indus_Tarim.prj",
+      "size": 145,
+      "sha256": "a02a27b1d1982c8516d83398e85a3c8b1aef1713c13ef4d84d7bde17430c07c4",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/dataset/1 Background datasets/watershed level 9_Upper_Indus_Tarim.sbn",
+      "size": 15780,
+      "sha256": "5f5ea598bc993b4ffc10d6033e236b22e72899fd29632e7af171ef1cedcaba1a",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/dataset/1 Background datasets/watershed level 9_Upper_Indus_Tarim.sbx",
+      "size": 1284,
+      "sha256": "33012b54f7994dd3d4c68c95f75a70e597fe48c2b0412956444af9fcbb04a093",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/dataset/1 Background datasets/watershed level 9_Upper_Indus_Tarim.shp",
+      "size": 2584416,
+      "sha256": "aa82171ef6998882d214e6b87a9839a63311614e7b6ba92c15a46498a874a106",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/dataset/1 Background datasets/watershed level 9_Upper_Indus_Tarim.shp.xml",
+      "size": 4165,
+      "sha256": "fcc220828ff1c91c6e4b8b0205e017d07e4c8aee8d6c04ae879eaeed066326ef",
+      "role": "data",
+      "content_type": "application/xml"
+    },
+    {
+      "path": "extracted/dataset/1 Background datasets/watershed level 9_Upper_Indus_Tarim.shx",
+      "size": 12620,
+      "sha256": "072820e376426391d37f1ea1f78155bd8f3c2ff575951314813cf077c84b3e75",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/dataset/2 Surge glaciers/SurgeGlacier.dbf",
+      "size": 468611,
+      "sha256": "4524944f842e1cf58b1d2c128e0afaefd2c91ec1898a4b1a66f4585315011e0d",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/dataset/2 Surge glaciers/SurgeGlacier.prj",
+      "size": 145,
+      "sha256": "a02a27b1d1982c8516d83398e85a3c8b1aef1713c13ef4d84d7bde17430c07c4",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/dataset/2 Surge glaciers/SurgeGlacier.sbn",
+      "size": 2252,
+      "sha256": "43b68b900b3d8e4117a019cb02da7770dc8bbc30114fdd611c704d07a447196c",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/dataset/2 Surge glaciers/SurgeGlacier.sbx",
+      "size": 212,
+      "sha256": "99eddcded77b398f9bfd73bfd6370233eb3d62cb8c8ffbcd707ade7705723411",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/dataset/2 Surge glaciers/SurgeGlacier.shp",
+      "size": 6400,
+      "sha256": "23559a500d00c9c1ac59e54b6c3f4143517eca38d30a15b605c7f2bd5fa81f8a",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/dataset/2 Surge glaciers/SurgeGlacier.shx",
+      "size": 1900,
+      "sha256": "99d52149f4c5c1b337072ffe98aa925961a049c23af3e964f789025cbc61ead7",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/dataset/3 Historical ice-dammed outbursts/GLOF events.dbf",
+      "size": 39900,
+      "sha256": "43d1131670b2f197aa0c0a567b20db905ce592f51b5414863c1dc458f0f21021",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/dataset/3 Historical ice-dammed outbursts/GLOF events.prj",
+      "size": 145,
+      "sha256": "a02a27b1d1982c8516d83398e85a3c8b1aef1713c13ef4d84d7bde17430c07c4",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/dataset/3 Historical ice-dammed outbursts/GLOF events.sbn",
+      "size": 412,
+      "sha256": "b2a60ca12daa7c9adbdd719131519f33c65571b72f5fc4ccf550b7bde5c6b953",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/dataset/3 Historical ice-dammed outbursts/GLOF events.sbx",
+      "size": 124,
+      "sha256": "1a1d51ea1c05b3ab4c7cb4b77b3e9a8aed574b9d06bc11ae5a19d17e0526df6f",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/dataset/3 Historical ice-dammed outbursts/GLOF events.shp",
+      "size": 940,
+      "sha256": "37331d8075f27600514d274fc2cf5aa390800eea38afc1541ef77b0683023feb",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/dataset/3 Historical ice-dammed outbursts/GLOF events.shx",
+      "size": 340,
+      "sha256": "a37a0fc0b292a50d99f9b3694d0e6e0235f68b07365a064eb3b69f2e838824e4",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/dataset/4 Glacier floods or debris flow/Watershed_outlets.dbf",
+      "size": 1076,
+      "sha256": "49752c1e055865be81cac6b4bc11ead5a98ef388e10ba115fc883e70b4295757",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/dataset/4 Glacier floods or debris flow/Watershed_outlets.prj",
+      "size": 145,
+      "sha256": "a02a27b1d1982c8516d83398e85a3c8b1aef1713c13ef4d84d7bde17430c07c4",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/dataset/4 Glacier floods or debris flow/Watershed_outlets.sbn",
+      "size": 1052,
+      "sha256": "d0a000eac2fe02ac60cc38f1e9ee288911137478e2247f7b8c1b287330a51177",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/dataset/4 Glacier floods or debris flow/Watershed_outlets.sbx",
+      "size": 156,
+      "sha256": "e170fbc79b8281f4a00f9ddfd1d27be2e9eff6792d012e6ff2328b051e746d8a",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/dataset/4 Glacier floods or debris flow/Watershed_outlets.shp",
+      "size": 11412,
+      "sha256": "dd3ec6b2ba1eaedcbd9007eb3e5161d719afb89259c6b84ea8d6223f3cc7d74f",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/dataset/4 Glacier floods or debris flow/Watershed_outlets.shx",
+      "size": 908,
+      "sha256": "5a3584f15fe6f3a721072a4a30dae97be6d8ed0ed66cf4eb08dfc39ceb57a070",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/dataset/4 Glacier floods or debris flow/Watersheds.dbf",
+      "size": 8880,
+      "sha256": "c46c63a6ba9b0a4bfce9de6bbf25bf36cb9adba6951984a9ff6c92c067b499df",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/dataset/4 Glacier floods or debris flow/Watersheds.prj",
+      "size": 145,
+      "sha256": "a02a27b1d1982c8516d83398e85a3c8b1aef1713c13ef4d84d7bde17430c07c4",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/dataset/4 Glacier floods or debris flow/Watersheds.sbn",
+      "size": 1068,
+      "sha256": "beb67bc27294aa0bfda5652035ebcb257b58ccf3c7f55a881daf052ea71d0d80",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/dataset/4 Glacier floods or debris flow/Watersheds.sbx",
+      "size": 172,
+      "sha256": "950c4b0adb183bf206c4a5eeef96c6eb8d5ae44cd350153ade317633589526af",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/dataset/4 Glacier floods or debris flow/Watersheds.shp",
+      "size": 1101020,
+      "sha256": "e4a9295c7102b0dadbb6bc5abe1315ff3180dba7ad286d4adeecc45b33e71c4a",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/dataset/4 Glacier floods or debris flow/Watersheds.shp.xml",
+      "size": 1125,
+      "sha256": "620499118ea3a34d2323b2f4c8781b2918a914f9463caf8ba495aabf64046a56",
+      "role": "data",
+      "content_type": "application/xml"
+    },
+    {
+      "path": "extracted/dataset/4 Glacier floods or debris flow/Watersheds.shx",
+      "size": 908,
+      "sha256": "9720c6b6d86fff6fa7328f96de0a9fabd9cb21e68801fd302f1676a553f98a84",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/dataset/4 Glacier floods or debris flow/stream network.dbf",
+      "size": 89989,
+      "sha256": "3a658d5157dee6c8bd324e3041d54bd0037838ba3f3cd7583a55be9e3b084467",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/dataset/4 Glacier floods or debris flow/stream network.prj",
+      "size": 145,
+      "sha256": "a02a27b1d1982c8516d83398e85a3c8b1aef1713c13ef4d84d7bde17430c07c4",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/dataset/4 Glacier floods or debris flow/stream network.sbn",
+      "size": 8420,
+      "sha256": "80c68bdb9e4197059353176d25c903048b91b97238a9873a05e080b9719f8f75",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/dataset/4 Glacier floods or debris flow/stream network.sbx",
+      "size": 452,
+      "sha256": "a1a128dbd0c936a49c14f3c586c8642c8edbe98fa9f6a5266b4e8611578efbf2",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/dataset/4 Glacier floods or debris flow/stream network.shp",
+      "size": 133804,
+      "sha256": "a1776d6743fac6808539cde3be92a8f3548d53c34d4f8135cc72dfd906e092a3",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/dataset/4 Glacier floods or debris flow/stream network.shx",
+      "size": 7052,
+      "sha256": "1cbc8bafb3a2875234a05c5568686b6af4787fb5ac62812511ba99fe7cb57e7b",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/dataset/5 Landslides in the upstream/landslides.dbf",
+      "size": 118919,
+      "sha256": "12a23d16ff424a9b51ea80a58a6cf6a36e516aec797b0e3bc3b08153d3c5f654",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/dataset/5 Landslides in the upstream/landslides.prj",
+      "size": 145,
+      "sha256": "a02a27b1d1982c8516d83398e85a3c8b1aef1713c13ef4d84d7bde17430c07c4",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/dataset/5 Landslides in the upstream/landslides.sbn",
+      "size": 1164,
+      "sha256": "fe84a05dcdca51be2d13188f2337cf438e506aca27bd307d061dfc21026de426",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/dataset/5 Landslides in the upstream/landslides.sbx",
+      "size": 156,
+      "sha256": "b7f2649556a44f6dd5adc491256365674c9dc22ec59e14c09f315a95a9219d01",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/dataset/5 Landslides in the upstream/landslides.shp",
+      "size": 3208,
+      "sha256": "51cb1d998e31be2a9e38e947edb3efb792ebc34a98f735f8894d6347aca1e84e",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/dataset/5 Landslides in the upstream/landslides.shp.xml",
+      "size": 12164,
+      "sha256": "1661999c9047feb673b3ddc004f7b8287e9fb477d9abc9be480a2fc5fad87fb4",
+      "role": "data",
+      "content_type": "application/xml"
+    },
+    {
+      "path": "extracted/dataset/5 Landslides in the upstream/landslides.shx",
+      "size": 988,
+      "sha256": "d92955fbef12dc5c4f0f7bbc261ec8bdc1b8c862f1535171ee9e45c7c43a98da",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/dataset/6 Historical earthquake activities/earthquicks.dbf",
+      "size": 1989226,
+      "sha256": "2b7ff49e1bb19fbd02ba805c244906883d7b483edac2e0c41f4e669d827c67d7",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/dataset/6 Historical earthquake activities/earthquicks.prj",
+      "size": 145,
+      "sha256": "a02a27b1d1982c8516d83398e85a3c8b1aef1713c13ef4d84d7bde17430c07c4",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/dataset/6 Historical earthquake activities/earthquicks.sbn",
+      "size": 33020,
+      "sha256": "67b6632a55130e2bc55bb87eaae4086dce911206a01b65fdf91135bf269ebb99",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/dataset/6 Historical earthquake activities/earthquicks.sbx",
+      "size": 1860,
+      "sha256": "1e5cd26d6d6e6d2d14be30d0fa4b352683aaafbb055d2a8e76e6ab81152c30a3",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/dataset/6 Historical earthquake activities/earthquicks.shp",
+      "size": 95300,
+      "sha256": "b5e700b36d4819bd395285fd5a7b9461a00cae7a6f3b44fb75fda7f3d7dba034",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/dataset/6 Historical earthquake activities/earthquicks.shp.xml",
+      "size": 1105,
+      "sha256": "bb4e8f37f5c40ad9ba6638ea810aec166e7c37a6dd5f920dd3d14cd079b816c5",
+      "role": "data",
+      "content_type": "application/xml"
+    },
+    {
+      "path": "extracted/dataset/6 Historical earthquake activities/earthquicks.shx",
+      "size": 27300,
+      "sha256": "470eb98a4ddb7f761d2e0f38a1718d370a45126a7513fa69b747ee896cdc4d6a",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    }
+  ]
+}

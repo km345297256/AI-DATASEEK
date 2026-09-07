@@ -1,0 +1,153 @@
+{
+  "dataset_id": "tpdc-northern-permafrost-ecosystem",
+  "external_id": "53b58111-e5a9-45c3-989f-af028b6866c1",
+  "data_center_id": "reviewed-tpdc-catalog",
+  "data_center_name": "国家青藏高原科学数据中心",
+  "name": "北半球多年冻土气候-生态系统敏感性分区图（2000-2016）",
+  "description": "融合多年冻土范围、气候、植被、土壤、地形及富冰有机质冻土信息，划分气候驱动与生态系统作用相关的五类多年冻土。",
+  "domain": "geoscience",
+  "data_type": "SHP",
+  "tags": [
+    "geoscience",
+    "国家青藏高原科学数据中心",
+    "公开数据"
+  ],
+  "metadata": {
+    "curated": true,
+    "catalog_version": 1,
+    "source_catalog": "tpdc",
+    "publisher": "国家青藏高原科学数据中心",
+    "source_url": "https://data.tpdc.ac.cn/zh-hans/data/53b58111-e5a9-45c3-989f-af028b6866c1",
+    "license": "CC BY-NC-SA 4.0",
+    "license_url": "https://creativecommons.org/licenses/by-nc-sa/4.0/",
+    "license_details": "官方许可原文：Attribution-NonCommercial-ShareAlike 4.0 International (CC BY-NC-SA 4.0)。公开共享策略 A/online；需注明数据作者、国家青藏高原科学数据中心及数据/文章引用要求；限非商业使用，演绎须相同方式共享。 DOI: 10.11888/Geocry.tpdc.271659",
+    "sample_scope": "原官方全包；实际主要实体为多年冻土分区矢量 Shapefile（含 DBF 属性表），附图层/预览辅助文件，不是栅格。所述面积不含冰川和湖泊。",
+    "sample_note": "原官方全包；实际主要实体为多年冻土分区矢量 Shapefile（含 DBF 属性表），附图层/预览辅助文件，不是栅格。所述面积不含冰川和湖泊。",
+    "authors": [
+      "冉有华",
+      "M. Torre Jorgenson",
+      "李新",
+      "金会军",
+      "吴通华",
+      "李韧",
+      "程国栋"
+    ],
+    "doi": "10.11888/Geocry.tpdc.271659",
+    "source_version": "",
+    "source_descriptor_sha256": "8003d8fee0ceab103ac9e3e5078bf423874dfd79424ddef37de10412fcf4177f",
+    "download_date": "2026-09-07",
+    "provenance": [
+      {
+        "path": "tpdc-northern-permafrost-ecosystem.zip",
+        "size": 36783513,
+        "sha256": "91279ca0f766cee72b8e07f289344e3b622dce61b7324c029a61fad564b05538",
+        "role": "data",
+        "content_type": "application/zip",
+        "download_url": "https://data.tpdc.ac.cn/file/file/batchDownloadFile?metadataId=53b58111-e5a9-45c3-989f-af028b6866c1"
+      }
+    ],
+    "inventory_complete": true,
+    "recursive_file_count": 14,
+    "total_size_bytes": 158552647
+  },
+  "files": [
+    {
+      "path": "SOURCE.md",
+      "size": 1462,
+      "sha256": "7736e69214073c4f09ad9018701c39607bb8aac160e68895a4dd5ac1b112dcff",
+      "role": "documentation",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/nested-v1/NIEER_PER_Biophysical_ZONES_2000_2016_NH/NIEER_PER_Biophysical_ZONES_2000_2016_NH.cpg",
+      "size": 5,
+      "sha256": "3ad3031f5503a4404af825262ee8232cc04d4ea6683d42c5dd0a2f2a27ac9824",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/nested-v1/NIEER_PER_Biophysical_ZONES_2000_2016_NH/NIEER_PER_Biophysical_ZONES_2000_2016_NH.dbf",
+      "size": 19079258,
+      "sha256": "a5670a19b1765bb0dc655db548ee64bc7bd84d1900a497011641a1304d5922ed",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/nested-v1/NIEER_PER_Biophysical_ZONES_2000_2016_NH/NIEER_PER_Biophysical_ZONES_2000_2016_NH.jpg",
+      "size": 6941288,
+      "sha256": "8ee8b6570d8a479adc8144016da3f1b5ec0f3df7a1f81f42711d89f7b626b174",
+      "role": "data",
+      "content_type": "image/jpeg"
+    },
+    {
+      "path": "extracted/nested-v1/NIEER_PER_Biophysical_ZONES_2000_2016_NH/NIEER_PER_Biophysical_ZONES_2000_2016_NH.lyr",
+      "size": 8704,
+      "sha256": "cd564a0f21ad539a35939a10616edb94277d10f1a06d6a34a5557b7f49dc6c66",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/nested-v1/NIEER_PER_Biophysical_ZONES_2000_2016_NH/NIEER_PER_Biophysical_ZONES_2000_2016_NH.prj",
+      "size": 145,
+      "sha256": "a02a27b1d1982c8516d83398e85a3c8b1aef1713c13ef4d84d7bde17430c07c4",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/nested-v1/NIEER_PER_Biophysical_ZONES_2000_2016_NH/NIEER_PER_Biophysical_ZONES_2000_2016_NH.sbn",
+      "size": 1590820,
+      "sha256": "56a1606166e6bf0a95e374747eb4508ee57c6712d20fbc91cd51fe545c53c114",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/nested-v1/NIEER_PER_Biophysical_ZONES_2000_2016_NH/NIEER_PER_Biophysical_ZONES_2000_2016_NH.sbx",
+      "size": 52612,
+      "sha256": "63ce16a13a3bfd20b2617678776595562e24a502da11573724396f519ce7d712",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/nested-v1/NIEER_PER_Biophysical_ZONES_2000_2016_NH/NIEER_PER_Biophysical_ZONES_2000_2016_NH.shp",
+      "size": 55983380,
+      "sha256": "150a3f28fb3d8ca78aa2c582d504d503d1154778a1f00e7245dc8526265dfb42",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/nested-v1/NIEER_PER_Biophysical_ZONES_2000_2016_NH/NIEER_PER_Biophysical_ZONES_2000_2016_NH.shp.xml",
+      "size": 7881,
+      "sha256": "d860e85c8e6d15d7debc852fcf5d0dc01dbfeddf372a99468497340309a44bc4",
+      "role": "data",
+      "content_type": "application/xml"
+    },
+    {
+      "path": "extracted/nested-v1/NIEER_PER_Biophysical_ZONES_2000_2016_NH/NIEER_PER_Biophysical_ZONES_2000_2016_NH.shx",
+      "size": 1282724,
+      "sha256": "d4ffa9f4c6557249a0914d2485dd264a693a4312c6d0855d4eaa10d6cc0cd85f",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/nested-v1/NIEER_PER_Biophysical_ZONES_2000_2016_NH/readme.txt",
+      "size": 357,
+      "sha256": "c644058d274e15b23213b671ca266c21361002dbc4d09bfe52fb755f34550097",
+      "role": "data",
+      "content_type": "text/plain"
+    },
+    {
+      "path": "extracted/tpdc-northern-permafrost-ecosystem/北半球多年冻土气候-生态系统敏感性分区图（2000-2016）/NIEER_PER_Biophysical_ZONES_2000_2016_NH.rar",
+      "size": 36820498,
+      "sha256": "745e642ab66f2cc90a9758fe555741afa1d83050ee20f595f4dba5aa9e8b2b0d",
+      "role": "data",
+      "content_type": "application/x-rar-compressed"
+    },
+    {
+      "path": "tpdc-northern-permafrost-ecosystem.zip",
+      "size": 36783513,
+      "sha256": "91279ca0f766cee72b8e07f289344e3b622dce61b7324c029a61fad564b05538",
+      "role": "data",
+      "content_type": "application/zip"
+    }
+  ]
+}

@@ -1,0 +1,47 @@
+{
+  "dataset_id": "open-noaa-air-climatology",
+  "external_id": "open-noaa-air-climatology",
+  "data_center_id": "international-open-catalog",
+  "data_center_name": "NOAA Physical Sciences Laboratory · NCEP/NCAR",
+  "name": "NOAA 近地面气温月气候态",
+  "description": "NCEP/NCAR 再分析的 sigma=0.995 层全球气温，采用 1991—2020 年月平均气候态。原始 NetCDF 包含 12 个月的空间网格，适合变量、单位、经纬度与季节分布探查；不是逐日或逐年观测序列。",
+  "domain": "geoscience",
+  "data_type": "NetCDF",
+  "tags": [
+    "geoscience",
+    "NC",
+    "开放数据"
+  ],
+  "metadata": {
+    "curated": true,
+    "catalog_version": 1,
+    "publisher": "NOAA Physical Sciences Laboratory · NCEP/NCAR",
+    "source_url": "https://psl.noaa.gov/data/gridded/data.ncep.reanalysis.html",
+    "license": "Public domain (NOAA)",
+    "license_url": "https://psl.noaa.gov/disclaimer/",
+    "license_details": "Public domain (NOAA)",
+    "sample_scope": "12 个月气候态 · 1991—2020 基准期",
+    "sample_note": "NCEP/NCAR 再分析的 sigma=0.995 层全球气温，采用 1991—2020 年月平均气候态。原始 NetCDF 包含 12 个月的空间网格，适合变量、单位、经纬度与季节分布探查；不是逐日或逐年观测序列。",
+    "provenance": [
+      {
+        "path": "air.sig995.mon.ltm.1991-2020.nc",
+        "download_url": "https://downloads.psl.noaa.gov/Datasets/ncep.reanalysis.derived/surface/air.sig995.mon.ltm.1991-2020.nc",
+        "sha256": "31e6f601fd8e1ecc0bd63e9907ae9e0f931fe675c397ab608abe191b15576619",
+        "size": 657356
+      }
+    ],
+    "inventory_complete": true,
+    "recursive_file_count": 1,
+    "total_size_bytes": 657356
+  },
+  "files": [
+    {
+      "path": "air.sig995.mon.ltm.1991-2020.nc",
+      "size": 657356,
+      "sha256": "31e6f601fd8e1ecc0bd63e9907ae9e0f931fe675c397ab608abe191b15576619",
+      "role": "data",
+      "content_type": "application/x-netcdf"
+    }
+  ]
+}
+

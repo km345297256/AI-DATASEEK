@@ -191,7 +191,10 @@ class CompletionAdviceService:
                 ][:3]
             return advice
         except Exception as exc:
-            logger.warning("Completion advice generation failed: %s", exc)
+            logger.warning(
+                "Completion advice generation failed error_type=%s",
+                type(exc).__name__,
+            )
             return heuristic_skill or self._default_advice()
 
     def _build_prompt(self, events: list[Any], heuristic_skill: CompletionAdvice) -> str:

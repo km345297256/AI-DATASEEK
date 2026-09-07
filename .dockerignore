@@ -1,5 +1,9 @@
 .git
 .gitignore
+.cache
+.env
+.env.*
+!.env.example
 **/.DS_Store
 **/__pycache__
 **/.pytest_cache

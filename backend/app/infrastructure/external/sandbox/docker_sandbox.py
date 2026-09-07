@@ -45,11 +45,24 @@ def _safe_mount_filename(value: str) -> bool:
 
 
 class DockerSandbox(Sandbox):
-    def __init__(self, ip: str = None, container_name: str = None, docker_host: str = None):
+    def __init__(
+        self,
+        ip: str = None,
+        container_name: str = None,
+        docker_host: str = None,
+        image_reference: str | None = None,
+        image_digest: str | None = None,
+        runtime_kind: str | None = None,
+    ):
         """Initialize Docker sandbox and API interaction client"""
         self.client = httpx.AsyncClient(timeout=600)
         self._container_name = container_name
         self._docker_host = docker_host
+        self._image_reference = image_reference
+        self._image_digest = image_digest
+        self._execution_runtime_kind = runtime_kind or (
+            "remote_docker" if docker_host else "local_docker"
+        )
         self._set_ip(ip)
 
     def _set_ip(self, ip: str) -> None:
@@ -132,6 +145,24 @@ class DockerSandbox(Sandbox):
                     break
 
         return ip_address
+
+    @staticmethod
+    def _get_container_image_identity(
+        container,
+        fallback_reference: str | None = None,
+    ) -> tuple[str | None, str | None]:
+        """Read only Docker's image reference and immutable content id."""
+        attrs = container.attrs if isinstance(getattr(container, "attrs", None), dict) else {}
+        config = attrs.get("Config") if isinstance(attrs.get("Config"), dict) else {}
+        reference = config.get("Image") or fallback_reference
+        digest = attrs.get("Image")
+        if not digest:
+            image = getattr(container, "image", None)
+            digest = getattr(image, "id", None)
+        return (
+            str(reference) if reference else None,
+            str(digest) if digest else None,
+        )
 
     @staticmethod
     def _create_task(
@@ -266,12 +297,19 @@ class DockerSandbox(Sandbox):
             # Get container IP address
             container.reload()  # Refresh container info
             ip_address = DockerSandbox._get_container_ip(container)
+            image_reference, image_digest = DockerSandbox._get_container_image_identity(
+                container,
+                fallback_reference=image,
+            )
             
             # Create and return DockerSandbox instance
             return DockerSandbox(
                 ip=ip_address,
                 container_name=container_name,
                 docker_host=docker_host,
+                image_reference=image_reference,
+                image_digest=image_digest,
+                runtime_kind="remote_docker" if docker_host else "local_docker",
             )
             
         except Exception as e:
@@ -491,6 +529,16 @@ class DockerSandbox(Sandbox):
         )
         return self._tool_result_from_response(response, "shell_exec")
 
+    async def exec_command_with_credentials(
+        self, session_id: str, exec_dir: str, command: str, credentials: dict[str, str],
+    ) -> ToolResult:
+        response = await self.client.post(
+            f"{self.base_url}/api/v1/shell/exec",
+            json={"id": session_id, "exec_dir": exec_dir, "command": command,
+                  "credentials": credentials},
+        )
+        return self._tool_result_from_response(response, "plugin_exec")
+
     async def view_shell(self, session_id: str, console: bool = False) -> ToolResult:
         response = await self.client.post(
             f"{self.base_url}/api/v1/shell/view",
@@ -525,7 +573,16 @@ class DockerSandbox(Sandbox):
     async def kill_process(self, session_id: str) -> ToolResult:
         response = await self.client.post(
             f"{self.base_url}/api/v1/shell/kill",
-            json={"id": session_id}
+            json={"id": session_id},
+            timeout=4.0,
+        )
+        return ToolResult(**response.json())
+
+    async def release_shell(self, session_id: str) -> ToolResult:
+        response = await self.client.post(
+            f"{self.base_url}/api/v1/shell/release",
+            json={"id": session_id},
+            timeout=4.5,
         )
         return ToolResult(**response.json())
 
@@ -1031,7 +1088,7 @@ class DockerSandbox(Sandbox):
         if settings.sandbox_address and settings.sandbox_isolation == "shared":
             # Chrome CDP needs IP address
             ip = await cls._resolve_hostname_to_ip(settings.sandbox_address)
-            return DockerSandbox(ip=ip)
+            return DockerSandbox(ip=ip, runtime_kind="fixed_sandbox")
     
         async with _DOCKER_CREATE_SEMAPHORE:
             return await asyncio.to_thread(DockerSandbox._create_task, None, None, mounts)
@@ -1059,7 +1116,11 @@ class DockerSandbox(Sandbox):
         settings = get_settings()
         if settings.sandbox_address and settings.sandbox_isolation == "shared":
             ip = await cls._resolve_hostname_to_ip(settings.sandbox_address)
-            return DockerSandbox(ip=ip, container_name=id)
+            return DockerSandbox(
+                ip=ip,
+                container_name=id,
+                runtime_kind="fixed_sandbox",
+            )
 
         docker_client = docker.from_env()
         try:
@@ -1067,8 +1128,15 @@ class DockerSandbox(Sandbox):
             container.reload()
 
             ip_address = cls._get_container_ip(container)
+            image_reference, image_digest = cls._get_container_image_identity(container)
             logger.info(f"IP address: {ip_address}")
-            return DockerSandbox(ip=ip_address, container_name=container.name)
+            return DockerSandbox(
+                ip=ip_address,
+                container_name=container.name,
+                image_reference=image_reference,
+                image_digest=image_digest,
+                runtime_kind="local_docker",
+            )
         finally:
             docker_client.close()
 
@@ -1080,7 +1148,15 @@ class DockerSandbox(Sandbox):
             container.reload()
 
             ip_address = cls._get_container_ip(container)
+            image_reference, image_digest = cls._get_container_image_identity(container)
             logger.info(f"Remote sandbox IP address: {ip_address}")
-            return DockerSandbox(ip=ip_address, container_name=container.name, docker_host=docker_host)
+            return DockerSandbox(
+                ip=ip_address,
+                container_name=container.name,
+                docker_host=docker_host,
+                image_reference=image_reference,
+                image_digest=image_digest,
+                runtime_kind="remote_docker",
+            )
         finally:
             docker_client.close()

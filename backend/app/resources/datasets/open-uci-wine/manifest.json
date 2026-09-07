@@ -1,0 +1,73 @@
+{
+  "dataset_id": "open-uci-wine",
+  "external_id": "open-uci-wine",
+  "data_center_id": "international-open-catalog",
+  "data_center_name": "S. Aeberhard / M. Forina · UCI Machine Learning Repository",
+  "name": "Wine 意大利葡萄酒成分数据",
+  "description": "178 个葡萄酒样本的 13 项化学成分及三个品种标签，可用于质量检查、变量相关性和多变量聚类。完整 UCI 数据；仅新增 CSV 表头，保留原始数值。",
+  "domain": "general",
+  "data_type": "CSV",
+  "tags": [
+    "general",
+    "CSV",
+    "开放数据"
+  ],
+  "metadata": {
+    "curated": true,
+    "catalog_version": 1,
+    "publisher": "S. Aeberhard / M. Forina · UCI Machine Learning Repository",
+    "source_url": "https://archive.ics.uci.edu/dataset/109/wine",
+    "license": "CC BY 4.0",
+    "license_url": "https://creativecommons.org/licenses/by/4.0/",
+    "license_details": "CC BY 4.0",
+    "sample_scope": "完整数据 · 178 条记录；附原始文件",
+    "sample_note": "178 个葡萄酒样本的 13 项化学成分及三个品种标签，可用于质量检查、变量相关性和多变量聚类。完整 UCI 数据；仅新增 CSV 表头，保留原始数值。",
+    "provenance": [
+      {
+        "path": "wine.csv",
+        "download_url": "https://archive.ics.uci.edu/static/public/109/wine.zip",
+        "sha256": "cea9a880b6c07ebcbe92aa34f723c13e55935ee225e7ce80cbd973c2ecd89031",
+        "size": 10941
+      },
+      {
+        "path": "wine.data",
+        "download_url": "https://archive.ics.uci.edu/static/public/109/wine.zip",
+        "sha256": "6be6b1203f3d51df0b553a70e57b8a723cd405683958204f96d23d7cd6aea659",
+        "size": 10782
+      },
+      {
+        "path": "wine.names",
+        "download_url": "https://archive.ics.uci.edu/static/public/109/wine.zip",
+        "sha256": "f1b84f2ef845e0bdebf13e14fa7a213e56de4f1baa40c5974dbd1ee51c5ae710",
+        "size": 3036
+      }
+    ],
+    "inventory_complete": true,
+    "recursive_file_count": 3,
+    "total_size_bytes": 24759
+  },
+  "files": [
+    {
+      "path": "wine.csv",
+      "size": 10941,
+      "sha256": "cea9a880b6c07ebcbe92aa34f723c13e55935ee225e7ce80cbd973c2ecd89031",
+      "role": "data",
+      "content_type": "text/csv"
+    },
+    {
+      "path": "wine.data",
+      "size": 10782,
+      "sha256": "6be6b1203f3d51df0b553a70e57b8a723cd405683958204f96d23d7cd6aea659",
+      "role": "documentation",
+      "content_type": "text/plain"
+    },
+    {
+      "path": "wine.names",
+      "size": 3036,
+      "sha256": "f1b84f2ef845e0bdebf13e14fa7a213e56de4f1baa40c5974dbd1ee51c5ae710",
+      "role": "documentation",
+      "content_type": "text/plain"
+    }
+  ]
+}
+

@@ -1,0 +1,231 @@
+{
+  "dataset_id": "tpdc-tp-lake-storage",
+  "external_id": "5e537e53-9532-4acd-9b17-65ff43bb0eff",
+  "data_center_id": "reviewed-tpdc-catalog",
+  "data_center_name": "国家青藏高原科学数据中心",
+  "name": "青藏高原大于1平方公里湖泊水量变化（1976-2020）v2.0",
+  "description": "涵盖1132个大于1平方公里湖泊的多年水储量变化估计，适合流域汇总、时期比较以及冰川补给湖与非冰川补给湖对比。",
+  "domain": "geoscience",
+  "data_type": "SHP / XLSX",
+  "tags": [
+    "geoscience",
+    "国家青藏高原科学数据中心",
+    "公开数据"
+  ],
+  "metadata": {
+    "curated": true,
+    "catalog_version": 1,
+    "source_catalog": "tpdc",
+    "publisher": "国家青藏高原科学数据中心",
+    "source_url": "https://data.tpdc.ac.cn/zh-hans/data/5e537e53-9532-4acd-9b17-65ff43bb0eff",
+    "license": "CC BY-NC-SA 4.0",
+    "license_url": "https://creativecommons.org/licenses/by-nc-sa/4.0/",
+    "license_details": "官方许可原文：Attribution-NonCommercial-ShareAlike 4.0 International (CC BY-NC-SA 4.0)。公开共享策略 A/online；需注明数据作者、国家青藏高原科学数据中心及数据/文章引用要求；限非商业使用，演绎须相同方式共享。 DOI: 10.11888/Hydro.tpdc.271169",
+    "sample_scope": "原官方全包；标题1976–2020，正文统计重点1976–2019，分析应以文件具体年份为准。",
+    "sample_note": "原官方全包；标题1976–2020，正文统计重点1976–2019，分析应以文件具体年份为准。",
+    "authors": [
+      "张国庆"
+    ],
+    "doi": "10.11888/Hydro.tpdc.271169",
+    "source_version": "",
+    "source_descriptor_sha256": "692c6ce91249e3bea9d23cc4165fe934ffa57db68d7b1ffdf4ae6643456b0359",
+    "download_date": "2026-09-07",
+    "provenance": [
+      {
+        "path": "tpdc-tp-lake-storage.zip",
+        "size": 16944010,
+        "sha256": "85f3aaee1bcc69f880e1ce48505658e734f598e49b891cf393498098f3d77772",
+        "role": "data",
+        "content_type": "application/zip",
+        "download_url": "https://data.tpdc.ac.cn/file/file/batchDownloadFile?metadataId=5e537e53-9532-4acd-9b17-65ff43bb0eff"
+      }
+    ],
+    "inventory_complete": true,
+    "recursive_file_count": 26,
+    "total_size_bytes": 63243329
+  },
+  "files": [
+    {
+      "path": "SOURCE.md",
+      "size": 1307,
+      "sha256": "0ee4137cf7fc84218b6900f22aaafca16e9cbd8556518567cd27b47042c00cc7",
+      "role": "documentation",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/nested-v1/LakeVolumeChang/LakeVolumeChang/LakeVolueChange_EachLake/LakeVolueChange_EachLake2.cpg",
+      "size": 5,
+      "sha256": "3ad3031f5503a4404af825262ee8232cc04d4ea6683d42c5dd0a2f2a27ac9824",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/nested-v1/LakeVolumeChang/LakeVolumeChang/LakeVolueChange_EachLake/LakeVolueChange_EachLake2.dbf",
+      "size": 1324858,
+      "sha256": "d2de0b1f053a9745f76a1de37572f9a3725731d84e954109aba465c06cbbde6c",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/nested-v1/LakeVolumeChang/LakeVolumeChang/LakeVolueChange_EachLake/LakeVolueChange_EachLake2.prj",
+      "size": 145,
+      "sha256": "a02a27b1d1982c8516d83398e85a3c8b1aef1713c13ef4d84d7bde17430c07c4",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/nested-v1/LakeVolumeChang/LakeVolumeChang/LakeVolueChange_EachLake/LakeVolueChange_EachLake2.sbn",
+      "size": 11940,
+      "sha256": "bfecc4b90fa8c0552253b8183360c06633b98b978a2b350366994655bf62c533",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/nested-v1/LakeVolumeChang/LakeVolumeChang/LakeVolueChange_EachLake/LakeVolueChange_EachLake2.sbx",
+      "size": 940,
+      "sha256": "a212f17cd45e1d3c9cfbc9e8b01022853d2ea1ac19dcbf2b7f582e4be4692a91",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/nested-v1/LakeVolumeChang/LakeVolumeChang/LakeVolueChange_EachLake/LakeVolueChange_EachLake2.shp",
+      "size": 13449572,
+      "sha256": "a73f1eff7f380cba27c7bbe3e5599ef4016ce497611fee6ece488c7d73cb4712",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/nested-v1/LakeVolumeChang/LakeVolumeChang/LakeVolueChange_EachLake/LakeVolueChange_EachLake2.shp.xml",
+      "size": 3136,
+      "sha256": "9f5ec4801eb2c661a3aa08e997d9911cff2c339ae60481e798523b4bdb017638",
+      "role": "data",
+      "content_type": "application/xml"
+    },
+    {
+      "path": "extracted/nested-v1/LakeVolumeChang/LakeVolumeChang/LakeVolueChange_EachLake/LakeVolueChange_EachLake2.shx",
+      "size": 9156,
+      "sha256": "f1a7249f7287f51b6f1abd8e26e1256b553bd44f42eca53fa8a38220af9c8b99",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/nested-v1/LakeVolumeChang/LakeVolumeChang/LakeVolueChange_EachLake/Statement.txt",
+      "size": 117,
+      "sha256": "689234f03027492f247aef01b27579633a892a3927024b27cf6aa3293cf20888",
+      "role": "data",
+      "content_type": "text/plain"
+    },
+    {
+      "path": "extracted/nested-v1/LakeVolumeChang/LakeVolumeChang/Table_1_Correlation between lake area and elevaion.xlsx",
+      "size": 308814,
+      "sha256": "115a535fb17dfef6e8499551550c41de7b11162b1c67afd683083fd261c4c779",
+      "role": "data",
+      "content_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    },
+    {
+      "path": "extracted/nested-v1/LakeVolumeChang/LakeVolumeChang/Table_2_lake volume change.xlsx",
+      "size": 13414,
+      "sha256": "a657c669e090537ac73e0636973b2056caac4bfdc0164ee90c3ded8a00b58ff5",
+      "role": "data",
+      "content_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    },
+    {
+      "path": "extracted/nested-v1/TP_lakeVolumeChange_1970_2020_v20220408/TP_lakeVolumeChange_1970_2020_v20220408/Statement.txt",
+      "size": 295,
+      "sha256": "8e0dde740e57568884ab73386d4b00e920a121ef9a63b0b2333a3a5b93d06b3a",
+      "role": "data",
+      "content_type": "text/plain"
+    },
+    {
+      "path": "extracted/nested-v1/TP_lakeVolumeChange_1970_2020_v20220408/TP_lakeVolumeChange_1970_2020_v20220408/TP_lakeVolumeChange_1970_2020_v20220408.CPG",
+      "size": 5,
+      "sha256": "3ad3031f5503a4404af825262ee8232cc04d4ea6683d42c5dd0a2f2a27ac9824",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/nested-v1/TP_lakeVolumeChange_1970_2020_v20220408/TP_lakeVolumeChange_1970_2020_v20220408/TP_lakeVolumeChange_1970_2020_v20220408.dbf",
+      "size": 439954,
+      "sha256": "4dbd581b1adaaff29464a3c5fd96f59df716add96386ec8d6bc9a3bcf2bfb3d1",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/nested-v1/TP_lakeVolumeChange_1970_2020_v20220408/TP_lakeVolumeChange_1970_2020_v20220408/TP_lakeVolumeChange_1970_2020_v20220408.prj",
+      "size": 145,
+      "sha256": "a02a27b1d1982c8516d83398e85a3c8b1aef1713c13ef4d84d7bde17430c07c4",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/nested-v1/TP_lakeVolumeChange_1970_2020_v20220408/TP_lakeVolumeChange_1970_2020_v20220408/TP_lakeVolumeChange_1970_2020_v20220408.sbn",
+      "size": 11940,
+      "sha256": "bfecc4b90fa8c0552253b8183360c06633b98b978a2b350366994655bf62c533",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/nested-v1/TP_lakeVolumeChange_1970_2020_v20220408/TP_lakeVolumeChange_1970_2020_v20220408/TP_lakeVolumeChange_1970_2020_v20220408.sbx",
+      "size": 940,
+      "sha256": "a212f17cd45e1d3c9cfbc9e8b01022853d2ea1ac19dcbf2b7f582e4be4692a91",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/nested-v1/TP_lakeVolumeChange_1970_2020_v20220408/TP_lakeVolumeChange_1970_2020_v20220408/TP_lakeVolumeChange_1970_2020_v20220408.shp",
+      "size": 13449572,
+      "sha256": "a73f1eff7f380cba27c7bbe3e5599ef4016ce497611fee6ece488c7d73cb4712",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/nested-v1/TP_lakeVolumeChange_1970_2020_v20220408/TP_lakeVolumeChange_1970_2020_v20220408/TP_lakeVolumeChange_1970_2020_v20220408.shp.xml",
+      "size": 694,
+      "sha256": "f5646914ddfbde730b7a8f9e11ba05a01780c4df1bf62a202bf46be3fcea3e18",
+      "role": "data",
+      "content_type": "application/xml"
+    },
+    {
+      "path": "extracted/nested-v1/TP_lakeVolumeChange_1970_2020_v20220408/TP_lakeVolumeChange_1970_2020_v20220408/TP_lakeVolumeChange_1970_2020_v20220408.shx",
+      "size": 9156,
+      "sha256": "f1a7249f7287f51b6f1abd8e26e1256b553bd44f42eca53fa8a38220af9c8b99",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/nested-v1/TP_lakeVolumeChange_1970_2020_v20220408/TP_lakeVolumeChange_1970_2020_v20220408/Table_1_Correlation between lake area and elevaion.xlsx",
+      "size": 308379,
+      "sha256": "1b35a81ccf9da46f4069823c0210c410860f8a83a4abeae5c791128a8612c425",
+      "role": "data",
+      "content_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    },
+    {
+      "path": "extracted/nested-v1/TP_lakeVolumeChange_1970_2020_v20220408/TP_lakeVolumeChange_1970_2020_v20220408/Table_2_lake volume change.xlsx",
+      "size": 13414,
+      "sha256": "a657c669e090537ac73e0636973b2056caac4bfdc0164ee90c3ded8a00b58ff5",
+      "role": "data",
+      "content_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    },
+    {
+      "path": "extracted/tpdc-tp-lake-storage/青藏高原大于1平方公里湖泊水量变化（1976-2020）v2.0/LakeVolumeChang.rar",
+      "size": 8441063,
+      "sha256": "cf2f5b828b6efa15861ae3828855657d996b21b96a0f0d01c6de4d7641fb56d1",
+      "role": "data",
+      "content_type": "application/x-rar-compressed"
+    },
+    {
+      "path": "extracted/tpdc-tp-lake-storage/青藏高原大于1平方公里湖泊水量变化（1976-2020）v2.0/TP_lakeVolumeChange_1970_2020_v20220408.rar",
+      "size": 8500358,
+      "sha256": "7e918f70ef2425db81a8d426cae9ddd4a1904cd28f0dadffe6aa44f4b1bb7ba5",
+      "role": "data",
+      "content_type": "application/x-rar-compressed"
+    },
+    {
+      "path": "tpdc-tp-lake-storage.zip",
+      "size": 16944010,
+      "sha256": "85f3aaee1bcc69f880e1ce48505658e734f598e49b891cf393498098f3d77772",
+      "role": "data",
+      "content_type": "application/zip"
+    }
+  ]
+}

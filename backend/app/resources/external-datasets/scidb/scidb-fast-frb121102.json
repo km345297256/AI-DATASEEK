@@ -1,0 +1,143 @@
+{
+  "dataset_id": "scidb-fast-frb121102",
+  "external_id": "f172ff40142c4100855724b80a085deb",
+  "data_center_id": "reviewed-scidb-catalog",
+  "data_center_name": "ScienceDB 科学数据银行",
+  "name": "FAST FRB 121102 爆发事件及动态谱样例",
+  "description": "FAST 2019年8—10月对FRB 121102检测到的1652次爆发事件表，含时间、色散、宽度、带宽、峰值流量、积分通量与能量；附一个爆发动态谱数据样例。",
+  "domain": "space",
+  "data_type": "csv,npy,png,pdf",
+  "tags": [
+    "space",
+    "ScienceDB 科学数据银行",
+    "公开数据"
+  ],
+  "metadata": {
+    "curated": true,
+    "catalog_version": 1,
+    "source_catalog": "scidb",
+    "publisher": "ScienceDB 科学数据银行",
+    "source_url": "https://www.scidb.cn/en/detail?dataSetId=f172ff40142c4100855724b80a085deb",
+    "license": "CC0",
+    "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "license_details": "CC0 1.0 公共领域贡献；保留来源、作者和DOI有助于科研溯源。",
+    "sample_scope": "精选 V4 的完整1652事件CSV、Burst 433动态谱NPY和PNG、补充表PDF，共4文件。不是FAST全量原始FITS观测库，也不是全部27个ScienceDB附件。NPY读取应禁用pickle。",
+    "sample_note": "精选 V4 的完整1652事件CSV、Burst 433动态谱NPY和PNG、补充表PDF，共4文件。不是FAST全量原始FITS观测库，也不是全部27个ScienceDB附件。NPY读取应禁用pickle。",
+    "download_date": "2026-09-07",
+    "provenance": [
+      {
+        "path": "FRB121102_1652burstList.csv",
+        "size": 185366,
+        "sha256": "6a38c154c0b88bd9efe3576f30d1c9b375c5979f37baf9e552faf5e235a6ef87",
+        "role": "data",
+        "content_type": "text/csv",
+        "download_url": "https://china.scidb.cn/download?fileId=c9e368237a9bd7f872dbb6efb440105f",
+        "publisher_md5": "1841659137e62706743102d34fe2a98b"
+      },
+      {
+        "path": "Demo-burst-DynPlot/Burst-ID433_FRB121102.png",
+        "size": 551214,
+        "sha256": "23c67b2ce87414e7a9f5cb7e3068374382d740d4f3dede9fba31ba541977b730",
+        "role": "data",
+        "content_type": "image/png",
+        "download_url": "https://china.scidb.cn/download?fileId=da56232994bb04e7a9fb25d790d67e7b",
+        "publisher_md5": "6946b80ccb9ed969287fa4760b53e521"
+      },
+      {
+        "path": "Demo-burst-DynPlot/BurstID433_FRB121102_Td8_Fd8_DM563.4.npy",
+        "size": 729216,
+        "sha256": "fc204fc85caaa0d8fa903d29cdd12bbe00a41f1da80e30d422d8f5f5addd296a",
+        "role": "data",
+        "content_type": "application/octet-stream",
+        "download_url": "https://china.scidb.cn/download?fileId=6c17586872e69603b7aa535d087f553b",
+        "publisher_md5": "b3c614bb721132e503123452f167ff3c"
+      },
+      {
+        "path": "Supplementary_Table_1/SI.pdf",
+        "size": 121950,
+        "sha256": "3b2a684dc7fc5c12c3ebf779e4f8f5544aab9e23753f412080017b5134967ef2",
+        "role": "data",
+        "content_type": "application/pdf",
+        "download_url": "https://china.scidb.cn/download?fileId=13e527553d57de47ffe25e4150f6cee9",
+        "publisher_md5": "59c1946d3b424b4c92aad47dd221b82a"
+      }
+    ],
+    "inventory_complete": true,
+    "recursive_file_count": 5,
+    "total_size_bytes": 1589296,
+    "source_version": "V4",
+    "doi": "https://doi.org/10.11922/sciencedb.01092",
+    "authors": [
+      "Di Li",
+      "Pei Wang",
+      "Weiwei Zhu",
+      "Bing Zhang",
+      "Xinxin Zhang",
+      "Ran Duan",
+      "Yongkun Zhang",
+      "Yi Feng",
+      "Ningyu Tang",
+      "S. Chatterjee",
+      "J. M. Cordes",
+      "M. Cruces",
+      "Shi Dai",
+      "V. Gajjar",
+      "G. Hobbs",
+      "C. Jin",
+      "M. Kramer",
+      "D. R. Lorimer",
+      "Chenchen Miao",
+      "Chenhui Niu",
+      "Jiarui Niu",
+      "Zhichen Pan",
+      "Lei Qian",
+      "L. Spitler",
+      "D. Werthimer",
+      "Guoqiang Zhang",
+      "Fayin Wang",
+      "Xiaoyao Xie",
+      "Youling Yue",
+      "Lei Zhang",
+      "Qijun Zhi",
+      "Yan Zhu"
+    ],
+    "source_descriptor_sha256": "2f15af28aa8ff13ef90edb46522433d9ffb18e5d557a4dcc5210733c7b2c4730"
+  },
+  "files": [
+    {
+      "path": "Demo-burst-DynPlot/Burst-ID433_FRB121102.png",
+      "size": 551214,
+      "sha256": "23c67b2ce87414e7a9f5cb7e3068374382d740d4f3dede9fba31ba541977b730",
+      "role": "data",
+      "content_type": "image/png"
+    },
+    {
+      "path": "Demo-burst-DynPlot/BurstID433_FRB121102_Td8_Fd8_DM563.4.npy",
+      "size": 729216,
+      "sha256": "fc204fc85caaa0d8fa903d29cdd12bbe00a41f1da80e30d422d8f5f5addd296a",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "FRB121102_1652burstList.csv",
+      "size": 185366,
+      "sha256": "6a38c154c0b88bd9efe3576f30d1c9b375c5979f37baf9e552faf5e235a6ef87",
+      "role": "data",
+      "content_type": "text/csv"
+    },
+    {
+      "path": "SOURCE.md",
+      "size": 1550,
+      "sha256": "3c7330ec5e4aa515c9e1f1c1949294ce07cc3ed17afee259d1fb265d9bd7cadd",
+      "role": "documentation",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "Supplementary_Table_1/SI.pdf",
+      "size": 121950,
+      "sha256": "3b2a684dc7fc5c12c3ebf779e4f8f5544aab9e23753f412080017b5134967ef2",
+      "role": "data",
+      "content_type": "application/pdf"
+    }
+  ]
+}

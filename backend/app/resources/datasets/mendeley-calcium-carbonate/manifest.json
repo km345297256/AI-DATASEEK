@@ -1,0 +1,59 @@
+{
+  "dataset_id": "mendeley-calcium-carbonate",
+  "external_id": "mendeley-calcium-carbonate",
+  "data_center_id": "international-open-catalog",
+  "data_center_name": "Abduljamiu Amao、Bandar Alotaibi、Khalid Alramadan / Mendeley Data",
+  "name": "国际碳酸钙高分辨率 XRD 衍射谱样本",
+  "description": "选自 Amao、Alotaibi 与 Alramadan 发布的碳酸钙 X 射线衍射数据集，包含 Carbonates_1000 与 Carbonates_1001 两条原始公开 XRDML 文件。适合衍射角轴检查、峰检测、背景和谱线对比。 完整上游研究含西班牙、意大利、沙特阿拉伯样品；这里仅选择两个原文件，不代表整个研究且不推断具体样品国家。DOI 10.17632/kxd48sck74.1。上游已用 PowDLL 转为 XRDML，并明确提示时间、计数时间和 Kβ 元数据为格式占位，不可作为真实实验条件使用。本项目仅选取文件，未修改数值；角度按文件头而非论文总体范围解释。",
+  "domain": "spectroscopy",
+  "data_type": "XRDML",
+  "tags": [
+    "spectroscopy",
+    "XRDML",
+    "开放数据"
+  ],
+  "metadata": {
+    "curated": true,
+    "catalog_version": 1,
+    "publisher": "Abduljamiu Amao、Bandar Alotaibi、Khalid Alramadan / Mendeley Data",
+    "source_url": "https://data.mendeley.com/datasets/kxd48sck74/1",
+    "license": "CC-BY-4.0",
+    "license_url": "https://creativecommons.org/licenses/by/4.0/",
+    "sample_scope": "研究子集 · 2 条原始衍射谱",
+    "sample_note": "完整上游研究含西班牙、意大利、沙特阿拉伯样品；这里仅选择两个原文件，不代表整个研究且不推断具体样品国家。DOI 10.17632/kxd48sck74.1。上游已用 PowDLL 转为 XRDML，并明确提示时间、计数时间和 Kβ 元数据为格式占位，不可作为真实实验条件使用。本项目仅选取文件，未修改数值；角度按文件头而非论文总体范围解释。",
+    "provenance": [
+      {
+        "path": "Carbonates_1000.xrdml",
+        "download_url": "https://data.mendeley.com/public-files/datasets/kxd48sck74/files/9a7e6d24-6a80-46de-9185-c7d0a9fa2ee5/file_downloaded",
+        "sha256": "8e8990c06a4d83c5eab749f0885f6f56bd14863f292f200ed875983d7e73b1bf",
+        "size": 55485
+      },
+      {
+        "path": "Carbonates_1001.xrdml",
+        "download_url": "https://data.mendeley.com/public-files/datasets/kxd48sck74/files/a7135ca9-0032-46a8-ae80-556eddee9cb3/file_downloaded",
+        "sha256": "daad45ceb228f50f33eb79bd5d73bb9bc28f176e904d7e43e9e859a013e2b023",
+        "size": 55474
+      }
+    ],
+    "inventory_complete": true,
+    "recursive_file_count": 2,
+    "total_size_bytes": 110959
+  },
+  "files": [
+    {
+      "path": "Carbonates_1000.xrdml",
+      "size": 55485,
+      "sha256": "8e8990c06a4d83c5eab749f0885f6f56bd14863f292f200ed875983d7e73b1bf",
+      "role": "data",
+      "content_type": "application/xml"
+    },
+    {
+      "path": "Carbonates_1001.xrdml",
+      "size": 55474,
+      "sha256": "daad45ceb228f50f33eb79bd5d73bb9bc28f176e904d7e43e9e859a013e2b023",
+      "role": "data",
+      "content_type": "application/xml"
+    }
+  ]
+}
+

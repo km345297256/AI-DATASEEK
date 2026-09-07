@@ -13,6 +13,9 @@ from app.domain.external.sandbox import Sandbox
 from app.domain.external.sandbox_runtime import SandboxRuntime
 from app.domain.external.search import SearchEngine
 from app.domain.external.file import FileStorage
+from app.domain.external.plugin_runtime import PluginRuntime
+from app.domain.external.spill import SpillArtifactStore
+from app.domain.models.spill import SpillArtifactOwner
 from app.domain.repositories.agent_repository import AgentRepository
 from app.domain.external.task import Task
 from app.domain.models.file import FileInfo
@@ -36,12 +39,21 @@ class AgentService:
         mcp_repository: MCPRepository,
         search_engine: Optional[SearchEngine] = None,
         sandbox_runtime: Optional[SandboxRuntime] = None,
+        plugin_runtime: Optional[PluginRuntime] = None,
+        spill_artifact_store: Optional[SpillArtifactStore] = None,
+        analysis_job_service=None,
+        tool_approval_service=None,
+        credential_service=None,
     ):
         logger.info("Initializing AgentService")
         self._agent_repository = agent_repository
         self._session_repository = session_repository
         self._file_storage = file_storage
         self._sandbox_runtime = sandbox_runtime or get_default_sandbox_runtime(sandbox_cls)
+        self._plugin_runtime = plugin_runtime
+        self._spill_artifact_store = spill_artifact_store
+        self._analysis_job_service = analysis_job_service
+        self._tool_approval_service = tool_approval_service
         self._agent_domain_service = AgentDomainService(
             self._agent_repository,
             self._session_repository,
@@ -51,6 +63,11 @@ class AgentService:
             mcp_repository,
             search_engine,
             self._sandbox_runtime,
+            self._plugin_runtime,
+            self._spill_artifact_store,
+            analysis_job_service=analysis_job_service,
+            tool_approval_service=tool_approval_service,
+            credential_service=credential_service,
         )
         self._search_engine = search_engine
         self._sandbox_cls = sandbox_cls
@@ -95,6 +112,7 @@ class AgentService:
         message: Optional[str] = None,
         timestamp: Optional[datetime] = None,
         event_id: Optional[str] = None,
+        event_seq: Optional[int] = None,
         attachments: Optional[List[dict]] = None,
         skills: Optional[List[str]] = None,
         mcp_servers: Optional[List[str]] = None,
@@ -103,7 +121,11 @@ class AgentService:
         llm_overrides: Optional[dict] = None,
         client_message_id: Optional[str] = None,
     ) -> AsyncGenerator[AgentEvent, None]:
-        logger.info(f"Starting chat with session {session_id}: {(message or '')[:50]}...")
+        logger.info(
+            "Starting chat session=%s message_chars=%d",
+            session_id,
+            len(message or ""),
+        )
         # Directly use the domain service's chat method, which will check if the session exists
         async for event in self._agent_domain_service.chat(
             session_id=session_id,
@@ -111,6 +133,7 @@ class AgentService:
             message=message,
             timestamp=timestamp,
             latest_event_id=event_id,
+            latest_event_seq=event_seq,
             attachments=attachments,
             skills=skills,
             mcp_servers=mcp_servers,
@@ -119,7 +142,11 @@ class AgentService:
             llm_overrides=llm_overrides,
             client_message_id=client_message_id,
         ):
-            logger.debug(f"Received event: {event}")
+            logger.debug(
+                "Received agent event type=%s id=%s",
+                getattr(event, "type", type(event).__name__),
+                getattr(event, "id", ""),
+            )
             yield event
         logger.info(f"Chat with session {session_id} completed")
     
@@ -163,6 +190,15 @@ class AgentService:
             raise RuntimeError("Session not found")
 
         await self._agent_domain_service.delete_session_resources(session)
+        if self._analysis_job_service is not None:
+            await self._analysis_job_service.delete_owner(session.user_id, session.id)
+        if self._tool_approval_service is not None:
+            await self._tool_approval_service.delete_owner(session.user_id, session.id)
+        if self._spill_artifact_store is not None:
+            await self._spill_artifact_store.delete_owner(SpillArtifactOwner(
+                user_id=session.user_id,
+                session_id=session.id,
+            ))
         await self._session_repository.delete(session_id)
         logger.info(f"Session {session_id} deleted successfully")
 

@@ -13,8 +13,10 @@ AI-DataSeek is a focused AI dataset exploration and analysis platform extracted 
 - System administration limited to resource usage and configuration, tasks, MCP, and skills.
 - Per-session Docker sandboxes, task history, file results, and previews.
 - Token usage accounting for operations and capacity analysis, without per-user quotas.
+- A unified model driver, task-local execution budgets, and metadata-only context-compaction traces. See [model driver and context budget](docs/model-driver-and-context-budget.md).
+- Domain presets with on-demand Cordis tool loading, plus opt-in restricted Code Mode and bounded domain SubAgents. See [presets and experimental execution modes](docs/domain-presets-and-code-mode.md).
 
-The transitive runtime modules required by these capabilities are intentionally retained: Agent execution, session events, safety review, auditing, permissions, file storage, MongoDB, Redis, and the sandbox runtime. See [docs/architecture-scope.md](docs/architecture-scope.md) for the exact boundary.
+The transitive runtime modules required by these capabilities are intentionally retained: Agent execution, session events, safety review, auditing, permissions, file storage, MongoDB, Redis, and the sandbox runtime. See [docs/architecture-scope.md](docs/architecture-scope.md) for the exact boundary, [docs/cordis-plugin-architecture.md](docs/cordis-plugin-architecture.md) for the analysis-tool plugin boundary, and [docs/spill-artifact-store.md](docs/spill-artifact-store.md) for oversized tool-result retention.
 
 ## Runtime topology
 
@@ -43,6 +45,9 @@ AI-DataSeek has a fixed no-login access model. Browser and API requests do not
 use Bearer tokens or `X-API-Key`; every caller operates as the same built-in
 system administrator. Token consumption is recorded for usage reporting only
 and never checked against or deducted from a user quota.
+Separate model-runtime safety limits bound each request's estimated context and
+each Agent task's cumulative token/call usage. These are configurable execution
+limits, not account balances or billing quotas.
 
 For a Snap-packaged Docker daemon, expose host dataset paths through:
 

@@ -33,6 +33,8 @@ MAX_DATASET_PROMPT_CHARS = 10_000
 MAX_RESPONSE_CHARS = 16_000
 DEFAULT_SUGGESTED_QUESTION_CACHE_TTL_SECONDS = 60 * 60
 DEFAULT_SUGGESTED_QUESTION_CACHE_MAX_ENTRIES = 256
+DEFAULT_SUGGESTED_QUESTION_TIMEOUT_SECONDS = 8.0
+MAX_SUGGESTED_QUESTION_TIMEOUT_SECONDS = 20.0
 _MAX_FILE_NAME_CHARS = 160
 _MAX_SUMMARY_CHARS = 3_000
 _MAX_SHORT_FIELD_CHARS = 400
@@ -169,23 +171,25 @@ class DatasetSuggestedQuestionService:
             return cached_questions
 
         try:
-            model = create_chat_model(get_settings())
-            request_messages = [
-                SystemMessage(content=_SYSTEM_PROMPT),
-                HumanMessage(content=prompt),
-            ]
-            response = await model.ainvoke(request_messages)
-            try:
-                questions = self._parse_response(response)
-            except Exception:
-                invalid_content = self._content_text(getattr(response, "content", response))
-                invalid_content = invalid_content[:MAX_RESPONSE_CHARS]
-                corrected_response = await model.ainvoke([
-                    *request_messages,
-                    AIMessage(content=invalid_content or "（模型未返回有效文本）"),
-                    HumanMessage(content=_CORRECTION_PROMPT),
-                ])
-                questions = self._parse_response(corrected_response)
+            settings = get_settings()
+            async with asyncio.timeout(self._model_timeout_seconds(settings)):
+                model = create_chat_model(settings)
+                request_messages = [
+                    SystemMessage(content=_SYSTEM_PROMPT),
+                    HumanMessage(content=prompt),
+                ]
+                response = await model.ainvoke(request_messages)
+                try:
+                    questions = self._parse_response(response)
+                except Exception:
+                    invalid_content = self._content_text(getattr(response, "content", response))
+                    invalid_content = invalid_content[:MAX_RESPONSE_CHARS]
+                    corrected_response = await model.ainvoke([
+                        *request_messages,
+                        AIMessage(content=invalid_content or "（模型未返回有效文本）"),
+                        HumanMessage(content=_CORRECTION_PROMPT),
+                    ])
+                    questions = self._parse_response(corrected_response)
             await self._cache.put(cache_key, questions)
             return questions
         except Exception as exc:
@@ -207,6 +211,23 @@ class DatasetSuggestedQuestionService:
         """Return a fresh, schema-valid list when the recommendation model is unavailable."""
 
         return list(FALLBACK_SUGGESTED_QUESTIONS)
+
+    @staticmethod
+    def _model_timeout_seconds(settings: Any) -> float:
+        raw_timeout = getattr(
+            settings,
+            "dataset_suggested_question_timeout_seconds",
+            DEFAULT_SUGGESTED_QUESTION_TIMEOUT_SECONDS,
+        )
+        if isinstance(raw_timeout, bool):
+            return DEFAULT_SUGGESTED_QUESTION_TIMEOUT_SECONDS
+        try:
+            timeout = float(raw_timeout)
+        except (TypeError, ValueError):
+            return DEFAULT_SUGGESTED_QUESTION_TIMEOUT_SECONDS
+        if not math.isfinite(timeout) or timeout <= 0:
+            return DEFAULT_SUGGESTED_QUESTION_TIMEOUT_SECONDS
+        return min(timeout, MAX_SUGGESTED_QUESTION_TIMEOUT_SECONDS)
 
     def _build_dataset_prompt(self, dataset: DataCenterDataset) -> str:
         """Serialize an explicit safe-field allowlist for the model."""

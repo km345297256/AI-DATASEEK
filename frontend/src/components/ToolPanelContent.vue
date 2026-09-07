@@ -4,8 +4,11 @@
       <div class="flex items-center gap-2 w-full">
         <div class="text-[var(--text-primary)] text-lg font-semibold flex-1">{{ $t('AI-DataSeek Computer') }}</div>
         <button
+          type="button"
+          :aria-label="$t('Close')"
+          @click="hide"
           class="w-7 h-7 relative rounded-md inline-flex items-center justify-center gap-2.5 cursor-pointer hover:bg-[var(--fill-tsp-gray-main)]">
-          <Minimize2 class="w-5 h-5 text-[var(--icon-tertiary)]" @click="hide" />
+          <Minimize2 class="w-5 h-5 text-[var(--icon-tertiary)]" />
         </button>
       </div>
       <div v-if="toolInfo" class="flex items-center gap-2 mt-2">
@@ -25,6 +28,28 @@
       </div>
       <div
         class="flex flex-col rounded-[12px] overflow-hidden bg-[var(--background-gray-main)] border border-[var(--border-dark)] dark:border-black/30 shadow-[0px_4px_32px_0px_rgba(0,0,0,0.04)] flex-1 min-h-0 mt-[16px]">
+        <div
+          v-if="safeToolContent.analysis_job || safeToolContent.tool_approval || safeToolContent.spill"
+          data-testid="tool-execution-details"
+          role="region"
+          :aria-label="$t('Analysis Tools')"
+          tabindex="0"
+          class="max-h-[60%] min-h-0 shrink-0 overflow-y-auto overscroll-contain pb-3"
+        >
+          <AnalysisJobCard v-if="safeToolContent.analysis_job" :initial="safeToolContent.analysis_job" :session-id="sessionId" :is-share="isShare" />
+          <ToolApprovalCard v-if="safeToolContent.tool_approval" :initial="safeToolContent.tool_approval" :session-id="sessionId" :is-share="isShare" />
+          <div
+            v-if="safeToolContent.spill"
+            class="m-3 mb-0 shrink-0 rounded-xl border border-amber-300/70 bg-amber-50/80 px-3 py-2 text-xs text-amber-950 dark:border-amber-700/70 dark:bg-amber-950/30 dark:text-amber-100"
+          >
+            <div class="flex items-center justify-between gap-3 font-medium">
+              <span>{{ safeToolContent.spill.status === 'stored' ? $t('Full tool output stored') : $t('Full tool output unavailable') }}</span>
+              <span class="shrink-0 font-mono text-[11px] opacity-75">{{ formatByteCount(safeToolContent.spill.original_bytes) }}</span>
+            </div>
+            <pre v-if="safeToolContent.spill.preview" class="mt-2 max-h-32 overflow-auto whitespace-pre-wrap break-all rounded-lg bg-black/5 p-2 font-mono text-[11px] leading-4 dark:bg-black/20">{{ safeToolContent.spill.preview }}</pre>
+            <code v-if="safeToolContent.spill.reference" class="mt-2 block break-all text-[10px] opacity-70">{{ safeToolContent.spill.reference.locator }}</code>
+          </div>
+        </div>
         <component v-if="toolInfo" :is="toolInfo.view" :live="live" :sessionId="sessionId"
           :toolContent="safeToolContent" :isShare="isShare" />
         <div class="mt-auto flex w-full items-center gap-2 px-4 h-[44px] relative" v-if="!realTime">
@@ -46,6 +71,8 @@ import { Minimize2, PlayIcon } from 'lucide-vue-next';
 import type { ToolContent } from '@/types/message';
 import { useToolInfo } from '@/composables/useTool';
 import { safeToolContentForDisplay } from '@/utils/toolDisplay';
+import AnalysisJobCard from './AnalysisJobCard.vue';
+import ToolApprovalCard from './ToolApprovalCard.vue';
 
 const props = defineProps<{
   sessionId?: string;
@@ -57,6 +84,13 @@ const props = defineProps<{
 
 const { toolInfo } = useToolInfo(toRef(props, 'toolContent'));
 const safeToolContent = computed(() => safeToolContentForDisplay(props.toolContent));
+
+const formatByteCount = (value: number): string => {
+  if (!Number.isFinite(value) || value < 0) return '0 B';
+  if (value < 1024) return `${value} B`;
+  if (value < 1024 * 1024) return `${(value / 1024).toFixed(1)} KiB`;
+  return `${(value / (1024 * 1024)).toFixed(1)} MiB`;
+};
 
 const emit = defineEmits<{
   (e: 'jumpToRealTime'): void,

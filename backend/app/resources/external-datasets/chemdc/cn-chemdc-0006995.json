@@ -1,0 +1,513 @@
+{
+  "dataset_id": "cn-chemdc-0006995",
+  "external_id": "10.57841/casdc.0006995",
+  "data_center_id": "reviewed-chemdc-catalog",
+  "data_center_name": "中国科学院化学化工科学数据中心",
+  "name": "室温有机自旋电子器件通过电光补偿策略实现宽范围磁电流调控和多功能性论文数据集",
+  "description": "室温有机自旋器件在光、偏压和磁场条件下的磁电流及对照实验；公开目录为六个 XLSX 实体文件和一份说明。",
+  "domain": "chemistry",
+  "data_type": "xlsx,docx",
+  "tags": [
+    "chemistry",
+    "中国科学院化学化工科学数据中心",
+    "公开数据"
+  ],
+  "metadata": {
+    "source_catalog": "chemdc",
+    "source_url": "https://doi.org/10.57841/casdc.0006995",
+    "portal_detail_url": "http://chemdc.casdc.cn/dataDetails/0a0290ee47934d6caf32bd683bf64572",
+    "authors": [
+      "孟轲"
+    ],
+    "doi": "10.57841/casdc.0006995",
+    "license": "CC BY 4.0",
+    "license_url": "https://creativecommons.org/licenses/by/4.0/",
+    "license_details": "已核验的官方详情标注 CC BY 4.0、开放访问；导入时保留署名、DOI、许可链接及原文件说明。访问流程仍要求用户正常登录，CC 许可不构成绕过认证的授权。",
+    "curated": true,
+    "catalog_version": 1,
+    "publisher": "中国科学院化学化工科学数据中心",
+    "sample_scope": "官方条目的完整7文件组合：6个电光补偿/磁电流实验XLSX及1个说明DOCX，原始共204,197字节；另附本地生成的SOURCE.md。保留官方目录层级，不代表ChemDC全库。",
+    "sample_note": "官方条目的完整7文件组合：6个电光补偿/磁电流实验XLSX及1个说明DOCX，原始共204,197字节；另附本地生成的SOURCE.md。保留官方目录层级，不代表ChemDC全库。",
+    "download_date": "2026-09-07",
+    "inventory_complete": true,
+    "source_reported_file_count": 7,
+    "source_reported_total_size_bytes": 204197,
+    "acquisition_mode": "user_provided_official_download",
+    "source_evidence_kind": "reviewed_official_metadata_and_user_provided_files",
+    "source_evidence": {
+      "schema_version": 1,
+      "dataset_id": "cn-chemdc-0006995",
+      "external_id": "10.57841/casdc.0006995",
+      "source_url": "https://doi.org/10.57841/casdc.0006995",
+      "portal_detail_url": "http://chemdc.casdc.cn/dataDetails/0a0290ee47934d6caf32bd683bf64572",
+      "authors": [
+        "孟轲"
+      ],
+      "doi": "10.57841/casdc.0006995",
+      "license": "CC BY 4.0",
+      "license_url": "https://creativecommons.org/licenses/by/4.0/",
+      "acquisition_mode": "user_provided_official_download",
+      "reviewed_at": "2026-09-07",
+      "source_reported_file_count": 7,
+      "source_reported_total_size_bytes": 204197,
+      "files": [
+        {
+          "path": "XDB0520302-006-室温有机自旋电子器件通过电光补偿策略实现宽范围磁电流调控和多功能性论文数据集-数据说明文件.docx",
+          "size": 21360,
+          "sha256": "8d6ddbb64203203c0e318c12f57055d2939a7819bc869192a0ffd2c28db3ddb1",
+          "role": "documentation",
+          "content_type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+          "source_file_id": "6960c69dd12c453f30fbdea2",
+          "source_tree_id": 2,
+          "download_url": null,
+          "acquisition_method": "用户通过官网正常下载后提供；不保存登录凭据或带认证参数的下载地址。"
+        },
+        {
+          "path": "XDB0520302-006-室温有机自旋电子器件通过电光补偿策略实现宽范围磁电流调控和多功能性论文数据集-数据集实体文件/Fig1d.PC71BM材料UPS与LEIPES数据 .xlsx",
+          "size": 13779,
+          "sha256": "93f13275ef3e4106932d05234eb02f7eb757878560fa9e512043e659b4925755",
+          "role": "data",
+          "content_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+          "source_file_id": "6960c69dd12c453f30fbde9c",
+          "source_tree_id": 11,
+          "download_url": null,
+          "acquisition_method": "用户通过官网正常下载后提供；不保存登录凭据或带认证参数的下载地址。"
+        },
+        {
+          "path": "XDB0520302-006-室温有机自旋电子器件通过电光补偿策略实现宽范围磁电流调控和多功能性论文数据集-数据集实体文件/Fig1e.P3HT材料UPS与LEIPES数据 .xlsx",
+          "size": 14205,
+          "sha256": "b27ed1f9a078f0dbb074ef1883c73b5e224dffecb0b20f31adb5a3479cbc3041",
+          "role": "data",
+          "content_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+          "source_file_id": "6960c69dd12c453f30fbde9d",
+          "source_tree_id": 12,
+          "download_url": null,
+          "acquisition_method": "用户通过官网正常下载后提供；不保存登录凭据或带认证参数的下载地址。"
+        },
+        {
+          "path": "XDB0520302-006-室温有机自旋电子器件通过电光补偿策略实现宽范围磁电流调控和多功能性论文数据集-数据集实体文件/Fig2.光照与黑暗条件I-V曲线 .xlsx",
+          "size": 15652,
+          "sha256": "5cb359525cb21fcbb157c51384cc66a73e011899decdc0183eb4f0707f77843e",
+          "role": "data",
+          "content_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+          "source_file_id": "6960c69dd12c453f30fbde9e",
+          "source_tree_id": 13,
+          "download_url": null,
+          "acquisition_method": "用户通过官网正常下载后提供；不保存登录凭据或带认证参数的下载地址。"
+        },
+        {
+          "path": "XDB0520302-006-室温有机自旋电子器件通过电光补偿策略实现宽范围磁电流调控和多功能性论文数据集-数据集实体文件/Fig2.光照与黑暗条件MC曲线 .xlsx",
+          "size": 32214,
+          "sha256": "858b30e5e77a321badf2508f21c357b6c706183c9872b0881bba1ac2f621c304",
+          "role": "data",
+          "content_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+          "source_file_id": "6960c69dd12c453f30fbde9f",
+          "source_tree_id": 14,
+          "download_url": null,
+          "acquisition_method": "用户通过官网正常下载后提供；不保存登录凭据或带认证参数的下载地址。"
+        },
+        {
+          "path": "XDB0520302-006-室温有机自旋电子器件通过电光补偿策略实现宽范围磁电流调控和多功能性论文数据集-数据集实体文件/Fig3.光照与磁场条件电流测试数据 .xlsx",
+          "size": 81804,
+          "sha256": "f7e25f8219aa48f7f1e55bc32110db42a1e7919c45beaf4e640a723337018a52",
+          "role": "data",
+          "content_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+          "source_file_id": "6960c69dd12c453f30fbdea0",
+          "source_tree_id": 15,
+          "download_url": null,
+          "acquisition_method": "用户通过官网正常下载后提供；不保存登录凭据或带认证参数的下载地址。"
+        },
+        {
+          "path": "XDB0520302-006-室温有机自旋电子器件通过电光补偿策略实现宽范围磁电流调控和多功能性论文数据集-数据集实体文件/Fig4.器件磁响应测试数据 .xlsx",
+          "size": 25183,
+          "sha256": "45bb833ac07e78b82c004904e3486d5b39ca52ea6ba46be8238e0aa9772353c1",
+          "role": "data",
+          "content_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+          "source_file_id": "6960c69dd12c453f30fbdea1",
+          "source_tree_id": 16,
+          "download_url": null,
+          "acquisition_method": "用户通过官网正常下载后提供；不保存登录凭据或带认证参数的下载地址。"
+        }
+      ]
+    },
+    "source_evidence_sha256": "149849ecd8eb36565ca0be41a654038c5b931999076dd662976c63e587d667d3",
+    "provenance": [
+      {
+        "path": "XDB0520302-006-室温有机自旋电子器件通过电光补偿策略实现宽范围磁电流调控和多功能性论文数据集-数据说明文件.docx",
+        "size": 21360,
+        "sha256": "8d6ddbb64203203c0e318c12f57055d2939a7819bc869192a0ffd2c28db3ddb1",
+        "role": "documentation",
+        "content_type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        "source_file_id": "6960c69dd12c453f30fbdea2",
+        "source_tree_id": 2,
+        "download_url": null,
+        "acquisition_method": "用户通过官网正常下载后提供；不保存登录凭据或带认证参数的下载地址。"
+      },
+      {
+        "path": "XDB0520302-006-室温有机自旋电子器件通过电光补偿策略实现宽范围磁电流调控和多功能性论文数据集-数据集实体文件/Fig1d.PC71BM材料UPS与LEIPES数据 .xlsx",
+        "size": 13779,
+        "sha256": "93f13275ef3e4106932d05234eb02f7eb757878560fa9e512043e659b4925755",
+        "role": "data",
+        "content_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "source_file_id": "6960c69dd12c453f30fbde9c",
+        "source_tree_id": 11,
+        "download_url": null,
+        "acquisition_method": "用户通过官网正常下载后提供；不保存登录凭据或带认证参数的下载地址。"
+      },
+      {
+        "path": "XDB0520302-006-室温有机自旋电子器件通过电光补偿策略实现宽范围磁电流调控和多功能性论文数据集-数据集实体文件/Fig1e.P3HT材料UPS与LEIPES数据 .xlsx",
+        "size": 14205,
+        "sha256": "b27ed1f9a078f0dbb074ef1883c73b5e224dffecb0b20f31adb5a3479cbc3041",
+        "role": "data",
+        "content_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "source_file_id": "6960c69dd12c453f30fbde9d",
+        "source_tree_id": 12,
+        "download_url": null,
+        "acquisition_method": "用户通过官网正常下载后提供；不保存登录凭据或带认证参数的下载地址。"
+      },
+      {
+        "path": "XDB0520302-006-室温有机自旋电子器件通过电光补偿策略实现宽范围磁电流调控和多功能性论文数据集-数据集实体文件/Fig2.光照与黑暗条件I-V曲线 .xlsx",
+        "size": 15652,
+        "sha256": "5cb359525cb21fcbb157c51384cc66a73e011899decdc0183eb4f0707f77843e",
+        "role": "data",
+        "content_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "source_file_id": "6960c69dd12c453f30fbde9e",
+        "source_tree_id": 13,
+        "download_url": null,
+        "acquisition_method": "用户通过官网正常下载后提供；不保存登录凭据或带认证参数的下载地址。"
+      },
+      {
+        "path": "XDB0520302-006-室温有机自旋电子器件通过电光补偿策略实现宽范围磁电流调控和多功能性论文数据集-数据集实体文件/Fig2.光照与黑暗条件MC曲线 .xlsx",
+        "size": 32214,
+        "sha256": "858b30e5e77a321badf2508f21c357b6c706183c9872b0881bba1ac2f621c304",
+        "role": "data",
+        "content_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "source_file_id": "6960c69dd12c453f30fbde9f",
+        "source_tree_id": 14,
+        "download_url": null,
+        "acquisition_method": "用户通过官网正常下载后提供；不保存登录凭据或带认证参数的下载地址。"
+      },
+      {
+        "path": "XDB0520302-006-室温有机自旋电子器件通过电光补偿策略实现宽范围磁电流调控和多功能性论文数据集-数据集实体文件/Fig3.光照与磁场条件电流测试数据 .xlsx",
+        "size": 81804,
+        "sha256": "f7e25f8219aa48f7f1e55bc32110db42a1e7919c45beaf4e640a723337018a52",
+        "role": "data",
+        "content_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "source_file_id": "6960c69dd12c453f30fbdea0",
+        "source_tree_id": 15,
+        "download_url": null,
+        "acquisition_method": "用户通过官网正常下载后提供；不保存登录凭据或带认证参数的下载地址。"
+      },
+      {
+        "path": "XDB0520302-006-室温有机自旋电子器件通过电光补偿策略实现宽范围磁电流调控和多功能性论文数据集-数据集实体文件/Fig4.器件磁响应测试数据 .xlsx",
+        "size": 25183,
+        "sha256": "45bb833ac07e78b82c004904e3486d5b39ca52ea6ba46be8238e0aa9772353c1",
+        "role": "data",
+        "content_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "source_file_id": "6960c69dd12c453f30fbdea1",
+        "source_tree_id": 16,
+        "download_url": null,
+        "acquisition_method": "用户通过官网正常下载后提供；不保存登录凭据或带认证参数的下载地址。"
+      }
+    ],
+    "recursive_file_count": 8,
+    "total_size_bytes": 209451,
+    "readability_validation": {
+      "schema_version": 1,
+      "checked_at_unix": 1788748586,
+      "file_count": 7,
+      "total_bytes": 204197,
+      "all_files_readable": true,
+      "scope": "offline structural/content readability; no scientific-quality or statistical-validity guarantee",
+      "input_files_modified": false,
+      "downloaded_code_or_macros_executed": false,
+      "files": [
+        {
+          "path": "XDB0520302-006-室温有机自旋电子器件通过电光补偿策略实现宽范围磁电流调控和多功能性论文数据集-数据说明文件.docx",
+          "bytes": 21360,
+          "sha256": "8d6ddbb64203203c0e318c12f57055d2939a7819bc869192a0ffd2c28db3ddb1",
+          "format": "docx",
+          "status": "readable",
+          "parser": "zipfile+defusedxml",
+          "content_role": "document",
+          "parser_warning_count": 0,
+          "zip_crc_verified": true,
+          "document_xml_verified": true,
+          "paragraph_count": 27,
+          "table_count": 0,
+          "table_row_count": 0,
+          "table_cell_count": 0,
+          "text_characters": 1352,
+          "embedded_macros_present": false,
+          "embedded_macros_executed": false
+        },
+        {
+          "path": "XDB0520302-006-室温有机自旋电子器件通过电光补偿策略实现宽范围磁电流调控和多功能性论文数据集-数据集实体文件/Fig1d.PC71BM材料UPS与LEIPES数据 .xlsx",
+          "bytes": 13779,
+          "sha256": "93f13275ef3e4106932d05234eb02f7eb757878560fa9e512043e659b4925755",
+          "format": "xlsx",
+          "status": "readable",
+          "parser": "openpyxl (read_only, keep_links=False)",
+          "content_role": "spreadsheet",
+          "parser_warning_count": 0,
+          "sheet_count": 1,
+          "sheets": [
+            {
+              "index": 0,
+              "nonempty_rows": 256,
+              "columns": 3,
+              "nonempty_cells": 511,
+              "numeric_cells": 508,
+              "formula_cells": 0
+            }
+          ],
+          "formulas_evaluated": false,
+          "macros_executed": false,
+          "external_links_followed": false
+        },
+        {
+          "path": "XDB0520302-006-室温有机自旋电子器件通过电光补偿策略实现宽范围磁电流调控和多功能性论文数据集-数据集实体文件/Fig1e.P3HT材料UPS与LEIPES数据 .xlsx",
+          "bytes": 14205,
+          "sha256": "b27ed1f9a078f0dbb074ef1883c73b5e224dffecb0b20f31adb5a3479cbc3041",
+          "format": "xlsx",
+          "status": "readable",
+          "parser": "openpyxl (read_only, keep_links=False)",
+          "content_role": "spreadsheet",
+          "parser_warning_count": 0,
+          "sheet_count": 1,
+          "sheets": [
+            {
+              "index": 0,
+              "nonempty_rows": 311,
+              "columns": 3,
+              "nonempty_cells": 621,
+              "numeric_cells": 524,
+              "formula_cells": 0
+            }
+          ],
+          "formulas_evaluated": false,
+          "macros_executed": false,
+          "external_links_followed": false
+        },
+        {
+          "path": "XDB0520302-006-室温有机自旋电子器件通过电光补偿策略实现宽范围磁电流调控和多功能性论文数据集-数据集实体文件/Fig2.光照与黑暗条件I-V曲线 .xlsx",
+          "bytes": 15652,
+          "sha256": "5cb359525cb21fcbb157c51384cc66a73e011899decdc0183eb4f0707f77843e",
+          "format": "xlsx",
+          "status": "readable",
+          "parser": "openpyxl (read_only, keep_links=False)",
+          "content_role": "spreadsheet",
+          "parser_warning_count": 0,
+          "sheet_count": 3,
+          "sheets": [
+            {
+              "index": 0,
+              "nonempty_rows": 33,
+              "columns": 5,
+              "nonempty_cells": 129,
+              "numeric_cells": 124,
+              "formula_cells": 0
+            },
+            {
+              "index": 1,
+              "nonempty_rows": 33,
+              "columns": 5,
+              "nonempty_cells": 129,
+              "numeric_cells": 124,
+              "formula_cells": 0
+            },
+            {
+              "index": 2,
+              "nonempty_rows": 33,
+              "columns": 13,
+              "nonempty_cells": 385,
+              "numeric_cells": 372,
+              "formula_cells": 0
+            }
+          ],
+          "formulas_evaluated": false,
+          "macros_executed": false,
+          "external_links_followed": false
+        },
+        {
+          "path": "XDB0520302-006-室温有机自旋电子器件通过电光补偿策略实现宽范围磁电流调控和多功能性论文数据集-数据集实体文件/Fig2.光照与黑暗条件MC曲线 .xlsx",
+          "bytes": 32214,
+          "sha256": "858b30e5e77a321badf2508f21c357b6c706183c9872b0881bba1ac2f621c304",
+          "format": "xlsx",
+          "status": "readable",
+          "parser": "openpyxl (read_only, keep_links=False)",
+          "content_role": "spreadsheet",
+          "parser_warning_count": 0,
+          "sheet_count": 3,
+          "sheets": [
+            {
+              "index": 0,
+              "nonempty_rows": 247,
+              "columns": 3,
+              "nonempty_cells": 493,
+              "numeric_cells": 490,
+              "formula_cells": 0
+            },
+            {
+              "index": 1,
+              "nonempty_rows": 262,
+              "columns": 5,
+              "nonempty_cells": 1009,
+              "numeric_cells": 956,
+              "formula_cells": 0
+            },
+            {
+              "index": 2,
+              "nonempty_rows": 295,
+              "columns": 3,
+              "nonempty_cells": 589,
+              "numeric_cells": 586,
+              "formula_cells": 0
+            }
+          ],
+          "formulas_evaluated": false,
+          "macros_executed": false,
+          "external_links_followed": false
+        },
+        {
+          "path": "XDB0520302-006-室温有机自旋电子器件通过电光补偿策略实现宽范围磁电流调控和多功能性论文数据集-数据集实体文件/Fig3.光照与磁场条件电流测试数据 .xlsx",
+          "bytes": 81804,
+          "sha256": "f7e25f8219aa48f7f1e55bc32110db42a1e7919c45beaf4e640a723337018a52",
+          "format": "xlsx",
+          "status": "readable",
+          "parser": "openpyxl (read_only, keep_links=False)",
+          "content_role": "spreadsheet",
+          "parser_warning_count": 0,
+          "sheet_count": 4,
+          "sheets": [
+            {
+              "index": 0,
+              "nonempty_rows": 297,
+              "columns": 13,
+              "nonempty_cells": 3553,
+              "numeric_cells": 3418,
+              "formula_cells": 0
+            },
+            {
+              "index": 1,
+              "nonempty_rows": 27,
+              "columns": 4,
+              "nonempty_cells": 79,
+              "numeric_cells": 75,
+              "formula_cells": 0
+            },
+            {
+              "index": 2,
+              "nonempty_rows": 296,
+              "columns": 15,
+              "nonempty_cells": 4131,
+              "numeric_cells": 4030,
+              "formula_cells": 0
+            },
+            {
+              "index": 3,
+              "nonempty_rows": 10,
+              "columns": 4,
+              "nonempty_cells": 28,
+              "numeric_cells": 24,
+              "formula_cells": 0
+            }
+          ],
+          "formulas_evaluated": false,
+          "macros_executed": false,
+          "external_links_followed": false
+        },
+        {
+          "path": "XDB0520302-006-室温有机自旋电子器件通过电光补偿策略实现宽范围磁电流调控和多功能性论文数据集-数据集实体文件/Fig4.器件磁响应测试数据 .xlsx",
+          "bytes": 25183,
+          "sha256": "45bb833ac07e78b82c004904e3486d5b39ca52ea6ba46be8238e0aa9772353c1",
+          "format": "xlsx",
+          "status": "readable",
+          "parser": "openpyxl (read_only, keep_links=False)",
+          "content_role": "spreadsheet",
+          "parser_warning_count": 0,
+          "sheet_count": 2,
+          "sheets": [
+            {
+              "index": 0,
+              "nonempty_rows": 334,
+              "columns": 5,
+              "nonempty_cells": 1333,
+              "numeric_cells": 610,
+              "formula_cells": 0
+            },
+            {
+              "index": 1,
+              "nonempty_rows": 281,
+              "columns": 3,
+              "nonempty_cells": 559,
+              "numeric_cells": 554,
+              "formula_cells": 0
+            }
+          ],
+          "formulas_evaluated": false,
+          "macros_executed": false,
+          "external_links_followed": false
+        }
+      ]
+    }
+  },
+  "files": [
+    {
+      "path": "XDB0520302-006-室温有机自旋电子器件通过电光补偿策略实现宽范围磁电流调控和多功能性论文数据集-数据说明文件.docx",
+      "size": 21360,
+      "sha256": "8d6ddbb64203203c0e318c12f57055d2939a7819bc869192a0ffd2c28db3ddb1",
+      "role": "documentation",
+      "content_type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+    },
+    {
+      "path": "XDB0520302-006-室温有机自旋电子器件通过电光补偿策略实现宽范围磁电流调控和多功能性论文数据集-数据集实体文件/Fig1d.PC71BM材料UPS与LEIPES数据 .xlsx",
+      "size": 13779,
+      "sha256": "93f13275ef3e4106932d05234eb02f7eb757878560fa9e512043e659b4925755",
+      "role": "data",
+      "content_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    },
+    {
+      "path": "XDB0520302-006-室温有机自旋电子器件通过电光补偿策略实现宽范围磁电流调控和多功能性论文数据集-数据集实体文件/Fig1e.P3HT材料UPS与LEIPES数据 .xlsx",
+      "size": 14205,
+      "sha256": "b27ed1f9a078f0dbb074ef1883c73b5e224dffecb0b20f31adb5a3479cbc3041",
+      "role": "data",
+      "content_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    },
+    {
+      "path": "XDB0520302-006-室温有机自旋电子器件通过电光补偿策略实现宽范围磁电流调控和多功能性论文数据集-数据集实体文件/Fig2.光照与黑暗条件I-V曲线 .xlsx",
+      "size": 15652,
+      "sha256": "5cb359525cb21fcbb157c51384cc66a73e011899decdc0183eb4f0707f77843e",
+      "role": "data",
+      "content_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    },
+    {
+      "path": "XDB0520302-006-室温有机自旋电子器件通过电光补偿策略实现宽范围磁电流调控和多功能性论文数据集-数据集实体文件/Fig2.光照与黑暗条件MC曲线 .xlsx",
+      "size": 32214,
+      "sha256": "858b30e5e77a321badf2508f21c357b6c706183c9872b0881bba1ac2f621c304",
+      "role": "data",
+      "content_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    },
+    {
+      "path": "XDB0520302-006-室温有机自旋电子器件通过电光补偿策略实现宽范围磁电流调控和多功能性论文数据集-数据集实体文件/Fig3.光照与磁场条件电流测试数据 .xlsx",
+      "size": 81804,
+      "sha256": "f7e25f8219aa48f7f1e55bc32110db42a1e7919c45beaf4e640a723337018a52",
+      "role": "data",
+      "content_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    },
+    {
+      "path": "XDB0520302-006-室温有机自旋电子器件通过电光补偿策略实现宽范围磁电流调控和多功能性论文数据集-数据集实体文件/Fig4.器件磁响应测试数据 .xlsx",
+      "size": 25183,
+      "sha256": "45bb833ac07e78b82c004904e3486d5b39ca52ea6ba46be8238e0aa9772353c1",
+      "role": "data",
+      "content_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    },
+    {
+      "path": "SOURCE.md",
+      "size": 5254,
+      "sha256": "6e19c4e67eb9fdb61caa66afd3e8b1e41392da170d7ea3f28cbc8d09c1b791fd",
+      "role": "documentation",
+      "content_type": "text/markdown"
+    }
+  ]
+}

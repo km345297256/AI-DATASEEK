@@ -1,0 +1,160 @@
+{
+  "dataset_id": "scidb-galactic-cosmic-rays",
+  "external_id": "1de994ad3c4140dba319b1522d7113b9",
+  "data_center_id": "reviewed-scidb-catalog",
+  "data_center_name": "ScienceDB 科学数据银行",
+  "name": "银河宇宙线理论通量比较数据",
+  "description": "GALPROP计算的质子、氦、硼、碳、氧理论通量，比较不同背景源与近邻源方案及太阳调制影响；每个文本文件含列定义。",
+  "domain": "space",
+  "data_type": "txt",
+  "tags": [
+    "space",
+    "ScienceDB 科学数据银行",
+    "公开数据"
+  ],
+  "metadata": {
+    "curated": true,
+    "catalog_version": 1,
+    "source_catalog": "scidb",
+    "publisher": "ScienceDB 科学数据银行",
+    "source_url": "https://www.scidb.cn/en/detail?dataSetId=1de994ad3c4140dba319b1522d7113b9",
+    "license": "CC BY-NC 4.0",
+    "license_url": "https://creativecommons.org/licenses/by-nc/4.0/",
+    "license_details": "Creative Commons Attribution-NonCommercial 4.0；须署名、链接许可并说明修改，禁止未经许可的商业使用。",
+    "sample_scope": "完整 V1 的7个文本表格，对应研究图2—5；理论模型结果，不是实测粒子事件。仅限非商业使用。",
+    "sample_note": "完整 V1 的7个文本表格，对应研究图2—5；理论模型结果，不是实测粒子事件。仅限非商业使用。",
+    "download_date": "2026-09-07",
+    "provenance": [
+      {
+        "path": "fig2.txt",
+        "size": 7388,
+        "sha256": "5771f7af9da9243e4e34d75f79c9dffd2ef25e1fb272a692905c9c15c8d6ebad",
+        "role": "data",
+        "content_type": "text/plain",
+        "download_url": "https://china.scidb.cn/download?fileId=5a69b4557a237f45c126c25bb83a6b56",
+        "publisher_md5": "ce2a02fe3a8dea05953d23aa4f281789"
+      },
+      {
+        "path": "fig3a.txt",
+        "size": 3747,
+        "sha256": "3fb346fd5ef013544ee4909d33adcb6ad2de7dc4deaf0e83a520b221eb47c02d",
+        "role": "data",
+        "content_type": "text/plain",
+        "download_url": "https://china.scidb.cn/download?fileId=a3b8cd49ab995cdeb8bb36cdb38a20a6",
+        "publisher_md5": "4add6a8ed95fed45e5c7b3889d0dffc1"
+      },
+      {
+        "path": "fig3b.txt",
+        "size": 3755,
+        "sha256": "56584fdfbe19c315b988f8a3393444d6c0f874eeea74099c14de8544dbec235e",
+        "role": "data",
+        "content_type": "text/plain",
+        "download_url": "https://china.scidb.cn/download?fileId=8a75981a49af4ec5dc978aecf0ea84c2",
+        "publisher_md5": "0ed556166f17dffd42686a4999a36222"
+      },
+      {
+        "path": "fig4a.txt",
+        "size": 4928,
+        "sha256": "fc8ef1cc714bad9955439e1718921f3c201efbb8567f8feb8e982f8f9207aea1",
+        "role": "data",
+        "content_type": "text/plain",
+        "download_url": "https://china.scidb.cn/download?fileId=3bfba337bcc990383edf40231551040e",
+        "publisher_md5": "a2a7b16f1f6f467658f24a09ad916b11"
+      },
+      {
+        "path": "fig4b.txt",
+        "size": 4967,
+        "sha256": "812ae18e44ae1068691ad66fd7ec16fdb73f25202237ccb4f52e0db06c034689",
+        "role": "data",
+        "content_type": "text/plain",
+        "download_url": "https://china.scidb.cn/download?fileId=16d45e90a6d17bd1a2275a7a87f3c1ad",
+        "publisher_md5": "3f35d21be7fd448854e07eb62307fc84"
+      },
+      {
+        "path": "fig5a.txt",
+        "size": 4390,
+        "sha256": "a2a81722400d16ab9ff9483fb9d1e5d6c782c7e9a46c28fe036f506e51fc2cdc",
+        "role": "data",
+        "content_type": "text/plain",
+        "download_url": "https://china.scidb.cn/download?fileId=e8d807460d605059f6ad5960a68a9049",
+        "publisher_md5": "b185f4942d7a6ebe05f9947b95f5f3cf"
+      },
+      {
+        "path": "fig5b.txt",
+        "size": 4463,
+        "sha256": "4e8e328cb89eaec9a117f2a84e7e2bce27ee4ebd0a042dbafa2231bd2f8d846b",
+        "role": "data",
+        "content_type": "text/plain",
+        "download_url": "https://china.scidb.cn/download?fileId=fbccde64567aa66d1e950f59afd619ee",
+        "publisher_md5": "eb6c6a99d053ce2a8d9c5e448de2b59a"
+      }
+    ],
+    "inventory_complete": true,
+    "recursive_file_count": 8,
+    "total_size_bytes": 34766,
+    "source_version": "V1",
+    "doi": "https://doi.org/10.57760/sciencedb.36475",
+    "authors": [
+      "Qiang Yuan"
+    ],
+    "source_descriptor_sha256": "a8484f8b525aa1bcd06644521b9efe229af4ac71b155c7c56e807194c0e26036"
+  },
+  "files": [
+    {
+      "path": "SOURCE.md",
+      "size": 1128,
+      "sha256": "71782bfede30fc608ea633644e47200e80c7a3eceaa52c7f2b18026ea489e326",
+      "role": "documentation",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "fig2.txt",
+      "size": 7388,
+      "sha256": "5771f7af9da9243e4e34d75f79c9dffd2ef25e1fb272a692905c9c15c8d6ebad",
+      "role": "data",
+      "content_type": "text/plain"
+    },
+    {
+      "path": "fig3a.txt",
+      "size": 3747,
+      "sha256": "3fb346fd5ef013544ee4909d33adcb6ad2de7dc4deaf0e83a520b221eb47c02d",
+      "role": "data",
+      "content_type": "text/plain"
+    },
+    {
+      "path": "fig3b.txt",
+      "size": 3755,
+      "sha256": "56584fdfbe19c315b988f8a3393444d6c0f874eeea74099c14de8544dbec235e",
+      "role": "data",
+      "content_type": "text/plain"
+    },
+    {
+      "path": "fig4a.txt",
+      "size": 4928,
+      "sha256": "fc8ef1cc714bad9955439e1718921f3c201efbb8567f8feb8e982f8f9207aea1",
+      "role": "data",
+      "content_type": "text/plain"
+    },
+    {
+      "path": "fig4b.txt",
+      "size": 4967,
+      "sha256": "812ae18e44ae1068691ad66fd7ec16fdb73f25202237ccb4f52e0db06c034689",
+      "role": "data",
+      "content_type": "text/plain"
+    },
+    {
+      "path": "fig5a.txt",
+      "size": 4390,
+      "sha256": "a2a81722400d16ab9ff9483fb9d1e5d6c782c7e9a46c28fe036f506e51fc2cdc",
+      "role": "data",
+      "content_type": "text/plain"
+    },
+    {
+      "path": "fig5b.txt",
+      "size": 4463,
+      "sha256": "4e8e328cb89eaec9a117f2a84e7e2bce27ee4ebd0a042dbafa2231bd2f8d846b",
+      "role": "data",
+      "content_type": "text/plain"
+    }
+  ]
+}

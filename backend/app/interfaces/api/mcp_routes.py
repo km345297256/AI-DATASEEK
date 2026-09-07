@@ -274,12 +274,8 @@ async def list_mcp_tools(
                 continue
             function = tool.get("function", {})
             tool_name = function.get("name", "")
-            server_name = ""
-            for name in config.mcpServers:
-                prefix = name if name.startswith("mcp_") else f"mcp_{name}"
-                if tool_name.startswith(f"{prefix}_"):
-                    server_name = name
-                    break
+            route = toolkit.manager.get_tool_route(tool_name) if toolkit.manager else None
+            server_name = route[0] if route else ""
             tools.append(
                 MCPToolResponse(
                     name=tool_name,

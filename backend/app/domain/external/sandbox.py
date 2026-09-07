@@ -38,6 +38,12 @@ class Sandbox(Protocol):
             Shell status information
         """
         ...
+
+    async def exec_command_with_credentials(
+        self, session_id: str, exec_dir: str, command: str, credentials: dict[str, str],
+    ) -> ToolResult:
+        """Private trusted-plugin adapter; values must never enter command text."""
+        ...
     
     async def wait_for_process(
         self,
@@ -82,6 +88,10 @@ class Sandbox(Protocol):
         Returns:
             Termination result
         """
+        ...
+
+    async def release_shell(self, session_id: str) -> ToolResult:
+        """Terminate if needed and discard one internal shell session."""
         ...
     
     async def file_write(

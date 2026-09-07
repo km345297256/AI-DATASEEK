@@ -1,0 +1,72 @@
+{
+  "dataset_id": "cn-ngdc-gwhbhep01000000",
+  "external_id": "GWHBHEP01000000",
+  "data_center_id": "reviewed-ngdc-catalog",
+  "data_center_name": "国家基因组科学数据中心 NGDC / CNCB",
+  "name": "参薯完整叶绿体基因组",
+  "description": "NGDC Genome Warehouse公开发布的Dioscorea alata（Chloroplast）基因组序列，组装级别为Complete。导入叶绿体组装，不包含核基因组，也不是群体遗传或个人临床数据。 可用于序列统计、GC组成与片段长度探查。",
+  "domain": "sequence",
+  "data_type": "FASTA",
+  "tags": [
+    "sequence",
+    "国家基因组科学数据中心 NGDC / CNCB",
+    "公开数据"
+  ],
+  "metadata": {
+    "curated": true,
+    "catalog_version": 1,
+    "source_catalog": "ngdc",
+    "publisher": "国家基因组科学数据中心 NGDC / CNCB",
+    "source_url": "https://ngdc.cncb.ac.cn/gwh/Assembly/24173/show",
+    "license": "NGDC GWH academic-use terms",
+    "license_url": "https://ngdc.cncb.ac.cn/gwh/statistics/genome",
+    "license_details": "GWH官方页面声明数据库仅免费用于学术研究；商业使用需另询商业许可。未发现本记录单独CC许可，不标为CC0或CC BY。引用GWH/NGDC与accession，并在有论文时引用原研究。",
+    "sample_scope": "完整已发布的叶绿体基因组FASTA，不含核基因组。",
+    "sample_note": "完整已发布的叶绿体基因组FASTA，不含核基因组。",
+    "authors": [],
+    "doi": "",
+    "source_version": "",
+    "source_descriptor_sha256": "fd2714dae13ee1088081977d68cc5d19ee0da931b70a468c14984949c44f6ec4",
+    "organism": "Dioscorea alata",
+    "assembly_level": "Complete",
+    "bioproject": "PRJCA007984",
+    "release_time": "2022-01-21 00:00:17.0",
+    "download_date": "2026-09-07",
+    "provenance": [
+      {
+        "path": "GWHBHEP01000000.genome.fasta.gz",
+        "size": 47054,
+        "sha256": "cdeb40535aa4c45f2e565883192a6a10e73700591ad9eb7f1818852895486dee",
+        "role": "data",
+        "content_type": "application/octet-stream",
+        "download_url": "https://download.cncb.ac.cn/gwh/Plants/Dioscorea_alata_Chloroplast_GWHBHEP01000000/GWHBHEP01000000.genome.fasta.gz"
+      }
+    ],
+    "inventory_complete": true,
+    "recursive_file_count": 3,
+    "total_size_bytes": 203098
+  },
+  "files": [
+    {
+      "path": "GWHBHEP01000000.genome.fasta.gz",
+      "size": 47054,
+      "sha256": "cdeb40535aa4c45f2e565883192a6a10e73700591ad9eb7f1818852895486dee",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "SOURCE.md",
+      "size": 1278,
+      "sha256": "b9ba2d6d1119d612a8e612e83f3ba81c2068322c0ab3bf154c5d2c68d98d4cba",
+      "role": "documentation",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/GWHBHEP01000000.genome.fasta",
+      "size": 154766,
+      "sha256": "c96f5c6efe3b734fb43f8bb9755ee7f5a883d87f5be846c0868edf735b723282",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    }
+  ]
+}

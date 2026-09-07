@@ -484,6 +484,7 @@ async def stream_sessions(
 async def chat(
     session_id: str,
     request: ChatRequest,
+    http_request: Request,
     current_user: User = Depends(get_current_user),
     agent_service: AgentService = Depends(get_agent_service),
     profile_service: AgentProfileService = Depends(get_agent_profile_service),
@@ -512,7 +513,11 @@ async def chat(
             user_id=current_user.id,
             message=request.message,
             timestamp=datetime.fromtimestamp(request.timestamp) if request.timestamp else None,
-            event_id=request.event_id,
+            # ``event_id`` remains the Redis XREAD cursor.  Supplying it in the
+            # JSON body preserves the original API; Last-Event-ID adds standard
+            # SSE reconnect support without changing event names.
+            event_id=request.event_id or http_request.headers.get("last-event-id"),
+            event_seq=request.event_seq,
             attachments=request.attachments,
             skills=effective_skills,
             mcp_servers=effective_mcp_servers,
@@ -521,13 +526,25 @@ async def chat(
             llm_overrides=llm_overrides,
             client_message_id=request.client_message_id,
         ):
-            logger.debug(f"Received event from chat: {event}")
+            logger.debug(
+                "Received chat event type=%s id=%s",
+                getattr(event, "type", type(event).__name__),
+                getattr(event, "id", ""),
+            )
             sse_event = await EventMapper.event_to_sse_event(event)
-            logger.debug(f"Received event: {sse_event}")
+            logger.debug(
+                "Projected SSE event type=%s id=%s",
+                getattr(sse_event, "event", type(sse_event).__name__),
+                getattr(getattr(sse_event, "data", None), "event_id", ""),
+            )
             if sse_event:
                 yield ServerSentEvent(
                     event=sse_event.event,
-                    data=sse_event.data.model_dump_json() if sse_event.data else None
+                    data=sse_event.data.model_dump_json() if sse_event.data else None,
+                    # Keep the wire ID equal to the existing Redis event ID.
+                    # Sequence is an additive payload field, not a replacement
+                    # for the Redis resume cursor.
+                    id=sse_event.data.event_id if sse_event.data else None,
                 )
 
     return EventSourceResponse(event_generator())

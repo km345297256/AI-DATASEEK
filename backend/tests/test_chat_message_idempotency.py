@@ -99,6 +99,14 @@ class FakeSessionRepository:
         self.latest_messages = []
         self.fail_latest_message_update = False
         self.fail_add_event_once = False
+        self.event_seq = 0
+
+    async def reserve_event_sequence(self, session_id, event):
+        assert session_id == self.session.id
+        if event.seq is None:
+            self.event_seq += 1
+            event.seq = self.event_seq
+        return event.seq
 
     async def claim_client_message_id(self, session_id, client_message_id):
         key = (session_id, client_message_id)
@@ -182,6 +190,7 @@ async def test_same_client_message_id_is_enqueued_once():
     assert len(user_events) == 1
     payload = json.loads(task.input_stream.messages[0])
     assert payload["metadata"]["client_message_id"] == "client-message-1"
+    assert payload["seq"] == user_events[0].seq == 1
 
 
 @pytest.mark.asyncio

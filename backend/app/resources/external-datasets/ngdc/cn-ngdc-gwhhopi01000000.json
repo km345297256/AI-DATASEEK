@@ -1,0 +1,72 @@
+{
+  "dataset_id": "cn-ngdc-gwhhopi01000000",
+  "external_id": "GWHHOPI01000000",
+  "data_center_id": "reviewed-ngdc-catalog",
+  "data_center_name": "国家基因组科学数据中心 NGDC / CNCB",
+  "name": "动物双歧杆菌Nourse12001完整基因组",
+  "description": "NGDC Genome Warehouse公开发布的Bifidobacterium animalis（Bifidobacteriumanimalis_Nourse12001）基因组序列，组装级别为Complete。导入该独立菌株的全部已发布组装FASTA，不是原始测序reads，也不包含人类个人基因序列。 可用于序列统计、GC组成与片段长度探查。",
+  "domain": "sequence",
+  "data_type": "FASTA",
+  "tags": [
+    "sequence",
+    "国家基因组科学数据中心 NGDC / CNCB",
+    "公开数据"
+  ],
+  "metadata": {
+    "curated": true,
+    "catalog_version": 1,
+    "source_catalog": "ngdc",
+    "publisher": "国家基因组科学数据中心 NGDC / CNCB",
+    "source_url": "https://ngdc.cncb.ac.cn/gwh/Assembly/111608/show",
+    "license": "NGDC GWH academic-use terms",
+    "license_url": "https://ngdc.cncb.ac.cn/gwh/statistics/genome",
+    "license_details": "GWH官方页面声明数据库仅免费用于学术研究；商业使用需另询商业许可。未发现本记录单独CC许可，不标为CC0或CC BY。引用GWH/NGDC与accession，并在有论文时引用原研究。",
+    "sample_scope": "完整已发布的该菌株组装文件；库内为Complete组装",
+    "sample_note": "完整已发布的该菌株组装文件；库内为Complete组装",
+    "authors": [],
+    "doi": "",
+    "source_version": "",
+    "source_descriptor_sha256": "9547511c8d9f4c34fd4d01771796b9c861a054f2f8cba7da9e69807473af5df9",
+    "organism": "Bifidobacterium animalis",
+    "assembly_level": "Complete",
+    "bioproject": "PRJCA058252",
+    "release_time": "2026-02-27 00:01:56.0",
+    "download_date": "2026-09-07",
+    "provenance": [
+      {
+        "path": "GWHHOPI01000000.genome.fasta.gz",
+        "size": 584775,
+        "sha256": "27b762d839a8307824d0dacfcee6c51f9ca1a9aa25b4d22c60fc5cf4455c4a29",
+        "role": "data",
+        "content_type": "application/octet-stream",
+        "download_url": "https://download.cncb.ac.cn/gwh/Bacteria/Bifidobacterium_animalis_Bifidobacteriumanimalis_Nourse12001_GWHHOPI01000000/GWHHOPI01000000.genome.fasta.gz"
+      }
+    ],
+    "inventory_complete": true,
+    "recursive_file_count": 3,
+    "total_size_bytes": 2549797
+  },
+  "files": [
+    {
+      "path": "GWHHOPI01000000.genome.fasta.gz",
+      "size": 584775,
+      "sha256": "27b762d839a8307824d0dacfcee6c51f9ca1a9aa25b4d22c60fc5cf4455c4a29",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "SOURCE.md",
+      "size": 1351,
+      "sha256": "9a5915164b9ddc2186a4ea2e854ed1aae4d6aa92b271a04310b9e402965e609b",
+      "role": "documentation",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/GWHHOPI01000000.genome.fasta",
+      "size": 1963671,
+      "sha256": "867ac80b9c8b4c9475dd1b92936f28353339c104d528c79fa06dcbe0f97d06b0",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    }
+  ]
+}

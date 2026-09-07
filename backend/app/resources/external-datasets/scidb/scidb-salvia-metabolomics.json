@@ -1,0 +1,99 @@
+{
+  "dataset_id": "scidb-salvia-metabolomics",
+  "external_id": "8e5c50c6eb244689967ac6047ea47d97",
+  "data_center_id": "reviewed-scidb-catalog",
+  "data_center_name": "ScienceDB 科学数据银行",
+  "name": "一串红克罗烷生物合成关联数据",
+  "description": "一串红研究中的自组织映射和互排名表、LC-MS代谢组数据及高分辨质谱展示，适合植物代谢物相关性与质谱数据探查。",
+  "domain": "spectroscopy",
+  "data_type": "xlsx,pptx",
+  "tags": [
+    "spectroscopy",
+    "ScienceDB 科学数据银行",
+    "公开数据"
+  ],
+  "metadata": {
+    "curated": true,
+    "catalog_version": 1,
+    "source_catalog": "scidb",
+    "publisher": "ScienceDB 科学数据银行",
+    "source_url": "https://www.scidb.cn/en/detail?dataSetId=8e5c50c6eb244689967ac6047ea47d97",
+    "license": "CC BY-NC 4.0",
+    "license_url": "https://creativecommons.org/licenses/by-nc/4.0/",
+    "license_details": "Creative Commons Attribution-NonCommercial 4.0；须署名、链接许可并说明修改，禁止未经许可的商业使用。",
+    "sample_scope": "完整 V1 的3个附件（2个XLSX和1个PPTX）；PPTX为光谱展示，不能声称具备所有原始仪器谱文件。仅限非商业使用。",
+    "sample_note": "完整 V1 的3个附件（2个XLSX和1个PPTX）；PPTX为光谱展示，不能声称具备所有原始仪器谱文件。仅限非商业使用。",
+    "download_date": "2026-09-07",
+    "provenance": [
+      {
+        "path": "Dataset 1.xlsx",
+        "size": 43507,
+        "sha256": "cff5abe805f183e2a59984a3cb018560aa3bbf324efaf5c15a94c77da95079aa",
+        "role": "data",
+        "content_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "download_url": "https://china.scidb.cn/download?fileId=26c8edfcf06db852d4c41fd3668f4d36",
+        "publisher_md5": "6f809feb3a86493e1f874d2733fc4c55"
+      },
+      {
+        "path": "Dataset D2 .xlsx",
+        "size": 42642,
+        "sha256": "a518a54b7cf3aee06ed3af40607d1d95aaa9247956115cd79b94334ac2693df4",
+        "role": "data",
+        "content_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "download_url": "https://china.scidb.cn/download?fileId=dd3202e2e1ac82c1e8688a52a93bea29",
+        "publisher_md5": "2cab01fb60280c12862cff1e21f987ee"
+      },
+      {
+        "path": "Dataset D3 I.pptx",
+        "size": 409953,
+        "sha256": "14fcd4739a7e5aff317ea022d8bef8366931df38ee7a0eff930719028b7bdcde",
+        "role": "data",
+        "content_type": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+        "download_url": "https://china.scidb.cn/download?fileId=57984cc8ad438fd64e403453093193c5",
+        "publisher_md5": "2ebf986050fd4be5b7f727b532640f04"
+      }
+    ],
+    "inventory_complete": true,
+    "recursive_file_count": 4,
+    "total_size_bytes": 497292,
+    "source_version": "V1",
+    "doi": "https://doi.org/10.57760/sciencedb.20358",
+    "authors": [
+      "Lin Ruoxi",
+      "Li Haixiu",
+      "Martin Cathie",
+      "Tatsis Evangelos"
+    ],
+    "source_descriptor_sha256": "19a5ec8c8b983b7ef7aed2178e89b20ae090615c3328223d6c2c3cc14181fb9f"
+  },
+  "files": [
+    {
+      "path": "Dataset 1.xlsx",
+      "size": 43507,
+      "sha256": "cff5abe805f183e2a59984a3cb018560aa3bbf324efaf5c15a94c77da95079aa",
+      "role": "data",
+      "content_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    },
+    {
+      "path": "Dataset D2 .xlsx",
+      "size": 42642,
+      "sha256": "a518a54b7cf3aee06ed3af40607d1d95aaa9247956115cd79b94334ac2693df4",
+      "role": "data",
+      "content_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    },
+    {
+      "path": "Dataset D3 I.pptx",
+      "size": 409953,
+      "sha256": "14fcd4739a7e5aff317ea022d8bef8366931df38ee7a0eff930719028b7bdcde",
+      "role": "data",
+      "content_type": "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+    },
+    {
+      "path": "SOURCE.md",
+      "size": 1190,
+      "sha256": "5d785dc93a3cc877b4887389ffdead584d7412af95a1158cac1c16b30d9fd8d7",
+      "role": "documentation",
+      "content_type": "application/octet-stream"
+    }
+  ]
+}

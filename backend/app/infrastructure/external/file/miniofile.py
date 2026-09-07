@@ -1,4 +1,5 @@
 import asyncio
+import hashlib
 import json
 import logging
 import re
@@ -15,6 +16,13 @@ logger = logging.getLogger(__name__)
 
 _MINIO_METADATA_MAX_BYTES = 1800
 _MINIO_METADATA_VALUE_MAX_CHARS = 512
+
+
+def _opaque_file_ref(value: Any) -> str:
+    digest = hashlib.sha256(
+        str(value or "missing").encode("utf-8", errors="replace")
+    ).hexdigest()[:12]
+    return f"file:sha256:{digest}"
 
 
 def _safe_filename(filename: str) -> str:
@@ -56,6 +64,58 @@ def _minio_metadata(metadata: Dict[str, Any]) -> Dict[str, str]:
         result[clean_key] = ascii_value
         total_bytes += header_bytes
     return result
+
+
+def _read_minio_range(
+    client: Any,
+    bucket: str,
+    object_key: str,
+    *,
+    offset: int,
+    length: int,
+) -> bytes:
+    response = client.get_object(
+        bucket,
+        object_key,
+        offset=offset,
+        length=length,
+    )
+    try:
+        chunks: list[bytes] = []
+        remaining = length
+        while remaining:
+            chunk = response.read(remaining)
+            if not chunk:
+                break
+            chunks.append(bytes(chunk))
+            remaining -= len(chunk)
+        return b"".join(chunks)
+    finally:
+        response.close()
+        response.release_conn()
+
+
+async def _complete_despite_cancellation(awaitable: Any) -> tuple[Any, asyncio.CancelledError | None]:
+    """Finish an external side effect even if its caller is cancelled.
+
+    ``asyncio.to_thread`` cannot stop the underlying blocking MinIO request.
+    Waiting for the real outcome lets the caller perform deterministic cleanup
+    instead of abandoning a write that may still commit later.
+    """
+    task = asyncio.ensure_future(awaitable)
+    cancellation: asyncio.CancelledError | None = None
+    while True:
+        try:
+            return await asyncio.shield(task), cancellation
+        except asyncio.CancelledError as error:
+            if task.done() and task.cancelled():
+                raise cancellation or error
+            cancellation = error
+            continue
+        except Exception as error:
+            if cancellation is not None:
+                raise cancellation from error
+            raise
 
 
 class MinIOFileStorage(FileStorage):
@@ -142,8 +202,20 @@ class MinIOFileStorage(FileStorage):
             put_kwargs["part_size"] = 10 * 1024 * 1024
 
         try:
-            result = await asyncio.to_thread(self._client.put_object, **put_kwargs)
-            stat = await asyncio.to_thread(self._client.stat_object, self.bucket_name, object_key)
+            _, cancelled = await _complete_despite_cancellation(
+                asyncio.to_thread(self._client.put_object, **put_kwargs)
+            )
+            if cancelled is not None:
+                raise cancelled
+            stat, cancelled = await _complete_despite_cancellation(
+                asyncio.to_thread(
+                    self._client.stat_object,
+                    self.bucket_name,
+                    object_key,
+                )
+            )
+            if cancelled is not None:
+                raise cancelled
             size = int(getattr(stat, "size", 0) or 0)
             doc = StoredFileDocument(
                 file_id=file_id,
@@ -159,15 +231,38 @@ class MinIOFileStorage(FileStorage):
                 created_at=now,
                 updated_at=now,
             )
-            await doc.insert()
-            logger.info("File uploaded to MinIO: %s -> %s/%s etag=%s", file_id, self.bucket_name, object_key, result.etag)
+            _, cancelled = await _complete_despite_cancellation(doc.insert())
+            if cancelled is not None:
+                raise cancelled
+            logger.info(
+                "File uploaded to MinIO file=%s bytes=%d",
+                _opaque_file_ref(file_id),
+                size,
+            )
             return self._file_info_from_doc(doc)
-        except Exception:
+        except BaseException as original_error:
+            object_removed = False
             try:
-                await asyncio.to_thread(self._client.remove_object, self.bucket_name, object_key)
-            except Exception:
+                await _complete_despite_cancellation(asyncio.to_thread(
+                    self._client.remove_object,
+                    self.bucket_name,
+                    object_key,
+                ))
+                object_removed = True
+            except BaseException:
                 pass
-            raise
+            if object_removed:
+                try:
+                    stored, _ = await _complete_despite_cancellation(
+                        StoredFileDocument.find_one(
+                            StoredFileDocument.file_id == file_id
+                        )
+                    )
+                    if stored is not None:
+                        await _complete_despite_cancellation(stored.delete())
+                except BaseException:
+                    pass
+            raise original_error
 
     async def init_large_upload(
         self,
@@ -317,12 +412,49 @@ class MinIOFileStorage(FileStorage):
         response = await asyncio.to_thread(self._client.get_object, doc.bucket or self.bucket_name, doc.object_key)
         return response, self._file_info_from_doc(doc)
 
+    async def download_file_range(
+        self,
+        file_id: str,
+        user_id: Optional[str],
+        *,
+        offset: int,
+        length: int,
+    ) -> Tuple[bytes, FileInfo]:
+        """Read one server-side ranged MinIO response."""
+        if isinstance(offset, bool) or not isinstance(offset, int) or offset < 0:
+            raise ValueError("offset must be a non-negative integer")
+        if isinstance(length, bool) or not isinstance(length, int) or length < 0:
+            raise ValueError("length must be a non-negative integer")
+        doc = await StoredFileDocument.find_one(StoredFileDocument.file_id == file_id)
+        if not doc or doc.provider != "minio" or not doc.object_key:
+            raise FileNotFoundError("File not found")
+        if user_id is not None and doc.user_id != user_id:
+            raise PermissionError("Access denied")
+        info = self._file_info_from_doc(doc)
+        if offset > info.size:
+            raise ValueError("offset exceeds file size")
+        requested = min(length, max(0, info.size - offset))
+        if requested == 0:
+            return b"", info
+        data = await asyncio.to_thread(
+            _read_minio_range,
+            self._client,
+            doc.bucket or self.bucket_name,
+            doc.object_key,
+            offset=offset,
+            length=requested,
+        )
+        return data, info
+
     async def delete_file(self, file_id: str, user_id: str) -> bool:
         doc = await StoredFileDocument.find_one(StoredFileDocument.file_id == file_id)
         if not doc or doc.provider != "minio" or not doc.object_key:
             return False
         if doc.user_id != user_id:
-            logger.warning("Delete access denied: file %s does not belong to user %s", file_id, user_id)
+            logger.warning(
+                "Delete access denied file=%s",
+                _opaque_file_ref(file_id),
+            )
             return False
         await asyncio.to_thread(self._client.remove_object, doc.bucket or self.bucket_name, doc.object_key)
         await doc.delete()

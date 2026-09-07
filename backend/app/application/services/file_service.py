@@ -1,4 +1,5 @@
 from typing import Dict, Any, Optional, BinaryIO, Tuple, List
+import hashlib
 import logging
 from datetime import datetime, UTC
 from app.domain.external.file import FileStorage
@@ -8,6 +9,39 @@ from app.infrastructure.models.documents import FileUploadSessionDocument
 
 # Set up logger
 logger = logging.getLogger(__name__)
+
+
+def _opaque_reference(value: Any, namespace: str) -> str:
+    digest = hashlib.sha256(
+        str(value or "missing").encode("utf-8", errors="replace")
+    ).hexdigest()[:12]
+    return f"{namespace}:sha256:{digest}"
+
+
+def _is_private_spill(file_info: FileInfo | None) -> bool:
+    metadata = file_info.metadata if file_info and isinstance(file_info.metadata, dict) else {}
+    # The source marker alone is reserved. Requiring every companion field to
+    # validate would turn malformed metadata into a fail-open public file.
+    return metadata.get("source") == "tool_output_spill"
+
+
+def _contains_reserved_spill_metadata(metadata: Optional[Dict[str, Any]]) -> bool:
+    if not isinstance(metadata, dict):
+        return False
+    if metadata.get("source") == "tool_output_spill":
+        return True
+    return any(str(key).lower().startswith("spill_") for key in metadata)
+
+
+def _close_download_stream(stream: Any) -> None:
+    try:
+        close = getattr(stream, "close", None)
+        if callable(close):
+            close()
+    finally:
+        release_conn = getattr(stream, "release_conn", None)
+        if callable(release_conn):
+            release_conn()
 
 
 def _as_utc(value: datetime) -> datetime:
@@ -23,17 +57,32 @@ class FileService:
 
     async def upload_file(self, file_data: BinaryIO, filename: str, user_id: str, content_type: Optional[str] = None, metadata: Optional[Dict[str, Any]] = None) -> FileInfo:
         """Upload file"""
-        logger.info(f"Upload file request: filename={filename}, user_id={user_id}, content_type={content_type}")
+        logger.info(
+            "Upload file request file=%s user=%s content_type=%s",
+            _opaque_reference(filename, "file"),
+            _opaque_reference(user_id, "user"),
+            content_type,
+        )
         if not self._file_storage:
             logger.error("File storage service not available")
             raise RuntimeError("File storage service not available")
+        if _contains_reserved_spill_metadata(metadata):
+            raise ValueError("Reserved file metadata is not accepted")
         
         try:
             result = await self._file_storage.upload_file(file_data, filename, user_id, content_type, metadata)
-            logger.info(f"File uploaded successfully: file_id={result.file_id}, user_id={user_id}")
+            logger.info(
+                "File uploaded successfully file=%s user=%s",
+                _opaque_reference(result.file_id, "file"),
+                _opaque_reference(user_id, "user"),
+            )
             return result
         except Exception as e:
-            logger.error(f"Failed to upload file for user {user_id}: {str(e)}")
+            logger.error(
+                "Failed to upload file user=%s error_type=%s",
+                _opaque_reference(user_id, "user"),
+                type(e).__name__,
+            )
             raise
 
     def _require_large_upload_storage(self):
@@ -60,7 +109,35 @@ class FileService:
             raise ValueError("filename is required")
         if size <= 0:
             raise ValueError("size must be greater than 0")
+        if _contains_reserved_spill_metadata(metadata):
+            raise ValueError("Reserved file metadata is not accepted")
         return await storage.init_large_upload(filename, user_id, size, content_type, metadata)
+
+    async def _reject_reserved_large_upload_session(
+        self,
+        storage: Any,
+        session: FileUploadSessionDocument,
+    ) -> None:
+        """Reject legacy multipart sessions that claimed the private spill namespace.
+
+        Older sessions may predate the init-time guard.  Abort an unfinished
+        multipart upload before rejecting it so callers cannot use that legacy
+        record to materialize a browser-invisible object.  Abort remains best
+        effort: its provider error must not turn the stable validation failure
+        into an internal-detail response.
+        """
+        if not _contains_reserved_spill_metadata(getattr(session, "metadata", None)):
+            return
+        if getattr(session, "status", None) not in {"completed", "aborted"}:
+            try:
+                await storage.abort_large_upload(session)
+            except Exception as error:
+                logger.warning(
+                    "Failed to abort reserved large upload upload=%s error_type=%s",
+                    _opaque_reference(getattr(session, "upload_id", ""), "upload"),
+                    type(error).__name__,
+                )
+        raise ValueError("Reserved file metadata is not accepted")
 
     async def get_large_upload(self, upload_id: str, user_id: str) -> FileUploadSessionDocument:
         session = await FileUploadSessionDocument.find_one(FileUploadSessionDocument.upload_id == upload_id)
@@ -75,6 +152,7 @@ class FileService:
     async def upload_large_upload_part(self, upload_id: str, part_number: int, user_id: str, data: bytes) -> str:
         storage = self._require_large_upload_storage()
         session = await self.get_large_upload(upload_id, user_id)
+        await self._reject_reserved_large_upload_session(storage, session)
         if session.status not in {"initiated", "uploading"}:
             raise ValueError(f"Upload session is {session.status}")
         if _as_utc(session.expires_at) < datetime.now(UTC):
@@ -92,6 +170,7 @@ class FileService:
     async def complete_large_upload(self, upload_id: str, parts: List[Dict[str, Any]], user_id: str) -> FileInfo:
         storage = self._require_large_upload_storage()
         session = await self.get_large_upload(upload_id, user_id)
+        await self._reject_reserved_large_upload_session(storage, session)
         if session.status == "completed":
             existing = await self.get_file_info(session.file_id, user_id)
             if existing:
@@ -112,53 +191,87 @@ class FileService:
     
     async def download_file(self, file_id: str, user_id: Optional[str] = None) -> Tuple[BinaryIO, FileInfo]:
         """Download file"""
-        logger.info(f"Download file request: file_id={file_id}, user_id={user_id}")
+        file_ref = _opaque_reference(file_id, "file")
+        user_ref = _opaque_reference(user_id, "user")
+        logger.info("Download file request file=%s user=%s", file_ref, user_ref)
         if not self._file_storage:
             logger.error("File storage service not available")
             raise RuntimeError("File storage service not available")
         
         try:
+            # Preflight metadata before obtaining a potentially huge stream.
+            # Missing and unauthorized files share the same public response.
+            file_info = await self._file_storage.get_file_info(file_id, user_id)
+            if file_info is None or _is_private_spill(file_info):
+                raise FileNotFoundError("File not found")
             result = await self._file_storage.download_file(file_id, user_id)
-            logger.info(f"File downloaded successfully: file_id={file_id}, user_id={user_id}")
+            if _is_private_spill(result[1]):
+                _close_download_stream(result[0])
+                raise FileNotFoundError("File not found")
+            logger.info("File downloaded successfully file=%s user=%s", file_ref, user_ref)
             return result
         except Exception as e:
-            logger.error(f"Failed to download file {file_id} for user {user_id}: {str(e)}")
+            logger.error(
+                "Failed to download file file=%s user=%s error_type=%s",
+                file_ref,
+                user_ref,
+                type(e).__name__,
+            )
             raise
 
     async def delete_file(self, file_id: str, user_id: str) -> bool:
         """Delete file"""
-        logger.info(f"Delete file request: file_id={file_id}, user_id={user_id}")
+        file_ref = _opaque_reference(file_id, "file")
+        user_ref = _opaque_reference(user_id, "user")
+        logger.info("Delete file request file=%s user=%s", file_ref, user_ref)
         if not self._file_storage:
             logger.error("File storage service not available")
             raise RuntimeError("File storage service not available")
         
         try:
+            file_info = await self._file_storage.get_file_info(file_id, user_id)
+            if _is_private_spill(file_info):
+                return False
             result = await self._file_storage.delete_file(file_id, user_id)
             if result:
-                logger.info(f"File deleted successfully: file_id={file_id}, user_id={user_id}")
+                logger.info("File deleted successfully file=%s user=%s", file_ref, user_ref)
             else:
-                logger.warning(f"File deletion failed or file not found: file_id={file_id}, user_id={user_id}")
+                logger.warning("File deletion failed or not found file=%s user=%s", file_ref, user_ref)
             return result
         except Exception as e:
-            logger.error(f"Failed to delete file {file_id} for user {user_id}: {str(e)}")
+            logger.error(
+                "Failed to delete file file=%s user=%s error_type=%s",
+                file_ref,
+                user_ref,
+                type(e).__name__,
+            )
             raise
 
     async def get_file_info(self, file_id: str, user_id: Optional[str] = None) -> Optional[FileInfo]:
         """Get file information"""
-        logger.info(f"Get file info request: file_id={file_id}, user_id={user_id}")
+        file_ref = _opaque_reference(file_id, "file")
+        user_ref = _opaque_reference(user_id, "user")
+        logger.info("Get file info request file=%s user=%s", file_ref, user_ref)
         if not self._file_storage:
             logger.error("File storage service not available")
             raise RuntimeError("File storage service not available")
         
         try:
             result = await self._file_storage.get_file_info(file_id, user_id)
+            if _is_private_spill(result):
+                return None
             if result:
-                logger.info(f"File info retrieved successfully: file_id={file_id}, user_id={user_id}")
+                logger.info("File info retrieved successfully file=%s user=%s", file_ref, user_ref)
             else:
-                logger.warning(f"File not found or access denied: file_id={file_id}, user_id={user_id}")
+                logger.warning("File not found or access denied file=%s user=%s", file_ref, user_ref)
             return result
         except Exception as e:
-            logger.error(f"Failed to get file info {file_id} for user {user_id}: {str(e)}")
+            logger.error(
+                "Failed to get file info file=%s user=%s error_type=%s",
+                file_ref,
+                user_ref,
+                type(e).__name__,
+            )
             raise
     
     async def enrich_with_file_url(self, file_info: FileInfo) -> FileInfo:

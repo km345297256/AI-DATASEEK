@@ -1,0 +1,60 @@
+{
+  "dataset_id": "bbbc039-nuclei-preview",
+  "external_id": "bbbc039-nuclei-preview",
+  "data_center_id": "international-open-catalog",
+  "data_center_name": "Broad Institute Imaging Platform; Juan C. Caicedo and contributors",
+  "name": "BBBC039 细胞核图像与实例分割掩膜（官方预览对）",
+  "description": "Broad Institute 发布的 U2OS 细胞核分割基准 BBBC039 的官方预览样本：1 张 Hoechst/DNA 荧光显微图像和与其对应的彩色实例掩膜，均保留官方 PNG 像素。可练习图像与标签识别、连通区域计数和分割结果比较。这是带白色边框的网页预览对，不是完整 200 视野的 16 位 TIFF 原始库，也不用于原始荧光强度定量或医学诊断。",
+  "domain": "image_science",
+  "data_type": "PNG",
+  "tags": [
+    "image_science",
+    "PNG",
+    "开放数据"
+  ],
+  "metadata": {
+    "curated": true,
+    "catalog_version": 1,
+    "publisher": "Broad Institute Imaging Platform; Juan C. Caicedo and contributors",
+    "source_url": "https://bbbc.broadinstitute.org/BBBC039",
+    "license": "CC0-1.0",
+    "license_url": "https://bbbc.broadinstitute.org/BBBC039",
+    "license_details": "Official Copyright section states CC0 and that contributors waived copyright and related rights to BBBC039v1.",
+    "sample_scope": "官方预览对 · 非原始 16 位 TIFF 全库",
+    "sample_note": "Official example PNG image 1 and matching color instance-mask PNG image 2; previews retain white borders and are not the original 16-bit microscopy TIFF data. No pixel changes.",
+    "provenance": [
+      {
+        "path": "nuclei-image-preview.png",
+        "download_url": "https://data.broadinstitute.org/bbbc/BBBC039/BBBC039exampleimage1.png",
+        "sha256": "f92357666a4baa97ea1618375062ef94f5c03a13bb262c6eea61fce0018a5179",
+        "size": 140383
+      },
+      {
+        "path": "nuclei-instance-mask-preview.png",
+        "download_url": "https://data.broadinstitute.org/bbbc/BBBC039/BBBC039exampleimage2.png",
+        "sha256": "02274c83e8e0641155d4d4c099f8ad50db7133199ad43c028fe882e50290bfe6",
+        "size": 7776
+      }
+    ],
+    "inventory_complete": true,
+    "recursive_file_count": 2,
+    "total_size_bytes": 148159
+  },
+  "files": [
+    {
+      "path": "nuclei-image-preview.png",
+      "size": 140383,
+      "sha256": "f92357666a4baa97ea1618375062ef94f5c03a13bb262c6eea61fce0018a5179",
+      "role": "data",
+      "content_type": "image/png"
+    },
+    {
+      "path": "nuclei-instance-mask-preview.png",
+      "size": 7776,
+      "sha256": "02274c83e8e0641155d4d4c099f8ad50db7133199ad43c028fe882e50290bfe6",
+      "role": "data",
+      "content_type": "image/png"
+    }
+  ]
+}
+

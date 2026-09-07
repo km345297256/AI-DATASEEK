@@ -1,4 +1,6 @@
+import asyncio
 import json
+import hashlib
 import logging
 import re
 from datetime import datetime, UTC
@@ -6,7 +8,7 @@ from pathlib import PurePosixPath
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from app.domain.services.flows.base import BaseFlow
 from app.domain.models.message import Message
-from typing import AsyncGenerator, Optional
+from typing import Any, AsyncGenerator, Optional
 from enum import Enum
 from app.domain.models.event import (
     BaseEvent,
@@ -21,11 +23,14 @@ from app.domain.models.event import (
 from app.domain.models.plan import ExecutionStatus, Plan, Step
 from app.domain.services.agents.planner import PlannerAgent
 from app.domain.services.agents.execution import ExecutionAgent
+from app.domain.services.agents.base import is_non_substantive_message_text
 from app.domain.services.agents.vision import VisionAgent
 from app.domain.external.sandbox import Sandbox
 from app.domain.external.browser import Browser
 from app.domain.external.search import SearchEngine
 from app.domain.external.file import FileStorage
+from app.domain.external.plugin_runtime import PluginRuntime
+from app.domain.external.spill import SpillArtifactStore
 from app.domain.repositories.agent_repository import AgentRepository
 from app.domain.repositories.session_repository import SessionRepository
 from app.domain.models.session import SessionStatus
@@ -38,12 +43,32 @@ from app.domain.services.tools.search import SearchToolkit
 from app.domain.services.tools.skill import SkillToolkit
 from app.domain.services.tools.dataset_catalog import DatasetCatalogToolkit
 from app.domain.services.tools.plugin import PluginToolkit
+from app.domain.services.tools.registry import ToolRegistry
+from app.domain.services.tools.tool_selection import PluginToolView, ToolDiscoveryToolkit
+from app.domain.services.tool_runtime_config import resolve_tool_runtime
+from app.domain.services.domain_presets import get_domain_preset
+from app.domain.services.tools.spill import SpillArtifactInterceptor, SpillArtifactToolkit
+from app.domain.services.tools.analysis_job import AnalysisJobInterceptor
+from app.domain.services.tools.authorization import ToolCallAuthorizationInterceptor
+from app.domain.services.tools.spill_projection import (
+    projected_tool_artifact,
+    spill_notice_from_result,
+    sanitize_spill_public_data,
+)
+from app.domain.services.tools.pipeline import opaque_log_identifier
+from app.domain.services.tools.interceptors import (
+    ToolExecutionTraceSink,
+    ToolPolicySnapshot,
+    create_production_tool_interceptors,
+)
+from app.domain.services.execution_identity import private_identity_hmac
 from app.domain.services.skills import SkillRegistry, SkillRenderer
 from app.domain.services.skills.session_skill_creator import is_skill_create_request
 from app.core.config import get_settings
 from app.domain.models.agent_profile import AgentSubAgentConfig, default_subagents
 from app.application.services.data_center_dataset_service import render_dataset_context
 from app.domain.models.dataset import DatasetFile
+from app.domain.models.spill import SpillArtifactOwner
 
 logger = logging.getLogger(__name__)
 
@@ -62,6 +87,7 @@ class PlanActFlow(BaseFlow):
     MAX_SESSION_CONTEXT_MESSAGES = 8
     MAX_SESSION_CONTEXT_MESSAGE_BYTES = 2 * 1024
     MAX_SESSION_CONTEXT_BYTES = 12 * 1024
+    MAX_SESSION_SPILL_REFERENCES = 8
     MAX_TARGET_FILES = 48
     _EXPLICIT_FILE_REFERENCE = re.compile(
         r"[^\W\d_][^\s,，、。;；!?！？:：\"'“”‘’<>《》]{0,511}"
@@ -167,6 +193,11 @@ class PlanActFlow(BaseFlow):
         search_engine: Optional[SearchEngine] = None,
         llm_overrides: Optional[dict] = None,
         file_storage: Optional[FileStorage] = None,
+        plugin_runtime: Optional[PluginRuntime] = None,
+        spill_artifact_store: Optional[SpillArtifactStore] = None,
+        analysis_job_service=None,
+        tool_approval_service=None,
+        credential_service=None,
     ):
         self._agent_id = agent_id
         self._user_id = user_id
@@ -176,6 +207,13 @@ class PlanActFlow(BaseFlow):
         self._sandbox = sandbox
         self._browser = browser
         self._file_storage = file_storage
+        self._spill_artifact_store = spill_artifact_store
+        self._analysis_job_service = analysis_job_service
+        self._tool_approval_service = tool_approval_service
+        self._credential_service = credential_service
+        self._tool_approval_event_sink = None
+        self._analysis_job_identity_provider = None
+        self._analysis_job_event_sink = None
         self.status = AgentStatus.IDLE
         self.plan = None
         settings = get_settings()
@@ -191,7 +229,9 @@ class PlanActFlow(BaseFlow):
         self.dataset_context = ""
         self._dataset_fast_path_active = False
         self.agent_profile_config = (llm_overrides or {}).get("agent_profile") or {}
+        self.tool_runtime = resolve_tool_runtime(self.agent_profile_config)
         self.subagents = self._load_subagents(self.agent_profile_config)
+        self._add_domain_subagent_configs()
         self.enabled_subagents = {
             subagent.key: subagent
             for subagent in self.subagents
@@ -205,12 +245,13 @@ class PlanActFlow(BaseFlow):
             session_repository=self._session_repository,
         )
         self.dataset_catalog_toolkit = DatasetCatalogToolkit()
-        plugin_toolkit = PluginToolkit(
+        self.mcp_toolkit = mcp_tool
+        self.plugin_toolkit = PluginToolkit(
             sandbox,
             session_id=self._session_id,
+            plugin_runtime=plugin_runtime,
         )
-        tools = [
-            plugin_toolkit,
+        non_plugin_tools = [
             ShellToolkit(sandbox, include_plugin_managed_tools=False),
             BrowserToolkit(
                 browser,
@@ -226,8 +267,43 @@ class PlanActFlow(BaseFlow):
             mcp_tool,
         ]
 
+        if settings.spill_enabled and self._spill_artifact_store is not None:
+            non_plugin_tools.append(SpillArtifactToolkit(
+                self._spill_artifact_store,
+                owner=SpillArtifactOwner(
+                    user_id=self._user_id,
+                    session_id=self._session_id,
+                ),
+                max_inline_bytes=settings.spill_max_inline_bytes,
+            ))
+
         if search_engine:
-            tools.append(SearchToolkit(search_engine))
+            non_plugin_tools.append(SearchToolkit(search_engine))
+
+        self._plugin_view = PluginToolView(
+            self.plugin_toolkit, preset_id=self.tool_runtime.preset_id,
+            selection_mode=self.tool_runtime.selection_mode,
+        )
+        self._domain_agents: dict[str, ExecutionAgent] = {}
+        self._domain_tool_views: dict[str, PluginToolView] = {}
+        self._domain_governance_toolkits = []
+        if self.tool_runtime.selection_mode == "on_demand" or self.tool_runtime.domain_subagents_enabled:
+            non_plugin_tools.append(ToolDiscoveryToolkit(self._plugin_view))
+        if self.tool_runtime.code_mode_enabled:
+            non_plugin_tools.append(self._create_code_mode_toolkit())
+
+        # Cordis owns the plugin namespace. Reject ambiguity before either the
+        # Planner or Executor sees a duplicated model-facing tool definition.
+        self._non_plugin_toolkits = non_plugin_tools
+        self.validate_plugin_tool_names()
+        tools = [self.plugin_toolkit, *non_plugin_tools]
+        self._tool_registry = ToolRegistry(tools)
+        agent_tools = [self._plugin_view, *non_plugin_tools]
+        self._tool_execution_disposer = None
+        self._spill_interceptors: list[SpillArtifactInterceptor] = []
+        self._execution_toolset_identity = None
+        self._prepared_skill_request = None
+        self._prepared_active_skills = None
 
         usage_context = {
             "user_id": self._user_id,
@@ -237,29 +313,35 @@ class PlanActFlow(BaseFlow):
         self.planner = PlannerAgent(
             agent_id=self._agent_id,
             agent_repository=self._repository,
-            tools=tools,
+            tools=agent_tools,
             dynamic_system_prompt_provider=self._dynamic_system_prompt,
             dynamic_user_context_provider=self._dynamic_user_context,
             llm_overrides=self._agent_llm_overrides(base_llm_overrides, "planner"),
             usage_context=usage_context,
         )
-        logger.debug(f"Created planner agent for Agent {self._agent_id}")
+        logger.debug(
+            "Created planner agent agent=%s",
+            opaque_log_identifier(self._agent_id, namespace="agent"),
+        )
 
         self.executor = ExecutionAgent(
             agent_id=self._agent_id,
             agent_repository=self._repository,
-            tools=tools,
+            tools=agent_tools,
             dynamic_system_prompt_provider=self._dynamic_system_prompt,
             dynamic_user_context_provider=self._dynamic_user_context,
             llm_overrides=self._agent_llm_overrides(base_llm_overrides, "execution"),
             usage_context=usage_context,
         )
-        logger.debug(f"Created execution agent for Agent {self._agent_id}")
+        logger.debug(
+            "Created execution agent agent=%s",
+            opaque_log_identifier(self._agent_id, namespace="agent"),
+        )
 
         self.vision = VisionAgent(
             agent_id=self._agent_id,
             agent_repository=self._repository,
-            tools=tools,
+            tools=agent_tools,
             dynamic_system_prompt_provider=self._dynamic_system_prompt,
             dynamic_user_context_provider=self._dynamic_user_context,
             llm_overrides=self._agent_llm_overrides(base_llm_overrides, "vision"),
@@ -267,7 +349,396 @@ class PlanActFlow(BaseFlow):
             file_storage=self._file_storage,
             user_id=self._user_id,
         )
-        logger.debug(f"Created vision agent for Agent {self._agent_id}")
+        logger.debug(
+            "Created vision agent agent=%s",
+            opaque_log_identifier(self._agent_id, namespace="agent"),
+        )
+        self._create_domain_agents(base_llm_overrides, usage_context)
+        self._governed_tool_registry = ToolRegistry([
+            *tools, *self._domain_governance_toolkits,
+        ])
+
+    def _add_domain_subagent_configs(self) -> None:
+        if not self.tool_runtime.domain_subagents_enabled:
+            # A saved preset declaration alone never enables the experiment.
+            self.subagents = [item for item in self.subagents if item.preset_id is None]
+            return
+        configured = [item for item in self.subagents if item.enabled and item.preset_id]
+        if len(configured) > 4:
+            raise ValueError("At most four domain SubAgents may be enabled")
+        preset_ids = ("tabular", "geoscience") if self.tool_runtime.preset_id == "general" else (self.tool_runtime.preset_id,)
+        keys = {item.key for item in self.subagents}
+        for preset_id in preset_ids:
+            if len(configured) >= 4 or any(item.preset_id == preset_id for item in configured):
+                continue
+            preset = get_domain_preset(preset_id)
+            key = f"domain_{preset.id}"
+            if key in keys:
+                continue
+            item = AgentSubAgentConfig(
+                key=key, name=preset.name, handler_type="execution", preset_id=preset.id,
+                planner_capability=f"Bounded domain analysis: {preset.description}",
+                use_when=f"A plan step needs {preset.name} methods and the supplied dataset evidence.",
+                avoid_when="The step requires shell, arbitrary code, browser access, delegation, or another domain.",
+                input_contract="A bounded plan step, mounted dataset references and prior step results.",
+                output_contract="Evidence, methods, caveats and sandbox artifact references; never a new workflow or nested team.",
+            )
+            self.subagents.append(item)
+            configured.append(item)
+            keys.add(key)
+
+    def _create_domain_agents(self, base_overrides: dict, usage_context: dict) -> None:
+        if not self.tool_runtime.domain_subagents_enabled:
+            return
+        for key, config in self.enabled_subagents.items():
+            if not config.preset_id:
+                continue
+            if config.handler_type != "execution":
+                raise ValueError("Domain presets require an execution handler")
+            view = PluginToolView(self.plugin_toolkit, preset_id=config.preset_id, selection_mode="on_demand")
+            discovery = ToolDiscoveryToolkit(view)
+            # Specialists share the existing Docker boundary and governance,
+            # but do not inherit shell, browser, file-write, MCP, skill creation,
+            # user-question tools or Code Mode/delegation capabilities.
+            core = [toolkit for toolkit in self._non_plugin_toolkits
+                    if isinstance(toolkit, (DatasetCatalogToolkit, SpillArtifactToolkit))]
+            overrides = self._agent_llm_overrides(base_overrides, key)
+            overrides["max_iterations"] = 4
+            agent = ExecutionAgent(
+                agent_id=self._agent_id, agent_repository=self._repository,
+                tools=[view, discovery, *core],
+                dynamic_system_prompt_provider=lambda view=view: self._domain_system_prompt(view),
+                dynamic_user_context_provider=self._dynamic_user_context,
+                llm_overrides=overrides, usage_context=dict(usage_context),
+            )
+            # Persisted memory and model-trace roles must be isolated even for
+            # administrator-controlled display keys that are not safe labels.
+            agent.name = "domain_" + hashlib.sha256(key.encode()).hexdigest()[:16]
+            self._domain_agents[key] = agent
+            self._domain_tool_views[key] = view
+            self._domain_governance_toolkits.append(discovery)
+
+    def _domain_system_prompt(self, view: PluginToolView) -> str:
+        return "\n\n".join(filter(None, (
+            self._runtime_context_prompt(), self.dataset_context,
+            view.preset.instructions, self._tool_selection_prompt(view),
+            "You are a bounded domain step executor in the existing plan. Do not delegate, invent tools, "
+            "run shell commands or propose a new Agent loop. Use only supplied tool schemas. "
+            "Return evidence and limitations to the parent plan through the ordinary step result.",
+        )))
+
+    def _tool_selection_prompt(self, view: PluginToolView | None = None) -> str:
+        view = view or getattr(self, "_plugin_view", None)
+        if view is None:
+            return ""
+        state = view.selection_snapshot()
+        code_mode_hint = ""
+        if view is getattr(self, "_plugin_view", None) and getattr(self, "_code_mode_tool_names", ()):
+            code_mode_hint = (
+                " Experimental code_mode_run is enabled for sequential read-only composition only. "
+                "Use assignments of the form result = await tools.call('tool_name', {literal_arguments}), "
+                "then a final dictionary/value expression. No imports, loops, shell or recursion. "
+                "Only these explicitly reviewed tools are eligible, and they must first be loaded: "
+                + ", ".join(self._code_mode_tool_names) + ". "
+            )
+        return (
+            f"<tool_selection>Preset: {view.preset.id}; mode: {view.selection_mode}; "
+            f"loaded plugin tools: {state['loaded_tool_count']}; available: {state['available_tool_count']}. "
+            "Only loaded schemas are callable. In on_demand mode, use tool_catalog_search with precise "
+            "keywords, then tool_catalog_load (up to 8 tools) and use their schemas on the next turn. "
+            "Catalog loading does not grant permissions or bypass approvals. "
+            f"{view.preset.instructions}{code_mode_hint}</tool_selection>"
+        )
+
+    def _create_code_mode_toolkit(self):
+        from app.domain.services.code_mode import CodeModeToolSpec
+        from app.domain.services.tools.code_mode import CodeModeToolkit
+
+        specs = {}
+        for name, definition in self.plugin_toolkit._definitions.items():
+            spec = CodeModeToolSpec.from_manifest(definition)
+            if spec.eligible:
+                specs[name] = spec
+        self._code_mode_tool_names = tuple(sorted(specs))
+
+        async def dispatch(name: str, arguments: dict, *, call_id: str):
+            tool = self._plugin_view.get_tool(name)
+            if tool is None or name not in specs:
+                raise ValueError("Code Mode tool is unavailable or not loaded")
+            # Never call PluginToolkit.call_tool directly: each inner request
+            # must cross the same authorization/job/Spill/audit pipeline.
+            result = await tool.ainvoke({"id": call_id, "name": name, "args": arguments})
+            artifact = projected_tool_artifact(result)
+            if hasattr(artifact, "model_dump"):
+                artifact = artifact.model_dump(mode="json")
+            if not isinstance(artifact, dict) or artifact.get("success") is not True:
+                raise ValueError("Code Mode inner tool did not succeed")
+            return sanitize_spill_public_data(artifact)
+
+        return CodeModeToolkit(dispatch, tuple(specs.values()), enabled=True)
+
+    def validate_plugin_tool_names(self) -> None:
+        """Recheck the complete namespace after dynamic toolkit changes."""
+        ToolRegistry([
+            self.plugin_toolkit,
+            *self._non_plugin_toolkits,
+        ]).assert_unique_tool_names()
+
+    def prepare_execution_environment(self, message: Message) -> None:
+        """Freeze the actual skill selection before provenance is persisted."""
+        view = getattr(self, "_plugin_view", None)
+        if view is not None:
+            view.reset()
+            for domain_view in self._domain_tool_views.values():
+                domain_view.reset()
+            captured = getattr(self, "_execution_toolset_identity", None)
+            if isinstance(captured, dict):
+                captured["selection"] = self._selection_identity()
+        requested = tuple(message.skills or ())
+        active_skills = self._activate_skills(list(requested))
+        scope_counts: dict[str, int] = {}
+        private_skill_identities: list[dict[str, object]] = []
+        for skill in active_skills:
+            raw_scope = getattr(getattr(skill, "scope", None), "value", None)
+            scope = raw_scope if raw_scope in {
+                "global",
+                "user",
+                "workspace",
+                "private",
+                "shared",
+            } else "unknown"
+            scope_counts[scope] = scope_counts.get(scope, 0) + 1
+            # Skill names and instructions can be private or low-entropy. Feed
+            # the effective identity only to the server-keyed HMAC boundary;
+            # neither these values nor a plain hash of them is persisted.
+            private_skill_identities.append({
+                "id": str(getattr(skill, "id", "") or ""),
+                "name": str(getattr(skill, "name", "") or ""),
+                "description": str(getattr(skill, "description", "") or ""),
+                "triggers": [str(value) for value in (getattr(skill, "triggers", ()) or ())],
+                "content": str(getattr(skill, "content", "") or ""),
+                "scope": scope,
+                "priority": getattr(skill, "priority", 0),
+                "max_context_chars": getattr(skill, "max_context_chars", None),
+                "scripts": sorted(str(value) for value in (getattr(skill, "scripts", ()) or ())),
+                "references": sorted(str(value) for value in (getattr(skill, "references", ()) or ())),
+                "templates": sorted(str(value) for value in (getattr(skill, "templates", ()) or ())),
+                "user_id": str(getattr(skill, "user_id", "") or ""),
+                "owner_user_id": str(getattr(skill, "owner_user_id", "") or ""),
+                "workspace_id": str(getattr(skill, "workspace_id", "") or ""),
+            })
+        captured = self._execution_toolset_identity
+        if isinstance(captured, dict):
+            self._execution_toolset_identity = {
+                **captured,
+                "active_skill_count": len(active_skills),
+                "active_skill_hmac_sha256": (
+                    private_identity_hmac({"active_skills": private_skill_identities})
+                    if private_skill_identities
+                    else None
+                ),
+            }
+        self._prepared_skill_request = requested
+        self._prepared_active_skills = list(active_skills)
+
+    async def drain_spill_saves(self) -> None:
+        """Join every bundle, including any replaced during reconfiguration."""
+        cancellation: asyncio.CancelledError | None = None
+        pending = getattr(self, "_spill_interceptors", [])
+        while pending:
+            interceptor = pending.pop(0)
+            try:
+                await interceptor.drain_pending_saves()
+            except asyncio.CancelledError as error:
+                cancellation = error
+        if cancellation is not None:
+            raise cancellation
+
+    def configure_tool_execution(
+        self,
+        *,
+        trace_sink: ToolExecutionTraceSink | None = None,
+    ) -> None:
+        """Pin and install the production interceptor bundle for this turn.
+
+        MCP discovery completes after the flow is constructed, so this runs at
+        that boundary rather than capturing an incomplete constructor-time
+        registry. Reconfiguration disposes the previous bundle atomically from
+        every shared toolkit pipeline before installing the next snapshot.
+        """
+        settings = get_settings()
+        spill_store = getattr(self, "_spill_artifact_store", None)
+        self.validate_plugin_tool_names()
+        tool_names = self._tool_registry.tool_names()
+        catalog_revision = self.plugin_toolkit.catalog_revision
+        # MCP server/tool names are administrator- or provider-controlled and
+        # may accidentally contain credentials or host paths. They still pin
+        # the in-memory allowlist below, but must never become persisted hash
+        # input. Cordis tools are represented by their catalog revision, MCP
+        # tools by their dynamic count, and only repository-owned core names
+        # are included verbatim in this safe structural identity.
+        plugin_tool_names = set(
+            ToolRegistry([self.plugin_toolkit]).tool_names()
+        )
+        core_tool_names = sorted(
+            name
+            for name in tool_names
+            if name not in plugin_tool_names and not name.startswith("mcp_")
+        )
+        mcp_toolkit = getattr(self, "mcp_toolkit", None)
+        mcp_tools = list(getattr(mcp_toolkit, "_tools", ()) or ())
+        mcp_tool_count = len(mcp_tools)
+        mcp_tools_hmac = (
+            private_identity_hmac({"discovered_mcp_tools": mcp_tools})
+            if mcp_tools
+            else None
+        )
+        registry_identity = json.dumps(
+            {
+                "catalog_revision": catalog_revision,
+                "core_tool_names": core_tool_names,
+                "mcp_tool_count": mcp_tool_count,
+                "mcp_tools_hmac_sha256": mcp_tools_hmac,
+                "plugin_tool_count": len(plugin_tool_names),
+                "tool_count": len(tool_names),
+            },
+            ensure_ascii=True,
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode("utf-8")
+        tool_names_digest = hashlib.sha256(registry_identity).hexdigest()
+        consent_enabled = getattr(self, "_tool_approval_service", None) is not None
+        policy = ToolPolicySnapshot.for_registered_tools(
+            tool_names,
+            version=f"tool-policy/{'call-consent-v1' if consent_enabled else 'registry'}-{tool_names_digest[:16]}",
+            metadata={
+                "catalog_revision": catalog_revision,
+                "tool_count": len(tool_names),
+            },
+        )
+        policy_identity = json.dumps(
+            {
+                "version": policy.version,
+                "default_decision": policy.default_decision.value,
+                "allowed_tool_count": len(policy.allowed_tools),
+                "denied_tool_count": len(policy.denied_tools),
+                "allowed_effects": sorted(policy.allowed_effects),
+                "granted_permissions": sorted(policy.granted_permissions),
+                "allow_unclassified_effects": policy.allow_unclassified_effects,
+                "registry_identity_digest": tool_names_digest,
+                "call_consent": "single-use-v1" if consent_enabled else "none",
+            },
+            ensure_ascii=True,
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode("utf-8")
+        policy_digest = hashlib.sha256(policy_identity).hexdigest()
+        interceptors = create_production_tool_interceptors(
+            call_authorization_interceptor=(
+                ToolCallAuthorizationInterceptor(
+                    policy, approvals=self._tool_approval_service, credentials=self._credential_service,
+                    user_id=self._user_id, session_id=self._session_id,
+                    identity_provider=self._analysis_job_identity_provider,
+                    event_sink=self._tool_approval_event_sink,
+                ) if getattr(self, "_tool_approval_service", None) is not None
+                and callable(getattr(self, "_analysis_job_identity_provider", None)) else None
+            ),
+            analysis_job_interceptor=(
+                AnalysisJobInterceptor(
+                    self._analysis_job_service,
+                    user_id=self._user_id, session_id=self._session_id,
+                    identity_provider=self._analysis_job_identity_provider,
+                    event_sink=self._analysis_job_event_sink,
+                )
+                if settings.analysis_jobs_enabled
+                and getattr(self, "_analysis_job_service", None) is not None
+                and callable(getattr(self, "_analysis_job_identity_provider", None))
+                else None
+            ),
+            policy_snapshot=policy,
+            trace_sink=trace_sink,
+            trace_attributes={
+                "agent_id": self._agent_id,
+                "catalog_revision": catalog_revision,
+                "session_id": self._session_id,
+                "user_id": self._user_id,
+            },
+            # Preserve the existing sandbox safety ceiling even if a future
+            # manifest advertises a larger host-side budget.
+            default_timeout_seconds=120.0,
+            maximum_timeout_seconds=120.0,
+            spill_store=(
+                spill_store
+                if settings.spill_enabled
+                else None
+            ),
+            spill_owner=(
+                SpillArtifactOwner(
+                    user_id=self._user_id,
+                    session_id=self._session_id,
+                )
+                if settings.spill_enabled and spill_store is not None
+                else None
+            ),
+            spill_max_inline_bytes=settings.spill_max_inline_bytes,
+            spill_max_artifact_bytes=settings.spill_max_artifact_bytes,
+            spill_preview_bytes=settings.spill_preview_bytes,
+            spill_store_timeout_seconds=settings.spill_store_timeout_seconds,
+        )
+        next_disposer = getattr(self, "_governed_tool_registry", self._tool_registry).register_interceptors(
+            interceptors,
+        )
+        previous = self._tool_execution_disposer
+        try:
+            if previous is not None:
+                previous()
+        except Exception:
+            next_disposer()
+            raise
+        self._tool_execution_disposer = next_disposer
+        if not hasattr(self, "_spill_interceptors"):
+            self._spill_interceptors = []
+        self._spill_interceptors.extend(
+            interceptor for interceptor in interceptors
+            if isinstance(interceptor, SpillArtifactInterceptor)
+        )
+        # This contains only names already exposed to the model plus numeric
+        # counts. It is captured after MCP discovery and never includes MCP
+        # command lines, environment variables or credentials.
+        self._execution_toolset_identity = {
+            "policy_version": policy.version,
+            "policy_digest": policy_digest,
+            "tool_names_digest": tool_names_digest,
+            "tool_count": len(tool_names),
+            "mcp_tool_count": mcp_tool_count,
+            "mcp_tools_hmac_sha256": mcp_tools_hmac,
+            "active_skill_count": 0,
+            "active_skill_hmac_sha256": None,
+            "selection": self._selection_identity(),
+        }
+
+    def _selection_identity(self) -> dict | None:
+        view = getattr(self, "_plugin_view", None)
+        if view is None:
+            return None
+        from app.domain.models.execution_environment import stable_sha256
+        state = view.selection_snapshot()
+        return {
+            "version": 1, "preset_id": view.preset.id, "selection_mode": view.selection_mode,
+            "initial_tool_count": state["loaded_tool_count"],
+            "available_tool_count": state["available_tool_count"],
+            "selection_digest": stable_sha256({
+                "config": self.tool_runtime.model_dump(),
+                "initial_plugin_tools": list(view.loaded_tool_names),
+                "domain_views": {agent.name: {
+                    "preset_id": self._domain_tool_views[key].preset.id,
+                    "initial_plugin_tools": list(self._domain_tool_views[key].loaded_tool_names),
+                } for key, agent in self._domain_agents.items()},
+            }),
+            "code_mode_enabled": self.tool_runtime.code_mode_enabled,
+            "domain_subagents_enabled": self.tool_runtime.domain_subagents_enabled,
+            "domain_agent_count": len(self._domain_agents),
+        }
 
     async def run(self, message: Message) -> AsyncGenerator[BaseEvent, None]:
 
@@ -276,18 +747,32 @@ class PlanActFlow(BaseFlow):
         if not session:
             raise ValueError(f"Session {self._session_id} not found")
         
+        resumed_waiting_question = False
         if session.status != SessionStatus.PENDING:
-            logger.debug(f"Session {self._session_id} is not in PENDING status, rolling back")
-            await self.executor.roll_back(message)
+            logger.debug(
+                "Session is not pending; rolling back session=%s",
+                opaque_log_identifier(self._session_id, namespace="session"),
+            )
+            resumed_waiting_question = await self.executor.roll_back(message)
             await self.planner.roll_back(message)
         
         if session.status == SessionStatus.RUNNING:
-            logger.debug(f"Session {self._session_id} is in RUNNING status")
+            logger.debug(
+                "Session is running session=%s",
+                opaque_log_identifier(self._session_id, namespace="session"),
+            )
             self.status = AgentStatus.PLANNING
 
         if session.status == SessionStatus.WAITING:
-            logger.debug(f"Session {self._session_id} is in WAITING status")
-            self.status = AgentStatus.EXECUTING
+            logger.debug(
+                "Session is waiting session=%s",
+                opaque_log_identifier(self._session_id, namespace="session"),
+            )
+            self.status = (
+                AgentStatus.EXECUTING
+                if resumed_waiting_question
+                else AgentStatus.PLANNING
+            )
 
         await self._session_repository.update_status(self._session_id, SessionStatus.RUNNING)
         events = await self._session_repository.get_events(self._session_id)
@@ -307,23 +792,44 @@ class PlanActFlow(BaseFlow):
                 yield event
             self.status = AgentStatus.IDLE
             return
-        active_skills = self._activate_skills(message.skills or [])
+        requested_skills = tuple(message.skills or ())
+        if (
+            getattr(self, "_prepared_skill_request", None) == requested_skills
+            and getattr(self, "_prepared_active_skills", None) is not None
+        ):
+            active_skills = list(self._prepared_active_skills)
+            self._prepared_skill_request = None
+            self._prepared_active_skills = None
+        else:
+            active_skills = self._activate_skills(list(requested_skills))
         if active_skills:
             logger.info(
-                "Agent %s activated skills: %s",
-                self._agent_id,
-                ", ".join(skill.name for skill in active_skills),
+                "Agent activated skills agent=%s count=%d",
+                opaque_log_identifier(self._agent_id, namespace="agent"),
+                len(active_skills),
             )
 
-        logger.info(f"Agent {self._agent_id} started processing message: {message.message[:50]}...")
+        logger.info(
+            "Agent %s started processing message chars=%d",
+            self._agent_id,
+            len(message.message),
+        )
         step = None
         while True:
             if self.status == AgentStatus.IDLE:
-                logger.info(f"Agent {self._agent_id} state changed from {AgentStatus.IDLE} to {AgentStatus.PLANNING}")
+                logger.info(
+                    "Agent state changed agent=%s from=%s to=%s",
+                    opaque_log_identifier(self._agent_id, namespace="agent"),
+                    AgentStatus.IDLE,
+                    AgentStatus.PLANNING,
+                )
                 self.status = AgentStatus.PLANNING
             elif self.status == AgentStatus.PLANNING:
                 # Create plan
-                logger.info(f"Agent {self._agent_id} started creating plan")
+                logger.info(
+                    "Agent started creating plan agent=%s",
+                    opaque_log_identifier(self._agent_id, namespace="agent"),
+                )
                 if self._should_use_dataset_fast_path(message):
                     self._dataset_fast_path_active = True
                     self.plan = self._create_dataset_fast_path_plan(message)
@@ -340,13 +846,25 @@ class PlanActFlow(BaseFlow):
                             self.plan = event.plan
                             self._normalize_plan_agents()
                             self._ensure_vision_step_for_image_message(message)
-                            logger.info(f"Agent {self._agent_id} created plan successfully with {len(event.plan.steps)} steps")
+                            logger.info(
+                                "Agent created plan agent=%s step_count=%d",
+                                opaque_log_identifier(self._agent_id, namespace="agent"),
+                                len(event.plan.steps),
+                            )
                             yield TitleEvent(title=event.plan.title)
                         yield event
-                logger.info(f"Agent {self._agent_id} state changed from {AgentStatus.PLANNING} to {AgentStatus.EXECUTING}")
+                logger.info(
+                    "Agent state changed agent=%s from=%s to=%s",
+                    opaque_log_identifier(self._agent_id, namespace="agent"),
+                    AgentStatus.PLANNING,
+                    AgentStatus.EXECUTING,
+                )
                 self.status = AgentStatus.EXECUTING
                 if len(self.plan.steps) == 0:
-                    logger.info(f"Agent {self._agent_id} created plan successfully with no steps")
+                    logger.info(
+                        "Agent created plan with no steps agent=%s",
+                        opaque_log_identifier(self._agent_id, namespace="agent"),
+                    )
                     self.status = AgentStatus.COMPLETED
                     
             elif self.status == AgentStatus.EXECUTING:
@@ -354,11 +872,21 @@ class PlanActFlow(BaseFlow):
                 self.plan.status = ExecutionStatus.RUNNING
                 step = self.plan.get_next_step()
                 if not step:
-                    logger.info(f"Agent {self._agent_id} has no more steps, state changed from {AgentStatus.EXECUTING} to {AgentStatus.COMPLETED}")
+                    logger.info(
+                        "Agent has no more steps agent=%s from=%s to=%s",
+                        opaque_log_identifier(self._agent_id, namespace="agent"),
+                        AgentStatus.EXECUTING,
+                        AgentStatus.COMPLETED,
+                    )
                     self.status = AgentStatus.SUMMARIZING
                     continue
                 # Execute step
-                logger.info(f"Agent {self._agent_id} started executing step {step.id}: {step.description[:50]}...")
+                logger.info(
+                    "Agent %s started executing step=%s description_chars=%d",
+                    self._agent_id,
+                    step.id,
+                    len(step.description or ""),
+                )
                 complete_after_vision_step = False
                 if step.agent not in self.enabled_subagents:
                     step.status = ExecutionStatus.FAILED
@@ -369,22 +897,30 @@ class PlanActFlow(BaseFlow):
                     continue
 
                 handler_type = self.enabled_subagents[step.agent].handler_type
+                executor = getattr(self, "_domain_agents", {}).get(step.agent, self.executor)
                 if handler_type == "vision":
                     async for event in self.vision.analyze_step(self.plan, step, message, sandbox=self._sandbox):
                         yield event
                     complete_after_vision_step = self._should_complete_after_vision_step()
                 else:
-                    async for event in self.executor.execute_step(self.plan, step, message):
+                    async for event in executor.execute_step(self.plan, step, message):
                         yield event
-                logger.info(f"Agent {self._agent_id} completed step {step.id}")
+                logger.info(
+                    "Agent completed step agent=%s step=%s",
+                    opaque_log_identifier(self._agent_id, namespace="agent"),
+                    opaque_log_identifier(step.id, namespace="step"),
+                )
                 # Persist the complete updated plan before moving on so task or
                 # process recovery cannot repeat a successful side-effecting step.
                 yield PlanEvent(status=PlanStatus.UPDATED, plan=self.plan, step=step)
                 if complete_after_vision_step:
                     self.status = AgentStatus.COMPLETED
                     continue
-                await self.executor.compact_memory()
-                logger.debug(f"Agent {self._agent_id} compacted memory")
+                await executor.compact_memory()
+                logger.debug(
+                    "Agent compacted memory agent=%s",
+                    opaque_log_identifier(self._agent_id, namespace="agent"),
+                )
                 # A successful step does not invalidate the original plan. Replanning
                 # after every success adds an LLM round trip and can also make a later
                 # step repeat work that has already finished. Replan only on failure.
@@ -403,30 +939,53 @@ class PlanActFlow(BaseFlow):
                 )
             elif self.status == AgentStatus.UPDATING:
                 # Update plan
-                logger.info(f"Agent {self._agent_id} started updating plan")
+                logger.info(
+                    "Agent started updating plan agent=%s",
+                    opaque_log_identifier(self._agent_id, namespace="agent"),
+                )
                 async for event in self.planner.update_plan(self.plan, step):
                     if isinstance(event, PlanEvent):
                         self._normalize_plan_agents()
                     yield event
-                logger.info(f"Agent {self._agent_id} plan update completed, state changed from {AgentStatus.UPDATING} to {AgentStatus.EXECUTING}")
+                logger.info(
+                    "Agent plan update completed agent=%s from=%s to=%s",
+                    opaque_log_identifier(self._agent_id, namespace="agent"),
+                    AgentStatus.UPDATING,
+                    AgentStatus.EXECUTING,
+                )
                 self.status = AgentStatus.EXECUTING
             elif self.status == AgentStatus.SUMMARIZING:
                 # Conclusion
-                logger.info(f"Agent {self._agent_id} started summarizing")
+                logger.info(
+                    "Agent started summarizing agent=%s",
+                    opaque_log_identifier(self._agent_id, namespace="agent"),
+                )
+                self.executor._current_plan = self.plan
                 async for event in self.executor.summarize():
                     yield event
-                logger.info(f"Agent {self._agent_id} summarizing completed, state changed from {AgentStatus.SUMMARIZING} to {AgentStatus.COMPLETED}")
+                logger.info(
+                    "Agent summarizing completed agent=%s from=%s to=%s",
+                    opaque_log_identifier(self._agent_id, namespace="agent"),
+                    AgentStatus.SUMMARIZING,
+                    AgentStatus.COMPLETED,
+                )
                 self.status = AgentStatus.COMPLETED
             elif self.status == AgentStatus.COMPLETED:
                 self.plan.status = ExecutionStatus.COMPLETED
                 self._finalize_incomplete_steps()
-                logger.info(f"Agent {self._agent_id} plan has been completed")
+                logger.info(
+                    "Agent plan completed agent=%s",
+                    opaque_log_identifier(self._agent_id, namespace="agent"),
+                )
                 yield PlanEvent(status=PlanStatus.COMPLETED, plan=self.plan)
                 self.status = AgentStatus.IDLE
                 break
         yield DoneEvent()
         
-        logger.info(f"Agent {self._agent_id} message processing completed")
+        logger.info(
+            "Agent message processing completed agent=%s",
+            opaque_log_identifier(self._agent_id, namespace="agent"),
+        )
     
     def is_done(self) -> bool:
         return self.status == AgentStatus.IDLE
@@ -456,7 +1015,7 @@ class PlanActFlow(BaseFlow):
             tool_name=self.skill_toolkit.name,
             function_name=function_name,
             function_args=function_args,
-            function_result=result,
+            function_result=projected_tool_artifact(tool_message),
         )
 
         if not result.success:
@@ -499,6 +1058,7 @@ class PlanActFlow(BaseFlow):
                 for part in [
                     self._runtime_context_prompt(),
                     self.dataset_context,
+                    self._tool_selection_prompt(),
                 ]
                 if part
             )
@@ -509,6 +1069,7 @@ class PlanActFlow(BaseFlow):
                 self._subagent_capabilities_prompt(),
                 self.active_skill_context,
                 getattr(self, "dataset_context", ""),
+                self._tool_selection_prompt(),
             ]
             if part
         ]
@@ -527,6 +1088,7 @@ class PlanActFlow(BaseFlow):
         """
         return bool(
             message.datasets
+            and not getattr(self, "_domain_agents", {})
             and "execution" in self._enabled_subagents()
             and not is_skill_create_request(message.message)
             and not message.skills
@@ -1482,7 +2044,10 @@ class PlanActFlow(BaseFlow):
             try:
                 subagents.append(AgentSubAgentConfig.model_validate(item))
             except Exception as exc:
-                logger.warning("Ignoring invalid subagent profile config %s: %s", item, exc)
+                logger.warning(
+                    "Ignoring invalid subagent profile config error_type=%s",
+                    type(exc).__name__,
+                )
         return subagents or default_subagents()
 
     def _agent_llm_overrides(self, base_overrides: dict, agent_key: str) -> dict:
@@ -1595,13 +2160,30 @@ class PlanActFlow(BaseFlow):
         vision_results: list[str] = []
         analysis_results: list[tuple[str, tuple[str, ...]]] = []
         seen_analysis_results: set[tuple[str, tuple[str, ...]]] = set()
+        spill_references: list[dict[str, Any]] = []
+        seen_spill_locators: set[str] = set()
         for index, event in enumerate(events):
             if (
                 isinstance(event, MessageEvent)
                 and index != current_event_index
                 and event.message.strip()
+                and not (
+                    event.role == "assistant"
+                    and is_non_substantive_message_text(event.message)
+                )
             ):
                 conversation.append((event.role, event.message.strip()))
+            if isinstance(event, ToolEvent) and event.status == ToolStatus.CALLED:
+                notice = spill_notice_from_result(event.function_result)
+                reference = notice.reference if notice is not None else None
+                if reference is not None and reference.locator not in seen_spill_locators:
+                    seen_spill_locators.add(reference.locator)
+                    spill_references.append({
+                        "locator": reference.locator,
+                        "byte_count": reference.byte_count,
+                        "sha256": reference.sha256,
+                        "media_type": reference.media_type,
+                    })
             if not isinstance(event, PlanEvent):
                 continue
             for step in event.plan.steps:
@@ -1663,6 +2245,7 @@ class PlanActFlow(BaseFlow):
             not rendered_messages
             and not rendered_vision_results
             and not rendered_analysis_results
+            and not spill_references
         ):
             return ""
 
@@ -1680,6 +2263,9 @@ class PlanActFlow(BaseFlow):
                 }
                 for result, attachments in rendered_analysis_results
             ],
+            # Only opaque, session-authorized references are replayed. Raw
+            # output and even its bounded preview stay out of future prompts.
+            "spill_artifacts": spill_references[-self.MAX_SESSION_SPILL_REFERENCES:],
         }
         return json.dumps(
             payload,

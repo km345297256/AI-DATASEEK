@@ -1,0 +1,47 @@
+{
+  "dataset_id": "plos-jupyter-notebooks",
+  "external_id": "plos-jupyter-notebooks",
+  "data_center_id": "international-open-catalog",
+  "data_center_name": "PLOS Computational Biology; Adam Rule and coauthors",
+  "name": "PLOS Jupyter 科研笔记本十条准则（开放论文 PDF）",
+  "description": "Rule 等于 2019 年在 PLOS Computational Biology 发表的开放指南 Ten simple rules for writing and sharing computational analyses in Jupyter Notebooks，DOI: 10.1371/journal.pcbi.1007007。完整原版 8 页 PDF，含流程图和参考文献，可用于提取标题、图文关系、编写摘要，以及与另一份科研复现指南比较。这是公开文献样本，非测量数据或可执行笔记本。",
+  "domain": "documents",
+  "data_type": "PDF",
+  "tags": [
+    "documents",
+    "PDF",
+    "开放数据"
+  ],
+  "metadata": {
+    "curated": true,
+    "catalog_version": 1,
+    "publisher": "PLOS Computational Biology; Adam Rule and coauthors",
+    "source_url": "https://journals.plos.org/ploscompbiol/article?id=10.1371/journal.pcbi.1007007",
+    "license": "CC-BY-4.0",
+    "license_url": "https://creativecommons.org/licenses/by/4.0/",
+    "license_details": "The publisher's article Copyright section explicitly links its Creative Commons Attribution license to https://creativecommons.org/licenses/by/4.0/.",
+    "sample_scope": "完整论文 PDF · 8 页；文档分析样本",
+    "sample_note": "Complete unmodified eight-page publisher PDF; document-analysis teaching sample, not a research measurement dataset or executable notebook. Original citation and copyright retained.",
+    "provenance": [
+      {
+        "path": "jupyter-notebooks-guidelines.pdf",
+        "download_url": "https://journals.plos.org/ploscompbiol/article/file?id=10.1371/journal.pcbi.1007007&type=printable",
+        "sha256": "30af1629e0fe31b51a82c8f01c901a0ecc6d13bb61bc601861aeb3d260397910",
+        "size": 430105
+      }
+    ],
+    "inventory_complete": true,
+    "recursive_file_count": 1,
+    "total_size_bytes": 430105
+  },
+  "files": [
+    {
+      "path": "jupyter-notebooks-guidelines.pdf",
+      "size": 430105,
+      "sha256": "30af1629e0fe31b51a82c8f01c901a0ecc6d13bb61bc601861aeb3d260397910",
+      "role": "data",
+      "content_type": "application/pdf"
+    }
+  ]
+}
+

@@ -1,0 +1,47 @@
+{
+  "dataset_id": "ncbi-lambda-reference",
+  "external_id": "ncbi-lambda-reference",
+  "data_center_id": "international-open-catalog",
+  "data_center_name": "NCBI / U.S. National Library of Medicine; NCBI Genome Project",
+  "name": "NCBI λ 噬菌体完整参考基因组",
+  "description": "NCBI RefSeq 发布的 Escherichia（Enterobacteria）phage lambda 完整参考基因组，登录号 NC_001416.1，48,502 个碱基，原版 FASTA。用于序列格式检查、GC 含量、碱基组成与序列片段检索。非人类个人基因数据；本地包含该登录号的完整单条参考序列，没有合成或裁剪。",
+  "domain": "sequence",
+  "data_type": "FASTA",
+  "tags": [
+    "sequence",
+    "FASTA",
+    "开放数据"
+  ],
+  "metadata": {
+    "curated": true,
+    "catalog_version": 1,
+    "publisher": "NCBI / U.S. National Library of Medicine; NCBI Genome Project",
+    "source_url": "https://www.ncbi.nlm.nih.gov/nuccore/NC_001416.1",
+    "license": "NCBI 公共序列使用政策",
+    "license_url": "https://www.ncbi.nlm.nih.gov/genbank/about/",
+    "license_details": "NCBI GenBank Data Usage states that NCBI places no restrictions on use or distribution; it also notes possible third-party rights. This is not labeled CC0 or a blanket waiver of third-party rights.",
+    "sample_scope": "完整参考序列 · 48,502 个碱基",
+    "sample_note": "Complete versioned reference record NC_001416.1, 48,502 bases, downloaded through NCBI EFetch. Public non-human reference sequence, not individual genomic data.",
+    "provenance": [
+      {
+        "path": "lambda-NC_001416.1.fasta",
+        "download_url": "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=nuccore&id=NC_001416.1&rettype=fasta&retmode=text",
+        "sha256": "78a78913d3585570fa28b7cec05e4fcf067c1aaa3740d37a377f2babda70618c",
+        "size": 49254
+      }
+    ],
+    "inventory_complete": true,
+    "recursive_file_count": 1,
+    "total_size_bytes": 49254
+  },
+  "files": [
+    {
+      "path": "lambda-NC_001416.1.fasta",
+      "size": 49254,
+      "sha256": "78a78913d3585570fa28b7cec05e4fcf067c1aaa3740d37a377f2babda70618c",
+      "role": "data",
+      "content_type": "text/plain"
+    }
+  ]
+}
+

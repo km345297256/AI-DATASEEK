@@ -34,14 +34,37 @@ from app.domain.external.sandbox import Sandbox
 from app.domain.external.browser import Browser
 from app.domain.external.search import SearchEngine
 from app.domain.external.file import FileStorage
+from app.domain.external.plugin_runtime import PluginRuntime
+from app.domain.external.spill import SpillArtifactStore
 from app.domain.repositories.agent_repository import AgentRepository
 from app.domain.external.task import TaskRunner, Task
 from app.domain.repositories.session_repository import SessionRepository
 from app.domain.repositories.mcp_repository import MCPRepository
 from app.domain.models.session import SessionStatus
 from app.domain.models.file import FileInfo
+from app.domain.models.execution_environment import ExecutionEnvironmentSnapshot
+from app.domain.services.execution_environment import create_agent_execution_snapshot
+from app.domain.services.model_runtime import ModelBudgetStopped, model_execution_scope, model_stop_reason
+from app.infrastructure.repositories.mongo_model_trace_repository import get_model_trace_repository
 from app.domain.services.tools.mcp import MCPToolkit
+from app.domain.services.tools.interceptors import (
+    AuditServiceToolTraceSink,
+    CompositeToolTraceSink,
+    JsonLoggingToolTraceSink,
+)
+from app.domain.services.tools.pipeline import opaque_log_identifier
+from app.domain.services.tools.spill import SPILL_READ_TOOL_NAME
+from app.domain.services.tools.analysis_job import AnalysisJobCancelled, AnalysisJobInterrupted
+from app.domain.services.tools.authorization import ToolAuthorizationStopped
+from app.domain.services.tools.spill_projection import (
+    durable_spill_read_projection,
+    durable_spill_result_projection,
+    sanitize_spill_public_data,
+    sanitize_spill_public_text,
+    spill_notice_from_result,
+)
 from app.domain.models.tool_result import ToolResult
+from app.domain.models.analysis_job import AnalysisJobView
 from app.domain.models.search import SearchResults
 from app.domain.models.mcp_config import MCPConfig, can_access_mcp
 from app.domain.services.completion_advice_service import get_completion_advice_service
@@ -159,6 +182,11 @@ class AgentTaskRunner(TaskRunner):
         search_engine: Optional[SearchEngine] = None,
         llm_overrides: Optional[dict] = None,
         front_controller_resolution: Optional[FrontControllerResolution] = None,
+        plugin_runtime: Optional[PluginRuntime] = None,
+        spill_artifact_store: Optional[SpillArtifactStore] = None,
+        analysis_job_service=None,
+        tool_approval_service=None,
+        credential_service=None,
     ):
         self._session_id = session_id
         self._agent_id = agent_id
@@ -170,10 +198,27 @@ class AgentTaskRunner(TaskRunner):
         self._session_repository = session_repository
         self._file_storage = file_storage
         self._mcp_repository = mcp_repository
+        self._plugin_runtime = plugin_runtime
+        self._spill_artifact_store = spill_artifact_store
+        self._analysis_job_service = analysis_job_service
+        self._analysis_job_tools: dict[str, ToolEvent] = {}
+        self._analysis_job_views: dict[str, AnalysisJobView] = {}
+        self._tool_approval_service = tool_approval_service
+        self._tool_approval_views: dict[str, Any] = {}
+        self._llm_overrides = dict(llm_overrides or {})
+        self._execution_snapshot: ExecutionEnvironmentSnapshot | None = None
         self._mcp_tool = MCPToolkit()
         self._front_controller_resolution = front_controller_resolution
         self._safety_policy_store = get_safety_policy_store()
         self._audit_service = AuditService()
+        self._tool_trace_sink = CompositeToolTraceSink((
+            JsonLoggingToolTraceSink(),
+            AuditServiceToolTraceSink(
+                self._audit_service,
+                actor_user_id=self._user_id,
+                session_id=self._session_id,
+            ),
+        ))
         self._completion_advice_service = get_completion_advice_service()
         self._flow = PlanActFlow(
             self._agent_id,
@@ -187,6 +232,11 @@ class AgentTaskRunner(TaskRunner):
             self._search_engine,
             llm_overrides=llm_overrides,
             file_storage=self._file_storage,
+            plugin_runtime=plugin_runtime,
+            spill_artifact_store=spill_artifact_store,
+            analysis_job_service=analysis_job_service,
+            tool_approval_service=tool_approval_service,
+            credential_service=credential_service,
         )
         self._generated_files: List[FileInfo] = []
         self._artifact_baseline_paths: set[str] = set()
@@ -205,11 +255,192 @@ class AgentTaskRunner(TaskRunner):
         # roots from tool arguments instead of relying on a directory name.
         self._private_artifact_roots: set[str] = set()
 
+    async def _record_execution_snapshot(
+        self,
+        *,
+        task_id: str,
+        message: Message,
+        trigger_event_seq: int | None = None,
+    ) -> ExecutionEnvironmentSnapshot:
+        dataset_ids = [
+            getattr(dataset, "dataset_id", None)
+            for dataset in (message.datasets or [])
+            if getattr(dataset, "dataset_id", None)
+        ]
+        snapshot = create_agent_execution_snapshot(
+            task_id=task_id,
+            session_id=self._session_id,
+            flow=self._flow,
+            sandbox=self._sandbox,
+            dataset_ids=dataset_ids,
+            resolution=self._front_controller_resolution,
+            llm_overrides=self._llm_overrides,
+            requested_mcp_servers=message.mcp_servers or [],
+            requested_skill_count=len(set(message.skills or [])),
+            trigger_event_seq=trigger_event_seq,
+        )
+        existing = self._execution_snapshot
+        if existing is not None:
+            if (
+                existing.task_id != task_id
+                or existing.fingerprint != snapshot.fingerprint
+                or existing.trigger_event_seq != snapshot.trigger_event_seq
+            ):
+                raise RuntimeError("Task execution environment changed after it was frozen")
+            return existing
+
+        persist = getattr(self._session_repository, "add_execution_snapshot", None)
+        if callable(persist):
+            try:
+                await persist(snapshot)
+            except Exception as exc:
+                logger.error(
+                    "Failed to persist execution snapshot session=%s task=%s error_type=%s",
+                    opaque_log_identifier(self._session_id, namespace="session"),
+                    opaque_log_identifier(task_id, namespace="task"),
+                    type(exc).__name__,
+                )
+                raise RuntimeError(
+                    "The task execution environment could not be recorded"
+                ) from exc
+        else:
+            # Backward compatibility for isolated test repositories. The
+            # production Mongo repository always implements this operation.
+            logger.warning(
+                "Session repository has no execution snapshot store session=%s",
+                opaque_log_identifier(self._session_id, namespace="session"),
+            )
+        self._execution_snapshot = snapshot
+        return snapshot
+
+    def _execution_task_id(self, task: Task) -> str | None:
+        """Return a production task id, allowing only legacy test doubles to omit it."""
+        task_id = getattr(task, "id", None)
+        if isinstance(task_id, str) and task_id.strip():
+            return task_id
+        if callable(getattr(self._session_repository, "add_execution_snapshot", None)):
+            raise RuntimeError("Persisted agent task is missing its task id")
+        logger.warning(
+            "Legacy untracked agent task session=%s",
+            opaque_log_identifier(self._session_id, namespace="session"),
+        )
+        return None
+
     async def _put_and_add_event(self, task: Task, event: AgentEvent) -> None:
+        if isinstance(event, ToolEvent):
+            approvals = getattr(self, "_tool_approval_views", {})
+            if event.tool_approval is None and event.tool_call_id in approvals:
+                event = event.model_copy(update={"tool_approval": approvals[event.tool_call_id]})
+            views = getattr(self, "_analysis_job_views", {})
+            if event.analysis_job is None:
+                if event.status == ToolStatus.CALLING:
+                    templates = getattr(self, "_analysis_job_tools", None)
+                    if templates is not None:
+                        templates[event.tool_call_id] = event.model_copy()
+                if event.tool_call_id in views:
+                    event = event.model_copy(update={"analysis_job": views[event.tool_call_id]})
+        event = self._durable_event_projection(event)
         event = self._bound_event_payload(event)
+        event.bind_producer_event_id()
+        reserve_sequence = getattr(
+            self._session_repository,
+            "reserve_event_sequence",
+            None,
+        )
+        if callable(reserve_sequence):
+            # The sequence must be inside the Redis payload; assigning it after
+            # XADD would make live events and persisted history disagree.
+            await reserve_sequence(self._session_id, event)
         event_id = await task.output_stream.put(event.model_dump_json())
         event.id = event_id
         await self._session_repository.add_event(self._session_id, event)
+
+    async def _publish_tool_approval(self, task: Task, view, context) -> None:
+        call_id = str(context.tool_call_id)
+        previous = self._tool_approval_views.get(call_id)
+        if previous is not None and previous.approval_id == view.approval_id and previous.revision >= view.revision:
+            return
+        self._tool_approval_views[call_id] = view
+        template = self._analysis_job_tools.get(call_id)
+        await self._put_and_add_event(task, ToolEvent(
+            tool_call_id=call_id,
+            tool_name=template.tool_name if template is not None else "plugin",
+            function_name=template.function_name if template is not None else context.tool_name,
+            function_args=sanitize_spill_public_data(template.function_args) if template is not None else {},
+            status=ToolStatus.CALLED if view.status in {"rejected", "expired", "cancelled"} else ToolStatus.CALLING,
+            tool_approval=view,
+        ))
+
+    async def _publish_analysis_job(self, task: Task, view: AnalysisJobView, context) -> None:
+        call_id = str(context.tool_call_id)
+        previous = self._analysis_job_views.get(call_id)
+        if previous is not None and previous.job_id == view.job_id and previous.revision >= view.revision:
+            return
+        self._analysis_job_views[call_id] = view
+        template = self._analysis_job_tools.get(call_id)
+        terminal = view.status in {"succeeded", "failed", "cancelled", "timed_out", "interrupted"}
+        # Only display arguments already emitted by the Agent are repeated.
+        # Compiled analysis intentionally emits a short label, never its code.
+        await self._put_and_add_event(task, ToolEvent(
+            tool_call_id=call_id,
+            tool_name=template.tool_name if template is not None else "plugin",
+            function_name=template.function_name if template is not None else context.tool_name,
+            function_args=sanitize_spill_public_data(template.function_args) if template is not None else {},
+            status=ToolStatus.CALLED if terminal else ToolStatus.CALLING,
+            analysis_job=view,
+        ))
+
+    @staticmethod
+    def _durable_event_projection(event: AgentEvent) -> AgentEvent:
+        """Clone and sanitize a spill event at the Redis/Mongo boundary.
+
+        The Agent may use the raw tool result during its current invocation,
+        while durable history retains only the bounded artifact reference and
+        a credential/path-safe preview.  Non-spill events are unchanged.
+        """
+
+        if not isinstance(event, ToolEvent):
+            return event
+        is_spill_read = event.function_name == SPILL_READ_TOOL_NAME
+        if not is_spill_read and spill_notice_from_result(event.function_result) is None:
+            return event
+
+        # Shallow clone first: untrusted arguments may be deeply nested or
+        # cyclic. The bounded sanitizer creates their independent safe copy.
+        durable = event.model_copy()
+        durable.function_result = (
+            durable_spill_read_projection(event.function_result)
+            if is_spill_read
+            else durable_spill_result_projection(event.function_result)
+        )
+        safe_args = sanitize_spill_public_data(durable.function_args)
+        durable.function_args = safe_args if isinstance(safe_args, dict) else {}
+        # A spill has one universal typed UI card. The declarative descriptor
+        # is redundant and could otherwise consume the complete event budget.
+        durable.presentation = None
+
+        if is_spill_read:
+            durable.tool_content = None
+            return durable
+
+        content = durable.tool_content
+        if isinstance(content, FileToolContent):
+            durable.tool_content = content.model_copy(update={
+                "content": sanitize_spill_public_text(content.content),
+            })
+        elif isinstance(content, ShellToolContent):
+            durable.tool_content = content.model_copy(update={
+                "console": sanitize_spill_public_data(content.console),
+            })
+        elif isinstance(content, McpToolContent):
+            durable.tool_content = content.model_copy(update={
+                "result": sanitize_spill_public_data(content.result),
+            })
+        elif isinstance(content, SkillToolContent):
+            durable.tool_content = content.model_copy(update={
+                "result": sanitize_spill_public_data(content.result),
+            })
+        return durable
 
     def _bound_event_payload(self, event: AgentEvent) -> AgentEvent:
         """Keep Redis and Mongo session-event documents well below BSON's 16MB limit."""
@@ -217,14 +448,19 @@ class AgentTaskRunner(TaskRunner):
             return event
 
         logger.warning(
-            "Agent %s bounded oversized %s event before persistence (%d bytes)",
-            self._agent_id,
+            "Bounded oversized event before persistence agent=%s event_type=%s bytes=%d",
+            opaque_log_identifier(self._agent_id, namespace="agent"),
             event.type,
             self._event_payload_size(event),
         )
         if isinstance(event, ToolEvent):
+            spill_notice = spill_notice_from_result(event.function_result)
             event.function_args = self._event_preview(event.function_args)
-            event.function_result = self._event_preview(event.function_result)
+            # A spill notice is already bounded and is the sole route back to
+            # the complete output. Preserve it when oversized arguments or UI
+            # content trigger this final BSON/Redis defense.
+            if spill_notice is None:
+                event.function_result = self._event_preview(event.function_result)
             if isinstance(event.tool_content, FileToolContent):
                 event.tool_content.content = self._event_preview_text(event.tool_content.content)
             elif isinstance(event.tool_content, ShellToolContent):
@@ -241,8 +477,8 @@ class AgentTaskRunner(TaskRunner):
         if self._event_payload_size(event) <= self.MAX_EVENT_PAYLOAD_BYTES:
             return event
         logger.error(
-            "Agent %s event remained oversized after bounding; replacing it with an error event",
-            self._agent_id,
+            "Event remained oversized after bounding; replacing it agent=%s",
+            opaque_log_identifier(self._agent_id, namespace="agent"),
         )
         return ErrorEvent(error="Task event was too large to persist; inline output was omitted.")
 
@@ -274,7 +510,10 @@ class AgentTaskRunner(TaskRunner):
 
     def _decode_input_event(self, event_id, event_str) -> AgentEvent:
         if event_str is None:
-            logger.warning(f"Agent {self._agent_id} received empty message")
+            logger.warning(
+                "Agent received empty message agent=%s",
+                opaque_log_identifier(self._agent_id, namespace="agent"),
+            )
             return
         event = TypeAdapter(AgentEvent).validate_json(event_str)
         event.id = event_id
@@ -410,18 +649,18 @@ class AgentTaskRunner(TaskRunner):
             deleted = await self._file_storage.delete_file(file_info.file_id, self._user_id)
             if not deleted:
                 logger.warning(
-                    "Agent %s could not delete replaced artifact object %s",
-                    self._agent_id,
-                    file_info.file_id,
+                    "Could not delete replaced artifact object agent=%s object=%s",
+                    opaque_log_identifier(self._agent_id, namespace="agent"),
+                    opaque_log_identifier(file_info.file_id, namespace="object"),
                 )
         except Exception as exc:
             # The new attachment is already durable.  Object cleanup is
             # intentionally best-effort and must not make the task fail.
             logger.warning(
-                "Agent %s failed to delete replaced artifact object %s: %s",
-                self._agent_id,
-                file_info.file_id,
-                exc,
+                "Failed to delete replaced artifact object agent=%s object=%s error_type=%s",
+                opaque_log_identifier(self._agent_id, namespace="agent"),
+                opaque_log_identifier(file_info.file_id, namespace="object"),
+                type(exc).__name__,
             )
 
     async def _sync_file_to_storage(
@@ -482,7 +721,12 @@ class AgentTaskRunner(TaskRunner):
             self._remember_artifact_fingerprint(file_path, fingerprint)
             return file_info
         except Exception as e:
-            logger.exception(f"Agent {self._agent_id} failed to sync file: {e}")
+            logger.error(
+                "Failed to sync artifact file agent=%s file=%s error_type=%s",
+                opaque_log_identifier(self._agent_id, namespace="agent"),
+                opaque_log_identifier(file_path, namespace="file"),
+                type(e).__name__,
+            )
 
     def _remember_generated_file(self, file_info: Optional[FileInfo]) -> None:
         if not file_info or not file_info.file_path:
@@ -646,7 +890,11 @@ class AgentTaskRunner(TaskRunner):
                     seen_paths.add(file_path)
                     discovered_paths.append(file_path)
         except Exception as e:
-            logger.exception(f"Agent {self._agent_id} failed to list sandbox artifacts: {e}")
+            logger.error(
+                "Failed to list sandbox artifacts agent=%s error_type=%s",
+                opaque_log_identifier(self._agent_id, namespace="agent"),
+                type(e).__name__,
+            )
         return discovered_paths
 
     async def _capture_artifact_baseline(self) -> None:
@@ -667,9 +915,9 @@ class AgentTaskRunner(TaskRunner):
             }
         except Exception as exc:
             logger.warning(
-                "Agent %s could not load artifact baseline metadata: %s",
-                self._agent_id,
-                exc,
+                "Could not load artifact baseline metadata agent=%s error_type=%s",
+                opaque_log_identifier(self._agent_id, namespace="agent"),
+                type(exc).__name__,
             )
 
         for file_path in baseline_paths:
@@ -682,10 +930,10 @@ class AgentTaskRunner(TaskRunner):
                     # body cannot be read. Discovery will observe it once without
                     # publishing pre-task output.
                     logger.warning(
-                        "Agent %s could not fingerprint legacy baseline artifact %s: %s",
-                        self._agent_id,
-                        file_path,
-                        exc,
+                        "Could not fingerprint legacy baseline artifact agent=%s file=%s error_type=%s",
+                        opaque_log_identifier(self._agent_id, namespace="agent"),
+                        opaque_log_identifier(file_path, namespace="file"),
+                        type(exc).__name__,
                     )
                     continue
             self._artifact_fingerprints[file_path] = fingerprint
@@ -715,10 +963,10 @@ class AgentTaskRunner(TaskRunner):
                 file_data, fingerprint = await self._read_artifact_with_fingerprint(file_path)
             except Exception as exc:
                 logger.warning(
-                    "Agent %s could not fingerprint artifact %s: %s",
-                    self._agent_id,
-                    file_path,
-                    exc,
+                    "Could not fingerprint artifact agent=%s file=%s error_type=%s",
+                    opaque_log_identifier(self._agent_id, namespace="agent"),
+                    opaque_log_identifier(file_path, namespace="file"),
+                    type(exc).__name__,
                 )
                 continue
 
@@ -752,7 +1000,12 @@ class AgentTaskRunner(TaskRunner):
                 file_info.file_path = file_path
                 return file_info
         except Exception as e:
-            logger.exception(f"Agent {self._agent_id} failed to sync file: {e}")
+            logger.error(
+                "Failed to sync storage file into sandbox agent=%s object=%s error_type=%s",
+                opaque_log_identifier(self._agent_id, namespace="agent"),
+                opaque_log_identifier(file_id, namespace="object"),
+                type(e).__name__,
+            )
 
     async def _sync_message_attachments_to_storage(self, event: MessageEvent) -> None:
         """Sync message attachments and update event attachments"""
@@ -771,7 +1024,11 @@ class AgentTaskRunner(TaskRunner):
                 attachments.extend(await self._sync_explicit_paths_to_storage(paths_to_sync))
             event.attachments = attachments
         except Exception as e:
-            logger.exception(f"Agent {self._agent_id} failed to sync attachments to storage: {e}")
+            logger.error(
+                "Failed to sync attachments to storage agent=%s error_type=%s",
+                opaque_log_identifier(self._agent_id, namespace="agent"),
+                type(e).__name__,
+            )
 
     async def _sync_step_attachments_to_storage(self, event: StepEvent) -> List[FileInfo]:
         """Sync files explicitly reported by a completed step."""
@@ -779,7 +1036,11 @@ class AgentTaskRunner(TaskRunner):
             if event.status == StepStatus.COMPLETED and event.step.attachments:
                 return await self._sync_explicit_paths_to_storage(event.step.attachments)
         except Exception as e:
-            logger.exception(f"Agent {self._agent_id} failed to sync step attachments to storage: {e}")
+            logger.error(
+                "Failed to sync step attachments to storage agent=%s error_type=%s",
+                opaque_log_identifier(self._agent_id, namespace="agent"),
+                type(e).__name__,
+            )
         return []
 
     def _should_attach_generated_files_to_message(self) -> bool:
@@ -810,6 +1071,32 @@ class AgentTaskRunner(TaskRunner):
         result over a second sandbox lookup, which can race with sandbox pause
         or cleanup after the command has finished.
         """
+        notice = spill_notice_from_result(event.function_result)
+        if notice is not None:
+            projected_result = event.function_result
+            if isinstance(projected_result, ToolResult):
+                succeeded = projected_result.success
+            elif isinstance(projected_result, dict):
+                succeeded = projected_result.get("success") is not False
+            else:
+                succeeded = False
+            locator = (
+                notice.reference.locator
+                if notice.reference is not None
+                else "unavailable"
+            )
+            return [{
+                "ps1": "$",
+                "command": str((event.function_args or {}).get("command") or event.function_name),
+                "output": (
+                    f"{sanitize_spill_public_text(notice.preview)}\n\n"
+                    f"[Oversized output: {notice.original_bytes} bytes; "
+                    f"spill={notice.status}; locator={locator}]"
+                ),
+                "status": "completed" if succeeded else "failed",
+                "returncode": 0 if succeeded else 1,
+            }]
+
         function_result = event.function_result
         if isinstance(function_result, ToolResult):
             result_data = function_result.data
@@ -847,6 +1134,30 @@ class AgentTaskRunner(TaskRunner):
     @staticmethod
     def _dataset_analysis_console(event: ToolEvent) -> list[dict[str, Any]]:
         """Render the high-level analysis result without exposing generated code."""
+        notice = spill_notice_from_result(event.function_result)
+        if notice is not None:
+            if isinstance(event.function_result, ToolResult):
+                success = event.function_result.success
+            elif isinstance(event.function_result, dict):
+                success = event.function_result.get("success") is not False
+            else:
+                success = False
+            output = (
+                "数据集分析已完成；完整输出已保存为当前会话的私有溢出结果。"
+                if success and notice.status == "stored"
+                else "数据集分析已完成，但完整输出暂时无法保存。"
+                if success
+                else "数据集分析执行失败；详细输出已保存为当前会话的私有溢出结果。"
+                if notice.status == "stored"
+                else "数据集分析执行失败，且详细输出暂时无法保存。"
+            )
+            return [{
+                "ps1": "$",
+                "command": "分析数据集并生成成果",
+                "output": output,
+                "status": "completed" if success else "failed",
+                "returncode": 0 if success else 1,
+            }]
         result = event.function_result if isinstance(event.function_result, dict) else {}
         success = bool(result.get("success"))
         output = result.get("result") if success else result.get("error") or result.get("result")
@@ -864,6 +1175,30 @@ class AgentTaskRunner(TaskRunner):
     def _dataset_quicklook_console(event: ToolEvent) -> list[dict[str, Any]]:
         """Render quicklook's compact summary instead of its full evidence JSON."""
         function_result = event.function_result
+        notice = spill_notice_from_result(function_result)
+        if notice is not None:
+            if isinstance(function_result, ToolResult):
+                success = function_result.success
+            elif isinstance(function_result, dict):
+                success = function_result.get("success") is not False
+            else:
+                success = False
+            output = (
+                "数据集快速探查已完成；完整证据已保存为当前会话的私有溢出结果。"
+                if success and notice.status == "stored"
+                else "数据集快速探查已完成，但完整证据暂时无法保存。"
+                if success
+                else "数据集快速探查失败；详细输出已保存为当前会话的私有溢出结果。"
+                if notice.status == "stored"
+                else "数据集快速探查失败，且详细输出暂时无法保存。"
+            )
+            return [{
+                "ps1": "$",
+                "command": "快速探查数据集",
+                "output": output,
+                "status": "completed" if success else "failed",
+                "returncode": 0 if success else 1,
+            }]
         if isinstance(function_result, ToolResult):
             data = function_result.data if isinstance(function_result.data, dict) else {}
         elif isinstance(function_result, dict):
@@ -920,14 +1255,18 @@ class AgentTaskRunner(TaskRunner):
                     else:
                         attachments.append(attachment)
                         logger.warning(
-                            "Agent %s kept unsynced attachment %s (%s)",
-                            self._agent_id,
-                            attachment.file_id,
-                            attachment.filename,
+                            "Kept unsynced attachment agent=%s object=%s filename_chars=%d",
+                            opaque_log_identifier(self._agent_id, namespace="agent"),
+                            opaque_log_identifier(attachment.file_id, namespace="object"),
+                            len(attachment.filename or ""),
                         )
             event.attachments = attachments
         except Exception as e:
-            logger.exception(f"Agent {self._agent_id} failed to sync attachments to event: {e}")
+            logger.error(
+                "Failed to sync attachments to event agent=%s error_type=%s",
+                opaque_log_identifier(self._agent_id, namespace="agent"),
+                type(e).__name__,
+            )
     
 
     # TODO: refactor this function
@@ -939,7 +1278,11 @@ class AgentTaskRunner(TaskRunner):
                     event.tool_content = BrowserToolContent(screenshot=await self._get_browser_screenshot())
                 elif event.tool_name == "search":
                     search_results: ToolResult[SearchResults] = event.function_result
-                    logger.debug(f"Search tool results: {search_results}")
+                    logger.debug(
+                        "Search tool result prepared agent=%s success=%s",
+                        opaque_log_identifier(self._agent_id, namespace="agent"),
+                        getattr(search_results, "success", None),
+                    )
                     event.tool_content = SearchToolContent(results=search_results.data.results)
                 elif event.tool_name == "shell":
                     if event.function_name == "dataset_analysis_run":
@@ -958,7 +1301,19 @@ class AgentTaskRunner(TaskRunner):
                     else:
                         event.tool_content = ShellToolContent(console="(No Console)")
                 elif event.tool_name == "file":
-                    if event.function_name == "file_find_by_name":
+                    spill_notice = spill_notice_from_result(event.function_result)
+                    if spill_notice is not None:
+                        locator = (
+                            spill_notice.reference.locator
+                            if spill_notice.reference is not None
+                            else "unavailable"
+                        )
+                        event.tool_content = FileToolContent(content=(
+                            f"{sanitize_spill_public_text(spill_notice.preview)}\n\n"
+                            f"[Oversized output: {spill_notice.original_bytes} bytes; "
+                            f"spill={spill_notice.status}; locator={locator}]"
+                        ))
+                    elif event.function_name == "file_find_by_name":
                         event.tool_content = FileToolContent(content=event.function_result.model_dump_json() if hasattr(event.function_result, "model_dump_json") else str(event.function_result))
                     elif event.function_name == "file_find_in_content":
                         event.tool_content = FileToolContent(content=event.function_result.model_dump_json() if hasattr(event.function_result, "model_dump_json") else str(event.function_result))
@@ -970,26 +1325,29 @@ class AgentTaskRunner(TaskRunner):
                     else:
                         event.tool_content = FileToolContent(content="(No Content)")
                 elif event.tool_name == "mcp":
-                    logger.debug(f"Processing MCP tool event: function_result={event.function_result}")
+                    logger.debug(
+                        "Processing MCP tool event agent=%s success=%s result_type=%s",
+                        opaque_log_identifier(self._agent_id, namespace="agent"),
+                        getattr(event.function_result, "success", None),
+                        type(event.function_result).__name__,
+                    )
                     if event.function_result:
                         if hasattr(event.function_result, 'data') and event.function_result.data:
-                            logger.debug(f"MCP tool result data: {event.function_result.data}")
                             event.tool_content = McpToolContent(result=event.function_result.data)
                         elif hasattr(event.function_result, 'success') and event.function_result.success:
-                            logger.debug(f"MCP tool result (success, no data): {event.function_result}")
                             result_data = event.function_result.model_dump() if hasattr(event.function_result, 'model_dump') else str(event.function_result)
                             event.tool_content = McpToolContent(result=result_data)
                         else:
-                            logger.debug(f"MCP tool result (fallback): {event.function_result}")
                             event.tool_content = McpToolContent(result=str(event.function_result))
                     else:
                         logger.warning("MCP tool: No function_result found")
                         event.tool_content = McpToolContent(result="No result available")
                     
-                    logger.debug(f"MCP tool_content set to: {event.tool_content}")
-                    if event.tool_content:
-                        logger.debug(f"MCP tool_content.result: {event.tool_content.result}")
-                        logger.debug(f"MCP tool_content dict: {event.tool_content.model_dump()}")
+                    logger.debug(
+                        "MCP tool content prepared agent=%s content_type=%s",
+                        opaque_log_identifier(self._agent_id, namespace="agent"),
+                        type(event.tool_content).__name__ if event.tool_content else None,
+                    )
                 elif event.tool_name == "skill":
                     if event.function_result:
                         if hasattr(event.function_result, 'data') and event.function_result.data:
@@ -1006,11 +1364,19 @@ class AgentTaskRunner(TaskRunner):
                     # own message stream and do not need additional tool content.
                     pass
                 else:
-                    logger.warning(f"Agent {self._agent_id} received unknown tool event: {event.tool_name}")
+                    logger.warning(
+                        "Received unknown tool event agent=%s tool=%s",
+                        opaque_log_identifier(self._agent_id, namespace="agent"),
+                        opaque_log_identifier(event.tool_name, namespace="tool"),
+                    )
             if event.status == ToolStatus.CALLED:
                 await self._report_analysis_tool_usage(event)
         except Exception as e:
-            logger.exception(f"Agent {self._agent_id} failed to generate tool content: {e}")
+            logger.error(
+                "Failed to generate tool content agent=%s error_type=%s",
+                opaque_log_identifier(self._agent_id, namespace="agent"),
+                type(e).__name__,
+            )
 
     async def _report_analysis_tool_usage(self, event: ToolEvent) -> None:
         """Report successful scientific Tool calls for SSO-linked submissions."""
@@ -1044,9 +1410,34 @@ class AgentTaskRunner(TaskRunner):
             await asyncio.gather(*reports)
 
     async def run(self, task: Task) -> None:
+        task_id = getattr(task, "id", None)
+        if isinstance(task_id, str) and task_id:
+            with model_execution_scope(user_id=self._user_id, session_id=self._session_id,
+                                       task_id=task_id, store=get_model_trace_repository()):
+                await self._run_with_model_budget(task)
+        else:
+            # Isolated legacy Task test doubles have no persisted identity.
+            await self._run_with_model_budget(task)
+
+    async def _run_with_model_budget(self, task: Task) -> None:
         """Process agent's message queue and run the agent's flow"""
+        if getattr(self, "_analysis_job_service", None) is not None or getattr(self, "_tool_approval_service", None) is not None:
+            task_id = self._execution_task_id(task)
+            self._flow._analysis_job_identity_provider = lambda: {
+                "task_id": task_id,
+                "execution_snapshot_id": (
+                    self._execution_snapshot.task_id if self._execution_snapshot else None
+                ),
+                "catalog_revision": self._flow.plugin_toolkit.catalog_revision,
+                "sandbox_id": self._sandbox.id,
+            }
+            self._flow._analysis_job_event_sink = lambda view, context: self._publish_analysis_job(task, view, context)
+            self._flow._tool_approval_event_sink = lambda view, context: self._publish_tool_approval(task, view, context)
         try:
-            logger.info(f"Agent {self._agent_id} message processing task started")
+            logger.info(
+                "Message processing task started agent=%s",
+                opaque_log_identifier(self._agent_id, namespace="agent"),
+            )
             ensure_api_ready = getattr(self._sandbox, "ensure_api_ready", None)
             if callable(ensure_api_ready):
                 await ensure_api_ready()
@@ -1096,7 +1487,11 @@ class AgentTaskRunner(TaskRunner):
                     await self._capture_artifact_baseline()
                     artifact_baseline_initialized = True
                     
-                logger.info(f"Agent {self._agent_id} received new message: {message[:50]}...")
+                logger.info(
+                    "Agent received new message agent=%s chars=%d",
+                    opaque_log_identifier(self._agent_id, namespace="agent"),
+                    len(message),
+                )
 
                 sandbox_attachment_paths = [
                     attachment.file_path
@@ -1104,8 +1499,8 @@ class AgentTaskRunner(TaskRunner):
                     if attachment.file_path
                 ]
                 logger.info(
-                    "Agent %s message attachments: request=%d file_ids=%d sandbox_paths=%d",
-                    self._agent_id,
+                    "Agent message attachments agent=%s request=%d file_ids=%d sandbox_paths=%d",
+                    opaque_log_identifier(self._agent_id, namespace="agent"),
                     len(event.attachments or []),
                     len([attachment for attachment in (event.attachments or []) if attachment.file_id]),
                     len(sandbox_attachment_paths),
@@ -1134,7 +1529,17 @@ class AgentTaskRunner(TaskRunner):
                 # from an earlier turn here makes later summaries re-deliver
                 # stale artifacts even when nothing changed.
                 self._generated_files = []
-                async for event in self._run_flow(message_obj):
+                execution_task_id = self._execution_task_id(task)
+                flow_events = (
+                    self._run_flow(
+                        message_obj,
+                        task_id=execution_task_id,
+                        trigger_event_seq=event.seq,
+                    )
+                    if execution_task_id is not None
+                    else self._run_flow(message_obj)
+                )
+                async for event in flow_events:
                     await self._put_and_add_event(task, event)
                     if isinstance(event, TitleEvent):
                         await self._session_repository.update_title(self._session_id, event.title)
@@ -1146,19 +1551,44 @@ class AgentTaskRunner(TaskRunner):
                         return
 
             await self._session_repository.update_status(self._session_id, SessionStatus.COMPLETED)
-        except asyncio.CancelledError:
-            logger.info(f"Agent {self._agent_id} task cancelled")
+        except asyncio.CancelledError as error:
+            logger.info(
+                "Agent task cancelled agent=%s",
+                opaque_log_identifier(self._agent_id, namespace="agent"),
+            )
+            if isinstance(error, ModelBudgetStopped) or model_stop_reason():
+                await self._put_and_add_event(task, MessageEvent(
+                    message=("本轮执行已在模型运行边界停止：上下文或本轮 Token/调用预算不足，或运行记录暂时无法保存。"
+                             "已有分析结果会保留。请缩小问题范围或检查模型运行记录后继续。"),
+                ))
+            elif isinstance(error, ToolAuthorizationStopped):
+                await self._put_and_add_event(task, MessageEvent(
+                    message="本次工具调用未获得有效授权（可能已拒绝、过期、凭据未配置或权限检查未通过），本轮执行已停止。请检查调用权限和凭据配置后重新发起。",
+                ))
+            elif isinstance(error, AnalysisJobCancelled):
+                await self._put_and_add_event(task, MessageEvent(
+                    message="当前分析作业已取消，本轮执行已停止。你可以调整要求后继续分析。",
+                ))
+            elif isinstance(error, AnalysisJobInterrupted):
+                await self._put_and_add_event(task, MessageEvent(
+                    message="当前分析作业的执行已中断，本轮执行已停止。系统没有自动重跑，请检查已有结果后再继续。",
+                ))
             await self._put_and_add_event(task, DoneEvent())
             await self._session_repository.update_status(self._session_id, SessionStatus.COMPLETED)
         except Exception as e:
-            logger.exception(f"Agent {self._agent_id} task encountered exception: {str(e)}")
+            logger.error(
+                "Agent %s task encountered exception error_type=%s",
+                opaque_log_identifier(self._agent_id, namespace="agent"),
+                type(e).__name__,
+            )
             
             # If debugger is attached, trigger breakpoint for debugging
             # You can also manually set ENABLE_DEBUG_BREAK=1 environment variable
             if debugpy.is_client_connected() or os.getenv('ENABLE_DEBUG_BREAK'):
-                logger.debug("Debugger detected, triggering breakpoint")
-                import traceback
-                traceback.print_exc()
+                logger.debug(
+                    "Debugger detected; triggering breakpoint error_type=%s",
+                    type(e).__name__,
+                )
                 debugpy.breakpoint()  # This will pause execution if a debugger is attached
             
             await self._put_and_add_event(
@@ -1188,11 +1618,45 @@ class AgentTaskRunner(TaskRunner):
         else:
             config = MCPConfig(mcpServers={})
         await self._mcp_tool.initialized(config, available_config=available_config)
+        # MCP tools are discovered asynchronously after PlanActFlow is built.
+        # Recheck here so no dynamic provider can create an ambiguous schema.
+        flow = getattr(self, "_flow", None)
+        validate_names = getattr(flow, "validate_plugin_tool_names", None)
+        if callable(validate_names):
+            try:
+                validate_names()
+            except Exception:
+                await self._mcp_tool.cleanup()
+                raise
+        configure_execution = getattr(flow, "configure_tool_execution", None)
+        if callable(configure_execution):
+            try:
+                configure_execution(
+                    trace_sink=getattr(self, "_tool_trace_sink", None),
+                )
+            except Exception:
+                await self._mcp_tool.cleanup()
+                raise
     
-    async def _run_flow(self, message: Message) -> AsyncGenerator[BaseEvent, None]:
+    async def _run_flow(
+        self,
+        message: Message,
+        *,
+        task_id: str | None = None,
+        trigger_event_seq: int | None = None,
+    ) -> AsyncGenerator[BaseEvent, None]:
         """Process a single message through the agent's flow and yield events"""
         if not message.message:
-            logger.warning(f"Agent {self._agent_id} received empty message")
+            if task_id:
+                await self._record_execution_snapshot(
+                    task_id=task_id,
+                    message=message,
+                    trigger_event_seq=trigger_event_seq,
+                )
+            logger.warning(
+                "Agent received empty message agent=%s",
+                opaque_log_identifier(self._agent_id, namespace="agent"),
+            )
             yield ErrorEvent(error="No message")
             return
 
@@ -1225,7 +1689,11 @@ class AgentTaskRunner(TaskRunner):
                 if attachment_review:
                     review = attachment_review
             except Exception as exc:
-                logger.error("Attachment safety policy check failed closed: %s", exc)
+                logger.error(
+                    "Attachment safety policy check failed closed agent=%s error_type=%s",
+                    opaque_log_identifier(self._agent_id, namespace="agent"),
+                    type(exc).__name__,
+                )
                 review = SafetyReview(
                     decision="reject",
                     risk_level="high",
@@ -1235,11 +1703,17 @@ class AgentTaskRunner(TaskRunner):
                 )
         await self._record_safety_audit(review)
         if not review.allowed:
+            if task_id:
+                await self._record_execution_snapshot(
+                    task_id=task_id,
+                    message=message,
+                    trigger_event_seq=trigger_event_seq,
+                )
             logger.warning(
-                "Agent %s rejected user message before Planner: risk=%s categories=%s",
-                self._agent_id,
+                "Rejected user message before Planner agent=%s risk=%s category_count=%d",
+                opaque_log_identifier(self._agent_id, namespace="agent"),
                 review.risk_level,
-                ",".join(review.categories),
+                len(review.categories),
             )
             yield MessageEvent(
                 role="assistant",
@@ -1262,7 +1736,41 @@ class AgentTaskRunner(TaskRunner):
             yield DoneEvent()
             return
 
-        await self._initialize_mcp_tool(message.mcp_servers, is_admin=message.mcp_access_all)
+        try:
+            await self._initialize_mcp_tool(
+                message.mcp_servers,
+                is_admin=message.mcp_access_all,
+            )
+        except Exception:
+            if task_id:
+                await self._record_execution_snapshot(
+                    task_id=task_id,
+                    message=message,
+                    trigger_event_seq=trigger_event_seq,
+                )
+            raise
+        prepare_environment = getattr(
+            self._flow,
+            "prepare_execution_environment",
+            None,
+        )
+        if callable(prepare_environment):
+            try:
+                prepare_environment(message)
+            except Exception:
+                if task_id:
+                    await self._record_execution_snapshot(
+                        task_id=task_id,
+                        message=message,
+                        trigger_event_seq=trigger_event_seq,
+                    )
+                raise
+        if task_id:
+            await self._record_execution_snapshot(
+                task_id=task_id,
+                message=message,
+                trigger_event_seq=trigger_event_seq,
+            )
 
         artifact_discovery_dirty = bool(getattr(self, "_generated_files", []))
         artifact_discovery_ran = False
@@ -1496,7 +2004,11 @@ class AgentTaskRunner(TaskRunner):
                         advice = completion_advice_service.analyze_fast([*turn_events, *pre_events])
                         event.advice = completion_advice_service.to_payload(advice)
                     except Exception as exc:
-                        logger.warning("Failed to build completion advice for session %s: %s", self._session_id, exc)
+                        logger.warning(
+                            "Failed to build completion advice session=%s error_type=%s",
+                            opaque_log_identifier(self._session_id, namespace="session"),
+                            type(exc).__name__,
+                        )
             for pre_event in pre_events:
                 yield pre_event
                 turn_events.append(pre_event)
@@ -1507,7 +2019,10 @@ class AgentTaskRunner(TaskRunner):
                 yield post_event
                 turn_events.append(post_event)
 
-        logger.info(f"Agent {self._agent_id} completed processing one message")
+        logger.info(
+            "Agent completed processing one message agent=%s",
+            opaque_log_identifier(self._agent_id, namespace="agent"),
+        )
 
     async def _attachment_review_excerpts(self, message: Message) -> list[dict[str, str]]:
         """Read small text excerpts for review without executing attachments."""
@@ -1525,7 +2040,12 @@ class AgentTaskRunner(TaskRunner):
                     content = (result.data or {}).get("content", "") if result else ""
                     item["content"] = str(content)[:8000]
                 except Exception as exc:
-                    logger.info("Safety review could not read attachment %s: %s", info.filename, exc)
+                    logger.info(
+                        "Safety review could not read attachment file=%s filename_chars=%d error_type=%s",
+                        opaque_log_identifier(path, namespace="file"),
+                        len(info.filename or ""),
+                        type(exc).__name__,
+                    )
             excerpts.append(item)
         return excerpts
 
@@ -1558,22 +2078,60 @@ class AgentTaskRunner(TaskRunner):
                 },
             )
         except Exception as exc:
-            logger.warning("Failed to persist safety review audit for session %s: %s", self._session_id, exc)
+            logger.warning(
+                "Failed to persist safety review audit session=%s error_type=%s",
+                opaque_log_identifier(self._session_id, namespace="session"),
+                type(exc).__name__,
+            )
 
     async def on_done(self, task: Task) -> None:
         """Called when the task is done"""
-        logger.info(f"Agent {self._agent_id} task done")
-        if self._browser and hasattr(self._browser, "cleanup"):
+        logger.info(
+            "Agent task done agent=%s",
+            opaque_log_identifier(self._agent_id, namespace="agent"),
+        )
+        try:
+            if self._browser and hasattr(self._browser, "cleanup"):
+                try:
+                    await self._browser.cleanup()
+                except Exception as exc:
+                    logger.warning(
+                        "Failed to cleanup browser before pausing sandbox agent=%s error_type=%s",
+                        opaque_log_identifier(self._agent_id, namespace="agent"),
+                        type(exc).__name__,
+                    )
+            if self._sandbox and hasattr(self._sandbox, "pause"):
+                paused = await self._sandbox.pause()
+                if paused:
+                    logger.info(
+                        "Paused sandbox after task completion agent=%s sandbox=%s",
+                        opaque_log_identifier(self._agent_id, namespace="agent"),
+                        opaque_log_identifier(self._sandbox.id, namespace="sandbox"),
+                    )
+                else:
+                    logger.warning(
+                        "Failed to pause sandbox after task completion agent=%s sandbox=%s",
+                        opaque_log_identifier(self._agent_id, namespace="agent"),
+                        opaque_log_identifier(self._sandbox.id, namespace="sandbox"),
+                    )
+        finally:
             try:
-                await self._browser.cleanup()
-            except Exception as exc:
-                logger.warning("Agent %s failed to cleanup browser before pausing sandbox: %s", self._agent_id, exc)
-        if self._sandbox and hasattr(self._sandbox, "pause"):
-            paused = await self._sandbox.pause()
-            if paused:
-                logger.info("Agent %s paused sandbox %s after task completion", self._agent_id, self._sandbox.id)
-            else:
-                logger.warning("Agent %s failed to pause sandbox %s after task completion", self._agent_id, self._sandbox.id)
+                mcp_tool = getattr(self, "_mcp_tool", None)
+                if mcp_tool:
+                    try:
+                        await mcp_tool.cleanup()
+                    except Exception as exc:
+                        logger.warning(
+                            "Failed to cleanup MCP tools after task completion agent=%s error_type=%s",
+                            opaque_log_identifier(self._agent_id, namespace="agent"),
+                            type(exc).__name__,
+                        )
+            finally:
+                drain = getattr(getattr(self, "_flow", None), "drain_spill_saves", None)
+                if callable(drain):
+                    # wait_closed() is the session-deletion barrier. No
+                    # detached save may insert a record after owner cleanup.
+                    await drain()
 
 
     async def destroy(self) -> None:
@@ -1582,11 +2140,20 @@ class AgentTaskRunner(TaskRunner):
         
         # Destroy sandbox environment
         if self._sandbox:
-            logger.debug(f"Destroying Agent {self._agent_id}'s sandbox environment")
+            logger.debug(
+                "Destroying sandbox environment agent=%s",
+                opaque_log_identifier(self._agent_id, namespace="agent"),
+            )
             await self._sandbox.destroy()
         
         if self._mcp_tool:
-            logger.debug(f"Destroying Agent {self._agent_id}'s MCP tool")
+            logger.debug(
+                "Destroying MCP tool agent=%s",
+                opaque_log_identifier(self._agent_id, namespace="agent"),
+            )
             await self._mcp_tool.cleanup()
         
-        logger.debug(f"Agent {self._agent_id} has been fully closed and resources cleared")
+        logger.debug(
+            "Agent fully closed and resources cleared agent=%s",
+            opaque_log_identifier(self._agent_id, namespace="agent"),
+        )

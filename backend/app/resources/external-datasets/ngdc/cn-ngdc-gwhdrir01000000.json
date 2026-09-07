@@ -1,0 +1,72 @@
+{
+  "dataset_id": "cn-ngdc-gwhdrir01000000",
+  "external_id": "GWHDRIR01000000",
+  "data_center_id": "reviewed-ngdc-catalog",
+  "data_center_name": "国家基因组科学数据中心 NGDC / CNCB",
+  "name": "西双版纳柑橘DYC002叶绿体组装",
+  "description": "NGDC Genome Warehouse公开发布的Citrus xishuangbannaensis S.H.Wang & F.S.Wang（DYC002 chloroplast complete genome）基因组序列，组装级别为Scaffold。导入叶绿体组装，不包含核基因组，也不是群体遗传或个人临床数据。 可用于序列统计、GC组成与片段长度探查。",
+  "domain": "sequence",
+  "data_type": "FASTA",
+  "tags": [
+    "sequence",
+    "国家基因组科学数据中心 NGDC / CNCB",
+    "公开数据"
+  ],
+  "metadata": {
+    "curated": true,
+    "catalog_version": 1,
+    "source_catalog": "ngdc",
+    "publisher": "国家基因组科学数据中心 NGDC / CNCB",
+    "source_url": "https://ngdc.cncb.ac.cn/gwh/Assembly/66231/show",
+    "license": "NGDC GWH academic-use terms",
+    "license_url": "https://ngdc.cncb.ac.cn/gwh/statistics/genome",
+    "license_details": "GWH官方页面声明数据库仅免费用于学术研究；商业使用需另询商业许可。未发现本记录单独CC许可，不标为CC0或CC BY。引用GWH/NGDC与accession，并在有论文时引用原研究。",
+    "sample_scope": "完整已发布的DYC002叶绿体FASTA；记录名称标complete genome，但官方组装级别为Scaffold，不能宣称无缺口完整染色体。不含核基因组。",
+    "sample_note": "完整已发布的DYC002叶绿体FASTA；记录名称标complete genome，但官方组装级别为Scaffold，不能宣称无缺口完整染色体。不含核基因组。",
+    "authors": [],
+    "doi": "",
+    "source_version": "",
+    "source_descriptor_sha256": "2fbcde5359eb6bcbc7726aa6ba1701526a44b00ebc217263a6d54ddfeab9f998",
+    "organism": "Citrus xishuangbannaensis S.H.Wang & F.S.Wang",
+    "assembly_level": "Scaffold",
+    "bioproject": "PRJCA009572",
+    "release_time": "2024-12-20 20:44:00.0",
+    "download_date": "2026-09-07",
+    "provenance": [
+      {
+        "path": "GWHDRIR01000000.genome.fasta.gz",
+        "size": 49058,
+        "sha256": "86beee1b1f55c1b5b579aa18e8deb2c71f4b8578c46c6a22ba7a935896ce0906",
+        "role": "data",
+        "content_type": "application/octet-stream",
+        "download_url": "https://download.cncb.ac.cn/gwh/Plants/Citrus_xishuangbannaensis_S.H.Wang_&_F.S.Wang_DYC002_chloroplast_complete_genome_GWHDRIR01000000/GWHDRIR01000000.genome.fasta.gz"
+      }
+    ],
+    "inventory_complete": true,
+    "recursive_file_count": 3,
+    "total_size_bytes": 212081
+  },
+  "files": [
+    {
+      "path": "GWHDRIR01000000.genome.fasta.gz",
+      "size": 49058,
+      "sha256": "86beee1b1f55c1b5b579aa18e8deb2c71f4b8578c46c6a22ba7a935896ce0906",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "SOURCE.md",
+      "size": 1444,
+      "sha256": "8cdbba4312d7fffc6b25186242173312002cf5ba33becc102f5cff74ffa441e2",
+      "role": "documentation",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/GWHDRIR01000000.genome.fasta",
+      "size": 161579,
+      "sha256": "c38bc9a111fe96e602f6f840637802735e3dbbb50f89ce1d0fdca12fa7790e68",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    }
+  ]
+}

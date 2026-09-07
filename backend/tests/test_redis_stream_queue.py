@@ -1,3 +1,5 @@
+import logging
+
 import pytest
 
 from app.infrastructure.external.message_queue.redis_stream_queue import RedisStreamQueue
@@ -10,6 +12,13 @@ class FakeRedisClient:
     async def xread(self, streams, count, block):
         self.calls.append((streams, count, block))
         return []
+
+
+class FakeWriteRedisClient:
+    async def xadd(self, stream_name, payload):
+        assert stream_name == "task:output:test"
+        assert "data" in payload
+        return "1710000000000-4"
 
 
 class FakeDeleteRedisClient:
@@ -44,6 +53,24 @@ async def test_get_preserves_valid_stream_id():
     await queue.get(start_id="1710000000000-3", block_ms=0)
 
     assert queue._redis.client.calls[0][0] == {"task:output:test": "1710000000000-3"}
+
+
+@pytest.mark.asyncio
+async def test_put_logs_only_payload_shape_not_raw_event(caplog):
+    queue = object.__new__(RedisStreamQueue)
+    queue._stream_name = "task:output:test"
+    queue._redis = type("RedisHolder", (), {"client": FakeWriteRedisClient()})()
+    payload = '{"message":"sk-private-value /Users/alice/private.csv"}'
+
+    with caplog.at_level(logging.DEBUG):
+        event_id = await queue.put(payload)
+
+    rendered = "\n".join(record.getMessage() for record in caplog.records)
+    assert event_id == "1710000000000-4"
+    assert "payload_type=str" in rendered
+    assert "payload_bytes=" in rendered
+    assert "sk-private-value" not in rendered
+    assert "/Users/alice/private.csv" not in rendered
 
 
 @pytest.mark.asyncio

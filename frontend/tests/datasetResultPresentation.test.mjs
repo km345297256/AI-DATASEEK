@@ -39,7 +39,15 @@ test('removes the English legacy notices and preserves unrelated limitations', (
 });
 
 test('recognizes only standalone assistant placeholder messages', () => {
-  for (const content of ['placeholder', 'TBD.', '待补充', '占位文本', '暂无结果']) {
+  for (const content of [
+    'placeholder',
+    'placeholder - do not send',
+    'placeholder_not_used',
+    'TBD.',
+    '待补充',
+    '占位文本',
+    '暂无结果',
+  ]) {
     assert.equal(isPlaceholderAssistantMessage(content), true);
   }
 

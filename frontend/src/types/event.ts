@@ -1,4 +1,26 @@
 import type { FileInfo } from '../api/file';
+import type { ToolPresentation } from './toolPresentation';
+import type { AnalysisJobView } from './analysisJob';
+import type { ToolApprovalView } from './toolApproval';
+
+export interface SpillArtifactRef {
+  schema_version: 1;
+  locator: string;
+  byte_count: number;
+  sha256: string;
+  media_type: string;
+  retrieval_hint: string;
+}
+
+export interface SpillArtifactNotice {
+  schema_version: 1;
+  status: 'stored' | 'unavailable';
+  reference?: SpillArtifactRef | null;
+  preview: string;
+  original_bytes: number;
+  retained_bytes: number;
+  omitted_bytes: number;
+}
 
 export type AgentSSEEvent = {
   event: 'tool' | 'step' | 'message' | 'error' | 'done' | 'title' | 'wait' | 'plan' | 'attachments';
@@ -6,7 +28,12 @@ export type AgentSSEEvent = {
 }
 
 export interface BaseEventData {
-  event_id: string;
+  /** Existing Redis stream cursor; kept for transport-level resume. */
+  event_id?: string | null;
+  /** Monotonic within one session. Missing on pre-versioning history. */
+  seq?: number | null;
+  /** Missing versions are interpreted as v1 for legacy history. */
+  version?: 1 | null;
   timestamp: number;
 }
 
@@ -17,6 +44,10 @@ export interface ToolEventData extends BaseEventData {
   function: string;
   args: {[key: string]: any};
   content?: any;
+  presentation?: ToolPresentation | null;
+  spill?: SpillArtifactNotice | null;
+  analysis_job?: AnalysisJobView | null;
+  tool_approval?: ToolApprovalView | null;
 }
 
 export interface StepEventData extends BaseEventData {

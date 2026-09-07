@@ -1,0 +1,72 @@
+{
+  "dataset_id": "cn-ngdc-gwhbpbn00000000",
+  "external_id": "GWHBPBN00000000",
+  "data_center_id": "reviewed-ngdc-catalog",
+  "data_center_name": "国家基因组科学数据中心 NGDC / CNCB",
+  "name": "粟酒裂殖酵母SP-LT18基因组组装",
+  "description": "NGDC Genome Warehouse公开发布的Schizosaccharomyces pombe（SP-LT18）基因组序列，组装级别为Scaffold。导入该独立菌株的全部已发布组装FASTA，不是原始测序reads，也不包含人类个人基因序列。 可用于序列统计、GC组成与片段长度探查。",
+  "domain": "sequence",
+  "data_type": "FASTA",
+  "tags": [
+    "sequence",
+    "国家基因组科学数据中心 NGDC / CNCB",
+    "公开数据"
+  ],
+  "metadata": {
+    "curated": true,
+    "catalog_version": 1,
+    "source_catalog": "ngdc",
+    "publisher": "国家基因组科学数据中心 NGDC / CNCB",
+    "source_url": "https://ngdc.cncb.ac.cn/gwh/Assembly/29521/show",
+    "license": "NGDC GWH academic-use terms",
+    "license_url": "https://ngdc.cncb.ac.cn/gwh/statistics/genome",
+    "license_details": "GWH官方页面声明数据库仅免费用于学术研究；商业使用需另询商业许可。未发现本记录单独CC许可，不标为CC0或CC BY。引用GWH/NGDC与accession，并在有论文时引用原研究。",
+    "sample_scope": "完整已发布的该菌株组装文件；库内为Scaffold草图，不宣称无缺口完整染色体",
+    "sample_note": "完整已发布的该菌株组装文件；库内为Scaffold草图，不宣称无缺口完整染色体",
+    "authors": [],
+    "doi": "",
+    "source_version": "",
+    "source_descriptor_sha256": "ea0a8cc9992f6617d96180c9022d5924360d80cef096db613d265ad65f5257a4",
+    "organism": "Schizosaccharomyces pombe",
+    "assembly_level": "Scaffold",
+    "bioproject": "PRJCA013520",
+    "release_time": "2023-01-30 00:00:00.0",
+    "download_date": "2026-09-07",
+    "provenance": [
+      {
+        "path": "GWHBPBN00000000.genome.fasta.gz",
+        "size": 3802038,
+        "sha256": "3aa658294d4c31c312f9433642aff076ac5270c353a98888b8863301a51848cf",
+        "role": "data",
+        "content_type": "application/octet-stream",
+        "download_url": "https://download.cncb.ac.cn/gwh/Fungi/Schizosaccharomyces_pombe_SP-LT18_GWHBPBN00000000/GWHBPBN00000000.genome.fasta.gz"
+      }
+    ],
+    "inventory_complete": true,
+    "recursive_file_count": 3,
+    "total_size_bytes": 16450602
+  },
+  "files": [
+    {
+      "path": "GWHBPBN00000000.genome.fasta.gz",
+      "size": 3802038,
+      "sha256": "3aa658294d4c31c312f9433642aff076ac5270c353a98888b8863301a51848cf",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "SOURCE.md",
+      "size": 1355,
+      "sha256": "24f3bf5668d6c53e707d2e946b8b47b5344ef467a29342e9b6b2ac1601d388b2",
+      "role": "documentation",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/GWHBPBN00000000.genome.fasta",
+      "size": 12647209,
+      "sha256": "e0498379a6c6ec837b760ba721a2e0c013eef3f4bfa3a56d7c851626950aa6da",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    }
+  ]
+}

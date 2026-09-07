@@ -65,6 +65,22 @@ class HybridFileStorage(FileStorage):
         storage = self._select_storage(file_id)
         return await storage.download_file(self._normalize_file_id(file_id), user_id)
 
+    async def download_file_range(
+        self,
+        file_id: str,
+        user_id: Optional[str],
+        *,
+        offset: int,
+        length: int,
+    ) -> Tuple[bytes, FileInfo]:
+        storage = self._select_storage(file_id)
+        return await storage.download_file_range(
+            self._normalize_file_id(file_id),
+            user_id,
+            offset=offset,
+            length=length,
+        )
+
     async def delete_file(self, file_id: str, user_id: str) -> bool:
         storage = self._select_storage(file_id)
         return await storage.delete_file(self._normalize_file_id(file_id), user_id)

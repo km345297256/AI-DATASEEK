@@ -244,6 +244,21 @@ def test_submission_schema_uses_one_normalized_storage_directory():
         )
 
 
+def test_submission_schema_accepts_the_three_field_local_form():
+    request = DatasetSubmissionRequest(
+        name=" Dataset ",
+        summary=" Summary ",
+        storage_directory=" /srv/datasets/example ",
+    )
+
+    assert request.name == "Dataset"
+    assert request.summary == "Summary"
+    assert request.storage_directory == "/srv/datasets/example"
+    assert request.external_id is None
+    assert request.keywords == []
+    assert request.token is None
+
+
 def test_submission_schema_accepts_only_http_ncview_urls():
     request = DatasetSubmissionRequest(
         external_id="external-1",

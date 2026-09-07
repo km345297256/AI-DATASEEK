@@ -49,12 +49,25 @@
         <div
           @click="handlePluginsClick"
           class="flex items-center rounded-[10px] cursor-pointer transition-colors w-full gap-[12px] h-11 sm:h-[36px] ps-[9px] pe-[2px]"
-          :class="route.path === '/chat/plugins' ? 'bg-[var(--fill-tsp-white-main)]' : 'hover:bg-[var(--fill-tsp-white-light)]'">
+          :class="route.path === '/plugins' || route.path === '/chat/plugins' ? 'bg-[var(--fill-tsp-white-main)]' : 'hover:bg-[var(--fill-tsp-white-light)]'">
           <div class="shrink-0 size-[18px] flex items-center justify-center">
             <Puzzle :size="18" class="text-[var(--text-primary)]" />
           </div>
           <div class="flex-1 min-w-0 flex gap-[4px] items-center text-[14px] text-[var(--text-primary)]">
             <span class="truncate">{{ t('Plugins') }}</span>
+          </div>
+        </div>
+
+        <!-- 数据集管理与探查入口 -->
+        <div
+          @click="handleDatasetChatClick"
+          class="flex items-center rounded-[10px] cursor-pointer transition-colors w-full gap-[12px] h-11 sm:h-[36px] ps-[9px] pe-[2px]"
+          :class="route.path.startsWith('/dataset') || route.path === '/chat/datasets' ? 'bg-[var(--fill-tsp-white-main)]' : 'hover:bg-[var(--fill-tsp-white-light)]'">
+          <div class="shrink-0 size-[18px] flex items-center justify-center">
+            <Database :size="18" class="text-[var(--text-primary)]" />
+          </div>
+          <div class="flex-1 min-w-0 flex gap-[4px] items-center text-[14px] text-[var(--text-primary)]">
+            <span class="truncate">{{ t('Dataset Management') }}</span>
           </div>
         </div>
 
@@ -156,8 +169,11 @@
         <button class="flex h-11 w-11 items-center justify-center rounded-lg hover:bg-[var(--fill-tsp-white-light)]" :class="route.path === '/' ? 'bg-[var(--fill-tsp-white-main)]' : ''" @click="handleNewTaskClick" :title="t('New Task')">
           <SquarePen :size="18" class="text-[var(--text-primary)]" />
         </button>
-        <button class="flex h-11 w-11 items-center justify-center rounded-lg hover:bg-[var(--fill-tsp-white-light)]" :class="route.path === '/chat/plugins' ? 'bg-[var(--fill-tsp-white-main)]' : ''" @click="handlePluginsClick" title="Plugins">
+        <button class="flex h-11 w-11 items-center justify-center rounded-lg hover:bg-[var(--fill-tsp-white-light)]" :class="route.path === '/plugins' || route.path === '/chat/plugins' ? 'bg-[var(--fill-tsp-white-main)]' : ''" @click="handlePluginsClick" title="Plugins">
           <Puzzle :size="18" class="text-[var(--text-primary)]" />
+        </button>
+        <button class="flex h-11 w-11 items-center justify-center rounded-lg hover:bg-[var(--fill-tsp-white-light)]" :class="route.path.startsWith('/dataset') || route.path === '/chat/datasets' ? 'bg-[var(--fill-tsp-white-main)]' : ''" @click="handleDatasetChatClick" :title="t('Dataset Management')">
+          <Database :size="18" class="text-[var(--text-primary)]" />
         </button>
         <button v-if="isAdmin" class="flex h-11 w-11 items-center justify-center rounded-lg hover:bg-[var(--fill-tsp-white-light)]" :class="route.path === '/chat/admin' ? 'bg-[var(--fill-tsp-white-main)]' : ''" @click="handleAdminClick" title="System Admin">
           <ShieldCheck :size="18" class="text-[var(--text-primary)]" />
@@ -188,7 +204,7 @@
 </template>
 
 <script setup lang="ts">
-import { PanelLeft, SquarePen, Command, MessageSquareDashed, ChevronUp, Puzzle, ShieldCheck } from 'lucide-vue-next';
+import { PanelLeft, SquarePen, Command, MessageSquareDashed, ChevronUp, Puzzle, ShieldCheck, Database } from 'lucide-vue-next';
 import SessionItem from './SessionItem.vue';
 import UserMenu from './UserMenu.vue';
 import { useLeftPanel } from '../composables/useLeftPanel';
@@ -270,7 +286,11 @@ const handleNewTaskClick = () => {
 }
 
 const handlePluginsClick = () => {
-  router.push('/chat/plugins')
+  router.push('/plugins')
+}
+
+const handleDatasetChatClick = () => {
+  router.push('/datasets')
 }
 
 const handleAdminClick = () => {

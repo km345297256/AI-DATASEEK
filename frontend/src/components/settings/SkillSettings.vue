@@ -181,7 +181,7 @@ const handleUpload = async (event: Event) => {
 
 const browseSkills = () => {
   closeSettingsDialog();
-  router.push({ path: '/chat/plugins', query: { tab: 'skills' } });
+  router.push({ path: '/plugins', query: { tab: 'skills' } });
 };
 
 onMounted(load);

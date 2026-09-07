@@ -1,6 +1,20 @@
 import logging
 from functools import lru_cache
+from pathlib import Path
+
+from app.core.config import get_settings
+from app.domain.external.plugin_runtime import PluginRuntime
 from app.infrastructure.external.file.factory import get_file_storage
+from app.infrastructure.external.file.spill_factory import get_spill_artifact_store
+from app.infrastructure.external.analysis_job_factory import get_analysis_job_service
+from app.infrastructure.external.tool_approval_factory import get_tool_approval_service
+from app.infrastructure.external.credential_factory import get_credential_service
+from app.infrastructure.external.plugins import (
+    NodePluginRuntime,
+    default_execution_contract_directory,
+    default_plugin_host_path,
+    default_tool_plugins_directory,
+)
 from app.infrastructure.external.search import get_search_engine
 from app.domain.models.user import User, UserRole
 
@@ -28,6 +42,40 @@ from app.infrastructure.repositories.agent_profile_repository import MongoAgentP
 
 # Configure logging
 logger = logging.getLogger(__name__)
+
+
+@lru_cache()
+def get_plugin_runtime() -> PluginRuntime | None:
+    """Return the process-wide Cordis supervisor, or None for explicit rollback."""
+    settings = get_settings()
+    if not settings.plugin_runtime_enabled:
+        return None
+
+    host_path = (
+        Path(settings.plugin_runtime_host_path)
+        if settings.plugin_runtime_host_path.strip()
+        else default_plugin_host_path()
+    )
+    tools_dir = (
+        Path(settings.plugin_runtime_tools_dir)
+        if settings.plugin_runtime_tools_dir.strip()
+        else default_tool_plugins_directory()
+    )
+    execution_contract_dir = (
+        Path(settings.plugin_runtime_execution_contract_dir)
+        if settings.plugin_runtime_execution_contract_dir.strip()
+        else default_execution_contract_directory()
+    )
+    return NodePluginRuntime(
+        host_path=host_path,
+        tools_dir=tools_dir,
+        execution_contract_dir=execution_contract_dir,
+        node_executable=settings.plugin_runtime_node_executable,
+        request_timeout_seconds=settings.plugin_runtime_request_timeout_seconds,
+        startup_timeout_seconds=settings.plugin_runtime_startup_timeout_seconds,
+        shutdown_timeout_seconds=settings.plugin_runtime_shutdown_timeout_seconds,
+        max_response_frame_bytes=settings.plugin_runtime_max_response_frame_bytes,
+    )
 
 @lru_cache()
 def get_agent_service() -> AgentService:
@@ -57,6 +105,11 @@ def get_agent_service() -> AgentService:
         file_storage=file_storage,
         search_engine=search_engine,
         mcp_repository=mcp_repository,
+        plugin_runtime=get_plugin_runtime(),
+        spill_artifact_store=get_spill_artifact_store(),
+        analysis_job_service=get_analysis_job_service(),
+        tool_approval_service=get_tool_approval_service(),
+        credential_service=get_credential_service(),
     )
 
 

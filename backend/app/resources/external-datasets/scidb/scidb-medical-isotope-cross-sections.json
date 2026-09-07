@@ -1,0 +1,262 @@
+{
+  "dataset_id": "scidb-medical-isotope-cross-sections",
+  "external_id": "79656e6850d442daa7dae2e984f8d47f",
+  "data_center_id": "reviewed-scidb-catalog",
+  "data_center_name": "ScienceDB 科学数据银行",
+  "name": "医用同位素核反应截面实验数据",
+  "description": "40—80 MeV区间医用放射性同位素反应截面的公开实验及比较数据，含能量、截面与不确定度，适合误差棒绘图和实验—理论比较。",
+  "domain": "tabular",
+  "data_type": "csv",
+  "tags": [
+    "tabular",
+    "ScienceDB 科学数据银行",
+    "公开数据"
+  ],
+  "metadata": {
+    "curated": true,
+    "catalog_version": 1,
+    "source_catalog": "scidb",
+    "publisher": "ScienceDB 科学数据银行",
+    "source_url": "https://www.scidb.cn/en/detail?dataSetId=79656e6850d442daa7dae2e984f8d47f",
+    "license": "CC BY 4.0",
+    "license_url": "https://creativecommons.org/licenses/by/4.0/",
+    "license_details": "Creative Commons Attribution 4.0；须署名、链接许可并说明修改。",
+    "sample_scope": "完整 V1 的13个 CSV 表格；仅做已公开科研数据分析，不涉及生产工艺或设施操作。",
+    "sample_note": "完整 V1 的13个 CSV 表格；仅做已公开科研数据分析，不涉及生产工艺或设施操作。",
+    "download_date": "2026-09-07",
+    "provenance": [
+      {
+        "path": "数据包/p+232Th产生106Ru反应截面.csv",
+        "size": 935,
+        "sha256": "a9a5291ebb541d1b842bc7e2626e502dc6fed598e6f84bc0f961212bab926153",
+        "role": "data",
+        "content_type": "text/csv",
+        "download_url": "https://china.scidb.cn/download?fileId=ebc022788f7c1a094604ba7359008128",
+        "publisher_md5": "aea658b6045b3ca87bb36f144910fba5"
+      },
+      {
+        "path": "数据包/p+232Th产生111Ag反应截面.csv",
+        "size": 1182,
+        "sha256": "a6cce9515db41b0699af2e3f55c82a0d22a4581fcf01bc41bcebeafc0c700089",
+        "role": "data",
+        "content_type": "text/csv",
+        "download_url": "https://china.scidb.cn/download?fileId=72bc23ae02326c4ec1b30cf312aadafc",
+        "publisher_md5": "0129fad69bbe5b0d0b10f00940c052ab"
+      },
+      {
+        "path": "数据包/p+232Th产生124Sb反应截面.csv",
+        "size": 1346,
+        "sha256": "8ed6895a1d2f292f1e23805e67ca21779f6e4d9b594a42b33ef5c7956787eb04",
+        "role": "data",
+        "content_type": "text/csv",
+        "download_url": "https://china.scidb.cn/download?fileId=397d06d4a78f62bb328471cd92ce1d66",
+        "publisher_md5": "e303cf56f531ec0c9976810a7da54b64"
+      },
+      {
+        "path": "数据包/p+232Th产生131I反应截面.csv",
+        "size": 1555,
+        "sha256": "b16c4e5b986bfc9bb1256e65adb1237cf2f4bfa27dfa2275cbee2763c8843f25",
+        "role": "data",
+        "content_type": "text/csv",
+        "download_url": "https://china.scidb.cn/download?fileId=197f969d36aa77066b6880dac975053e",
+        "publisher_md5": "ff6d5af1d983e2daa21a5e9499847e4f"
+      },
+      {
+        "path": "数据包/p+232Th产生140Ba反应截面.csv",
+        "size": 1538,
+        "sha256": "1b1e356a2f2e9317ac0b19a48415e06d5f3f9e1e1ae0e821a0678ec6604ae261",
+        "role": "data",
+        "content_type": "text/csv",
+        "download_url": "https://china.scidb.cn/download?fileId=b8eb4806fb4a5262297dddd159154b2c",
+        "publisher_md5": "f5e8f6d5734520d52192aaebce0fc40c"
+      },
+      {
+        "path": "数据包/p+232Th产生153Sm反应截面.csv",
+        "size": 701,
+        "sha256": "1609c91ad013ba499dfea48ba22283dc3415d00d7449d3c966497b112b43497d",
+        "role": "data",
+        "content_type": "text/csv",
+        "download_url": "https://china.scidb.cn/download?fileId=d00fda39ecae533a11660db9d5b90ed6",
+        "publisher_md5": "57fb73f7072ceff4379c0d8940c2b4c5"
+      },
+      {
+        "path": "数据包/p+232Th产生223Ra反应截面.csv",
+        "size": 2691,
+        "sha256": "e7876d922888fa1f8f68daa44cab1739d7368b685e638e3c47fccd8c64e3cb4d",
+        "role": "data",
+        "content_type": "text/csv",
+        "download_url": "https://china.scidb.cn/download?fileId=f6656128d8def5fa96495a587f6f7894",
+        "publisher_md5": "20392895ddb9e1a39ae7b2601339b5bc"
+      },
+      {
+        "path": "数据包/p+232Th产生225Ra反应截面.csv",
+        "size": 13950,
+        "sha256": "51adfef65cc892bbbe2c2a67f43aa1b011c8bfdc73846acba708275ea92a1b99",
+        "role": "data",
+        "content_type": "text/csv",
+        "download_url": "https://china.scidb.cn/download?fileId=cb2bf8ab6e7d4413b605b1aa38e98d2c",
+        "publisher_md5": "4977bb2e6a2eed2599848b582bbe26ea"
+      },
+      {
+        "path": "数据包/p+232Th产生226Ac反应截面.csv",
+        "size": 2642,
+        "sha256": "a71c04755cb62b7ebdae3dc5617ed843a6c49477c2389bfc602efb1ff6178faf",
+        "role": "data",
+        "content_type": "text/csv",
+        "download_url": "https://china.scidb.cn/download?fileId=f4277830149828d2a3bd97915ad6ae70",
+        "publisher_md5": "4dfe81017d3bef18a668307366992a7b"
+      },
+      {
+        "path": "数据包/p+232Th产生230Pa反应截面.csv",
+        "size": 6077,
+        "sha256": "26f67460e371a47c39568972d5ab15a2f2ecee731dca60827c8ba3d7c8b9aff9",
+        "role": "data",
+        "content_type": "text/csv",
+        "download_url": "https://china.scidb.cn/download?fileId=5f9c1aada924675102608c82145ef34c",
+        "publisher_md5": "52dfeb23b0488bde4af49ef2587fbbdc"
+      },
+      {
+        "path": "数据包/p+232Th产生88Y反应截面.csv",
+        "size": 780,
+        "sha256": "0a7fa69c2ad6c4895e1735f712cc9388c4b0890e8acfe71db36060408720449d",
+        "role": "data",
+        "content_type": "text/csv",
+        "download_url": "https://china.scidb.cn/download?fileId=9e9f82e47bf2510215ee11201e0d12c9",
+        "publisher_md5": "b96be5d6fb389537605747bb928e899d"
+      },
+      {
+        "path": "数据包/p+232Th产生99Mo反应截面.csv",
+        "size": 1569,
+        "sha256": "0350edd3170fd63ef41d268263ef737cc90a97e603ba5acf8afdf95131b018a0",
+        "role": "data",
+        "content_type": "text/csv",
+        "download_url": "https://china.scidb.cn/download?fileId=9cb0655231139d1453eef49ac8d7387f",
+        "publisher_md5": "e13bbf95be03ac3f0241454afbb550dc"
+      },
+      {
+        "path": "数据包/医用放射性核素及用于核素测定的主要特征γ 射线.csv",
+        "size": 518,
+        "sha256": "4e794264145247bc02f5796507bb5193c0800927a203560dcebc4c5c8c5fd996",
+        "role": "data",
+        "content_type": "text/csv",
+        "download_url": "https://china.scidb.cn/download?fileId=e4df3f611b3bd494d52f17b0c3aab66a",
+        "publisher_md5": "9290fd5001c4117453476aab189e0e78"
+      }
+    ],
+    "inventory_complete": true,
+    "recursive_file_count": 14,
+    "total_size_bytes": 36624,
+    "source_version": "V1",
+    "doi": "https://doi.org/10.57760/sciencedb.j00213.0008d",
+    "authors": [
+      "Jiang Bing",
+      "Liu Yuchen",
+      "Wu Fan",
+      "Hu Shengwei",
+      "Jiang Wei",
+      "Luo Wen",
+      "Jinghantao"
+    ],
+    "source_descriptor_sha256": "9870bf52a55cf90c8fc139871ce7fce0944176ea683862bd68c6d7c77e47431d"
+  },
+  "files": [
+    {
+      "path": "SOURCE.md",
+      "size": 1140,
+      "sha256": "3cc59fca57cfe0e04d17e2f538ba06e73c2bcd0b8cb55ebbd4c54a14f7c1e77a",
+      "role": "documentation",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "数据包/p+232Th产生106Ru反应截面.csv",
+      "size": 935,
+      "sha256": "a9a5291ebb541d1b842bc7e2626e502dc6fed598e6f84bc0f961212bab926153",
+      "role": "data",
+      "content_type": "text/csv"
+    },
+    {
+      "path": "数据包/p+232Th产生111Ag反应截面.csv",
+      "size": 1182,
+      "sha256": "a6cce9515db41b0699af2e3f55c82a0d22a4581fcf01bc41bcebeafc0c700089",
+      "role": "data",
+      "content_type": "text/csv"
+    },
+    {
+      "path": "数据包/p+232Th产生124Sb反应截面.csv",
+      "size": 1346,
+      "sha256": "8ed6895a1d2f292f1e23805e67ca21779f6e4d9b594a42b33ef5c7956787eb04",
+      "role": "data",
+      "content_type": "text/csv"
+    },
+    {
+      "path": "数据包/p+232Th产生131I反应截面.csv",
+      "size": 1555,
+      "sha256": "b16c4e5b986bfc9bb1256e65adb1237cf2f4bfa27dfa2275cbee2763c8843f25",
+      "role": "data",
+      "content_type": "text/csv"
+    },
+    {
+      "path": "数据包/p+232Th产生140Ba反应截面.csv",
+      "size": 1538,
+      "sha256": "1b1e356a2f2e9317ac0b19a48415e06d5f3f9e1e1ae0e821a0678ec6604ae261",
+      "role": "data",
+      "content_type": "text/csv"
+    },
+    {
+      "path": "数据包/p+232Th产生153Sm反应截面.csv",
+      "size": 701,
+      "sha256": "1609c91ad013ba499dfea48ba22283dc3415d00d7449d3c966497b112b43497d",
+      "role": "data",
+      "content_type": "text/csv"
+    },
+    {
+      "path": "数据包/p+232Th产生223Ra反应截面.csv",
+      "size": 2691,
+      "sha256": "e7876d922888fa1f8f68daa44cab1739d7368b685e638e3c47fccd8c64e3cb4d",
+      "role": "data",
+      "content_type": "text/csv"
+    },
+    {
+      "path": "数据包/p+232Th产生225Ra反应截面.csv",
+      "size": 13950,
+      "sha256": "51adfef65cc892bbbe2c2a67f43aa1b011c8bfdc73846acba708275ea92a1b99",
+      "role": "data",
+      "content_type": "text/csv"
+    },
+    {
+      "path": "数据包/p+232Th产生226Ac反应截面.csv",
+      "size": 2642,
+      "sha256": "a71c04755cb62b7ebdae3dc5617ed843a6c49477c2389bfc602efb1ff6178faf",
+      "role": "data",
+      "content_type": "text/csv"
+    },
+    {
+      "path": "数据包/p+232Th产生230Pa反应截面.csv",
+      "size": 6077,
+      "sha256": "26f67460e371a47c39568972d5ab15a2f2ecee731dca60827c8ba3d7c8b9aff9",
+      "role": "data",
+      "content_type": "text/csv"
+    },
+    {
+      "path": "数据包/p+232Th产生88Y反应截面.csv",
+      "size": 780,
+      "sha256": "0a7fa69c2ad6c4895e1735f712cc9388c4b0890e8acfe71db36060408720449d",
+      "role": "data",
+      "content_type": "text/csv"
+    },
+    {
+      "path": "数据包/p+232Th产生99Mo反应截面.csv",
+      "size": 1569,
+      "sha256": "0350edd3170fd63ef41d268263ef737cc90a97e603ba5acf8afdf95131b018a0",
+      "role": "data",
+      "content_type": "text/csv"
+    },
+    {
+      "path": "数据包/医用放射性核素及用于核素测定的主要特征γ 射线.csv",
+      "size": 518,
+      "sha256": "4e794264145247bc02f5796507bb5193c0800927a203560dcebc4c5c8c5fd996",
+      "role": "data",
+      "content_type": "text/csv"
+    }
+  ]
+}

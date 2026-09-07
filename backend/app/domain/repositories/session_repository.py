@@ -3,6 +3,7 @@ from datetime import datetime
 from app.domain.models.session import Session, SessionStatus, SessionSummary
 from app.domain.models.file import FileInfo
 from app.domain.models.event import BaseEvent, AgentEvent
+from app.domain.models.execution_environment import ExecutionEnvironmentSnapshot
 
 class SessionRepository(Protocol):
     """Repository interface for Session aggregate"""
@@ -59,6 +60,14 @@ class SessionRepository(Protocol):
         """Add an event to a session"""
         ...
 
+    async def reserve_event_sequence(self, session_id: str, event: BaseEvent) -> int:
+        """Persist and return an immutable producer/payload sequence reservation."""
+        ...
+
+    async def get_events_after(self, session_id: str, seq: int) -> List[AgentEvent]:
+        """Get persisted events whose sequence is greater than ``seq``."""
+        ...
+
     async def claim_client_message_id(self, session_id: str, client_message_id: str) -> bool:
         """Atomically claim a client message ID; return false when already claimed."""
         ...
@@ -69,6 +78,20 @@ class SessionRepository(Protocol):
 
     async def get_events(self, session_id: str) -> List[AgentEvent]:
         """Get all events for a session"""
+        ...
+
+    async def add_execution_snapshot(
+        self,
+        snapshot: ExecutionEnvironmentSnapshot,
+    ) -> None:
+        """Persist an immutable, idempotent per-task execution snapshot."""
+        ...
+
+    async def get_execution_snapshots(
+        self,
+        session_id: str,
+    ) -> List[ExecutionEnvironmentSnapshot]:
+        """Return task environments; sessions created before v1 return an empty list."""
         ...
 
     async def add_file(self, session_id: str, file_info: FileInfo) -> None:

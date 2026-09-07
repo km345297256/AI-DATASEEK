@@ -1,3 +1,4 @@
+import asyncio
 import json
 from types import SimpleNamespace
 
@@ -376,3 +377,26 @@ async def test_model_failure_returns_fresh_fallback_without_caching(monkeypatch)
     assert len(second) == 4
     assert model.calls == 2
     assert await cache.size() == 0
+
+
+@pytest.mark.asyncio
+async def test_hanging_model_uses_fallback_before_browser_request_timeout(monkeypatch):
+    class HangingModel:
+        calls = 0
+
+        async def ainvoke(self, _messages):
+            self.calls += 1
+            await asyncio.Event().wait()
+
+    model = HangingModel()
+    settings = SimpleNamespace(dataset_suggested_question_timeout_seconds=0.01)
+    monkeypatch.setattr(service_module, "get_settings", lambda: settings)
+    monkeypatch.setattr(service_module, "create_chat_model", lambda _settings: model)
+
+    questions = await asyncio.wait_for(
+        make_service().generate(make_dataset()),
+        timeout=0.5,
+    )
+
+    assert questions == list(FALLBACK_SUGGESTED_QUESTIONS)
+    assert model.calls == 1

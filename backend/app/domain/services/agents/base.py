@@ -26,11 +26,46 @@ from app.core.config import get_settings
 from app.infrastructure.external.llm import create_chat_model
 from langchain.messages import AIMessage, HumanMessage, ToolCall, ToolMessage, SystemMessage
 from app.domain.services.tools.base import Tool
+from app.domain.services.tools.pipeline import opaque_log_identifier, summarize_argument_keys
+from app.domain.services.tools.spill import SPILL_READ_TOOL_NAME
+from app.domain.services.tools.spill_projection import (
+    SPILL_DURABLE_CONTENT_KEY,
+    durable_spill_memory_message,
+    durable_spill_read_projection,
+    durable_spill_result_projection,
+    projected_tool_artifact,
+    spill_notice_from_result,
+)
+from app.domain.services.tools.registry import ToolRegistry
+from app.domain.utils.public_error import public_error_message
 from app.domain.utils.robust_json_parser import RobustJsonParser, ToolCallParseError, parse_json_lenient
 from app.domain.services.token_usage_service import TokenUsageService
+from app.domain.services.execution_identity import private_identity_hmac
+from app.domain.services.model_runtime import (
+    USAGE_RECORDED_KEY, flush_memory_changes, memory_checkpoint, model_call_role,
+    note_memory_change,
+)
 
 
 logger = logging.getLogger(__name__)
+
+NON_SUBSTANTIVE_MESSAGE_PATTERN = re.compile(
+    r"^(?:placeholder|tbd|todo|n/?a|待补充|占位(?:符|文本)?|暂无(?:内容|结果)?)"
+    r"(?:\s*[-_:—–]*\s*(?:"
+    r"do[-_ ]+not[-_ ]+(?:send|use|display)|"
+    r"not[-_ ]+(?:used|for[-_ ]+(?:sending|display))|"
+    r"ignore(?:[-_ ]+this)?|不要发送|请勿发送|无需发送"
+    r"))?[.!。]?$",
+    re.IGNORECASE,
+)
+
+
+def is_non_substantive_message_text(value: Any) -> bool:
+    """Recognize only blank or standalone internal placeholder messages."""
+    if not isinstance(value, str):
+        return True
+    text = value.strip()
+    return not text or bool(NON_SUBSTANTIVE_MESSAGE_PATTERN.fullmatch(text))
 
 
 class LLMServiceUnavailableError(RuntimeError):
@@ -128,6 +163,10 @@ class BaseAgent(ABC):
         dynamic_user_context_provider: Optional[Callable[[], str]] = None,
     ):
         settings = get_settings()
+        # Provenance records hash only this repository-owned prompt. A custom
+        # prompt override may contain private user data or credentials, so its
+        # contents (and any digest derived from them) never enter a snapshot.
+        builtin_system_prompt = str(self.system_prompt)
         self._agent_id = agent_id
         self._repository = agent_repository
         self._model_provider = settings.model_provider
@@ -173,6 +212,11 @@ class BaseAgent(ABC):
                         min(requested_iterations, self.MAX_CONFIGURED_ITERATIONS),
                     )
         system_prompt_override = llm_overrides.get('system_prompt')
+        custom_prompt_hmac = (
+            private_identity_hmac({"custom_system_prompt": system_prompt_override})
+            if system_prompt_override
+            else None
+        )
         if system_prompt_override:
             self.system_prompt = self.system_prompt + "\n\n" + system_prompt_override
         llm_kwargs = {
@@ -186,12 +230,37 @@ class BaseAgent(ABC):
         self._model = create_chat_model(settings, overrides=llm_kwargs)
         self._model_provider = llm_kwargs.get("model_provider") or self._model_provider
         self._model_name = llm_kwargs.get("model_name") or self._model_name
+        self._execution_builtin_system_prompt = builtin_system_prompt
+        self._execution_model_configuration = {
+            "temperature": (
+                llm_kwargs.get("temperature")
+                if llm_kwargs.get("temperature") is not None
+                else getattr(settings, "temperature", None)
+            ),
+            "max_tokens": (
+                llm_kwargs.get("max_tokens")
+                if llm_kwargs.get("max_tokens") is not None
+                else getattr(settings, "max_tokens", None)
+            ),
+            "max_iterations": self.max_iterations,
+            "has_custom_system_prompt": bool(system_prompt_override),
+            "custom_prompt_hmac_sha256": custom_prompt_hmac,
+            "model_runtime": {
+                "driver_version": "langchain-driver/v1",
+                "estimator_version": "utf8_bytes_div3_v1",
+                "context_capacity_tokens": getattr(settings, "model_context_capacity_tokens", 131_072),
+                "context_safety_tokens": getattr(settings, "model_context_safety_tokens", 2048),
+                "task_token_budget": getattr(settings, "model_task_token_budget", 1_000_000),
+                "task_call_budget": getattr(settings, "model_task_call_budget", 128),
+            },
+        }
         self._json_output_parser = RetryWithErrorOutputParser.from_llm(
             parser=JsonOutputParser(),
             llm=self._model,
             max_retries=self.max_retries,
         )
         self.toolkits = tools
+        self._tool_registry = ToolRegistry(tools)
         self.memory = None
         self.dynamic_system_prompt_provider = dynamic_system_prompt_provider
         self.dynamic_user_context_provider = dynamic_user_context_provider
@@ -214,7 +283,8 @@ class BaseAgent(ABC):
         except Exception:
             logger.warning("Local JSON parsing failed, falling back to LLM repair parser")
         prompt_value = self._JSON_PARSE_PROMPT.format_prompt(input=text)
-        repaired = await self._json_output_parser.aparse_with_prompt(text, prompt_value)
+        with model_call_role("json_repair"):
+            repaired = await self._json_output_parser.aparse_with_prompt(text, prompt_value)
         if not isinstance(repaired, dict):
             raise ValueError(
                 "JSON repair did not return the required response object"
@@ -236,6 +306,7 @@ class BaseAgent(ABC):
         tool_name: str,
     ) -> ToolMessage:
         """Keep model context bounded and avoid persisting raw tool artifacts in memory."""
+        checkpoint = memory_checkpoint([tool_result])
         content = self._message_content_to_text(tool_result.content)
         encoded = content.encode("utf-8")
         content_limit = self.TOOL_MESSAGE_CONTENT_LIMITS.get(
@@ -266,7 +337,24 @@ class BaseAgent(ABC):
                 tool_name,
                 len(encoded),
             )
-        return ToolMessage(tool_call_id=tool_call_id, name=tool_name, content=content)
+        durable_result = None
+        if tool_name == SPILL_READ_TOOL_NAME:
+            durable_result = durable_spill_read_projection(tool_result)
+        elif spill_notice_from_result(tool_result) is not None:
+            durable_result = durable_spill_result_projection(tool_result)
+        metadata = {}
+        if durable_result is not None:
+            metadata[SPILL_DURABLE_CONTENT_KEY] = (
+                durable_result.model_dump_json()
+                if hasattr(durable_result, "model_dump_json")
+                else json.dumps(durable_result, ensure_ascii=False)
+            )
+        bounded_message = ToolMessage(
+            tool_call_id=tool_call_id, name=tool_name, content=content,
+            additional_kwargs=metadata,
+        )
+        note_memory_change(checkpoint, [bounded_message], "tool_result_limit")
+        return bounded_message
 
     @staticmethod
     def _tool_result_succeeded(tool_result: ToolMessage) -> bool:
@@ -293,6 +381,7 @@ class BaseAgent(ABC):
         """
         if not self._tool_result_succeeded(tool_result):
             return
+        checkpoint = memory_checkpoint([AIMessage(content="", tool_calls=[tool_call])])
         args = tool_call.get("args")
         if not isinstance(args, dict):
             return
@@ -337,18 +426,24 @@ class BaseAgent(ABC):
 
         if changed:
             tool_call["args"] = compacted_args
+            note_memory_change(checkpoint, [AIMessage(content="", tool_calls=[tool_call])], "tool_arguments_compact")
     
     def get_tool(self, name: str) -> Optional[Tool]:
         """Get specified tool"""
-        for toolkit in self.toolkits:
-            tool = toolkit.get_tool(name)
-            if tool:
-                return tool
-        return None
+        return self._active_tool_registry().get_tool(name)
 
     def get_tools(self) -> List[Tool]:
         """Get all available tools list"""
-        return [tool for toolkit in self.toolkits for tool in toolkit.get_tools()]
+        return self._active_tool_registry().get_tools()
+
+    def _active_tool_registry(self) -> ToolRegistry:
+        """Return a live registry, including for light-weight test Agents."""
+        toolkits = getattr(self, "toolkits", [])
+        registry = getattr(self, "_tool_registry", None)
+        if registry is None or not registry.matches(toolkits):
+            registry = ToolRegistry(toolkits)
+            self._tool_registry = registry
+        return registry
 
     def _completion_from_tool_batch(
         self,
@@ -432,16 +527,39 @@ class BaseAgent(ABC):
             try:
                 return await tool.ainvoke(tool_call)
             except Exception as e:
-                last_error = str(e)
+                last_error = public_error_message(e)
                 retries += 1
+                if getattr(e, "retryable", True) is False:
+                    logger.warning(
+                        "Tool execution rejected non-retryable failure tool=%s call_id=%s error_type=%s",
+                        tool_call.get("name") or getattr(tool, "name", ""),
+                        opaque_log_identifier(tool_call.get("id", ""), namespace="call"),
+                        type(e).__name__,
+                    )
+                    break
                 if retries <= self.max_retries:
                     await asyncio.sleep(self.retry_interval)
                 else:
-                    logger.exception(f"Tool execution failed, {tool_call['name']}, {tool_call['args']}")
+                    logger.error(
+                        "Tool execution failed tool=%s call_id=%s argument_keys=%s",
+                        tool_call.get("name") or getattr(tool, "name", ""),
+                        opaque_log_identifier(tool_call.get("id", ""), namespace="call"),
+                        summarize_argument_keys(tool_call.get("args")),
+                    )
                     break
 
         return ToolMessage(tool_call_id=tool_call["id"], name=tool.name, content=last_error)
-    
+
+    @staticmethod
+    def _tool_presentation(tool: Any) -> Optional[dict[str, Any]]:
+        """Copy a resolved tool's static card descriptor into its event pair."""
+        presentation = getattr(tool, "presentation", None)
+        if hasattr(presentation, "model_dump"):
+            presentation = presentation.model_dump(exclude_none=True)
+        if not isinstance(presentation, dict):
+            return None
+        return dict(presentation)
+
     async def execute(
         self,
         request: str,
@@ -490,6 +608,34 @@ class BaseAgent(ABC):
                     tool_call["name"] = resolved_function_name
                 tool_call_id = tool_call["id"] = tool_call["id"] or str(uuid.uuid4())
                 function_args = tool_call["args"]
+
+                if function_name == "message_ask_user":
+                    question_text = (
+                        function_args.get("text")
+                        if isinstance(function_args, dict)
+                        else None
+                    )
+                    if is_non_substantive_message_text(question_text):
+                        logger.warning(
+                            "Agent %s suppressed a non-substantive message_ask_user call %s",
+                            self.name,
+                            tool_call_id,
+                        )
+                        tool_responses.append(ToolMessage(
+                            tool_call_id=tool_call_id,
+                            name=function_name,
+                            content=json.dumps({
+                                "success": False,
+                                "error": "invalid_user_question",
+                                "message": (
+                                    "The question was not sent because it was blank or placeholder text. "
+                                    "Continue with the evidence already available and return the required "
+                                    "final response. Only call message_ask_user with a substantive question "
+                                    "when execution is genuinely blocked."
+                                ),
+                            }),
+                        ))
+                        continue
                 
                 tool = self.get_tool(function_name)
                 if not tool:
@@ -507,13 +653,27 @@ class BaseAgent(ABC):
                     )
                     continue
 
+                tool_presentation = self._tool_presentation(tool)
+                display_args = function_args
+                if function_name == "code_mode_run":
+                    source = function_args.get("code", "") if isinstance(function_args, dict) else ""
+                    source = source if isinstance(source, str) else ""
+                    # Code may embed dataset values. Existing SSE records only
+                    # a size and keyed identity, never an entire source program.
+                    display_args = {
+                        "mode": "restricted_code_mode",
+                        "source_bytes": len(source.encode("utf-8", errors="replace")),
+                        "source_hmac": private_identity_hmac({"purpose": "code-mode-source/v1", "source": source}),
+                    }
+
                 # Generate event before tool call
                 yield ToolEvent(
                     status=ToolStatus.CALLING,
                     tool_call_id=tool_call_id,
                     tool_name=tool.toolkit.name,
                     function_name=function_name,
-                    function_args=function_args
+                    function_args=display_args,
+                    presentation=tool_presentation,
                 )
 
                 blocked_reason = self._blocked_runtime_install_reason(tool_call)
@@ -533,8 +693,9 @@ class BaseAgent(ABC):
                         tool_call_id=tool_call_id,
                         tool_name=tool.toolkit.name,
                         function_name=function_name,
-                        function_args=function_args,
+                        function_args=display_args,
                         function_result=blocked_result,
+                        presentation=tool_presentation,
                     )
                     tool_responses.append(
                         ToolMessage(
@@ -570,8 +731,9 @@ class BaseAgent(ABC):
                     tool_call_id=tool_call_id,
                     tool_name=tool.toolkit.name,
                     function_name=function_name,
-                    function_args=function_args,
-                    function_result=tool_result.artifact
+                    function_args=display_args,
+                    function_result=projected_tool_artifact(tool_result),
+                    presentation=tool_presentation,
                 )
 
                 self._compact_tool_call_arguments(tool_call, tool_result)
@@ -620,8 +782,8 @@ class BaseAgent(ABC):
                     tool_responses,
                 )
                 try:
-                    message = await asyncio.wait_for(
-                        self.ask_with_messages(
+                    async with asyncio.timeout(self.TOOL_FREE_COMPLETION_TIMEOUT_SECONDS):
+                        message = await self.ask_with_messages(
                             [
                                 *completion_tool_responses,
                                 HumanMessage(content=tool_free_instruction),
@@ -629,9 +791,7 @@ class BaseAgent(ABC):
                             format,
                             allow_tools=False,
                             max_tokens=self.TOOL_FREE_COMPLETION_MAX_TOKENS,
-                        ),
-                        timeout=self.TOOL_FREE_COMPLETION_TIMEOUT_SECONDS,
-                    )
+                        )
                 except asyncio.TimeoutError:
                     failure_reason = "finalization_timeout"
                     logger.warning(
@@ -694,14 +854,12 @@ class BaseAgent(ABC):
                     "new plan."
                 ))
                 try:
-                    message = await asyncio.wait_for(
-                        self.ask_with_messages(
+                    async with asyncio.timeout(self.FINALIZATION_TIMEOUT_SECONDS):
+                        message = await self.ask_with_messages(
                             [*tool_responses, final_instruction],
                             format,
                             allow_tools=False,
-                        ),
-                        timeout=self.FINALIZATION_TIMEOUT_SECONDS,
-                    )
+                        )
                 except asyncio.TimeoutError:
                     logger.warning(
                         "Agent %s no-tool finalization exceeded %.1fs at budget %d",
@@ -758,6 +916,27 @@ class BaseAgent(ABC):
     async def _ensure_memory(self):
         if not self.memory:
             self.memory = await self._repository.get_memory(self._agent_id, self.name)
+
+    def _uses_model_driver(self) -> bool:
+        return getattr(getattr(self, "_model", None), "_llm_type", None) == "dataseek-model-driver"
+
+    async def _persist_memory(self) -> None:
+        checkpoint = memory_checkpoint(self.memory.messages)
+        messages = [durable_spill_memory_message(item) for item in self.memory.messages]
+        durable = self.memory
+        if any(safe is not raw for safe, raw in zip(messages, self.memory.messages)):
+            durable = self.memory.model_copy(update={"messages": messages})
+            note_memory_change(checkpoint, messages, "durable_projection")
+        if self._uses_model_driver():
+            # Persistence and provider input have different limits. In
+            # particular a current image must never turn into truncated JSON
+            # text merely because its base64 exceeds the Mongo memory bound.
+            checkpoint = memory_checkpoint(messages)
+            durable = self.memory.model_copy(update={"messages": messages}, deep=True)
+            durable.bound(self.MAX_MEMORY_BYTES, self.MAX_TOOL_MESSAGE_CONTENT_BYTES)
+            note_memory_change(checkpoint, durable.messages, "storage_bound")
+        await flush_memory_changes()
+        await self._repository.save_memory(self._agent_id, self.name, durable)
     
     async def _add_to_memory(self, messages: List[Dict[str, Any]]) -> None:
         """Update memory and save to repository"""
@@ -765,19 +944,24 @@ class BaseAgent(ABC):
         if self.memory.empty:
             self.memory.add_message(SystemMessage(content=self.system_prompt))
         self.memory.add_messages(messages)
-        self.memory.bound(self.MAX_MEMORY_BYTES, self.MAX_TOOL_MESSAGE_CONTENT_BYTES)
-        await self._repository.save_memory(self._agent_id, self.name, self.memory)
+        if not self._uses_model_driver():
+            checkpoint = memory_checkpoint(self.memory.messages)
+            self.memory.bound(self.MAX_MEMORY_BYTES, self.MAX_TOOL_MESSAGE_CONTENT_BYTES)
+            note_memory_change(checkpoint, self.memory.messages, "storage_bound")
+        await self._persist_memory()
 
     async def reset_context(self) -> None:
         """Discard prior turns/tool transcripts at an explicit task boundary."""
         await self._ensure_memory()
+        checkpoint = memory_checkpoint(self.memory.messages)
         self.memory.reset_context(SystemMessage(content=self.system_prompt))
-        await self._repository.save_memory(self._agent_id, self.name, self.memory)
+        note_memory_change(checkpoint, self.memory.messages, "step_reset")
+        await self._persist_memory()
     
     async def _roll_back_memory(self) -> None:
         await self._ensure_memory()
         self.memory.roll_back()
-        await self._repository.save_memory(self._agent_id, self.name, self.memory)
+        await self._persist_memory()
 
     async def ask_with_messages(
         self,
@@ -809,10 +993,13 @@ class BaseAgent(ABC):
             runnable = runnable.bind_tools(self.get_tools())
         chain = runnable | RobustJsonParser.from_llm(self._model)
 
-        context, repaired_history = self._repair_tool_call_history(self.memory.get_messages())
+        stored_messages = self.memory.get_messages()
+        checkpoint = memory_checkpoint(stored_messages)
+        context, repaired_history = self._repair_tool_call_history(stored_messages)
         if repaired_history:
             self.memory.messages = context
-            await self._repository.save_memory(self._agent_id, self.name, self.memory)
+            note_memory_change(checkpoint, context, "history_repair")
+            await self._persist_memory()
         dynamic_context_insert_index = 1
         if self.dynamic_system_prompt_provider:
             dynamic_system_prompt = self.dynamic_system_prompt_provider()
@@ -841,7 +1028,8 @@ class BaseAgent(ABC):
         while True:
             try:
                 llm_started = time.perf_counter()
-                message: AIMessage = await chain.ainvoke(context)
+                with model_call_role(self.name or "agent"):
+                    message: AIMessage = await chain.ainvoke(context)
                 logger.info(
                     "agent_llm_call agent=%s session=%s model=%s messages=%d duration_ms=%.1f",
                     self.name,
@@ -904,7 +1092,13 @@ class BaseAgent(ABC):
                 )
                 if delay:
                     await asyncio.sleep(delay)
-        logger.debug(f"Response from model: {message}")
+        response_content = getattr(message, "content", "")
+        logger.debug(
+            "Response received from model response_type=%s content_chars=%d tool_call_count=%d",
+            type(message).__name__,
+            len(response_content) if isinstance(response_content, str) else len(str(response_content)),
+            len(getattr(message, "tool_calls", ()) or ()),
+        )
 
         await self._add_to_memory([message])
         return message
@@ -959,6 +1153,8 @@ class BaseAgent(ABC):
         return normalized, repaired
 
     async def _record_token_usage(self, message: AIMessage) -> None:
+        if (getattr(message, "additional_kwargs", None) or {}).get(USAGE_RECORDED_KEY):
+            return
         await self.token_usage_service.record_from_message(
             message,
             user_id=self.usage_context.get("user_id"),
@@ -974,24 +1170,39 @@ class BaseAgent(ABC):
             HumanMessage(content=request)
         ], format)
     
-    async def roll_back(self, message: Message):
+    async def roll_back(self, message: Message) -> bool:
         self._preserve_context_for_next_request = False
         await self._ensure_memory()
         last_message = self.memory.get_last_message()
         if not last_message:
-            return
+            return False
         if last_message.type != "ai":
-            return
+            return False
         if not last_message.tool_calls:
-            return
-        ask_user_call = next(
-            (
-                tool_call
-                for tool_call in last_message.tool_calls
-                if tool_call.get("name") == "message_ask_user"
-            ),
-            None,
-        )
+            return False
+        ask_user_calls = [
+            tool_call
+            for tool_call in last_message.tool_calls
+            if tool_call.get("name") == "message_ask_user"
+        ]
+        ask_user_call = next((
+            tool_call
+            for tool_call in ask_user_calls
+            if not is_non_substantive_message_text(
+                tool_call.get("args", {}).get("text")
+                if isinstance(tool_call.get("args"), dict)
+                else None
+            )
+        ), None)
+        if ask_user_calls and ask_user_call is None:
+            logger.warning(
+                "Agent %s discarded a pending assistant turn containing only "
+                "non-substantive message_ask_user calls",
+                self.name,
+            )
+            self.memory.roll_back()
+            await self._persist_memory()
+            return False
         if ask_user_call:
             self.memory.add_message(ToolMessage(
                 tool_call_id=ask_user_call["id"],
@@ -1000,8 +1211,9 @@ class BaseAgent(ABC):
             ))
         else:
             self.memory.roll_back()
-        await self._repository.save_memory(self._agent_id, self.name, self.memory)
+        await self._persist_memory()
         self._preserve_context_for_next_request = ask_user_call is not None
+        return ask_user_call is not None
 
     def _consume_preserved_context_marker(self) -> bool:
         preserve = bool(getattr(self, "_preserve_context_for_next_request", False))
@@ -1010,5 +1222,8 @@ class BaseAgent(ABC):
     
     async def compact_memory(self) -> None:
         await self._ensure_memory()
-        self.memory.bound(self.MAX_MEMORY_BYTES, self.MAX_TOOL_MESSAGE_CONTENT_BYTES)
-        await self._repository.save_memory(self._agent_id, self.name, self.memory)
+        if not self._uses_model_driver():
+            checkpoint = memory_checkpoint(self.memory.messages)
+            self.memory.bound(self.MAX_MEMORY_BYTES, self.MAX_TOOL_MESSAGE_CONTENT_BYTES)
+            note_memory_change(checkpoint, self.memory.messages, "storage_bound")
+        await self._persist_memory()

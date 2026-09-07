@@ -4,17 +4,37 @@
   "handler": "handler.py",
   "tools": [
     {
+      "contract_version": 2,
       "name": "data_format_inspect",
       "description": "Identify scientific and geospatial containers, including NetCDF, HDF5, GRIB, Zarr, raster and vector formats, and report embedded groups, subdatasets or layers without analyzing values.",
-      "scopes": ["dataset_fast_path"],
+      "scopes": ["dataset_fast_path", "code_mode"],
       "timeout_seconds": 60,
+      "output_schema": null,
+      "execution": {
+        "timeout_seconds": 60,
+        "cancellable": false,
+        "concurrency": "exclusive",
+        "effects": ["sandbox_read"],
+        "permissions": [],
+        "credentials": []
+      },
       "parameters": {"type":"object","properties":{"input_paths":{"type":"array","items":{"type":"string"},"minItems":1}},"required":["input_paths"],"additionalProperties":false}
     },
     {
+      "contract_version": 2,
       "name": "hierarchical_store_inspect",
       "description": "Inspect the bounded group and array tree of an HDF5 or Zarr store, including shapes, dtypes, chunks, compression and attributes without loading array values.",
-      "scopes": ["dataset_fast_path"],
+      "scopes": ["dataset_fast_path", "code_mode"],
       "timeout_seconds": 60,
+      "output_schema": null,
+      "execution": {
+        "timeout_seconds": 60,
+        "cancellable": false,
+        "concurrency": "exclusive",
+        "effects": ["sandbox_read"],
+        "permissions": [],
+        "credentials": []
+      },
       "parameters": {"type":"object","properties":{"input_path":{"type":"string"},"max_entries":{"type":"integer","minimum":1,"maximum":5000,"default":500}},"required":["input_path"],"additionalProperties":false}
     },
     {
@@ -25,10 +45,20 @@
       "parameters": {"type":"object","properties":{"input_path":{"type":"string"},"dataset_path":{"type":"string"},"selection":{"type":"array","items":{"anyOf":[{"type":"integer"},{"type":"string","pattern":"^-?[0-9]*:-?[0-9]*(?::-?[0-9]+)?$"}]},"maxItems":16,"default":[]},"max_values":{"type":"integer","minimum":1,"maximum":5000000,"default":1000000},"output_path":{"type":"string"}},"required":["input_path","dataset_path","output_path"],"additionalProperties":false}
     },
     {
+      "contract_version": 2,
       "name": "cf_semantics_validate",
       "description": "Validate coordinate, time calendar, missing-value, scale/offset, units, bounds and grid-mapping semantics in one NetCDF-compatible dataset before analysis.",
-      "scopes": ["dataset_fast_path"],
+      "scopes": ["dataset_fast_path", "code_mode"],
       "timeout_seconds": 60,
+      "output_schema": null,
+      "execution": {
+        "timeout_seconds": 60,
+        "cancellable": false,
+        "concurrency": "exclusive",
+        "effects": ["sandbox_read"],
+        "permissions": [],
+        "credentials": []
+      },
       "parameters": {"type":"object","properties":{"input_path":{"type":"string"}},"required":["input_path"],"additionalProperties":false}
     },
     {
@@ -79,10 +109,10 @@
       "name":"netcdf_missing_gap_detect","description":"Detect missing values and temporal gaps in an explicit NetCDF variable.","scopes":["dataset_fast_path"],"timeout_seconds":60,
       "parameters":{"type":"object","properties":{"input_path":{"type":"string"},"variable":{"type":"string"},"time_name":{"type":["string","null"]}},"required":["input_path","variable"],"additionalProperties":false}
     },
-    {"name":"netcdf_multi_file_concat","description":"Concatenate multiple NetCDF files along an explicit dimension after validating their shared coordinates.","scopes":["dataset_fast_path"],"timeout_seconds":180,"parameters":{"type":"object","properties":{"input_paths":{"type":"array","items":{"type":"string"},"minItems":2},"dimension":{"type":"string"},"variable":{"type":["string","null"]},"output_path":{"type":"string"}},"required":["input_paths","dimension","output_path"],"additionalProperties":false}},
-    {"name":"netcdf_multi_file_merge","description":"Merge variables from multiple compatible NetCDF files with exact coordinate matching.","scopes":["dataset_fast_path"],"timeout_seconds":180,"parameters":{"type":"object","properties":{"input_paths":{"type":"array","items":{"type":"string"},"minItems":2},"output_path":{"type":"string"}},"required":["input_paths","output_path"],"additionalProperties":false}},
-    {"name":"netcdf_mask_by_vector","description":"Mask a NetCDF latitude/longitude variable using a Shapefile or other vector boundary.","scopes":["dataset_fast_path"],"timeout_seconds":240,"parameters":{"type":"object","properties":{"input_path":{"type":"string"},"vector_path":{"type":"string"},"variable":{"type":["string","null"]},"output_path":{"type":"string"}},"required":["input_path","vector_path","output_path"],"additionalProperties":false}},
-    {"name":"netcdf_encoding_optimize","description":"Write a NetCDF artifact with explicit compression, shuffle and compression level settings.","scopes":["dataset_fast_path"],"timeout_seconds":180,"parameters":{"type":"object","properties":{"input_path":{"type":"string"},"variable":{"type":["string","null"]},"output_path":{"type":"string"},"compression_level":{"type":"integer","minimum":0,"maximum":9,"default":4}},"required":["input_path","output_path"],"additionalProperties":false}},
-    {"name":"netcdf_dimension_normalize","description":"Normalize explicit NetCDF variable dimension order to time, latitude, longitude, then remaining dimensions.","scopes":["dataset_fast_path"],"timeout_seconds":180,"parameters":{"type":"object","properties":{"input_path":{"type":"string"},"variable":{"type":["string","null"]},"output_path":{"type":"string"}},"required":["input_path","output_path"],"additionalProperties":false}}
+    {"name":"netcdf_multi_file_concat","description":"Concatenate multiple NetCDF files along an explicit dimension after validating their shared coordinates.","scopes":["dataset_fast_path"],"timeout_seconds":120,"parameters":{"type":"object","properties":{"input_paths":{"type":"array","items":{"type":"string"},"minItems":2},"dimension":{"type":"string"},"variable":{"type":["string","null"]},"output_path":{"type":"string"}},"required":["input_paths","dimension","output_path"],"additionalProperties":false}},
+    {"name":"netcdf_multi_file_merge","description":"Merge variables from multiple compatible NetCDF files with exact coordinate matching.","scopes":["dataset_fast_path"],"timeout_seconds":120,"parameters":{"type":"object","properties":{"input_paths":{"type":"array","items":{"type":"string"},"minItems":2},"output_path":{"type":"string"}},"required":["input_paths","output_path"],"additionalProperties":false}},
+    {"name":"netcdf_mask_by_vector","description":"Mask a NetCDF latitude/longitude variable using a Shapefile or other vector boundary.","scopes":["dataset_fast_path"],"timeout_seconds":120,"parameters":{"type":"object","properties":{"input_path":{"type":"string"},"vector_path":{"type":"string"},"variable":{"type":["string","null"]},"output_path":{"type":"string"}},"required":["input_path","vector_path","output_path"],"additionalProperties":false}},
+    {"name":"netcdf_encoding_optimize","description":"Write a NetCDF artifact with explicit compression, shuffle and compression level settings.","scopes":["dataset_fast_path"],"timeout_seconds":120,"parameters":{"type":"object","properties":{"input_path":{"type":"string"},"variable":{"type":["string","null"]},"output_path":{"type":"string"},"compression_level":{"type":"integer","minimum":0,"maximum":9,"default":4}},"required":["input_path","output_path"],"additionalProperties":false}},
+    {"name":"netcdf_dimension_normalize","description":"Normalize explicit NetCDF variable dimension order to time, latitude, longitude, then remaining dimensions.","scopes":["dataset_fast_path"],"timeout_seconds":120,"parameters":{"type":"object","properties":{"input_path":{"type":"string"},"variable":{"type":["string","null"]},"output_path":{"type":"string"}},"required":["input_path","output_path"],"additionalProperties":false}}
   ]
 }

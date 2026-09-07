@@ -1,13 +1,23 @@
 import asyncio
+import hashlib
+import hmac
+import json
 from typing import Optional, List
 from datetime import datetime, UTC
-from pymongo.errors import ConnectionFailure
+from pymongo import ReturnDocument
+from pymongo.errors import ConnectionFailure, DuplicateKeyError
 from pydantic import TypeAdapter
 from app.domain.models.session import Session, SessionStatus, SessionSummary
 from app.domain.models.file import FileInfo
 from app.domain.repositories.session_repository import SessionRepository
-from app.domain.models.event import BaseEvent, AgentEvent
-from app.infrastructure.models.documents import SessionDocument, SessionEventDocument
+from app.domain.models.event import BaseEvent, AgentEvent, MAX_EVENT_SEQUENCE
+from app.domain.models.execution_environment import ExecutionEnvironmentSnapshot
+from app.infrastructure.models.documents import (
+    ExecutionEnvironmentSnapshotDocument,
+    SessionDocument,
+    SessionEventDocument,
+    SessionEventReservationDocument,
+)
 import logging
 
 logger = logging.getLogger(__name__)
@@ -34,21 +44,30 @@ class MongoSessionRepository(SessionRepository):
     async def save(self, session: Session) -> None:
         """Save or update a session"""
         mongo_session = await SessionDocument.find_one(
-            SessionDocument.session_id == session.id
+            {"session_id": session.id}
         )
         
         if not mongo_session:
             mongo_session = SessionDocument.from_domain(session)
             await mongo_session.save()
             return
-        
+
         # A stale in-memory session must not undo a title explicitly chosen by the user.
         manual_title = mongo_session.title if mongo_session.title_manually_set else None
-        mongo_session.update_from_domain(session)
+        update_data = session.model_dump(exclude={"id", "created_at"})
+        update_data["updated_at"] = datetime.now(UTC)
         if manual_title is not None:
-            mongo_session.title = manual_title
-            mongo_session.title_manually_set = True
-        await mongo_session.save()
+            update_data["title"] = manual_title
+            update_data["title_manually_set"] = True
+        # Storage-only atomic fields such as ``event_seq`` and
+        # ``client_message_ids`` are intentionally absent. Replacing the whole
+        # document here could roll either field back from a stale read.
+        result = await SessionDocument.get_pymongo_collection().update_one(
+            {"session_id": session.id},
+            {"$set": update_data},
+        )
+        if not result.matched_count:
+            raise ValueError(f"Session {session.id} not found")
 
 
     async def find_by_id(self, session_id: str) -> Optional[Session]:
@@ -193,22 +212,406 @@ class MongoSessionRepository(SessionRepository):
         if not result:
             raise ValueError(f"Session {session_id} not found")
 
+    @staticmethod
+    def _stored_event_sequence(document: Optional[dict]) -> Optional[int]:
+        if not document:
+            return None
+        value = document.get("seq")
+        if not isinstance(value, int):
+            nested = document.get("event")
+            value = nested.get("seq") if isinstance(nested, dict) else None
+        return (
+            value
+            if isinstance(value, int)
+            and not isinstance(value, bool)
+            and 0 < value <= MAX_EVENT_SEQUENCE
+            else None
+        )
+
+    @staticmethod
+    def _producer_event_key(producer_event_id: str) -> str:
+        """Return the bounded, storage-only identity used by reservations."""
+        return hashlib.sha256(producer_event_id.encode("utf-8")).hexdigest()
+
+    @staticmethod
+    def _event_payload_digest(event: BaseEvent | dict) -> str:
+        """Hash semantic event content, excluding transport/allocation fields.
+
+        Redis cursor IDs, allocated sequences, and producer-local timestamps do
+        not change what an event means. Excluding them lets an idempotent retry
+        built in another process prove that it carries the same payload.
+        """
+        if isinstance(event, BaseEvent):
+            normalized = event.model_dump(
+                mode="json",
+                exclude={"id", "seq", "timestamp"},
+            )
+        else:
+            parsed = TypeAdapter(AgentEvent).validate_python(event)
+            normalized = parsed.model_dump(
+                mode="json",
+                exclude={"id", "seq", "timestamp"},
+            )
+        try:
+            encoded = json.dumps(
+                normalized,
+                ensure_ascii=False,
+                allow_nan=False,
+                separators=(",", ":"),
+                sort_keys=True,
+            ).encode("utf-8")
+        except (TypeError, ValueError) as exc:
+            raise ValueError("Event payload is not canonically serializable") from exc
+        return hashlib.sha256(encoded).hexdigest()
+
+    @classmethod
+    def _adopt_event_reservation(
+        cls,
+        event: BaseEvent,
+        reservation: dict,
+        payload_digest: str,
+    ) -> int:
+        reserved_digest = reservation.get("payload_digest")
+        if not isinstance(reserved_digest, str) or not hmac.compare_digest(
+            reserved_digest,
+            payload_digest,
+        ):
+            raise ValueError(
+                "Event producer identity was reused with a different payload"
+            )
+        seq = cls._stored_event_sequence(reservation)
+        if seq is None:
+            raise RuntimeError("Stored event reservation has an invalid sequence")
+        if event.seq is not None and event.seq != seq:
+            raise ValueError("Event sequence conflicts with its durable reservation")
+        event.seq = seq
+        return seq
+
+    async def _persist_event_reservation(
+        self,
+        *,
+        session_id: str,
+        producer_event_key: str,
+        payload_digest: str,
+        seq: int,
+        allow_legacy_sequence_alias: bool = False,
+    ) -> dict:
+        """Atomically insert-or-read one immutable logical-event reservation."""
+        collection = SessionEventReservationDocument.get_pymongo_collection()
+        query = {
+            "session_id": session_id,
+            "producer_event_key": producer_event_key,
+        }
+        document = {
+            **query,
+            "payload_digest": payload_digest,
+            "seq": seq,
+            "created_at": datetime.now(UTC),
+        }
+        for attempt in range(SESSION_EVENT_WRITE_ATTEMPTS):
+            try:
+                reservation = await collection.find_one_and_update(
+                    query,
+                    {"$setOnInsert": document},
+                    upsert=True,
+                    projection={"seq": 1, "payload_digest": 1, "producer_event_key": 1},
+                    return_document=ReturnDocument.AFTER,
+                )
+                if reservation is None:
+                    raise RuntimeError("Event reservation was not persisted")
+                return reservation
+            except DuplicateKeyError:
+                # Concurrent upserts for one logical ID can race at the unique
+                # index. Read the winner and adopt it. A legacy event may also
+                # already own the sequence under its pre-migration identity.
+                reservation = await collection.find_one(
+                    query,
+                    {"seq": 1, "payload_digest": 1, "producer_event_key": 1},
+                )
+                if reservation is not None:
+                    return reservation
+                if allow_legacy_sequence_alias:
+                    reservation = await collection.find_one(
+                        {"session_id": session_id, "seq": seq},
+                        {"seq": 1, "payload_digest": 1, "producer_event_key": 1},
+                    )
+                    if reservation is not None:
+                        return reservation
+                raise RuntimeError("Event reservation sequence collision")
+            except ConnectionFailure:
+                if attempt == SESSION_EVENT_WRITE_ATTEMPTS - 1:
+                    raise
+                delay = SESSION_EVENT_RETRY_DELAYS[attempt]
+                logger.warning(
+                    "Event reservation persistence interrupted; retrying in %.1fs (%d/%d)",
+                    delay,
+                    attempt + 1,
+                    SESSION_EVENT_WRITE_ATTEMPTS,
+                )
+                await asyncio.sleep(delay)
+        raise RuntimeError("Event reservation was not persisted")
+
+    async def _allocate_event_sequence(
+        self,
+        session_id: str,
+        event_collection,
+    ) -> int:
+        """Allocate a never-reused session sequence; abandoned values are gaps."""
+        session_collection = SessionDocument.get_pymongo_collection()
+        session_doc = await session_collection.find_one_and_update(
+            {
+                "session_id": session_id,
+                "event_seq": {"$gt": 0, "$lt": MAX_EVENT_SEQUENCE},
+            },
+            {"$inc": {"event_seq": 1}},
+            projection={"event_seq": 1},
+            return_document=ReturnDocument.AFTER,
+        )
+        if session_doc is None:
+            # Rolling upgrades can encounter sessions whose old events have no
+            # sequence. Establish a floor above both their count and any
+            # partially migrated value before the first increment. The update
+            # pipeline remains atomic if multiple workers initialize together.
+            legacy_count = await event_collection.count_documents(
+                {"session_id": session_id}
+            )
+            latest = await event_collection.find_one(
+                {"session_id": session_id, "seq": {"$type": "number"}},
+                {"seq": 1},
+                sort=[("seq", -1)],
+            )
+            latest_seq = self._stored_event_sequence(latest) or 0
+            history_floor = max(legacy_count, latest_seq)
+            if history_floor >= MAX_EVENT_SEQUENCE:
+                raise RuntimeError("Session event sequence space is exhausted")
+            session_doc = await session_collection.find_one_and_update(
+                {
+                    "session_id": session_id,
+                    "$or": [
+                        {"event_seq": {"$exists": False}},
+                        {"event_seq": {"$lte": 0}},
+                    ],
+                },
+                [{
+                    "$set": {
+                        "event_seq": {
+                            "$add": [
+                                {
+                                    "$max": [
+                                        {"$ifNull": ["$event_seq", 0]},
+                                        history_floor,
+                                    ]
+                                },
+                                1,
+                            ]
+                        }
+                    }
+                }],
+                projection={"event_seq": 1},
+                return_document=ReturnDocument.AFTER,
+            )
+            if session_doc is None:
+                # Another allocator may have initialized the counter after our
+                # fast-path miss. Retry the bounded atomic increment once.
+                session_doc = await session_collection.find_one_and_update(
+                    {
+                        "session_id": session_id,
+                        "event_seq": {"$gt": 0, "$lt": MAX_EVENT_SEQUENCE},
+                    },
+                    {"$inc": {"event_seq": 1}},
+                    projection={"event_seq": 1},
+                    return_document=ReturnDocument.AFTER,
+                )
+        if session_doc is None:
+            existing_session = await session_collection.find_one(
+                {"session_id": session_id},
+                {"event_seq": 1},
+            )
+            if existing_session is None:
+                raise ValueError(f"Session {session_id} not found")
+            raise RuntimeError("Session event sequence space is exhausted")
+        seq = session_doc.get("event_seq")
+        if (
+            not isinstance(seq, int)
+            or isinstance(seq, bool)
+            or seq < 1
+            or seq > MAX_EVENT_SEQUENCE
+        ):
+            raise RuntimeError("Session event sequence allocation failed")
+        return seq
+
+    async def reserve_event_sequence(self, session_id: str, event: BaseEvent) -> int:
+        """Persist an immutable logical-event reservation before publication.
+
+        Concurrent callers may consume more than one candidate counter value,
+        but the atomic reservation upsert chooses one winner and every matching
+        caller adopts its sequence. Gaps are intentional and never reused.
+        """
+        producer_event_id = event.bind_producer_event_id()
+        producer_event_key = self._producer_event_key(producer_event_id)
+        payload_digest = self._event_payload_digest(event)
+        reservation_collection = (
+            SessionEventReservationDocument.get_pymongo_collection()
+        )
+        reservation = await reservation_collection.find_one(
+            {
+                "session_id": session_id,
+                "producer_event_key": producer_event_key,
+            },
+            {"seq": 1, "payload_digest": 1, "producer_event_key": 1},
+        )
+        if reservation is not None:
+            return self._adopt_event_reservation(event, reservation, payload_digest)
+
+        legacy_event_key = f"{session_id}:{producer_event_id}"
+        event_collection = SessionEventDocument.get_pymongo_collection()
+        legacy_event = await event_collection.find_one(
+            {"event_key": legacy_event_key},
+            {"seq": 1, "event": 1, "payload_digest": 1},
+        )
+        legacy_seq = self._stored_event_sequence(legacy_event)
+        if legacy_event is not None and legacy_seq is not None:
+            stored_digest = legacy_event.get("payload_digest")
+            if not isinstance(stored_digest, str):
+                stored_payload = legacy_event.get("event")
+                if not isinstance(stored_payload, dict):
+                    raise RuntimeError("Stored legacy event has no valid payload")
+                stored_digest = self._event_payload_digest(stored_payload)
+            if not hmac.compare_digest(stored_digest, payload_digest):
+                raise ValueError(
+                    "Event producer identity was reused with a different payload"
+                )
+            reservation = await self._persist_event_reservation(
+                session_id=session_id,
+                producer_event_key=producer_event_key,
+                payload_digest=payload_digest,
+                seq=legacy_seq,
+                allow_legacy_sequence_alias=True,
+            )
+            return self._adopt_event_reservation(event, reservation, payload_digest)
+
+        if event.seq is not None:
+            # Only the allocator may mint a new sequence. A pre-populated value
+            # without a reservation could otherwise bypass the session counter.
+            raise ValueError("Event sequence has no durable reservation")
+
+        candidate_seq = await self._allocate_event_sequence(
+            session_id,
+            event_collection,
+        )
+        reservation = await self._persist_event_reservation(
+            session_id=session_id,
+            producer_event_key=producer_event_key,
+            payload_digest=payload_digest,
+            seq=candidate_seq,
+        )
+        return self._adopt_event_reservation(event, reservation, payload_digest)
+
+    @classmethod
+    def _validate_persisted_event(
+        cls,
+        document: dict,
+        *,
+        expected_seq: int,
+        payload_digest: str,
+    ) -> None:
+        stored_seq = cls._stored_event_sequence(document)
+        if stored_seq != expected_seq:
+            raise RuntimeError("Persisted event conflicts with its reservation")
+        stored_digest = document.get("payload_digest")
+        if not isinstance(stored_digest, str):
+            stored_payload = document.get("event")
+            if not isinstance(stored_payload, dict):
+                raise RuntimeError("Persisted event has no valid payload")
+            stored_digest = cls._event_payload_digest(stored_payload)
+        if not hmac.compare_digest(stored_digest, payload_digest):
+            raise ValueError(
+                "Event producer identity was reused with a different payload"
+            )
+
     async def add_event(self, session_id: str, event: BaseEvent) -> None:
-        """Add an event to a session"""
+        """Idempotently materialize the event selected by its reservation."""
+        producer_event_id = event.bind_producer_event_id()
+        producer_event_key = self._producer_event_key(producer_event_id)
+        payload_digest = self._event_payload_digest(event)
+        await self.reserve_event_sequence(session_id, event)
+        if event.seq is None:  # Narrow the type after the repository contract.
+            raise RuntimeError("Event reservation did not assign a sequence")
+
         event_key = f"{session_id}:{event.id}"
+        legacy_producer_key = f"{session_id}:{producer_event_id}"
+        collection = SessionEventDocument.get_pymongo_collection()
+        existing = await collection.find_one(
+            {
+                "session_id": session_id,
+                "$or": [
+                    {"producer_event_key": producer_event_key},
+                    {"event_key": event_key},
+                    {"event_key": legacy_producer_key},
+                ],
+            },
+            {"seq": 1, "event": 1, "payload_digest": 1},
+        )
+        if existing is not None:
+            self._validate_persisted_event(
+                existing,
+                expected_seq=event.seq,
+                payload_digest=payload_digest,
+            )
+            return
+
         document = {
             "session_id": session_id,
+            "producer_event_key": producer_event_key,
+            "payload_digest": payload_digest,
             "event_key": event_key,
+            "seq": event.seq,
+            "version": event.version,
             "event": event.model_dump(),
             "created_at": datetime.now(UTC),
         }
-        collection = SessionEventDocument.get_pymongo_collection()
         for attempt in range(SESSION_EVENT_WRITE_ATTEMPTS):
             try:
-                await collection.update_one(
-                    {"event_key": event_key},
+                persisted = await collection.find_one_and_update(
+                    {
+                        "session_id": session_id,
+                        "producer_event_key": producer_event_key,
+                    },
                     {"$setOnInsert": document},
                     upsert=True,
+                    projection={"seq": 1, "event": 1, "payload_digest": 1},
+                    return_document=ReturnDocument.AFTER,
+                )
+                if persisted is None:
+                    raise RuntimeError("Session event was not persisted")
+                self._validate_persisted_event(
+                    persisted,
+                    expected_seq=event.seq,
+                    payload_digest=payload_digest,
+                )
+                return
+            except DuplicateKeyError:
+                # The producer, legacy event-key, or sequence unique index may
+                # have selected a concurrent winner. Only an identical payload
+                # at the reserved sequence is an idempotent success.
+                existing = await collection.find_one(
+                    {
+                        "session_id": session_id,
+                        "$or": [
+                            {"producer_event_key": producer_event_key},
+                            {"event_key": event_key},
+                            {"event_key": legacy_producer_key},
+                            {"seq": event.seq},
+                        ],
+                    },
+                    {"seq": 1, "event": 1, "payload_digest": 1},
+                )
+                if existing is None:
+                    raise
+                self._validate_persisted_event(
+                    existing,
+                    expected_seq=event.seq,
+                    payload_digest=payload_digest,
                 )
                 return
             except ConnectionFailure:
@@ -266,12 +669,119 @@ class MongoSessionRepository(SessionRepository):
             raise ValueError(f"Session {session_id} not found")
 
     async def get_events(self, session_id: str) -> List[AgentEvent]:
-        """Get all events for a session ordered by creation time"""
+        """Get events in sequence order, synthesizing legacy sequence values."""
         docs = await SessionEventDocument.find(
-            SessionEventDocument.session_id == session_id
-        ).sort("+created_at").to_list()
+            {"session_id": session_id}
+        ).sort("+created_at", "+_id").to_list()
         adapter = TypeAdapter(AgentEvent)
-        return [adapter.validate_python(d.event) for d in docs]
+        events = [adapter.validate_python(d.event) for d in docs]
+
+        # Pre-versioning documents have neither top-level nor embedded seq.
+        # Their stable historical order becomes 1..N.  The allocator initializes
+        # new sessions above the legacy document count, so new values do not
+        # collide with this compatibility projection.
+        used_sequences = {
+            seq
+            for seq in (
+                self._stored_event_sequence({
+                    "seq": getattr(doc, "seq", None),
+                    "event": doc.event,
+                })
+                for doc in docs
+            )
+            if seq is not None
+        }
+        next_legacy_seq = 1
+        for doc, event in zip(docs, events):
+            stored_seq = self._stored_event_sequence({
+                "seq": getattr(doc, "seq", None),
+                "event": doc.event,
+            })
+            if stored_seq is not None:
+                event.seq = stored_seq
+                continue
+            while next_legacy_seq in used_sequences:
+                next_legacy_seq += 1
+            event.seq = next_legacy_seq
+            used_sequences.add(next_legacy_seq)
+            next_legacy_seq += 1
+        return sorted(events, key=lambda item: item.seq or 0)
+
+    async def get_events_after(self, session_id: str, seq: int) -> List[AgentEvent]:
+        """Return replay events, using the sequence index when history permits.
+
+        Any missing or non-integral top-level sequence identifies legacy/mixed
+        history and keeps the original full-history synthesis path. Fully
+        versioned sessions query only ``seq > watermark`` through the compound
+        ``(session_id, seq)`` index.
+        """
+        collection = SessionEventDocument.get_pymongo_collection()
+        legacy_or_invalid = await collection.find_one(
+            {
+                "session_id": session_id,
+                "$or": [
+                    {"seq": {"$not": {"$type": ["int", "long"]}}},
+                    {"seq": {"$lte": 0}},
+                    {"seq": {"$gt": MAX_EVENT_SEQUENCE}},
+                ],
+            },
+            {"_id": 1},
+        )
+        if legacy_or_invalid is not None:
+            events = await self.get_events(session_id)
+            return [event for event in events if (event.seq or 0) > seq]
+
+        docs = await SessionEventDocument.find(
+            {"session_id": session_id, "seq": {"$gt": seq}}
+        ).sort("+seq", "+_id").to_list()
+        adapter = TypeAdapter(AgentEvent)
+        events: List[AgentEvent] = []
+        for document in docs:
+            event = adapter.validate_python(document.event)
+            stored_seq = self._stored_event_sequence({
+                "seq": getattr(document, "seq", None),
+                "event": document.event,
+            })
+            if stored_seq is None:
+                # Defensive compatibility for a write racing the probe above.
+                all_events = await self.get_events(session_id)
+                return [item for item in all_events if (item.seq or 0) > seq]
+            if event.seq is not None and event.seq != stored_seq:
+                raise RuntimeError("Persisted event sequence envelope is inconsistent")
+            event.seq = stored_seq
+            events.append(event)
+        return events
+
+    async def add_execution_snapshot(
+        self,
+        snapshot: ExecutionEnvironmentSnapshot,
+    ) -> None:
+        """Insert once by task id; an identical retry is a successful no-op."""
+        collection = ExecutionEnvironmentSnapshotDocument.get_pymongo_collection()
+        try:
+            await collection.update_one(
+                {
+                    "task_id": snapshot.task_id,
+                    "session_id": snapshot.session_id,
+                    "fingerprint": snapshot.fingerprint,
+                    "trigger_event_seq": snapshot.trigger_event_seq,
+                },
+                {"$setOnInsert": snapshot.model_dump(mode="python")},
+                upsert=True,
+            )
+        except DuplicateKeyError as exc:
+            # A unique task id already exists with a different fingerprint.
+            # Provenance is immutable, so never replace the original record.
+            raise ValueError("Task execution snapshot is immutable") from exc
+
+    async def get_execution_snapshots(
+        self,
+        session_id: str,
+    ) -> List[ExecutionEnvironmentSnapshot]:
+        docs = await ExecutionEnvironmentSnapshotDocument.find(
+            ExecutionEnvironmentSnapshotDocument.session_id == session_id
+        ).sort("+captured_at").to_list()
+        return [document.to_domain() for document in docs]
     
     async def add_file(self, session_id: str, file_info: FileInfo) -> None:
         """Add a file to a session"""
@@ -310,9 +820,23 @@ class MongoSessionRepository(SessionRepository):
     async def delete(self, session_id: str) -> None:
         """Delete a session"""
         mongo_session = await SessionDocument.find_one(
-            SessionDocument.session_id == session_id
+            {"session_id": session_id}
         )
         if mongo_session:
+            from app.infrastructure.repositories.mongo_model_trace_repository import get_model_trace_repository
+            await get_model_trace_repository().delete_session(session_id)
+            # Delete internal provenance/reservations before the parent so a
+            # failed child cleanup cannot leave browser-invisible records after
+            # the user deletes the session.
+            await ExecutionEnvironmentSnapshotDocument.get_pymongo_collection().delete_many(
+                {"session_id": session_id}
+            )
+            await SessionEventReservationDocument.get_pymongo_collection().delete_many(
+                {"session_id": session_id}
+            )
+            await SessionEventDocument.get_pymongo_collection().delete_many(
+                {"session_id": session_id}
+            )
             await mongo_session.delete()
 
     async def get_all(self) -> List[Session]:

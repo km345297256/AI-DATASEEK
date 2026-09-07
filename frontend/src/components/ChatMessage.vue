@@ -120,7 +120,11 @@
       </div>
     </Teleport>
   </div>
-  <ToolUse v-else-if="message.type === 'tool'" :tool="toolContent" @click="handleToolClick(toolContent)" />
+  <div v-else-if="message.type === 'tool'" class="flex min-w-0 flex-col">
+    <ToolUse :tool="toolContent" @click="handleToolClick(toolContent)" />
+    <ToolApprovalCard v-if="toolContent.tool_approval" :initial="toolContent.tool_approval" :session-id="sessionId" :is-share="isShare" />
+    <DeclarativeToolCard v-if="toolContent.status === 'called'" :tool="toolContent" />
+  </div>
   <div v-else-if="message.type === 'step'" class="flex flex-col">
     <div v-if="stepContent.status === 'running'" class="mb-2 flex items-center gap-2 text-sm text-[var(--text-secondary)]">
       <span class="size-3.5 animate-spin rounded-full border-2 border-[var(--border-dark)] border-t-transparent" aria-hidden="true" />
@@ -139,6 +143,8 @@
             :collapsed-count="item.count"
             @click="handleToolClick(item.panelTool)"
           />
+          <DeclarativeToolCard v-if="item.tool.status === 'called'" :tool="item.tool" />
+          <ToolApprovalCard v-if="item.tool.tool_approval" :initial="item.tool.tool_approval" :session-id="sessionId" :is-share="isShare" />
           <div v-if="item.count > 1" class="ml-2 text-[12px] text-[var(--text-tertiary)]">
             已折叠 {{ item.count }} 次连续文件写入，点击可查看最后一次写入详情。
           </div>
@@ -161,6 +167,7 @@
 <script setup lang="ts">
 import { Message, MessageContent, AttachmentsContent, TaskSummaryContent } from '../types/message';
 import ToolUse from './ToolUse.vue';
+import DeclarativeToolCard from './DeclarativeToolCard.vue';
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';
 import { CheckIcon, Copy as CopyIcon, PackageOpen, Share2 as Share2Icon, ShieldAlert, ThumbsDown, ThumbsUp, X } from 'lucide-vue-next';
@@ -170,6 +177,7 @@ import { useRelativeTime } from '../composables/useTime';
 import AttachmentsMessage from './AttachmentsMessage.vue';
 import TaskExecutionSummary from './TaskExecutionSummary.vue';
 import { copyToClipboard } from '../utils/dom';
+import ToolApprovalCard from './ToolApprovalCard.vue';
 import { stripHiddenDatasetResultNotices } from '../utils/datasetResultPresentation';
 import { showErrorToast, showSuccessToast } from '../utils/toast';
 import { deleteTaskFeedback, getTaskFeedback, openJupyterNotebook, saveTaskFeedback, shareSession, type TaskFeedbackPreference } from '../api/agent';
@@ -178,6 +186,7 @@ import { deleteTaskFeedback, getTaskFeedback, openJupyterNotebook, saveTaskFeedb
 const props = defineProps<{
   message: Message;
   sessionId?: string;
+  isShare?: boolean;
   assistantIcon?: Component;
   assistantName?: string;
   hideAllFilesButton?: boolean;

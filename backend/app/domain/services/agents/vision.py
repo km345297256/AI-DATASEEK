@@ -17,6 +17,8 @@ from app.domain.models.plan import ExecutionStatus, Plan, Step
 from app.domain.repositories.agent_repository import AgentRepository
 from app.domain.services.agents.base import BaseAgent
 from app.domain.services.tools.base import BaseToolkit
+from app.domain.services.tools.pipeline import opaque_log_identifier
+from app.domain.utils.public_error import public_error_message
 
 logger = logging.getLogger(__name__)
 
@@ -121,10 +123,13 @@ class VisionAgent(BaseAgent):
             if result:
                 yield MessageEvent(message=result)
         except Exception as exc:
-            logger.exception("Vision step failed: %s", exc)
+            logger.error(
+                "Vision step failed error_type=%s",
+                type(exc).__name__,
+            )
             step.status = ExecutionStatus.FAILED
             step.success = False
-            step.error = str(exc)
+            step.error = public_error_message(exc)
             yield StepEvent(status=StepStatus.FAILED, step=step)
 
     async def _build_image_blocks(self, message: Message, sandbox: Sandbox) -> list[dict[str, Any]]:
@@ -160,7 +165,11 @@ class VisionAgent(BaseAgent):
                     continue
                 blocks.append(self._image_block(raw, content_type))
             except Exception as exc:
-                logger.warning("Failed to load vision attachment from storage %s: %s", file_id, exc)
+                logger.warning(
+                    "Failed to load vision attachment from storage file=%s error_type=%s",
+                    opaque_log_identifier(file_id, namespace="file"),
+                    type(exc).__name__,
+                )
         return blocks
 
     def _image_block(self, raw: bytes, mime_type: str) -> dict[str, Any]:

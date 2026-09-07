@@ -25,6 +25,7 @@ export interface DataCenterDataset {
   data_center_name: string;
   name: string;
   description: string;
+  domain?: string;
   temporal_coverage: string;
   spatial_coverage: string;
   data_type: string;
@@ -38,6 +39,43 @@ export interface DataCenterDataset {
   created_by?: string | null;
   created_at: string;
   updated_at: string;
+}
+
+export interface DatasetSubmissionPayload {
+  name: string;
+  summary: string;
+  storage_directory: string;
+}
+
+export interface DatasetRegistrationPayload {
+  name: string;
+  description: string;
+  domain: string;
+  storage_directory: string;
+}
+
+export async function listManagedDatasets(offset = 0): Promise<{ datasets: DataCenterDataset[]; total: number }> {
+  const response = await apiClient.get<ApiResponse<{ datasets: DataCenterDataset[]; total: number }>>(
+    '/datasets/manage', { params: { limit: 100, offset } },
+  );
+  return response.data.data;
+}
+
+export async function registerDataset(payload: DatasetRegistrationPayload): Promise<DataCenterDataset> {
+  const response = await apiClient.post<ApiResponse<DataCenterDataset>>('/datasets/registrations', payload);
+  return response.data.data;
+}
+
+export async function updateDatasetRegistration(
+  id: string, payload: Pick<DatasetRegistrationPayload, 'name' | 'description' | 'domain'>,
+): Promise<DataCenterDataset> {
+  const response = await apiClient.patch<ApiResponse<DataCenterDataset>>(`/datasets/${encodeURIComponent(id)}`, payload);
+  return response.data.data;
+}
+
+export async function archiveDatasetRegistration(id: string): Promise<DataCenterDataset> {
+  const response = await apiClient.delete<ApiResponse<DataCenterDataset>>(`/datasets/${encodeURIComponent(id)}`);
+  return response.data.data;
 }
 
 export interface DataProductFile {
@@ -90,6 +128,16 @@ export async function listDataCenterDatasets(): Promise<DataCenterDataset[]> {
 export async function getDataCenterDataset(datasetId: string): Promise<DataCenterDataset> {
   const response = await apiClient.get<ApiResponse<DataCenterDataset>>(
     `/datasets/${encodeURIComponent(datasetId)}`,
+  );
+  return response.data.data;
+}
+
+export async function createDatasetSubmission(
+  payload: DatasetSubmissionPayload,
+): Promise<DataCenterDataset> {
+  const response = await apiClient.post<ApiResponse<DataCenterDataset>>(
+    '/datasets/submissions',
+    payload,
   );
   return response.data.data;
 }

@@ -3,6 +3,8 @@ import json
 import logging
 from pydantic_settings import BaseSettings
 from functools import lru_cache
+from pydantic import Field
+from typing import Literal
 
 logger = logging.getLogger(__name__)
 
@@ -32,6 +34,19 @@ class Settings(BaseSettings):
     model_provider: str = "openai"
     temperature: float = 0.7
     max_tokens: int = 2000
+    # Deployment-owned engineering limits, not account quotas or advertised
+    # provider capacities. Offline token estimates include tool definitions.
+    model_context_capacity_tokens: int = Field(default=131_072, ge=4096, le=2_000_000)
+    model_context_safety_tokens: int = Field(default=2048, ge=256, le=65_536)
+    model_task_token_budget: int = Field(default=1_000_000, ge=4096, le=100_000_000)
+    model_task_call_budget: int = Field(default=128, ge=1, le=1024)
+    model_trace_store_timeout_seconds: float = Field(default=3.0, ge=0.1, le=30)
+    # Existing saved profiles retain their own defaults; sessions without a
+    # profile use progressive Cordis schema disclosure. Trials are opt-in.
+    tool_selection_mode: Literal["all", "on_demand"] = "on_demand"
+    tool_preset_id: str = "general"
+    code_mode_enabled: bool = False
+    domain_subagents_enabled: bool = False
     # Execution responses often contain a complete script or structured result.
     # Keep a larger floor than planner responses so valid output is not cut off.
     execution_max_tokens: int = 4096
@@ -49,6 +64,10 @@ class Settings(BaseSettings):
     # Lightweight dataset routing runs before any sandbox allocation. A slow or
     # unavailable classifier must fall back to the normal Agent path promptly.
     dataset_request_resolver_timeout_seconds: float = 8.0
+    # Suggested questions are optional page bootstrap data. Keep their model
+    # call below the browser API timeout so an unavailable provider can fall
+    # back to local questions without turning the whole panel into an error.
+    dataset_suggested_question_timeout_seconds: float = 8.0
 
     # System-owned safety gate. It always runs before Planner and is not part
     # of a user-editable Agent profile. If review is unavailable, it fails closed.
@@ -88,6 +107,23 @@ class Settings(BaseSettings):
     minio_object_prefix: str = "files"
     large_upload_part_size: int = 16 * 1024 * 1024
     large_upload_session_expire_hours: int = 24
+
+    # Oversized text tool results are durably spilled before they reach model
+    # context, SSE, Redis, or Mongo session events. Existing file storage owns
+    # the bytes; a private Mongo record maps the opaque locator to that object.
+    spill_enabled: bool = True
+    analysis_jobs_enabled: bool = True
+    # Dedicated Fernet key. No fallback to model credentials; existing model
+    # configuration and legacy MCP credentials are deliberately not migrated.
+    credential_encryption_key: str = ""
+    spill_max_inline_bytes: int = 50_000
+    spill_max_artifact_bytes: int = 32 * 1024 * 1024
+    spill_preview_bytes: int = 12_000
+    spill_read_chunk_bytes: int = 16_000
+    spill_store_timeout_seconds: float = 5.0
+    spill_artifact_retention_hours: int = 168
+    spill_reaper_interval_seconds: int = 300
+    spill_artifact_identity_key: str | None = None
 
     # Data-center dataset registry. Managed uploads are stored in a Docker volume
     # shared by backend and local Worker; host_path locations stay node-local.
@@ -208,6 +244,23 @@ class Settings(BaseSettings):
     # MCP configuration
     mcp_config_path: str = "/etc/mcp.json"
 
+    # Cordis plugin catalog/control-plane runtime. Tool execution remains in
+    # the existing sandbox; this process only owns registration and reloads.
+    plugin_runtime_enabled: bool = True
+    plugin_runtime_node_executable: str = "node"
+    plugin_runtime_host_path: str = ""
+    plugin_runtime_tools_dir: str = ""
+    plugin_runtime_execution_contract_dir: str = ""
+    plugin_runtime_request_timeout_seconds: float = 5.0
+    plugin_runtime_startup_timeout_seconds: float = 15.0
+    plugin_runtime_shutdown_timeout_seconds: float = 3.0
+    plugin_runtime_max_response_frame_bytes: int = 8 * 1024 * 1024
+
+    # Stable deployment secret used only for opaque execution-environment
+    # identities. Existing installations temporarily fall back to API_KEY;
+    # production deployments should provide an independent random value.
+    execution_snapshot_identity_key: str | None = None
+
     # Skill configuration
     skills_enabled: bool = True
     skills_dir: str = "skills"
@@ -226,6 +279,46 @@ class Settings(BaseSettings):
         """Validate configuration settings"""
         if not self.api_key:
             raise ValueError("API key is required")
+        if (
+            self.execution_snapshot_identity_key is not None
+            and len(self.execution_snapshot_identity_key.encode("utf-8")) < 32
+        ):
+            raise ValueError(
+                "EXECUTION_SNAPSHOT_IDENTITY_KEY must contain at least 32 bytes"
+            )
+        # Lifecycle settings remain valid even while new spill creation is
+        # disabled because the reaper still cleans older tombstones.
+        if self.spill_max_inline_bytes < 1024:
+            raise ValueError("SPILL_MAX_INLINE_BYTES must be at least 1024")
+        if self.spill_max_artifact_bytes < self.spill_max_inline_bytes:
+            raise ValueError(
+                "SPILL_MAX_ARTIFACT_BYTES must be at least SPILL_MAX_INLINE_BYTES"
+            )
+        if self.spill_preview_bytes < 0:
+            raise ValueError("SPILL_PREVIEW_BYTES must not be negative")
+        if self.spill_read_chunk_bytes < 1024:
+            raise ValueError("SPILL_READ_CHUNK_BYTES must be at least 1024")
+        maximum_safe_read = max(
+            1024,
+            (self.spill_max_inline_bytes - 4096) // 2,
+        )
+        if self.spill_read_chunk_bytes > maximum_safe_read:
+            raise ValueError(
+                "SPILL_READ_CHUNK_BYTES is too large for SPILL_MAX_INLINE_BYTES"
+            )
+        if self.spill_store_timeout_seconds <= 0:
+            raise ValueError("SPILL_STORE_TIMEOUT_SECONDS must be positive")
+        if self.spill_artifact_retention_hours <= 0:
+            raise ValueError("SPILL_ARTIFACT_RETENTION_HOURS must be positive")
+        if self.spill_reaper_interval_seconds <= 0:
+            raise ValueError("SPILL_REAPER_INTERVAL_SECONDS must be positive")
+        if (
+            self.spill_artifact_identity_key is not None
+            and len(self.spill_artifact_identity_key.encode("utf-8")) < 32
+        ):
+            raise ValueError(
+                "SPILL_ARTIFACT_IDENTITY_KEY must contain at least 32 bytes"
+            )
 
 @lru_cache()
 def get_settings() -> Settings:

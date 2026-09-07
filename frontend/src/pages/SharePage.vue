@@ -29,6 +29,7 @@
       <div class="mx-auto w-full max-w-full sm:max-w-[768px] sm:min-w-[390px] flex flex-col flex-1">
         <div class="flex flex-col w-full gap-[12px] pb-[80px] pt-[12px] flex-1 overflow-y-auto">
           <ChatMessage v-for="(message, index) in messages" :key="index" :message="message"
+            :is-share="true"
             :hideHeader="isConsecutiveAssistant(messages, index)"
             :show-assistant-actions="replayCompleted && isLatestAssistantMessage(messages, index)"
             @toolClick="handleToolClick" />
@@ -103,6 +104,7 @@
 </template>
 
 <script setup lang="ts">
+import { findAnalysisTool, mergeAnalysisToolEvent } from '@/utils/analysisJob';
 import SimpleBar from '../components/SimpleBar.vue';
 import { computed, ref, onMounted, onUnmounted, watch, nextTick, reactive, toRefs } from 'vue';
 import { useRouter } from 'vue-router';
@@ -138,6 +140,12 @@ import {
   insertTaskExecutionSummary,
   isLatestAssistantMessage,
 } from '../utils/chatTimeline';
+import { isPlaceholderAssistantMessage } from '../utils/datasetResultPresentation';
+import {
+  acceptAgentEvent,
+  createAgentEventCursor,
+  resetAgentEventCursor,
+} from '../utils/agentEventCursor';
 
 const router = useRouter()
 const { t } = useI18n()
@@ -160,6 +168,7 @@ const createInitialState = () => ({
   lastMessageTool: undefined as ToolContent | undefined,
   lastTool: undefined as ToolContent | undefined,
   lastEventId: undefined as string | undefined,
+  lastEventSeq: undefined as number | undefined,
   attachments: [] as FileInfo[],
   showReplayOverlay: false,
   countdown: 3,
@@ -184,6 +193,7 @@ const {
   lastNoMessageTool,
   lastTool,
   lastEventId,
+  lastEventSeq,
   showReplayOverlay,
   countdown,
   jumpToEnd,
@@ -195,6 +205,7 @@ const {
 const toolPanel = ref<InstanceType<typeof ToolPanel>>()
 const simpleBarRef = ref<InstanceType<typeof SimpleBar>>();
 let countdownTimer: number | null = null;
+const eventCursor = createAgentEventCursor();
 
 // Watch message changes and automatically scroll to bottom
 watch(messages, async () => {
@@ -238,6 +249,10 @@ const handleMessageEvent = (messageData: MessageEventData) => {
   if (messageData.role === 'user') {
     startUserTurn();
   }
+  if (
+    messageData.role === 'assistant'
+    && isPlaceholderAssistantMessage(messageData.content)
+  ) return;
   messages.value.push({
     type: messageData.role,
     content: {
@@ -261,8 +276,10 @@ const handleToolEvent = (toolData: ToolEventData) => {
   let toolContent: ToolContent = {
     ...toolData
   }
-  if (lastTool.value && lastTool.value.tool_call_id === toolContent.tool_call_id) {
-    Object.assign(lastTool.value, toolContent);
+  const existingTool = findAnalysisTool(messages.value, toolContent.tool_call_id);
+  if (existingTool) {
+    Object.assign(existingTool, mergeAnalysisToolEvent(existingTool, toolContent));
+    toolContent = existingTool;
   } else {
     if (lastStep?.status === 'running') {
       lastStep.tools.push(toolContent);
@@ -274,7 +291,7 @@ const handleToolEvent = (toolData: ToolEventData) => {
     }
     lastTool.value = toolContent;
   }
-  if (toolContent.name !== 'message') {
+  if (toolContent.name !== 'message' && (!existingTool || lastTool.value?.tool_call_id === toolContent.tool_call_id)) {
     lastNoMessageTool.value = toolContent;
   }
 }
@@ -367,6 +384,7 @@ const isTerminalStepStatus = (status: StepEventData['status']) => {
 
 // Main event handler function
 const handleEvent = (event: AgentSSEEvent) => {
+  if (!acceptAgentEvent(eventCursor, event)) return;
   if (event.event === 'message') {
     handleMessageEvent(event.data as MessageEventData);
   } else if (event.event === 'tool') {
@@ -386,11 +404,13 @@ const handleEvent = (event: AgentSSEEvent) => {
   } else if (event.event === 'plan') {
     handlePlanEvent(event.data as PlanEventData);
   }
-  lastEventId.value = event.data.event_id;
+  if (event.data.event_id) lastEventId.value = event.data.event_id;
+  lastEventSeq.value = eventCursor.lastSeq;
 }
 
 // Reset all refs to their initial values
 const resetState = () => {
+  resetAgentEventCursor(eventCursor);
   // Reset reactive state to initial values
   Object.assign(state, createInitialState());
 };

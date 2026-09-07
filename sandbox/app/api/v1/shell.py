@@ -18,10 +18,13 @@ async def exec_command(request: ShellExecRequest):
     if not request.id or request.id == "":
         request.id = shell_service.create_session_id()
         
+    private = ({"credentials": {slot: value.get_secret_value() for slot, value in request.credentials.items()}}
+               if request.credentials else {})
     result = await shell_service.exec_command(
         session_id=request.id,
         exec_dir=request.exec_dir,
-        command=request.command
+        command=request.command,
+        **private,
     )
 
     succeeded = result.status != "completed" or result.returncode == 0
@@ -114,4 +117,15 @@ async def kill_process(request: ShellKillProcessRequest):
         success=True,
         message=message,
         data=result.model_dump()
+    )
+
+
+@router.post("/release", response_model=Response)
+async def release_shell(request: ShellKillProcessRequest):
+    """Terminate if necessary and forget one internal shell session."""
+    result = await shell_service.release_shell(session_id=request.id)
+    return Response(
+        success=True,
+        message="Shell session released",
+        data=result.model_dump(),
     )

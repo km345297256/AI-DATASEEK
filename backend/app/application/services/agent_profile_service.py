@@ -5,6 +5,7 @@ from datetime import datetime, UTC
 
 from app.domain.models.agent_profile import AgentPlannerConfig, AgentProfile, AgentSubAgentConfig, default_subagents
 from app.domain.models.workspace import personal_workspace_id
+from app.domain.models.tool_runtime import ToolRuntimeConfig
 from app.domain.repositories.agent_profile_repository import AgentProfileRepository
 from app.application.errors.exceptions import NotFoundError, UnauthorizedError
 
@@ -33,6 +34,7 @@ class AgentProfileService:
         planner_config: Optional[AgentPlannerConfig] = None,
         subagents: Optional[List[AgentSubAgentConfig]] = None,
         is_global: bool = False,
+        tool_runtime: Optional[ToolRuntimeConfig] = None,
     ) -> AgentProfile:
         # Only admins can create global profiles
         if is_global and user_role != "admin":
@@ -55,6 +57,7 @@ class AgentProfileService:
             system_prompt=system_prompt,
             planner_config=planner_config or AgentPlannerConfig(),
             subagents=subagents or default_subagents(),
+            tool_runtime=tool_runtime or ToolRuntimeConfig(),
         )
         return await self._repository.create(profile)
 
@@ -92,6 +95,8 @@ class AgentProfileService:
 
         for field, value in kwargs.items():
             if hasattr(profile, field) and value is not None:
+                if field == "tool_runtime":
+                    value = ToolRuntimeConfig.model_validate(value)
                 setattr(profile, field, value)
         profile.updated_at = datetime.now(UTC)
         return await self._repository.update(profile)

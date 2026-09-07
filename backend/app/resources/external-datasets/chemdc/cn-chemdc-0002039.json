@@ -1,0 +1,178 @@
+{
+  "dataset_id": "cn-chemdc-0002039",
+  "external_id": "10.57841/casdc.0002039",
+  "data_center_id": "reviewed-chemdc-catalog",
+  "data_center_name": "中国科学院化学化工科学数据中心",
+  "name": "In2O3/HZSM-5二氧化碳加氢制汽油催化剂的性能数据集",
+  "description": "In2O3/HZSM-5 催化剂二氧化碳加氢性能及放大生产结果；实体为17页PDF文档和说明DOCX，文本已核验可读，不是可直接计算的CSV数值表。",
+  "domain": "chemistry",
+  "data_type": "pdf,docx",
+  "tags": [
+    "chemistry",
+    "中国科学院化学化工科学数据中心",
+    "公开数据"
+  ],
+  "metadata": {
+    "source_catalog": "chemdc",
+    "publisher": "中国科学院化学化工科学数据中心",
+    "source_url": "https://doi.org/10.57841/casdc.0002039",
+    "license": "CC BY 4.0",
+    "license_url": "https://creativecommons.org/licenses/by/4.0/",
+    "license_details": "已核验的官方详情标注 CC BY 4.0、开放访问；导入时保留署名、DOI、许可链接及原文件说明。访问流程仍要求用户正常登录，CC 许可不构成绕过认证的授权。",
+    "authors": [
+      "杨海艳",
+      "高鹏"
+    ],
+    "doi": "10.57841/casdc.0002039",
+    "sample_scope": "官方条目的完整两文件组合：17页性能数据PDF及配套说明DOCX，原始共2,067,725字节；另附本地生成的SOURCE.md。PDF是文档而非即用数值表，未验证图表数值的完整提取；不代表ChemDC全库。",
+    "download_date": "2026-09-07",
+    "inventory_complete": true,
+    "source_reported_file_count": 2,
+    "source_reported_total_size_bytes": 2067725,
+    "provenance": [
+      {
+        "path": "XDA21090200-009-In2O3-HZSM-5二氧化碳加氢制汽油催化剂的性能数据集-数据说明文件.docx",
+        "size": 25095,
+        "sha256": "f59edbb502ef89c556b716852571b456259ec2f7ad4a8bdfabc6adc32405b17a",
+        "role": "documentation",
+        "content_type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        "source_file_id": "64eff7629b76f3623c3c0a5d",
+        "source_tree_id": 1,
+        "download_url": null,
+        "acquisition_method": "用户通过官网正常下载后提供；不保存登录凭据或带认证参数的下载地址。"
+      },
+      {
+        "path": "XDA21090200-009-In2O3-HZSM-5二氧化碳加氢制汽油催化剂的性能数据集-数据集实体文件.pdf",
+        "size": 2042630,
+        "sha256": "dc80a929105e6e9429d16879801adb8c5b6327303029a51472d845d6b3dea993",
+        "role": "data",
+        "content_type": "application/pdf",
+        "source_file_id": "64eff7629b76f3623c3c0a5e",
+        "source_tree_id": 2,
+        "download_url": null,
+        "acquisition_method": "用户通过官网正常下载后提供；不保存登录凭据或带认证参数的下载地址。"
+      }
+    ],
+    "curated": true,
+    "catalog_version": 1,
+    "portal_detail_url": "http://chemdc.casdc.cn/dataDetails/b90ac8ae573c4e45a5127b6880dc9c65",
+    "sample_note": "官方条目的完整两文件组合：17页性能数据PDF及配套说明DOCX，原始共2,067,725字节；另附本地生成的SOURCE.md。PDF是文档而非即用数值表，未验证图表数值的完整提取；不代表ChemDC全库。",
+    "acquisition_mode": "user_provided_official_download",
+    "source_evidence_kind": "reviewed_official_metadata_and_user_provided_files",
+    "source_evidence": {
+      "schema_version": 1,
+      "dataset_id": "cn-chemdc-0002039",
+      "external_id": "10.57841/casdc.0002039",
+      "source_url": "https://doi.org/10.57841/casdc.0002039",
+      "portal_detail_url": "http://chemdc.casdc.cn/dataDetails/b90ac8ae573c4e45a5127b6880dc9c65",
+      "authors": [
+        "杨海艳",
+        "高鹏"
+      ],
+      "doi": "10.57841/casdc.0002039",
+      "license": "CC BY 4.0",
+      "license_url": "https://creativecommons.org/licenses/by/4.0/",
+      "acquisition_mode": "user_provided_official_download",
+      "reviewed_at": "2026-09-07",
+      "source_reported_file_count": 2,
+      "source_reported_total_size_bytes": 2067725,
+      "files": [
+        {
+          "path": "XDA21090200-009-In2O3-HZSM-5二氧化碳加氢制汽油催化剂的性能数据集-数据说明文件.docx",
+          "size": 25095,
+          "sha256": "f59edbb502ef89c556b716852571b456259ec2f7ad4a8bdfabc6adc32405b17a",
+          "role": "documentation",
+          "content_type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+          "source_file_id": "64eff7629b76f3623c3c0a5d",
+          "source_tree_id": 1,
+          "download_url": null,
+          "acquisition_method": "用户通过官网正常下载后提供；不保存登录凭据或带认证参数的下载地址。"
+        },
+        {
+          "path": "XDA21090200-009-In2O3-HZSM-5二氧化碳加氢制汽油催化剂的性能数据集-数据集实体文件.pdf",
+          "size": 2042630,
+          "sha256": "dc80a929105e6e9429d16879801adb8c5b6327303029a51472d845d6b3dea993",
+          "role": "data",
+          "content_type": "application/pdf",
+          "source_file_id": "64eff7629b76f3623c3c0a5e",
+          "source_tree_id": 2,
+          "download_url": null,
+          "acquisition_method": "用户通过官网正常下载后提供；不保存登录凭据或带认证参数的下载地址。"
+        }
+      ]
+    },
+    "source_evidence_sha256": "50e2310e3403a4d24e4cc271f34765e45f69a511fb6a7fa5d8f6b9ff01c538b1",
+    "recursive_file_count": 3,
+    "total_size_bytes": 2070363,
+    "readability_validation": {
+      "schema_version": 1,
+      "checked_at_unix": 1788745747,
+      "file_count": 2,
+      "total_bytes": 2067725,
+      "all_files_readable": true,
+      "scope": "offline structural/content readability; no scientific-quality, licensing or complete native-format guarantee",
+      "input_files_modified": false,
+      "downloaded_code_or_macros_executed": false,
+      "files": [
+        {
+          "path": "XDA21090200-009-In2O3-HZSM-5二氧化碳加氢制汽油催化剂的性能数据集-数据说明文件.docx",
+          "bytes": 25095,
+          "sha256": "f59edbb502ef89c556b716852571b456259ec2f7ad4a8bdfabc6adc32405b17a",
+          "format": "docx",
+          "status": "readable",
+          "parser": "zipfile+defusedxml",
+          "content_role": "document",
+          "zip_crc_verified": true,
+          "document_xml_verified": true,
+          "paragraph_count": 39,
+          "table_count": 0,
+          "table_row_count": 0,
+          "table_cell_count": 0,
+          "text_characters": 2577,
+          "embedded_macros_present": false,
+          "embedded_macros_executed": false,
+          "parser_warning_count": 0
+        },
+        {
+          "path": "XDA21090200-009-In2O3-HZSM-5二氧化碳加氢制汽油催化剂的性能数据集-数据集实体文件.pdf",
+          "bytes": 2042630,
+          "sha256": "dc80a929105e6e9429d16879801adb8c5b6327303029a51472d845d6b3dea993",
+          "format": "pdf",
+          "status": "readable",
+          "parser": "pymupdf",
+          "content_role": "document",
+          "page_count": 17,
+          "text_characters": 9797,
+          "pages_with_text": 17,
+          "pages_without_text": 0,
+          "ocr_performed": false,
+          "raw_numeric_table_readability_verified": false,
+          "parser_warning_count": 0
+        }
+      ]
+    }
+  },
+  "files": [
+    {
+      "path": "XDA21090200-009-In2O3-HZSM-5二氧化碳加氢制汽油催化剂的性能数据集-数据说明文件.docx",
+      "size": 25095,
+      "sha256": "f59edbb502ef89c556b716852571b456259ec2f7ad4a8bdfabc6adc32405b17a",
+      "role": "documentation",
+      "content_type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+    },
+    {
+      "path": "XDA21090200-009-In2O3-HZSM-5二氧化碳加氢制汽油催化剂的性能数据集-数据集实体文件.pdf",
+      "size": 2042630,
+      "sha256": "dc80a929105e6e9429d16879801adb8c5b6327303029a51472d845d6b3dea993",
+      "role": "data",
+      "content_type": "application/pdf"
+    },
+    {
+      "path": "SOURCE.md",
+      "size": 2638,
+      "sha256": "a75dbf0666ac26709cc6fd1a25c4457adf56004427dd39f80264119e763ccb89",
+      "role": "documentation",
+      "content_type": "text/markdown"
+    }
+  ]
+}

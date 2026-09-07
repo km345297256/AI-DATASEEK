@@ -1,6 +1,9 @@
+import copy
+import json
 from types import SimpleNamespace
 
 import pytest
+from pydantic import ValidationError
 
 from app.application.services import dataset_request_resolver as resolver_module
 from app.application.services.dataset_request_resolver import (
@@ -62,12 +65,14 @@ class _FakeModel:
     def __init__(self, responses):
         self.responses = list(responses)
         self.calls = 0
+        self.requests = []
 
     def bind(self, **_kwargs):
         return self
 
-    async def ainvoke(self, _messages):
+    async def ainvoke(self, messages):
         self.calls += 1
+        self.requests.append(messages)
         return SimpleNamespace(content=self.responses.pop(0))
 
 
@@ -80,6 +85,39 @@ def _resolver() -> DatasetRequestResolver:
     resolver = DatasetRequestResolver()
     resolver._policy_store = _EmptyPolicyStore()
     return resolver
+
+
+def _metadata_controller_payload(
+    *,
+    catalog_goal="dataset_metadata",
+    mode="catalog",
+    answer="",
+    catalog_queries=None,
+):
+    return {
+        "safety": {
+            "decision": "allow",
+            "risk_level": "low",
+            "categories": [],
+            "reason": "",
+            "suggestion": "",
+        },
+        "execution": {
+            "mode": mode,
+            "required_evidence": "catalog" if mode == "catalog" else "file_content",
+            "required_capabilities": [],
+            "requires_artifacts": False,
+            "target_files": [],
+        },
+        "catalog_goal": catalog_goal,
+        "answer": answer,
+        "catalog_queries": (
+            [{"operation": "dataset_metadata", "limit": 50}]
+            if catalog_queries is None
+            else catalog_queries
+        ),
+        "reason": "读取登记的数据集简介",
+    }
 
 
 def _resolution(*, mode="direct", answer="文件后缀名是 `.nc`。", safety=None):
@@ -332,6 +370,862 @@ async def test_invalid_controller_output_fails_closed_without_tools(monkeypatch)
     assert resolution.mode == "reject"
     assert resolution.decision.safety.categories == ["front_controller_unavailable"]
     assert model.calls == 1
+
+
+def test_front_controller_prompt_uses_a_schema_valid_concrete_example():
+    decision = RequestDecision.model_validate(
+        resolver_module.FRONT_CONTROLLER_PROMPT_EXAMPLE
+    )
+    query = CatalogQuery.model_validate(
+        resolver_module.FRONT_CONTROLLER_CATALOG_QUERY_EXAMPLE
+    )
+
+    assert decision.execution.mode == "sandbox"
+    assert query.operation == "filter_files"
+    assert "allow|reject" not in resolver_module.DECISION_PROMPT
+    assert "direct|catalog|sandbox" not in resolver_module.DECISION_PROMPT
+    assert "count|total_size" not in resolver_module.DECISION_PROMPT
+
+
+@pytest.mark.asyncio
+async def test_routing_schema_mismatch_is_repaired_once_with_locked_safety(monkeypatch):
+    locked_safety = {
+        "decision": "allow",
+        "risk_level": "low",
+        "categories": [],
+        "reason": "首次安全判定允许",
+        "suggestion": "",
+    }
+    invalid_payload = {
+        "safety": locked_safety,
+        "execution": {
+            "mode": "direct|catalog|sandbox",
+            "required_evidence": "file_content",
+        },
+        "catalog_goal": "lookup",
+        "answer": "",
+        "catalog_queries": [],
+        "reason": "需要读取文件",
+    }
+    repaired_payload = {
+        "safety": {
+            "decision": "allow",
+            "risk_level": "medium",
+            "categories": ["must_not_replace_locked_allow"],
+            "reason": "纠正阶段不得改写首次允许结论",
+            "suggestion": "",
+        },
+        "execution": {
+            "mode": "sandbox",
+            "required_evidence": "file_content",
+            "required_capabilities": ["python"],
+            "requires_artifacts": False,
+            "target_files": ["monthly/rain_195301.nc"],
+        },
+        "catalog_goal": "lookup",
+        "answer": "",
+        "catalog_queries": [],
+        "reason": "读取指定文件",
+    }
+    model = _FakeModel([
+        json.dumps(invalid_payload, ensure_ascii=False),
+        json.dumps(repaired_payload, ensure_ascii=False),
+    ])
+    monkeypatch.setattr(resolver_module, "create_chat_model", lambda *_args, **_kwargs: model)
+    monkeypatch.setattr(
+        resolver_module,
+        "get_settings",
+        lambda: SimpleNamespace(dataset_request_resolver_timeout_seconds=1),
+    )
+
+    resolution = await _resolver().resolve(
+        question="读取 rain_195301.nc 并分析",
+        datasets=[_dataset()],
+        events=[],
+    )
+
+    assert resolution.mode == "sandbox"
+    assert resolution.decision.safety.model_dump(mode="json") == locked_safety
+    assert resolution.target_files == ["monthly/rain_195301.nc"]
+    assert model.calls == 2
+    repair_message = model.requests[1][-1].content
+    assert repair_message.startswith(resolver_module.ROUTING_SCHEMA_REPAIR_PROMPT)
+    assert json.loads(repair_message.split(
+        "Validation errors (field and error type only):\n", 1
+    )[1]) == [{"loc": "execution.mode", "type": "literal_error"}]
+
+
+@pytest.mark.parametrize(
+    "extensions",
+    [
+        "",
+        " ",
+        ".",
+        ".nc,.csv",
+        ".nc .csv",
+        "*.nc",
+        "/tmp/file.nc",
+        ".tar.gz",
+        "." + "a" * 33,
+        {"extension": ".nc"},
+        123,
+        [".nc", None],
+        [".nc", {"extension": ".csv"}],
+    ],
+)
+def test_catalog_extensions_reject_ambiguous_shapes_without_dropping_filters(extensions):
+    with pytest.raises(ValidationError):
+        CatalogQuery(operation="filter_files", extensions=extensions)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("requires_repair", [False, True], ids=["initial", "repair"])
+@pytest.mark.parametrize("extensions", [None, ".nc", " NC "])
+async def test_catalog_extension_compatibility_preserves_all_filter_conditions(
+    monkeypatch,
+    extensions,
+    requires_repair,
+):
+    payload = _metadata_controller_payload(
+        catalog_goal="filtered_summary",
+        catalog_queries=[{
+            "operation": "filter_files",
+            "query": "monthly/",
+            "extensions": extensions,
+            "size_at_least_bytes": 200,
+            "return_files": True,
+        }],
+    )
+    responses = []
+    if requires_repair:
+        initial_payload = copy.deepcopy(payload)
+        initial_payload["catalog_queries"][0]["extensions"] = {
+            "private_unrecognized_filter": "do-not-repeat-this-value",
+        }
+        responses.append(json.dumps(initial_payload))
+        payload.pop("safety")
+    responses.append(json.dumps(payload))
+    model = _FakeModel(responses)
+    monkeypatch.setattr(resolver_module, "create_chat_model", lambda *_args, **_kwargs: model)
+    monkeypatch.setattr(
+        resolver_module,
+        "get_settings",
+        lambda: SimpleNamespace(dataset_request_resolver_timeout_seconds=1),
+    )
+    dataset = _dataset().model_copy(update={"files": [
+        *_dataset().files,
+        DatasetFile(path="monthly/stations.csv", size=768),
+        DatasetFile(path="annual/observations.nc", size=1024),
+    ]})
+
+    resolution = await _resolver().resolve(
+        question=(
+            "列出 monthly/ 目录中至少 200 字节的文件"
+            if extensions is None
+            else "列出 monthly/ 目录中至少 200 字节的 NetCDF 文件"
+        ),
+        datasets=[dataset],
+        events=[],
+    )
+
+    assert resolution.mode == "catalog"
+    assert resolution.controller_metadata["source"] == "catalog_executor"
+    assert "snow_195301.nc" in resolution.answer
+    assert "rain_195301.nc" not in resolution.answer
+    assert "observations.nc" not in resolution.answer
+    assert ("stations.csv" in resolution.answer) is (extensions is None)
+    assert resolution.decision.catalog_queries[0].extensions == (
+        [] if extensions is None else [extensions.strip()]
+    )
+    assert model.calls == (2 if requires_repair else 1)
+    if requires_repair:
+        repair_message = model.requests[1][-1].content
+        assert repair_message.startswith(resolver_module.ROUTING_SCHEMA_REPAIR_PROMPT)
+        assert json.loads(repair_message.split(
+            "Validation errors (field and error type only):\n", 1
+        )[1]) == [{"loc": "catalog_queries.0.extensions", "type": "list_type"}]
+        assert "private_unrecognized_filter" not in repair_message
+        assert "do-not-repeat-this-value" not in repair_message
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "extensions",
+    [{"extension": ".nc"}, ".nc,.csv", [".nc", {"extension": ".csv"}]],
+)
+async def test_repeated_invalid_catalog_extensions_still_fail_closed(monkeypatch, extensions):
+    payload = _metadata_controller_payload(
+        catalog_goal="filtered_summary",
+        catalog_queries=[{"operation": "filter_files", "extensions": extensions}],
+    )
+    model = _FakeModel([json.dumps(payload), json.dumps(payload)])
+    monkeypatch.setattr(resolver_module, "create_chat_model", lambda *_args, **_kwargs: model)
+    monkeypatch.setattr(
+        resolver_module,
+        "get_settings",
+        lambda: SimpleNamespace(dataset_request_resolver_timeout_seconds=1),
+    )
+
+    resolution = await _resolver().resolve(
+        question="列出 NetCDF 文件",
+        datasets=[_dataset()],
+        events=[],
+    )
+
+    assert resolution.mode == "reject"
+    assert resolution.decision.safety.categories == ["front_controller_unavailable"]
+    assert resolution.answer == ""
+    assert model.calls == 2
+
+
+@pytest.mark.asyncio
+async def test_repair_safety_rejection_takes_precedence(monkeypatch):
+    invalid_payload = {
+        "safety": {"decision": "allow", "risk_level": "low"},
+        "execution": {
+            "mode": "direct|catalog|sandbox",
+            "required_evidence": "file_content",
+        },
+        "catalog_queries": [],
+    }
+    repair_rejection = {
+        "safety": {
+            "decision": "reject",
+            "risk_level": "critical",
+            "categories": ["prompt_injection_or_jailbreak"],
+            "reason": "纠正阶段发现安全风险",
+            "suggestion": "移除越权指令",
+        },
+        "execution": {"mode": "still-invalid-and-unused"},
+    }
+    model = _FakeModel([
+        json.dumps(invalid_payload, ensure_ascii=False),
+        json.dumps(repair_rejection, ensure_ascii=False),
+    ])
+    monkeypatch.setattr(resolver_module, "create_chat_model", lambda *_args, **_kwargs: model)
+    monkeypatch.setattr(
+        resolver_module,
+        "get_settings",
+        lambda: SimpleNamespace(dataset_request_resolver_timeout_seconds=1),
+    )
+
+    resolution = await _resolver().resolve(
+        question="分析数据",
+        datasets=[_dataset()],
+        events=[],
+    )
+
+    assert resolution.mode == "reject"
+    assert resolution.decision.safety.categories == [
+        "prompt_injection_or_jailbreak"
+    ]
+    assert resolution.controller_metadata["source"] == "model"
+    assert model.calls == 2
+
+
+@pytest.mark.asyncio
+async def test_invalid_repair_safety_fails_closed(monkeypatch):
+    invalid_payload = {
+        "safety": {"decision": "allow", "risk_level": "low"},
+        "execution": {
+            "mode": "direct|catalog|sandbox",
+            "required_evidence": "file_content",
+        },
+        "catalog_queries": [],
+    }
+    invalid_repair_safety = {
+        "safety": {"decision": "allow|reject", "risk_level": "low"},
+        "execution": {
+            "mode": "sandbox",
+            "required_evidence": "file_content",
+        },
+        "catalog_queries": [],
+    }
+    model = _FakeModel([
+        json.dumps(invalid_payload, ensure_ascii=False),
+        json.dumps(invalid_repair_safety, ensure_ascii=False),
+    ])
+    monkeypatch.setattr(resolver_module, "create_chat_model", lambda *_args, **_kwargs: model)
+    monkeypatch.setattr(
+        resolver_module,
+        "get_settings",
+        lambda: SimpleNamespace(dataset_request_resolver_timeout_seconds=1),
+    )
+
+    resolution = await _resolver().resolve(
+        question="分析数据",
+        datasets=[_dataset()],
+        events=[],
+    )
+
+    assert resolution.mode == "reject"
+    assert resolution.decision.safety.categories == ["front_controller_unavailable"]
+    assert model.calls == 2
+
+
+@pytest.mark.asyncio
+async def test_invalid_safety_schema_fails_closed_without_repair(monkeypatch):
+    payload = {
+        "safety": {
+            "decision": "allow|reject",
+            "risk_level": "low",
+        },
+        "execution": {
+            "mode": "sandbox",
+            "required_evidence": "file_content",
+        },
+        "catalog_queries": [],
+    }
+    model = _FakeModel([json.dumps(payload, ensure_ascii=False)])
+    monkeypatch.setattr(resolver_module, "create_chat_model", lambda *_args, **_kwargs: model)
+    monkeypatch.setattr(
+        resolver_module,
+        "get_settings",
+        lambda: SimpleNamespace(dataset_request_resolver_timeout_seconds=1),
+    )
+
+    resolution = await _resolver().resolve(
+        question="分析数据",
+        datasets=[_dataset()],
+        events=[],
+    )
+
+    assert resolution.mode == "reject"
+    assert resolution.decision.safety.categories == ["front_controller_unavailable"]
+    assert model.calls == 1
+
+
+@pytest.mark.asyncio
+async def test_valid_safety_rejection_does_not_repair_unused_routing(monkeypatch):
+    payload = {
+        "safety": {
+            "decision": "reject",
+            "risk_level": "critical",
+            "categories": ["malware_or_dangerous_execution"],
+            "reason": "请求命中安全策略",
+            "suggestion": "移除危险操作",
+        },
+        "execution": {
+            "mode": "invalid-unused-mode",
+            "required_evidence": "file_content",
+        },
+        "catalog_queries": [],
+    }
+    model = _FakeModel([json.dumps(payload, ensure_ascii=False)])
+    monkeypatch.setattr(resolver_module, "create_chat_model", lambda *_args, **_kwargs: model)
+    monkeypatch.setattr(
+        resolver_module,
+        "get_settings",
+        lambda: SimpleNamespace(dataset_request_resolver_timeout_seconds=1),
+    )
+
+    resolution = await _resolver().resolve(
+        question="危险请求",
+        datasets=[_dataset()],
+        events=[],
+    )
+
+    assert resolution.mode == "reject"
+    assert resolution.decision.safety.categories == [
+        "malware_or_dangerous_execution"
+    ]
+    assert resolution.controller_metadata["source"] == "model"
+    assert model.calls == 1
+
+
+@pytest.mark.asyncio
+async def test_semantically_invalid_decision_is_not_schema_repaired(monkeypatch):
+    payload = {
+        "safety": {"decision": "allow", "risk_level": "low"},
+        "execution": {
+            "mode": "direct",
+            "required_evidence": "user_message",
+        },
+        "answer": "",
+        "catalog_queries": [],
+    }
+    model = _FakeModel([json.dumps(payload, ensure_ascii=False)])
+    monkeypatch.setattr(resolver_module, "create_chat_model", lambda *_args, **_kwargs: model)
+    monkeypatch.setattr(
+        resolver_module,
+        "get_settings",
+        lambda: SimpleNamespace(dataset_request_resolver_timeout_seconds=1),
+    )
+
+    resolution = await _resolver().resolve(
+        question="直接回答",
+        datasets=[_dataset()],
+        events=[],
+    )
+
+    assert resolution.mode == "reject"
+    assert resolution.decision.safety.categories == ["front_controller_unavailable"]
+    assert model.calls == 1
+
+
+@pytest.mark.asyncio
+async def test_dataset_metadata_goal_swap_is_repaired_only_for_matching_catalog_query(monkeypatch):
+    model = _FakeModel([
+        json.dumps(_metadata_controller_payload(), ensure_ascii=False),
+    ])
+    monkeypatch.setattr(resolver_module, "create_chat_model", lambda *_args, **_kwargs: model)
+    monkeypatch.setattr(
+        resolver_module,
+        "get_settings",
+        lambda: SimpleNamespace(dataset_request_resolver_timeout_seconds=1),
+    )
+    dataset = _dataset().model_copy(update={"description": "逐月气候观测数据"})
+
+    resolution = await _resolver().resolve(
+        question="这个数据集的简介是什么？",
+        datasets=[dataset],
+        events=[],
+    )
+
+    assert resolution.mode == "catalog"
+    assert resolution.decision.catalog_goal == "summary"
+    assert [query.operation for query in resolution.decision.catalog_queries] == ["dataset_metadata"]
+    assert resolution.controller_metadata["source"] == "catalog_executor"
+    assert "逐月气候观测数据" in resolution.answer
+    assert model.calls == 1
+
+
+@pytest.mark.asyncio
+async def test_valid_summary_goal_with_dataset_metadata_query_is_unchanged(monkeypatch):
+    model = _FakeModel([
+        json.dumps(
+            _metadata_controller_payload(catalog_goal="summary"),
+            ensure_ascii=False,
+        ),
+    ])
+    monkeypatch.setattr(resolver_module, "create_chat_model", lambda *_args, **_kwargs: model)
+    monkeypatch.setattr(
+        resolver_module,
+        "get_settings",
+        lambda: SimpleNamespace(dataset_request_resolver_timeout_seconds=1),
+    )
+
+    resolution = await _resolver().resolve(
+        question="展示数据集元数据",
+        datasets=[_dataset()],
+        events=[],
+    )
+
+    assert resolution.mode == "catalog"
+    assert resolution.decision.catalog_goal == "summary"
+    assert [query.operation for query in resolution.decision.catalog_queries] == ["dataset_metadata"]
+    assert resolution.controller_metadata["source"] == "catalog_executor"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("question", "coverage_field", "coverage"),
+    [
+        ("这个数据集的空间范围是多少？", "spatial_coverage", "73.5°E–135.1°E，18.2°N–53.6°N"),
+        ("这个数据集的时间范围是多少？", "temporal_coverage", "2011-2020"),
+        ("What is this dataset's spatial extent?", "spatial_coverage", "Qilian Mountains"),
+        ("What is this dataset's temporal coverage?", "temporal_coverage", "2011-2020"),
+    ],
+    ids=["spatial-zh", "temporal-zh", "spatial-en", "temporal-en"],
+)
+async def test_registered_metadata_coverage_stays_in_catalog_and_is_rendered(
+    monkeypatch,
+    question,
+    coverage_field,
+    coverage,
+):
+    model = _FakeModel([
+        json.dumps(
+            _metadata_controller_payload(catalog_goal="summary"),
+            ensure_ascii=False,
+        ),
+    ])
+    monkeypatch.setattr(resolver_module, "create_chat_model", lambda *_args, **_kwargs: model)
+    monkeypatch.setattr(
+        resolver_module,
+        "get_settings",
+        lambda: SimpleNamespace(dataset_request_resolver_timeout_seconds=1),
+    )
+    dataset = _dataset().model_copy(update={coverage_field: coverage})
+
+    resolution = await _resolver().resolve(
+        question=question,
+        datasets=[dataset],
+        events=[],
+    )
+
+    assert resolution.mode == "catalog"
+    assert resolution.controller_metadata["source"] == "catalog_executor"
+    assert coverage in resolution.answer
+    assert model.calls == 1
+
+
+@pytest.mark.asyncio
+async def test_registered_coverage_preserves_other_catalog_queries(monkeypatch):
+    payload = _metadata_controller_payload(
+        catalog_goal="summary",
+        catalog_queries=[
+            {"operation": "inventory_summary", "limit": 50},
+        ],
+    )
+    model = _FakeModel([json.dumps(payload, ensure_ascii=False)])
+    monkeypatch.setattr(resolver_module, "create_chat_model", lambda *_args, **_kwargs: model)
+    monkeypatch.setattr(
+        resolver_module,
+        "get_settings",
+        lambda: SimpleNamespace(dataset_request_resolver_timeout_seconds=1),
+    )
+    dataset = _dataset().model_copy(update={"spatial_coverage": "祁连山国家公园"})
+
+    resolution = await _resolver().resolve(
+        question="这个数据集的空间范围和文件数量是多少？",
+        datasets=[dataset],
+        events=[],
+    )
+
+    assert resolution.mode == "catalog"
+    assert [
+        query.operation for query in resolution.decision.catalog_queries
+    ] == ["inventory_summary", "dataset_metadata"]
+    assert "祁连山国家公园" in resolution.answer
+    assert "共有 2 个文件" in resolution.answer
+
+
+@pytest.mark.asyncio
+async def test_registered_coverage_replaces_direct_answer_with_catalog_evidence(monkeypatch):
+    payload = _metadata_controller_payload(
+        catalog_goal="summary",
+        mode="direct",
+        answer="模型猜测的范围",
+        catalog_queries=[],
+    )
+    model = _FakeModel([json.dumps(payload, ensure_ascii=False)])
+    monkeypatch.setattr(resolver_module, "create_chat_model", lambda *_args, **_kwargs: model)
+    monkeypatch.setattr(
+        resolver_module,
+        "get_settings",
+        lambda: SimpleNamespace(dataset_request_resolver_timeout_seconds=1),
+    )
+    dataset = _dataset().model_copy(update={"spatial_coverage": "祁连山国家公园"})
+
+    resolution = await _resolver().resolve(
+        question="这个数据集的空间范围是多少？",
+        datasets=[dataset],
+        events=[],
+    )
+
+    assert resolution.mode == "catalog"
+    assert resolution.controller_metadata["source"] == "catalog_executor"
+    assert "祁连山国家公园" in resolution.answer
+    assert "模型猜测的范围" not in resolution.answer
+    assert [
+        query.operation for query in resolution.decision.catalog_queries
+    ] == ["dataset_metadata"]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "question",
+    [
+        "这个数据集的空间范围是多少？",
+        "这个数据集的时间范围是多少？",
+        "What is this dataset's spatial extent?",
+        "What is this dataset's temporal coverage?",
+    ],
+    ids=["spatial-zh", "temporal-zh", "spatial-en", "temporal-en"],
+)
+async def test_missing_requested_metadata_coverage_escalates_to_sandbox(monkeypatch, question):
+    model = _FakeModel([
+        json.dumps(
+            _metadata_controller_payload(catalog_goal="summary"),
+            ensure_ascii=False,
+        ),
+    ])
+    monkeypatch.setattr(resolver_module, "create_chat_model", lambda *_args, **_kwargs: model)
+    monkeypatch.setattr(
+        resolver_module,
+        "get_settings",
+        lambda: SimpleNamespace(dataset_request_resolver_timeout_seconds=1),
+    )
+
+    resolution = await _resolver().resolve(
+        question=question,
+        datasets=[_dataset()],
+        events=[],
+    )
+
+    assert resolution.mode == "sandbox"
+    assert resolution.decision.execution.required_evidence == "file_content"
+    assert resolution.decision.catalog_queries == []
+    assert resolution.answer == ""
+    assert resolution.controller_metadata["source"] == "catalog_fallback"
+    assert model.calls == 1
+
+
+@pytest.mark.asyncio
+async def test_missing_coverage_does_not_escalate_unrelated_dataset_metadata(monkeypatch):
+    model = _FakeModel([
+        json.dumps(
+            _metadata_controller_payload(catalog_goal="summary"),
+            ensure_ascii=False,
+        ),
+    ])
+    monkeypatch.setattr(resolver_module, "create_chat_model", lambda *_args, **_kwargs: model)
+    monkeypatch.setattr(
+        resolver_module,
+        "get_settings",
+        lambda: SimpleNamespace(dataset_request_resolver_timeout_seconds=1),
+    )
+    dataset = _dataset().model_copy(update={
+        "description": "逐月气候观测数据",
+        "spatial_coverage": "祁连山国家公园",
+        "temporal_coverage": "2011-2020",
+    })
+
+    resolution = await _resolver().resolve(
+        question="这个数据集的简介是什么？",
+        datasets=[dataset],
+        events=[],
+    )
+
+    assert resolution.mode == "catalog"
+    assert resolution.controller_metadata["source"] == "catalog_executor"
+    assert "逐月气候观测数据" in resolution.answer
+    assert "祁连山国家公园" not in resolution.answer
+    assert "2011-2020" not in resolution.answer
+    assert model.calls == 1
+
+
+@pytest.mark.asyncio
+async def test_exact_coordinate_bounds_always_use_file_evidence(monkeypatch):
+    model = _FakeModel([
+        json.dumps(
+            _metadata_controller_payload(catalog_goal="summary"),
+            ensure_ascii=False,
+        ),
+    ])
+    monkeypatch.setattr(resolver_module, "create_chat_model", lambda *_args, **_kwargs: model)
+    monkeypatch.setattr(
+        resolver_module,
+        "get_settings",
+        lambda: SimpleNamespace(dataset_request_resolver_timeout_seconds=1),
+    )
+    dataset = _dataset().model_copy(update={"spatial_coverage": "祁连山国家公园"})
+
+    resolution = await _resolver().resolve(
+        question="这个数据集的经纬度范围是多少？",
+        datasets=[dataset],
+        events=[],
+    )
+
+    assert resolution.mode == "sandbox"
+    assert resolution.decision.execution.required_evidence == "file_content"
+    assert resolution.controller_metadata["source"] == "catalog_fallback"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "payload",
+    [
+        _metadata_controller_payload(
+            catalog_goal="summary",
+            mode="direct",
+            answer="经纬度范围是 70 至 140 度。",
+            catalog_queries=[],
+        ),
+        _metadata_controller_payload(
+            catalog_goal="summary",
+            catalog_queries=[{"operation": "inventory_summary", "limit": 50}],
+        ),
+    ],
+    ids=["direct", "wrong-catalog-operation"],
+)
+async def test_exact_coordinate_bounds_cannot_bypass_file_evidence(monkeypatch, payload):
+    model = _FakeModel([json.dumps(payload, ensure_ascii=False)])
+    monkeypatch.setattr(resolver_module, "create_chat_model", lambda *_args, **_kwargs: model)
+    monkeypatch.setattr(
+        resolver_module,
+        "get_settings",
+        lambda: SimpleNamespace(dataset_request_resolver_timeout_seconds=1),
+    )
+    dataset = _dataset().model_copy(update={"spatial_coverage": "祁连山国家公园"})
+
+    resolution = await _resolver().resolve(
+        question="这个数据集的经纬度范围是多少？",
+        datasets=[dataset],
+        events=[],
+    )
+
+    assert resolution.mode == "sandbox"
+    assert resolution.answer == ""
+    assert resolution.decision.execution.required_evidence == "file_content"
+    assert resolution.decision.catalog_queries == []
+    assert resolution.controller_metadata["source"] == "catalog_fallback"
+
+
+@pytest.mark.asyncio
+async def test_coverage_fallback_preserves_validated_target_file(monkeypatch):
+    payload = _metadata_controller_payload(catalog_goal="summary")
+    payload["execution"]["target_files"] = ["monthly/rain_195301.nc"]
+    model = _FakeModel([json.dumps(payload, ensure_ascii=False)])
+    monkeypatch.setattr(resolver_module, "create_chat_model", lambda *_args, **_kwargs: model)
+    monkeypatch.setattr(
+        resolver_module,
+        "get_settings",
+        lambda: SimpleNamespace(dataset_request_resolver_timeout_seconds=1),
+    )
+
+    resolution = await _resolver().resolve(
+        question="rain_195301.nc 的空间范围是多少？",
+        datasets=[_dataset()],
+        events=[],
+    )
+
+    assert resolution.mode == "sandbox"
+    assert resolution.target_files == ["monthly/rain_195301.nc"]
+    assert resolution.decision.execution.target_files == ["monthly/rain_195301.nc"]
+
+
+@pytest.mark.asyncio
+async def test_partial_coverage_across_datasets_uses_file_evidence(monkeypatch):
+    model = _FakeModel([
+        json.dumps(
+            _metadata_controller_payload(catalog_goal="summary"),
+            ensure_ascii=False,
+        ),
+    ])
+    monkeypatch.setattr(resolver_module, "create_chat_model", lambda *_args, **_kwargs: model)
+    monkeypatch.setattr(
+        resolver_module,
+        "get_settings",
+        lambda: SimpleNamespace(dataset_request_resolver_timeout_seconds=1),
+    )
+    complete = _dataset().model_copy(update={"spatial_coverage": "祁连山国家公园"})
+    incomplete = _dataset().model_copy(update={
+        "dataset_id": "dataset-2",
+        "name": "Second climate dataset",
+    })
+
+    resolution = await _resolver().resolve(
+        question="这两个数据集的空间范围分别是什么？",
+        datasets=[complete, incomplete],
+        events=[],
+    )
+
+    assert resolution.mode == "sandbox"
+    assert resolution.controller_metadata["source"] == "catalog_fallback"
+
+
+@pytest.mark.asyncio
+async def test_any_missing_requested_coverage_field_uses_file_evidence(monkeypatch):
+    model = _FakeModel([
+        json.dumps(
+            _metadata_controller_payload(catalog_goal="summary"),
+            ensure_ascii=False,
+        ),
+    ])
+    monkeypatch.setattr(resolver_module, "create_chat_model", lambda *_args, **_kwargs: model)
+    monkeypatch.setattr(
+        resolver_module,
+        "get_settings",
+        lambda: SimpleNamespace(dataset_request_resolver_timeout_seconds=1),
+    )
+    dataset = _dataset().model_copy(update={"spatial_coverage": "祁连山国家公园"})
+
+    resolution = await _resolver().resolve(
+        question="这个数据集的空间范围和时间范围是什么？",
+        datasets=[dataset],
+        events=[],
+    )
+
+    assert resolution.mode == "sandbox"
+    assert resolution.controller_metadata["source"] == "catalog_fallback"
+
+
+@pytest.mark.parametrize(
+    "question",
+    [
+        "这个数据集占用多少存储空间？",
+        "这次分析的运行时间是多少？",
+        "请分析空间分布和时间趋势。",
+        "How much storage space does this dataset use?",
+        "What was the analysis runtime?",
+    ],
+)
+def test_unrelated_space_and_time_phrases_are_not_coverage_requests(question):
+    assert DatasetRequestResolver._requested_coverage_fields(question) == []
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "payload",
+    [
+        _metadata_controller_payload(mode="sandbox"),
+        _metadata_controller_payload(
+            catalog_queries=[{"operation": "inventory_summary", "limit": 50}],
+        ),
+        _metadata_controller_payload(answer="模型不应为 catalog 模式直接作答"),
+        _metadata_controller_payload(
+            catalog_queries=[
+                {"operation": "dataset_metadata", "limit": 50},
+                {"operation": "dataset_metadata", "limit": 50},
+            ],
+        ),
+        _metadata_controller_payload(catalog_goal="unknown_goal"),
+    ],
+    ids=[
+        "wrong-mode",
+        "wrong-query-operation",
+        "non-empty-answer",
+        "multiple-queries",
+        "unknown-goal",
+    ],
+)
+async def test_dataset_metadata_goal_swap_mismatch_still_fails_closed(monkeypatch, payload):
+    invalid_response = json.dumps(payload, ensure_ascii=False)
+    model = _FakeModel([invalid_response, invalid_response])
+    monkeypatch.setattr(resolver_module, "create_chat_model", lambda *_args, **_kwargs: model)
+    monkeypatch.setattr(
+        resolver_module,
+        "get_settings",
+        lambda: SimpleNamespace(dataset_request_resolver_timeout_seconds=1),
+    )
+
+    resolution = await _resolver().resolve(
+        question="展示数据集元数据",
+        datasets=[_dataset()],
+        events=[],
+    )
+
+    assert resolution.mode == "reject"
+    assert resolution.decision.safety.categories == ["front_controller_unavailable"]
+    assert resolution.controller_metadata["source"] == "failure"
+    assert model.calls == 2
+
+
+@pytest.mark.asyncio
+async def test_dataset_metadata_goal_swap_does_not_mutate_parsed_payload(monkeypatch):
+    payload = _metadata_controller_payload()
+    original = copy.deepcopy(payload)
+    model = _FakeModel(["ignored because the parser is controlled by this test"])
+    monkeypatch.setattr(resolver_module, "create_chat_model", lambda *_args, **_kwargs: model)
+    monkeypatch.setattr(resolver_module, "parse_json_lenient", lambda _raw: payload)
+    monkeypatch.setattr(
+        resolver_module,
+        "get_settings",
+        lambda: SimpleNamespace(dataset_request_resolver_timeout_seconds=1),
+    )
+
+    resolution = await _resolver().resolve(
+        question="展示数据集元数据",
+        datasets=[_dataset()],
+        events=[],
+    )
+
+    assert resolution.mode == "catalog"
+    assert resolution.decision.catalog_goal == "summary"
+    assert payload == original
+    assert payload["catalog_goal"] == "dataset_metadata"
 
 
 def test_catalog_query_service_exposes_only_logical_catalog_metadata():

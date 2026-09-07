@@ -542,6 +542,10 @@ def test_plan_act_flow_passes_file_storage_only_to_vision(monkeypatch):
         def __init__(self, *args, **kwargs):
             pass
 
+        @staticmethod
+        def get_tools():
+            return []
+
     class FakeAgent:
         def __init__(self, *args, **kwargs):
             captured.setdefault(self.__class__.__name__, kwargs)
@@ -578,7 +582,7 @@ def test_plan_act_flow_passes_file_storage_only_to_vision(monkeypatch):
         session_repository=object(),
         sandbox=object(),
         browser=object(),
-        mcp_tool=object(),
+        mcp_tool=FakeToolkit(),
         file_storage=file_storage,
     )
 

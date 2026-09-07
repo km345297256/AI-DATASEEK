@@ -1,0 +1,46 @@
+{
+  "dataset_id": "pdb-ubiquitin",
+  "external_id": "pdb-ubiquitin",
+  "data_center_id": "international-open-catalog",
+  "data_center_name": "RCSB Protein Data Bank / S. Vijay-Kumar、C. E. Bugg 与 W. J. Cook",
+  "name": "RCSB 泛素蛋白晶体结构（1UBQ）",
+  "description": "RCSB PDB 发布的人类泛素蛋白实验结构，PDB 编号 1UBQ，分辨率 1.80 Å。保留完整原始 PDB 文件，适合检查原子组成、蛋白链、残基与分子几何，并与小蛋白结构开展比较。 公开数据库单个完整条目；适用 chemistry Preset 中的 molecular 工具。引用原论文 DOI 10.1016/0022-2836(87)90679-6。",
+  "domain": "chemistry",
+  "data_type": "PDB",
+  "tags": [
+    "chemistry",
+    "PDB",
+    "开放数据"
+  ],
+  "metadata": {
+    "curated": true,
+    "catalog_version": 1,
+    "publisher": "RCSB Protein Data Bank / S. Vijay-Kumar、C. E. Bugg 与 W. J. Cook",
+    "source_url": "https://www.rcsb.org/structure/1UBQ",
+    "license": "CC0-1.0",
+    "license_url": "https://www.rcsb.org/pages/usage-policy",
+    "sample_scope": "完整 PDB 条目 · 原始结构文件",
+    "sample_note": "公开数据库单个完整条目；适用 chemistry Preset 中的 molecular 工具。引用原论文 DOI 10.1016/0022-2836(87)90679-6。",
+    "provenance": [
+      {
+        "path": "1UBQ.pdb",
+        "download_url": "https://files.rcsb.org/download/1UBQ.pdb",
+        "sha256": "d4a6812d8951cf6594e6a0763f089e35f5a80b62acb3c117b2c5565228a7b161",
+        "size": 78570
+      }
+    ],
+    "inventory_complete": true,
+    "recursive_file_count": 1,
+    "total_size_bytes": 78570
+  },
+  "files": [
+    {
+      "path": "1UBQ.pdb",
+      "size": 78570,
+      "sha256": "d4a6812d8951cf6594e6a0763f089e35f5a80b62acb3c117b2c5565228a7b161",
+      "role": "data",
+      "content_type": "chemical/x-pdb"
+    }
+  ]
+}
+

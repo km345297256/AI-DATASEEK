@@ -79,7 +79,10 @@ class PlannerAgent(BaseAgent):
         )
         async for event in self.execute(message):
             if isinstance(event, MessageEvent):
-                logger.info(event.message)
+                logger.info(
+                    "Planner create-plan model output chars=%d",
+                    len(event.message or ""),
+                )
                 parsed_response = await self._parse_json(event.message)
                 parsed_response = self._sanitize_plan_payload(parsed_response)
                 plan = Plan.model_validate(parsed_response)
@@ -95,7 +98,10 @@ class PlannerAgent(BaseAgent):
         message = UPDATE_PLAN_PROMPT.format(plan=plan.dump_json(), step=step.model_dump_json())
         async for event in self.execute(message):
             if isinstance(event, MessageEvent):
-                logger.debug(f"Planner agent update plan: {event.message}")
+                logger.debug(
+                    "Planner update-plan model output chars=%d",
+                    len(event.message or ""),
+                )
                 parsed_response = await self._parse_json(event.message)
                 parsed_response = self._sanitize_plan_payload(parsed_response)
                 updated_plan = Plan.model_validate(parsed_response)

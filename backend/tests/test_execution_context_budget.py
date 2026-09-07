@@ -21,6 +21,8 @@ from app.domain.services.agents.base import BaseAgent
 from app.domain.services.agents.execution import ExecutionAgent
 from app.domain.models.tool_result import ToolResult
 from app.domain.services.prompts.execution import EXECUTION_PROMPT
+from app.domain.models.spill import SpillArtifactNotice, SpillArtifactRef
+from app.domain.services.tools.spill_projection import SPILL_PROJECTION_KEY
 
 
 def _preview_dataset(
@@ -316,6 +318,69 @@ async def test_compiled_dataset_analysis_runs_once_and_returns_validated_result(
     ]
     final = next(event for event in events if isinstance(event, MessageEvent))
     assert json.loads(final.message) == result_payload
+
+
+@pytest.mark.asyncio
+async def test_compiled_dataset_spill_message_excludes_preview_and_locator():
+    agent = object.__new__(ExecutionAgent)
+    agent.ask_with_messages = AsyncMock(
+        return_value=AIMessage(content='{"python_code":"print(1)"}')
+    )
+    agent._parse_json = AsyncMock(return_value={"python_code": "print('analysis')"})
+    agent.get_tool = lambda name: SimpleNamespace(
+        toolkit=SimpleNamespace(name="shell"),
+        name=name,
+    ) if name == "shell_run" else None
+    private_result = "Authorization: Bearer private-token /Users/alice/data.csv"
+    result_payload = {
+        "success": True,
+        "result": private_result,
+        "attachments": ["/home/ubuntu/output/chart.png"],
+    }
+    projected = ToolResult(
+        success=True,
+        data={"spill": SpillArtifactNotice(
+            status="stored",
+            reference=SpillArtifactRef(
+                locator="spill://artifact/0123456789abcdef0123456789abcdef",
+                byte_count=100_000,
+                sha256="a" * 64,
+                media_type="text/plain; charset=utf-8",
+                retrieval_hint="Use spill_artifact_read.",
+            ),
+            preview=private_result,
+            original_bytes=100_000,
+            retained_bytes=len(private_result.encode("utf-8")),
+            omitted_bytes=100_000 - len(private_result.encode("utf-8")),
+        ).model_dump(mode="python")},
+    )
+    rendered = json.dumps(result_payload, ensure_ascii=False)
+    agent.invoke_tool = AsyncMock(return_value=ToolMessage(
+        tool_call_id="",
+        name="shell_run",
+        content=projected.model_dump_json(),
+        artifact=ToolResult(
+            success=True,
+            data={"status": "completed", "returncode": 0, "output": rendered},
+        ),
+        additional_kwargs={SPILL_PROJECTION_KEY: projected},
+    ))
+
+    events = [
+        event
+        async for event in agent._execute_compiled_dataset_analysis(
+            "绘制降水空间分布图",
+            message=Message(message="绘制降水空间分布图", datasets=[_preview_dataset()]),
+        )
+    ]
+
+    final = next(event for event in events if isinstance(event, MessageEvent))
+    assert "private-token" not in final.message
+    assert "/Users/alice" not in final.message
+    assert "spill://artifact/" not in final.message
+    assert json.loads(final.message)["attachments"] == [
+        "/home/ubuntu/output/chart.png"
+    ]
 
 
 def _compiled_tool_result(payload: dict, *, output: str | None = None) -> ToolMessage:
@@ -2192,6 +2257,70 @@ async def test_waiting_answer_preserves_ask_user_tool_transcript_for_one_step():
         )
     ]
     agent.reset_context.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_waiting_answer_discards_placeholder_ask_user_transcript():
+    memory = Memory(messages=[
+        SystemMessage(content="system"),
+        HumanMessage(content="analyze the data"),
+        AIMessage(content="", tool_calls=[{
+            "name": "message_ask_user",
+            "args": {"text": "placeholder - do not send"},
+            "id": "ask-placeholder",
+        }]),
+    ])
+    repository = SimpleNamespace(save_memory=AsyncMock())
+    agent = object.__new__(ExecutionAgent)
+    agent.memory = memory
+    agent._repository = repository
+    agent._agent_id = "agent-wait-placeholder"
+    agent.name = "execution"
+
+    resumed = await agent.roll_back(Message(message="重新分析空间范围"))
+
+    assert resumed is False
+    assert [message.type for message in memory.messages] == ["system", "human"]
+    assert agent._consume_preserved_context_marker() is False
+    repository.save_memory.assert_awaited_once_with(
+        "agent-wait-placeholder",
+        "execution",
+        memory,
+    )
+
+
+@pytest.mark.asyncio
+async def test_waiting_answer_resumes_first_substantive_ask_after_placeholder():
+    memory = Memory(messages=[
+        SystemMessage(content="system"),
+        HumanMessage(content="analyze the data"),
+        AIMessage(content="", tool_calls=[
+            {
+                "name": "message_ask_user",
+                "args": {"text": "placeholder - do not send"},
+                "id": "ask-placeholder",
+            },
+            {
+                "name": "message_ask_user",
+                "args": {"text": "Which year?"},
+                "id": "ask-valid",
+            },
+        ]),
+    ])
+    repository = SimpleNamespace(save_memory=AsyncMock())
+    agent = object.__new__(ExecutionAgent)
+    agent.memory = memory
+    agent._repository = repository
+    agent._agent_id = "agent-wait-mixed"
+    agent.name = "execution"
+
+    resumed = await agent.roll_back(Message(message="2024"))
+
+    assert resumed is True
+    assert memory.messages[-1].type == "tool"
+    assert memory.messages[-1].tool_call_id == "ask-valid"
+    assert memory.messages[-1].content == "2024"
+    assert agent._consume_preserved_context_marker() is True
 
 
 @pytest.mark.asyncio

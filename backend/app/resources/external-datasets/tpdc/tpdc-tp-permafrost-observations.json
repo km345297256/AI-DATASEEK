@@ -1,0 +1,117 @@
+{
+  "dataset_id": "tpdc-tp-permafrost-observations",
+  "external_id": "789e838e-16ac-4539-bb7e-906217305a1d",
+  "data_center_id": "reviewed-tpdc-catalog",
+  "data_center_name": "国家青藏高原科学数据中心",
+  "name": "青藏高原多年冻土综合监测数据集（2002-2018）",
+  "description": "包括6个自动气象站、12个活动层观测点及84个钻孔的多要素时序，涵盖气象、土壤水热、活动层厚度和冻土地温。",
+  "domain": "geoscience",
+  "data_type": "XLSX / DOCX",
+  "tags": [
+    "geoscience",
+    "国家青藏高原科学数据中心",
+    "公开数据"
+  ],
+  "metadata": {
+    "curated": true,
+    "catalog_version": 1,
+    "source_catalog": "tpdc",
+    "publisher": "国家青藏高原科学数据中心",
+    "source_url": "https://data.tpdc.ac.cn/zh-hans/data/789e838e-16ac-4539-bb7e-906217305a1d",
+    "license": "CC BY-NC-SA 4.0",
+    "license_url": "https://creativecommons.org/licenses/by-nc-sa/4.0/",
+    "license_details": "官方许可原文：Attribution-NonCommercial-ShareAlike 4.0 International (CC BY-NC-SA 4.0)。公开共享策略 A/online；需注明数据作者、国家青藏高原科学数据中心及数据/文章引用要求；限非商业使用，演绎须相同方式共享。 DOI: 10.11888/Geocry.tpdc.271107",
+    "sample_scope": "原官方全包；各观测点的实际时间覆盖可能不同。",
+    "sample_note": "原官方全包；各观测点的实际时间覆盖可能不同。",
+    "authors": [
+      "赵林",
+      "胡国杰",
+      "邹德富",
+      "吴通华",
+      "杜二计",
+      "刘广岳",
+      "肖瑶",
+      "李韧",
+      "庞强强",
+      "乔永平",
+      "吴晓东",
+      "孙哲",
+      "幸赞品",
+      "盛煜",
+      "赵拥华",
+      "史健宗",
+      "谢昌卫",
+      "汪凌霄",
+      "王翀",
+      "程国栋"
+    ],
+    "doi": "10.11888/Geocry.tpdc.271107",
+    "source_version": "",
+    "source_descriptor_sha256": "dd174711ad74fc99d3f58a5cd1d7ae888ff401973c46fbb63f3da76aa4cc328b",
+    "download_date": "2026-09-07",
+    "provenance": [
+      {
+        "path": "tpdc-tp-permafrost-observations.zip",
+        "size": 5211806,
+        "sha256": "48124dedc627aaa4ae059944c6eafd91089180f2f42d08d490b052e60764d1eb",
+        "role": "data",
+        "content_type": "application/zip",
+        "download_url": "https://data.tpdc.ac.cn/file/file/batchDownloadFile?metadataId=789e838e-16ac-4539-bb7e-906217305a1d"
+      }
+    ],
+    "inventory_complete": true,
+    "recursive_file_count": 7,
+    "total_size_bytes": 10488311
+  },
+  "files": [
+    {
+      "path": "SOURCE.md",
+      "size": 1443,
+      "sha256": "fe7e5b1f380bd70cf61ca7f6cabc2c1760167c38fbbadc5cdfcb9a514039eb81",
+      "role": "documentation",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/tpdc-tp-permafrost-observations/青藏高原多年冻土综合监测数据集（2002-2018）/Active layer of ground temperature.xlsx",
+      "size": 2126387,
+      "sha256": "16f7c92ae6ce8b7c3e38087c499b325aba5ce7247f5f1c373312d1caf19ed277",
+      "role": "data",
+      "content_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    },
+    {
+      "path": "extracted/tpdc-tp-permafrost-observations/青藏高原多年冻土综合监测数据集（2002-2018）/Active layer of soil moisture.xlsx",
+      "size": 1196654,
+      "sha256": "6ef66fa22cd6afd39fa7eda408a172964b999f126013be6137faff29daac47ae",
+      "role": "data",
+      "content_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    },
+    {
+      "path": "extracted/tpdc-tp-permafrost-observations/青藏高原多年冻土综合监测数据集（2002-2018）/Ground temperature dataset.xlsx",
+      "size": 25577,
+      "sha256": "25bf8a9915b2decd98510ad555495f0537273784ecb65228481d5dad6ef8f47c",
+      "role": "data",
+      "content_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    },
+    {
+      "path": "extracted/tpdc-tp-permafrost-observations/青藏高原多年冻土综合监测数据集（2002-2018）/Meteorological dataset.xlsx",
+      "size": 1905902,
+      "sha256": "bc699edd9f32857ca99c12ff375284ddcc7e2530b3d0ecdf7fd42def175e9a48",
+      "role": "data",
+      "content_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    },
+    {
+      "path": "extracted/tpdc-tp-permafrost-observations/青藏高原多年冻土综合监测数据集（2002-2018）/Supplement Table_Location  information.docx",
+      "size": 20542,
+      "sha256": "7da26b60aea3efbd4e3a2d649f0cc75fd77206b9a72dd802885fa624dc924eda",
+      "role": "data",
+      "content_type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+    },
+    {
+      "path": "tpdc-tp-permafrost-observations.zip",
+      "size": 5211806,
+      "sha256": "48124dedc627aaa4ae059944c6eafd91089180f2f42d08d490b052e60764d1eb",
+      "role": "data",
+      "content_type": "application/zip"
+    }
+  ]
+}

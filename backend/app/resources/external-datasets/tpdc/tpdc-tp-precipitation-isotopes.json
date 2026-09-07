@@ -1,0 +1,70 @@
+{
+  "dataset_id": "tpdc-tp-precipitation-isotopes",
+  "external_id": "8b5495b9-7d52-41e8-ba62-8c06e7131950",
+  "data_center_id": "reviewed-tpdc-catalog",
+  "data_center_name": "国家青藏高原科学数据中心",
+  "name": "青藏高原降水稳定氧18同位素数据集（1991–2008）",
+  "description": "高原20多个站点的月尺度降水δ18O汇总，适合比较西风、印度季风及过渡区域的同位素—温度—降水联系。",
+  "domain": "geoscience",
+  "data_type": "XLS",
+  "tags": [
+    "geoscience",
+    "国家青藏高原科学数据中心",
+    "公开数据"
+  ],
+  "metadata": {
+    "curated": true,
+    "catalog_version": 1,
+    "source_catalog": "tpdc",
+    "publisher": "国家青藏高原科学数据中心",
+    "source_url": "https://data.tpdc.ac.cn/zh-hans/data/8b5495b9-7d52-41e8-ba62-8c06e7131950",
+    "license": "CC BY-NC-SA 4.0",
+    "license_url": "https://creativecommons.org/licenses/by-nc-sa/4.0/",
+    "license_details": "官方许可原文：Attribution-NonCommercial-ShareAlike 4.0 International (CC BY-NC-SA 4.0)。公开共享策略 A/online；需注明数据作者、国家青藏高原科学数据中心及数据/文章引用要求；限非商业使用，演绎须相同方式共享。 DOI: 10.11888/Geogra.tpdc.270940",
+    "sample_scope": "原官方全包；月尺度站点数据，不是全国格点降水。",
+    "sample_note": "原官方全包；月尺度站点数据，不是全国格点降水。",
+    "authors": [
+      "高晶"
+    ],
+    "doi": "10.11888/Geogra.tpdc.270940",
+    "source_version": "",
+    "source_descriptor_sha256": "a3844b3ce6ca88413263155b05a416fa852493dbde993346165e10910bde403c",
+    "download_date": "2026-09-07",
+    "provenance": [
+      {
+        "path": "tpdc-tp-precipitation-isotopes.zip",
+        "size": 56616,
+        "sha256": "015482c683730737f05142f95abebde51a0ce296b0e06fd58a4a80dd6143d910",
+        "role": "data",
+        "content_type": "application/zip",
+        "download_url": "https://data.tpdc.ac.cn/file/file/batchDownloadFile?metadataId=8b5495b9-7d52-41e8-ba62-8c06e7131950"
+      }
+    ],
+    "inventory_complete": true,
+    "recursive_file_count": 3,
+    "total_size_bytes": 274438
+  },
+  "files": [
+    {
+      "path": "SOURCE.md",
+      "size": 1246,
+      "sha256": "0769ea9cc0bda8d08335a266115da715479b2692b0366d512205523753e7a188",
+      "role": "documentation",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/tpdc-tp-precipitation-isotopes/青藏高原降水稳定氧18同位素数据集（1991–2008）/2011RG000380_TNIP data for the review paper publishing.xls",
+      "size": 216576,
+      "sha256": "f39395ccb974ec4f5f6d1464f74f55daccd3a0540cf8032eab84b97ab0a97ff0",
+      "role": "data",
+      "content_type": "application/vnd.ms-excel"
+    },
+    {
+      "path": "tpdc-tp-precipitation-isotopes.zip",
+      "size": 56616,
+      "sha256": "015482c683730737f05142f95abebde51a0ce296b0e06fd58a4a80dd6143d910",
+      "role": "data",
+      "content_type": "application/zip"
+    }
+  ]
+}

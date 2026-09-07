@@ -51,6 +51,16 @@
         </button>
       </div>
 
+      <div class="border-t border-[var(--border-main)] px-2 pt-1">
+        <button
+          type="button"
+          class="flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-sm text-[var(--text-primary)] hover:bg-[var(--fill-tsp-white-main)]"
+          @click="manageProfiles"
+        >
+          <Settings2 class="size-4 shrink-0 text-[var(--icon-secondary)]" />
+          {{ t('Manage Agent profiles') }}
+        </button>
+      </div>
     </div>
   </div>
 </template>
@@ -58,13 +68,15 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, watch, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { BotMessageSquare, ChevronDown, Check } from 'lucide-vue-next'
+import { BotMessageSquare, ChevronDown, Check, Settings2 } from 'lucide-vue-next'
 import { type AgentProfile } from '@/api/agentProfile'
 import { useAgentProfile } from '@/composables/useAgentProfile'
 import { getCachedClientConfig, type ClientConfigResponse } from '@/api/config'
+import { useSettingsDialog } from '@/composables/useSettingsDialog'
 
 const { t } = useI18n()
 const { selectedProfile, setSelectedProfile, profiles, refreshProfiles } = useAgentProfile()
+const { openSettingsDialog } = useSettingsDialog()
 
 const isOpen = ref(false)
 const buttonRef = ref<HTMLElement | null>(null)
@@ -105,6 +117,11 @@ watch(isOpen, (open) => {
 function selectProfile(profile: AgentProfile | null) {
   setSelectedProfile(profile)
   isOpen.value = false
+}
+
+function manageProfiles() {
+  isOpen.value = false
+  openSettingsDialog('agent-profiles')
 }
 
 onMounted(async () => {

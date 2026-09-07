@@ -83,7 +83,20 @@ class RedisStreamQueue(MessageQueue):
         Returns:
             str: Message ID
         """
-        logger.debug(f"Putting message into stream ({self._stream_name}): {message}")
+        if isinstance(message, str):
+            payload_bytes = len(message.encode("utf-8", errors="replace"))
+        elif isinstance(message, bytes):
+            payload_bytes = len(message)
+        else:
+            payload_bytes = None
+        # Stream payloads contain raw user text and tool arguments/results.
+        # Never interpolate either the payload or its potentially sensitive
+        # values into application logs.
+        logger.debug(
+            "Putting message into stream payload_type=%s payload_bytes=%s",
+            type(message).__name__,
+            payload_bytes if payload_bytes is not None else "unknown",
+        )
         message_id = await self._redis.client.xadd(self._stream_name, {"data": message})
         return message_id
     
@@ -97,7 +110,7 @@ class RedisStreamQueue(MessageQueue):
         Returns:
             Tuple[str, Any]: (Message ID, Message content), returns (None, None) if no message
         """
-        logger.debug(f"Getting message from stream ({self._stream_name}): {start_id}")
+        logger.debug("Getting message from stream")
         start_id = self._normalize_stream_id(start_id)
             
         # Read new messages
@@ -138,7 +151,11 @@ class RedisStreamQueue(MessageQueue):
         normalized = str(start_id).strip()
         if normalized in {"0", "0-0", "$"} or re.fullmatch(r"\d+-\d+", normalized):
             return normalized
-        logger.warning("Invalid Redis stream ID %r for XREAD; falling back to 0-0", start_id)
+        logger.warning(
+            "Invalid Redis stream ID for XREAD; falling back to 0-0 value_type=%s chars=%d",
+            type(start_id).__name__,
+            len(str(start_id)),
+        )
         return "0-0"
     
     async def get_range(self, start_id: str = "-", end_id: str = "+", count: int = 100) -> AsyncGenerator[Tuple[str, Any], None]:

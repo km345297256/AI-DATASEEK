@@ -12,22 +12,47 @@ def write(path, value):
 def local(tag): return tag.rsplit('}',1)[-1].lower()
 def numbers(text):
     return [float(x) for x in re.findall(r'[-+]?(?:\d+\.?\d*|\.\d+)(?:[eE][-+]?\d+)?', text or '')]
+
+def position_values(node, count):
+    """Decode the axis representations used by standard PANalytical XRDML."""
+    values = numbers(node.text)
+    if values:
+        return values
+    children = {local(child.tag): child for child in node}
+    for name in ('listpositions', 'positions'):
+        if name in children:
+            return numbers(children[name].text)
+    if 'startposition' in children and 'endposition' in children:
+        start = numbers(children['startposition'].text)
+        end = numbers(children['endposition'].text)
+        if len(start) == len(end) == 1:
+            return np.linspace(start[0], end[0], count).tolist()
+    if 'commonposition' in children:
+        common = numbers(children['commonposition'].text)
+        if len(common) == 1:
+            return common * count
+    return []
+
 def parse(path):
     root=ET.parse(path).getroot(); scans=[]
     for node in root.iter():
         if local(node.tag) != 'scan': continue
-        vals=[]; ints=[]
+        ints=[]; position_nodes=[]; legacy_positions=[]
         for child in node.iter():
             name=local(child.tag); text=(child.text or '').strip()
-            if name in {'positions','theta','twotheta','two-theta'}: vals += numbers(text)
+            if name == 'positions': position_nodes.append(child)
+            elif name in {'theta','twotheta','two-theta'}: legacy_positions += numbers(text)
             elif name in {'intensities','counts','intensity'}: ints += numbers(text)
+        # A scan may contain Omega, Phi and other motor axes as well as 2Theta.
+        # Combining them corrupts the diffraction angle/intensity pairing.
+        preferred = [p for p in position_nodes if re.sub(r'[^a-z0-9]', '', p.get('axis', '').lower()) in {'2theta','twotheta'}]
+        if not preferred:
+            preferred = [p for p in position_nodes if not p.get('axis')]
+        vals = position_values(preferred[0], len(ints)) if preferred and ints else legacy_positions
         if vals and ints:
-            n=min(len(vals),len(ints)); scans.append({'positions':vals[:n],'intensities':ints[:n],'attributes':{local(k):v for k,v in node.attrib.items()}})
-    if not scans:
-        allnums=[]
-        for node in root.iter():
-            if local(node.tag) in {'intensities','positions','theta','twotheta'}: allnums += numbers(node.text)
-        half=len(allnums)//2; scans=[{'positions':allnums[:half],'intensities':allnums[half:2*half],'attributes':{}}] if half else []
+            if len(vals) != len(ints):
+                raise ValueError('XRDML axis/intensity length mismatch')
+            scans.append({'positions':vals,'intensities':ints,'attributes':{local(k):v for k,v in node.attrib.items()}})
     meta={local(k):v for k,v in root.attrib.items()}
     for node in root.iter():
         if local(node.tag) in {'instrument','sample','measurement','wavelength','startposition','endposition','step'}:
@@ -56,7 +81,7 @@ def main():
         for i,scan in enumerate(d['scans']):
             if len(scan['positions'])!=len(scan['intensities']): issues.append(f'scan {i}: axis/intensity length mismatch')
             if len(scan['positions'])<2: issues.append(f'scan {i}: too few points')
-            if any(not np.isfinite(scan['positions'])) or any(not np.isfinite(scan['intensities'])): issues.append(f'scan {i}: non-finite values')
+            if not np.isfinite(scan['positions']).all() or not np.isfinite(scan['intensities']).all(): issues.append(f'scan {i}: non-finite values')
         emit({'valid':not issues,'issues':issues},a.get('output_path')); return
     if op=='xrdml_list_scans': emit({'scans':[{'index':i,'point_count':len(v['positions']),'min_angle':min(v['positions']) if v['positions'] else None,'max_angle':max(v['positions']) if v['positions'] else None,'attributes':v['attributes']} for i,v in enumerate(d['scans'])]},a.get('output_path')); return
     if op in {'xrdml_extract_scan','xrdml_export_csv'}:

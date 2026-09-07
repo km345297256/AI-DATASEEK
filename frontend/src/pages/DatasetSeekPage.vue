@@ -52,6 +52,7 @@
           mobileCatalogOpen ? '' : 'catalog-mobile-content-hidden',
         ]"
       >
+        <RouterLink to="/datasets" class="mb-4 inline-flex items-center gap-1 rounded px-1 py-1 text-xs text-[#286d52] hover:underline dark:text-[#a9cbbb]">← 数据集管理</RouterLink>
         <div v-if="catalogLoading" class="flex h-40 items-center justify-center text-xs text-[var(--text-tertiary)]">
           <LoaderCircle class="mr-2 size-4 animate-spin" />正在加载数据集
         </div>
@@ -59,6 +60,11 @@
         <div v-else-if="dataset" class="space-y-5">
           <section>
             <h2 class="break-words text-base font-semibold leading-6">{{ dataset.name }}</h2>
+            <div v-if="!sessionId" class="mt-3 space-y-2">
+              <p class="text-[11px] text-[var(--text-tertiary)]">新任务使用的 Agent 配置</p>
+              <AgentSelector />
+              <p v-if="profileDomainMismatch" role="status" class="rounded-md bg-amber-50 p-2 text-[11px] leading-5 text-amber-800 dark:bg-amber-950 dark:text-amber-200">当前配置的工具领域与数据集不同，可能缺少分析工具。请选择匹配的配置或通用 DataSeek；不会自动更改您的试点开关。</p>
+            </div>
           </section>
 
           <dl class="space-y-4 border-y border-[var(--border-main)] py-4">
@@ -499,8 +505,9 @@
 </template>
 
 <script setup lang="ts">
+import { findAnalysisTool, mergeAnalysisToolEvent } from '@/utils/analysisJob';
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
-import { useRoute } from 'vue-router';
+import { RouterLink, useRoute } from 'vue-router';
 import { Check, ChevronDown, ChevronRight, CircleAlert, Clock3, Copy, Database, Download, Eye, FileText, Folder, FolderOpen, History, Image as ImageIcon, LoaderCircle, PackageOpen, PanelLeftClose, PanelLeftOpen, Pencil, Plus, RefreshCw, Trash2, X } from 'lucide-vue-next';
 import ChatBox from '@/components/ChatBox.vue';
 import ChatMessage from '@/components/ChatMessage.vue';
@@ -510,6 +517,7 @@ import DataProductDialog from '@/components/DataProductDialog.vue';
 import DataProductFileMoveDialog from '@/components/DataProductFileMoveDialog.vue';
 import VersionBadge from '@/components/VersionBadge.vue';
 import SettingsDialog from '@/components/settings/SettingsDialog.vue';
+import AgentSelector from '@/components/AgentSelector.vue';
 import ToolPanel from '@/components/ToolPanel.vue';
 import { createSession, getSession, chatWithSession, stopSession } from '@/api/agent';
 import { API_CONFIG } from '@/api/client';
@@ -526,6 +534,7 @@ import { copyToClipboard } from '@/utils/dom';
 import { eventBus } from '@/utils/eventBus';
 import { showErrorToast, showSuccessToast } from '@/utils/toast';
 import { completeRunningSteps, failRunningSteps, findCurrentTurnRunningStep, findCurrentTurnStep, insertTaskExecutionSummary, isLatestAssistantMessage } from '@/utils/chatTimeline';
+import { acceptAgentEvent, createAgentEventCursor, resetAgentEventCursor } from '@/utils/agentEventCursor';
 import { isConsecutiveAssistant, type AttachmentsContent, type Message, type MessageContent, type StepContent, type ToolContent } from '@/types/message';
 import type { AgentSSEEvent, CompletionAdviceData, DoneEventData, ErrorEventData, MessageEventData, PlanEventData, StepEventData, TitleEventData, ToolEventData } from '@/types/event';
 import { SessionStatus } from '@/types/response';
@@ -533,7 +542,11 @@ import { SessionStatus } from '@/types/response';
 const DATASET_STORAGE_KEY_PREFIX = 'ai-dataseek:dataset-seek:session';
 
 const route = useRoute();
-const { selectedProfileId, refreshProfiles } = useAgentProfile();
+const { selectedProfileId, selectedProfile, refreshProfiles } = useAgentProfile();
+const profileDomainMismatch = computed(() => {
+  const preset = selectedProfile.value?.tool_runtime?.preset_id;
+  return Boolean(dataset.value?.domain && preset && preset !== 'general' && preset !== dataset.value.domain);
+});
 const { showFilePanel } = useFilePanel();
 const dataset = ref<DataCenterDataset>();
 const dataProducts = ref<DataProduct[]>([]);
@@ -570,6 +583,8 @@ const sessionId = ref<string | null>(null);
 const sessionCreatedAt = ref<number | null>(null);
 const expandedTaskSummaries = ref(new Set<number>());
 const lastEventId = ref<string>();
+const lastEventSeq = ref<number>();
+const eventCursor = createAgentEventCursor();
 const isLoading = ref(false);
 const taskStartedAtMs = ref<number>();
 const loadingStatus = ref('');
@@ -963,14 +978,15 @@ function isLegacyPlanProgressMessage(content: string) {
 
 function handleTool(data: ToolEventData) {
   const tool = { ...data } as ToolContent;
-  if (lastTool.value?.tool_call_id === tool.tool_call_id) Object.assign(lastTool.value, tool);
+  const existingTool = findAnalysisTool(messages.value, tool.tool_call_id);
+  if (existingTool) Object.assign(existingTool, mergeAnalysisToolEvent(existingTool, tool));
   else {
     const runningStep = findCurrentTurnRunningStep(messages.value);
     if (runningStep) runningStep.tools.push(tool);
     else messages.value.push({ type: 'tool', content: tool });
     lastTool.value = tool;
   }
-  if (tool.name !== 'message') {
+  if (tool.name !== 'message' && (!existingTool || lastTool.value?.tool_call_id === tool.tool_call_id)) {
     lastNoMessageTool.value = lastTool.value;
   }
 }
@@ -986,6 +1002,7 @@ function handleStep(data: StepEventData) {
 }
 
 function handleEvent(event: AgentSSEEvent) {
+  if (!acceptAgentEvent(eventCursor, event)) return;
   if (event.event === 'message') handleMessage(event.data as MessageEventData);
   else if (event.event === 'tool') handleTool(event.data as ToolEventData);
   else if (event.event === 'step') handleStep(event.data as StepEventData);
@@ -1010,7 +1027,8 @@ function handleEvent(event: AgentSSEEvent) {
     taskStartedAtMs.value = undefined;
   }
   else if (event.event === 'title') void (event.data as TitleEventData);
-  lastEventId.value = event.data.event_id;
+  if (event.data.event_id) lastEventId.value = event.data.event_id;
+  lastEventSeq.value = eventCursor.lastSeq;
   if (event.event === 'done' || event.event === 'wait' || event.event === 'error') {
     void refreshHistory();
   }
@@ -1222,6 +1240,7 @@ async function submit() {
       activeSessionId,
       question,
       lastEventId.value,
+      lastEventSeq.value,
       capabilities.attachments,
       capabilities.skills,
       capabilities.mcpServers,
@@ -1253,6 +1272,8 @@ function clearConversationState() {
   closeToolPanel();
   shouldFollowTimeline.value = true;
   lastEventId.value = undefined;
+  lastEventSeq.value = undefined;
+  resetAgentEventCursor(eventCursor);
   messages.value = [];
   expandedTaskSummaries.value = new Set();
   currentPlan.value = undefined;
@@ -1289,7 +1310,7 @@ async function loadConversation(targetSessionId: string) {
     selectedSkills.value = [...new Set(restoredSkills)];
     if (session.status === SessionStatus.RUNNING || session.status === SessionStatus.PENDING) {
       isLoading.value = true;
-      cancelChat = await chatWithSession(session.session_id, '', lastEventId.value, [], [], [], selectedProfileId.value, {
+      cancelChat = await chatWithSession(session.session_id, '', lastEventId.value, lastEventSeq.value, [], [], [], selectedProfileId.value, {
         onMessage: ({ event, data }) => handleEvent({ event: event as AgentSSEEvent['event'], data: data as AgentSSEEvent['data'] }),
         onClose: () => { isLoading.value = false; cancelChat = null; },
         onError: () => { isLoading.value = false; failRunningSteps(messages.value); },

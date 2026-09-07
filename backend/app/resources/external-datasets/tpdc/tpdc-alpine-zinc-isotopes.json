@@ -1,0 +1,70 @@
+{
+  "dataset_id": "tpdc-alpine-zinc-isotopes",
+  "external_id": "29c18c26-adef-451b-a4bc-2b1eb56ef6b5",
+  "data_center_id": "reviewed-tpdc-catalog",
+  "data_center_name": "国家青藏高原科学数据中心",
+  "name": "西阿尔卑斯沉积物Zn同位素数据（2023）",
+  "description": "西阿尔卑斯变质沉积物锌同位素测量数据，用于分析俯冲带碳酸盐—硅酸盐相互作用；官方说明每个样品重复测试三次，分析精度约0.04‰。",
+  "domain": "geoscience",
+  "data_type": "XLSX",
+  "tags": [
+    "geoscience",
+    "国家青藏高原科学数据中心",
+    "公开数据"
+  ],
+  "metadata": {
+    "curated": true,
+    "catalog_version": 1,
+    "source_catalog": "tpdc",
+    "publisher": "国家青藏高原科学数据中心",
+    "source_url": "https://data.tpdc.ac.cn/zh-hans/data/29c18c26-adef-451b-a4bc-2b1eb56ef6b5",
+    "license": "CC BY 4.0",
+    "license_url": "https://creativecommons.org/licenses/by/4.0/",
+    "license_details": "官方许可原文：1；官方前端枚举 1 = Attribution 4.0 International (CC BY 4.0)。公开共享策略 A/online；需注明数据作者、国家青藏高原科学数据中心及数据/文章引用要求； DOI: 10.11888/SolidEar.tpdc.302666",
+    "sample_scope": "原官方全包；地质样品，非个人生物医学数据。",
+    "sample_note": "原官方全包；地质样品，非个人生物医学数据。",
+    "authors": [
+      "瞿瑗汝"
+    ],
+    "doi": "10.11888/SolidEar.tpdc.302666",
+    "source_version": "",
+    "source_descriptor_sha256": "0507ad3967fa7e1828fb26357878f9a33fc7a0535266748f87bda159824260cf",
+    "download_date": "2026-09-07",
+    "provenance": [
+      {
+        "path": "tpdc-alpine-zinc-isotopes.zip",
+        "size": 16590,
+        "sha256": "6b3188cc8da1a4a9da535fc815b2fbffdec512fcd8d1fb73ffcd1b19248f960e",
+        "role": "data",
+        "content_type": "application/zip",
+        "download_url": "https://data.tpdc.ac.cn/file/file/batchDownloadFile?metadataId=29c18c26-adef-451b-a4bc-2b1eb56ef6b5"
+      }
+    ],
+    "inventory_complete": true,
+    "recursive_file_count": 3,
+    "total_size_bytes": 37469
+  },
+  "files": [
+    {
+      "path": "SOURCE.md",
+      "size": 1212,
+      "sha256": "9791559e8f2a456dcbfcbfe1385ac5daa88cf49598f284e5a939e940170955f1",
+      "role": "documentation",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/tpdc-alpine-zinc-isotopes/西阿尔卑斯沉积物Zn同位素数据（2023）/西阿尔卑斯沉积物Zn同位素数据.xlsx",
+      "size": 19667,
+      "sha256": "4e0041e4a0245b74bd45f9385923be416402cf4dbf8a8949f3fbb748aa933206",
+      "role": "data",
+      "content_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    },
+    {
+      "path": "tpdc-alpine-zinc-isotopes.zip",
+      "size": 16590,
+      "sha256": "6b3188cc8da1a4a9da535fc815b2fbffdec512fcd8d1fb73ffcd1b19248f960e",
+      "role": "data",
+      "content_type": "application/zip"
+    }
+  ]
+}

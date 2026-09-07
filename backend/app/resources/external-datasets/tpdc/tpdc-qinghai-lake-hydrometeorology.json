@@ -1,0 +1,70 @@
+{
+  "dataset_id": "tpdc-qinghai-lake-hydrometeorology",
+  "external_id": "12cb9320-e6ba-4938-a9ac-5b0ebb656825",
+  "data_center_id": "reviewed-tpdc-catalog",
+  "data_center_name": "国家青藏高原科学数据中心",
+  "name": "青海湖水文气象数据（1956-2020）",
+  "description": "青海湖水位、面积、流域径流、湖面温度、冰厚与结冰期，以及刚察站气温和降水；适合多年趋势和湖泊—气候关系分析。",
+  "domain": "geoscience",
+  "data_type": "XLSX",
+  "tags": [
+    "geoscience",
+    "国家青藏高原科学数据中心",
+    "公开数据"
+  ],
+  "metadata": {
+    "curated": true,
+    "catalog_version": 1,
+    "source_catalog": "tpdc",
+    "publisher": "国家青藏高原科学数据中心",
+    "source_url": "https://data.tpdc.ac.cn/zh-hans/data/12cb9320-e6ba-4938-a9ac-5b0ebb656825",
+    "license": "CC BY-NC-SA 4.0",
+    "license_url": "https://creativecommons.org/licenses/by-nc-sa/4.0/",
+    "license_details": "官方许可原文：Attribution-NonCommercial-ShareAlike 4.0 International (CC BY-NC-SA 4.0)。公开共享策略 A/online；需注明数据作者、国家青藏高原科学数据中心及数据/文章引用要求；限非商业使用，演绎须相同方式共享。 DOI: 10.1080/27669645.2021.2015870",
+    "sample_scope": "原官方全包；湖面温度1967–2020，冰厚1994–2020，气温/降水1958–2019，水位/径流1956–2020；DOI为关联论文DOI。",
+    "sample_note": "原官方全包；湖面温度1967–2020，冰厚1994–2020，气温/降水1958–2019，水位/径流1956–2020；DOI为关联论文DOI。",
+    "authors": [
+      "张国庆"
+    ],
+    "doi": "10.1080/27669645.2021.2015870",
+    "source_version": "",
+    "source_descriptor_sha256": "2ded803570fc542d1af145cd0d0131609375c5fbd0270b2d853450c6a2219baa",
+    "download_date": "2026-09-07",
+    "provenance": [
+      {
+        "path": "tpdc-qinghai-lake-hydrometeorology.zip",
+        "size": 23151,
+        "sha256": "1181255256bd1875a103ffc5dba52a0bd3d9e2c59bf53eec27a8e4ff1eaab417",
+        "role": "data",
+        "content_type": "application/zip",
+        "download_url": "https://data.tpdc.ac.cn/file/file/batchDownloadFile?metadataId=12cb9320-e6ba-4938-a9ac-5b0ebb656825"
+      }
+    ],
+    "inventory_complete": true,
+    "recursive_file_count": 3,
+    "total_size_bytes": 55742
+  },
+  "files": [
+    {
+      "path": "SOURCE.md",
+      "size": 1327,
+      "sha256": "e7ffd80e5e081144c4f4aafb51dde3b053d80141e3ef9b46523bf0af1b617089",
+      "role": "documentation",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/tpdc-qinghai-lake-hydrometeorology/青海湖水文气象数据（1956-2020）/QinghaiLake_Hydrology data.xlsx",
+      "size": 31264,
+      "sha256": "0e18dd56e27463fd74cddd11d3f350b4536854e1027010954de3e740f65a9f56",
+      "role": "data",
+      "content_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    },
+    {
+      "path": "tpdc-qinghai-lake-hydrometeorology.zip",
+      "size": 23151,
+      "sha256": "1181255256bd1875a103ffc5dba52a0bd3d9e2c59bf53eec27a8e4ff1eaab417",
+      "role": "data",
+      "content_type": "application/zip"
+    }
+  ]
+}

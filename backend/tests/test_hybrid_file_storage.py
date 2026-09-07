@@ -1,10 +1,14 @@
+import asyncio
 import io
 
 import pytest
 
 from app.domain.models.file import FileInfo
 from app.infrastructure.external.file.hybridfile import HybridFileStorage
-from app.infrastructure.external.file.miniofile import _minio_metadata
+from app.infrastructure.external.file.miniofile import (
+    _complete_despite_cancellation,
+    _minio_metadata,
+)
 
 
 class _FakeStorage:
@@ -22,6 +26,14 @@ class _FakeStorage:
     async def download_file(self, file_id, user_id=None):
         self.calls.append(("download", file_id, user_id))
         return io.BytesIO(b"data"), FileInfo(file_id=file_id, filename="file.txt", user_id=user_id or "")
+
+    async def download_file_range(self, file_id, user_id=None, *, offset, length):
+        self.calls.append(("range", file_id, user_id, offset, length))
+        return b"data"[offset:offset + length], FileInfo(
+            file_id=file_id,
+            filename="file.txt",
+            user_id=user_id or "",
+        )
 
     async def delete_file(self, file_id, user_id):
         self.calls.append(("delete", file_id, user_id))
@@ -114,6 +126,49 @@ async def test_hybrid_download_routes_unknown_new_ids_to_minio_storage():
 
     assert minio.calls == [("download", "future-provider:abc123", "user-1")]
     assert gridfs.calls == []
+
+
+@pytest.mark.asyncio
+async def test_hybrid_range_read_routes_without_full_download():
+    minio = _FakeStorage("minio")
+    gridfs = _FakeStorage("gridfs")
+    storage = HybridFileStorage(minio, gridfs)
+
+    data, _ = await storage.download_file_range(
+        "minio:abc123",
+        "user-1",
+        offset=1,
+        length=2,
+    )
+
+    assert data == b"at"
+    assert minio.calls == [("range", "minio:abc123", "user-1", 1, 2)]
+    assert gridfs.calls == []
+
+
+@pytest.mark.asyncio
+async def test_external_write_finishes_before_cancellation_is_propagated():
+    started = asyncio.Event()
+    release = asyncio.Event()
+    finished = asyncio.Event()
+
+    async def operation():
+        started.set()
+        await release.wait()
+        finished.set()
+        return "done"
+
+    waiter = asyncio.create_task(_complete_despite_cancellation(operation()))
+    await started.wait()
+    waiter.cancel()
+    await asyncio.sleep(0)
+
+    assert waiter.done() is False
+    release.set()
+    result, cancellation = await waiter
+    assert result == "done"
+    assert isinstance(cancellation, asyncio.CancelledError)
+    assert finished.is_set()
 
 
 @pytest.mark.asyncio

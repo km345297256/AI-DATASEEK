@@ -1,4 +1,13 @@
+import asyncio
+
+import pytest
+
 from app.domain.models.tool_result import ToolResult
+from app.domain.services.tools.interceptors import (
+    ToolExecutionTimeoutError,
+    ToolTimeoutInterceptor,
+)
+from app.domain.services.tools.pipeline import ToolExecutionPipeline
 from app.domain.services.tools.shell import ShellToolkit
 from app.infrastructure.external.sandbox.docker_sandbox import DockerSandbox
 
@@ -53,6 +62,7 @@ class _Sandbox:
         self.wait_seconds = None
         self.exec_dir = None
         self.command = None
+        self.kill_calls = []
 
     async def exec_command(self, session_id, exec_dir, command):
         self.exec_dir = exec_dir
@@ -89,6 +99,14 @@ class _Sandbox:
             data={"session_id": session_id, "output": "analysis complete\n"},
         )
 
+    async def kill_process(self, session_id):
+        self.kill_calls.append(session_id)
+        return ToolResult(
+            success=True,
+            message="terminated",
+            data={"session_id": session_id, "status": "terminated"},
+        )
+
 
 async def _invoke_shell_run(sandbox, *, timeout_seconds=30):
     toolkit = ShellToolkit(sandbox)
@@ -108,6 +126,7 @@ async def test_shell_run_returns_completed_output_in_one_tool_call():
     result = await _invoke_shell_run(sandbox, timeout_seconds=45)
 
     assert sandbox.wait_seconds == 45
+    assert sandbox.kill_calls == []
     assert result.success is True
     assert result.data == {
         "session_id": "shell-1",
@@ -127,15 +146,95 @@ async def test_shell_run_preserves_nonzero_return_code_and_output():
     assert result.data["output"] == "analysis complete\n"
 
 
-async def test_shell_run_returns_bounded_running_state_without_polling_loop():
+async def test_shell_run_terminates_process_when_bounded_wait_expires_without_interceptor():
     sandbox = _Sandbox(still_running=True)
 
     result = await _invoke_shell_run(sandbox, timeout_seconds=500)
 
-    assert sandbox.wait_seconds == 120
-    assert result.success is True
-    assert result.data["status"] == "running"
+    # Leave host-side headroom below the production interceptor's 120 second
+    # outer deadline so this fallback can clean up and return deterministically.
+    assert sandbox.wait_seconds == 119
+    assert sandbox.kill_calls == ["shell-1"]
+    assert result.success is False
+    assert result.data["status"] == "timed_out"
     assert result.data["returncode"] is None
+
+
+class _BlockingShellSandbox(_Sandbox):
+    def __init__(self):
+        super().__init__()
+        self.started = asyncio.Event()
+
+    async def exec_command(self, session_id, exec_dir, command):
+        self.started.set()
+        await asyncio.Event().wait()
+
+    async def wait_for_process(self, session_id, seconds):
+        self.started.set()
+        await asyncio.Event().wait()
+
+    async def view_shell(self, session_id):
+        self.started.set()
+        await asyncio.Event().wait()
+
+
+async def test_shell_exec_pipeline_timeout_cooperatively_kills_process_once():
+    sandbox = _BlockingShellSandbox()
+    toolkit = ShellToolkit(sandbox)
+    toolkit.tool_execution_pipeline = ToolExecutionPipeline([
+        ToolTimeoutInterceptor(0.01, maximum_timeout_seconds=1),
+    ])
+
+    with pytest.raises(ToolExecutionTimeoutError):
+        await toolkit.get_tool("shell_exec").ainvoke({
+            "id": "call-shell-exec",
+            "name": "shell_exec",
+            "args": {
+                "id": "process-1",
+                "exec_dir": "/home/ubuntu",
+                "command": "sleep 600",
+            },
+        })
+
+    assert sandbox.kill_calls == ["process-1"]
+
+
+async def test_shell_wait_external_cancellation_kills_process_once():
+    sandbox = _BlockingShellSandbox()
+    toolkit = ShellToolkit(sandbox)
+    toolkit.tool_execution_pipeline = ToolExecutionPipeline([
+        ToolTimeoutInterceptor(5, maximum_timeout_seconds=5),
+    ])
+
+    task = asyncio.create_task(toolkit.get_tool("shell_wait").ainvoke({
+        "id": "call-shell-wait",
+        "name": "shell_wait",
+        "args": {"id": "process-2", "seconds": 60},
+    }))
+    await sandbox.started.wait()
+    task.cancel()
+
+    with pytest.raises(asyncio.CancelledError):
+        await task
+
+    assert sandbox.kill_calls == ["process-2"]
+
+
+async def test_shell_view_timeout_does_not_kill_unrelated_process():
+    sandbox = _BlockingShellSandbox()
+    toolkit = ShellToolkit(sandbox)
+    toolkit.tool_execution_pipeline = ToolExecutionPipeline([
+        ToolTimeoutInterceptor(0.01, maximum_timeout_seconds=1),
+    ])
+
+    with pytest.raises(ToolExecutionTimeoutError):
+        await toolkit.get_tool("shell_view").ainvoke({
+            "id": "call-shell-view",
+            "name": "shell_view",
+            "args": {"id": "process-3"},
+        })
+
+    assert sandbox.kill_calls == []
 
 
 async def test_dataset_unpack_uses_one_quoted_bounded_command():
@@ -153,7 +252,7 @@ async def test_dataset_unpack_uses_one_quoted_bounded_command():
 
     assert result.success is True
     assert sandbox.exec_dir == "/home/ubuntu"
-    assert sandbox.wait_seconds == 120
+    assert sandbox.wait_seconds == 119
     assert sandbox.command == (
         "ai-dataseek-unpack '/home/ubuntu/datasets/demo/a file; touch nope.zip' "
         "--output '/home/ubuntu/output/unpacked demo' --timeout-seconds 120"
@@ -176,7 +275,7 @@ async def test_dataset_quicklook_uses_one_quoted_bounded_command():
 
     assert result.success is True
     assert sandbox.exec_dir == "/home/ubuntu"
-    assert sandbox.wait_seconds == 120
+    assert sandbox.wait_seconds == 119
     assert sandbox.command == (
         "ai-dataseek-quicklook '/home/ubuntu/datasets/demo/data; touch nope.zip' "
         "--output '/home/ubuntu/output/quick look' --max-plots 4 --timeout-seconds 120"
@@ -200,7 +299,7 @@ async def test_scientific_tools_build_one_quoted_bounded_command():
     )
 
     assert result.success is True
-    assert sandbox.wait_seconds == 120
+    assert sandbox.wait_seconds == 119
     assert sandbox.command == (
         "ai-dataseek-scientific subset '/home/ubuntu/datasets/demo/a file; touch nope.nc' "
         "--variable 'rain rate' --dimension-indices '{\"time\": 0}' "
@@ -225,7 +324,7 @@ async def test_netcdf_visualization_bundle_builds_one_bounded_command():
     )
 
     assert result.success is True
-    assert sandbox.wait_seconds == 120
+    assert sandbox.wait_seconds == 119
     assert sandbox.command == (
         "ai-dataseek-scientific visualize-bundle "
         "'/home/ubuntu/datasets/demo/a file; touch nope.nc' "
@@ -254,7 +353,7 @@ async def test_scientific_recipe_tools_build_one_quoted_bounded_command():
 
     assert result.success is True
     assert sandbox.exec_dir == "/home/ubuntu"
-    assert sandbox.wait_seconds == 120
+    assert sandbox.wait_seconds == 119
     assert sandbox.command == (
         "ai-dataseek-scientific-recipe region-timeseries "
         "'/home/ubuntu/datasets/demo/a file; touch nope.nc' "

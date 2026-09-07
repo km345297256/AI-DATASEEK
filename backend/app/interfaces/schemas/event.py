@@ -13,11 +13,34 @@ from app.domain.models.event import (
     TitleEvent,
     ToolEvent,
     StepEvent,
+    MAX_EVENT_SEQUENCE,
+)
+from app.domain.models.spill import SpillArtifactNotice
+from app.domain.models.analysis_job import AnalysisJobView
+from app.domain.models.tool_approval import ToolApprovalView
+from app.domain.services.tools.spill_projection import (
+    sanitize_spill_notice,
+    spill_notice_from_result,
 )
 from app.domain.utils.public_error import public_error_message
+from app.interfaces.schemas.tool_presentation import (
+    ToolPresentation,
+    normalize_tool_presentation,
+    populate_tool_presentation_data,
+    sanitize_tool_public_data,
+)
 
 class BaseEventData(BaseModel):
-    event_id: Optional[str]
+    event_id: Optional[str] = None
+    # Additive envelope metadata.  ``seq`` remains optional for callers that
+    # deserialize a pre-versioning event outside the session history mapper.
+    seq: Optional[int] = Field(
+        default=None,
+        strict=True,
+        ge=1,
+        le=MAX_EVENT_SEQUENCE,
+    )
+    version: Literal[1] = 1
     timestamp: datetime = Field(default_factory=lambda: datetime.now())
 
     class Config:
@@ -29,6 +52,8 @@ class BaseEventData(BaseModel):
     def base_event_data(cls, event: AgentEvent) -> dict:
         return {
             "event_id": event.id,
+            "seq": event.seq,
+            "version": event.version,
             "timestamp": int(event.timestamp.timestamp())
         }
     
@@ -36,7 +61,7 @@ class BaseEventData(BaseModel):
     def from_event(cls, event: AgentEvent) -> Self:
         return cls(
             **cls.base_event_data(event),
-            **event.model_dump(exclude={"type", "id", "timestamp"})
+            **event.model_dump(exclude={"type", "id", "seq", "version", "timestamp"})
         )
 
 class CommonEventData(BaseEventData):
@@ -87,6 +112,14 @@ class ToolEventData(BaseEventData):
     function: str
     args: Dict[str, Any]
     content: Optional[ToolContent] = None
+    # Optional extension. Existing SSE event names and fields stay unchanged.
+    presentation: Optional[ToolPresentation] = None
+    # Typed additive projection. The reference bypasses the generic text
+    # sanitizer because its locator is constrained by SpillArtifactRef's
+    # regex; the untrusted preview is sanitized separately by the mapper.
+    spill: Optional[SpillArtifactNotice] = None
+    analysis_job: Optional[AnalysisJobView] = None
+    tool_approval: Optional[ToolApprovalView] = None
 
 class ToolSSEEvent(BaseSSEEvent):
     event: Literal["tool"] = "tool"
@@ -98,6 +131,27 @@ class ToolSSEEvent(BaseSSEEvent):
         if isinstance(content, BrowserToolContent):
             from app.interfaces.dependencies import get_file_service
             content = BrowserToolContent(screenshot=await get_file_service().create_signed_url(content.screenshot))
+        safe_content = sanitize_tool_public_data(content)
+        safe_args = sanitize_tool_public_data(event.function_args)
+        spill_notice = (
+            spill_notice_from_result(event.function_result)
+            if event.status == ToolStatus.CALLED
+            else None
+        )
+        # A spill has one universal, typed UI projection. Suppress a plugin's
+        # declarative card for the same result so its legacy data traversal
+        # cannot display a damaged locator or duplicate the preview.
+        presentation = (
+            None
+            if spill_notice is not None
+            else populate_tool_presentation_data(
+                normalize_tool_presentation(getattr(event, "presentation", None)),
+                event.function_result if event.status == ToolStatus.CALLED else None,
+            )
+        )
+        spill = None
+        if spill_notice is not None:
+            spill = sanitize_spill_notice(spill_notice)
         return cls(
             data=ToolEventData(
                 **BaseEventData.base_event_data(event),
@@ -105,8 +159,12 @@ class ToolSSEEvent(BaseSSEEvent):
                 name=event.tool_name,
                 status=event.status,
                 function=event.function_name,
-                args=event.function_args,
-                content=content
+                args=safe_args if isinstance(safe_args, dict) else {},
+                content=safe_content,
+                presentation=presentation,
+                spill=spill,
+                analysis_job=event.analysis_job,
+                tool_approval=event.tool_approval,
             )
         )
 

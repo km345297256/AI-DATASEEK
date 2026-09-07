@@ -47,6 +47,10 @@ test('prefixed environment and object credential keys are redacted', () => {
     'AWS_SECRET_ACCESS_KEY=aws-secret',
     'MINIO_SECRET_KEY=minio-secret',
     'DATABASE_PASSWORD=db-password',
+    'openaiApiKey=camel-key',
+    'dbPassword=camel-password',
+    'apiSecret=camel-secret',
+    'accessToken=camel-token',
     'python /home/ubuntu/job.py',
   ].join(' ');
   const safeText = sanitizeToolDisplayText(command);
@@ -56,6 +60,10 @@ test('prefixed environment and object credential keys are redacted', () => {
       AWS_SECRET_ACCESS_KEY: 'aws-object',
       MINIO_SECRET_KEY: 'minio-object',
       DATABASE_PASSWORD: 'db-object',
+      openaiApiKey: 'camel-object-key',
+      dbPassword: 'camel-object-password',
+      apiSecret: 'camel-object-secret',
+      accessToken: 'camel-object-token',
     },
   }));
 
@@ -64,6 +72,10 @@ test('prefixed environment and object credential keys are redacted', () => {
     'aws-secret',
     'minio-secret',
     'db-password',
+    'camel-key',
+    'camel-password',
+    'camel-secret',
+    'camel-token',
   ]) {
     assert.equal(safeText.includes(secret), false);
   }

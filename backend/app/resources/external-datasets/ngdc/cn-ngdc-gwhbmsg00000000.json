@@ -1,0 +1,72 @@
+{
+  "dataset_id": "cn-ngdc-gwhbmsg00000000",
+  "external_id": "GWHBMSG00000000",
+  "data_center_id": "reviewed-ngdc-catalog",
+  "data_center_name": "国家基因组科学数据中心 NGDC / CNCB",
+  "name": "植物乳植杆菌AF91-04IFC-1A基因组组装",
+  "description": "NGDC Genome Warehouse公开发布的Lactiplantibacillus plantarum（AF91-04IFC-1A）基因组序列，组装级别为Scaffold。导入该独立菌株的全部已发布组装FASTA，不是原始测序reads，也不包含人类个人基因序列。 可用于序列统计、GC组成与片段长度探查。",
+  "domain": "sequence",
+  "data_type": "FASTA",
+  "tags": [
+    "sequence",
+    "国家基因组科学数据中心 NGDC / CNCB",
+    "公开数据"
+  ],
+  "metadata": {
+    "curated": true,
+    "catalog_version": 1,
+    "source_catalog": "ngdc",
+    "publisher": "国家基因组科学数据中心 NGDC / CNCB",
+    "source_url": "https://ngdc.cncb.ac.cn/gwh/Assembly/27930/show",
+    "license": "NGDC GWH academic-use terms",
+    "license_url": "https://ngdc.cncb.ac.cn/gwh/statistics/genome",
+    "license_details": "GWH官方页面声明数据库仅免费用于学术研究；商业使用需另询商业许可。未发现本记录单独CC许可，不标为CC0或CC BY。引用GWH/NGDC与accession，并在有论文时引用原研究。",
+    "sample_scope": "完整已发布的该菌株组装文件；库内为Scaffold草图，不宣称无缺口完整染色体",
+    "sample_note": "完整已发布的该菌株组装文件；库内为Scaffold草图，不宣称无缺口完整染色体",
+    "authors": [],
+    "doi": "",
+    "source_version": "",
+    "source_descriptor_sha256": "67af80c6b6567120496eb51415ce50ae80fabe9e2df229aaad576f18087de5d4",
+    "organism": "Lactiplantibacillus plantarum",
+    "assembly_level": "Scaffold",
+    "bioproject": "PRJCA011976",
+    "release_time": "2025-02-10 09:30:46.0",
+    "download_date": "2026-09-07",
+    "provenance": [
+      {
+        "path": "GWHBMSG00000000.genome.fasta.gz",
+        "size": 951761,
+        "sha256": "a3d79e9d3489102913b4ee50fcc2b8a6f4a1d14ea6f51c63cac222c15ac8066b",
+        "role": "data",
+        "content_type": "application/octet-stream",
+        "download_url": "https://download.cncb.ac.cn/gwh/Bacteria/Lactiplantibacillus_plantarum_AF91-04IFC-1A_GWHBMSG00000000/GWHBMSG00000000.genome.fasta.gz"
+      }
+    ],
+    "inventory_complete": true,
+    "recursive_file_count": 3,
+    "total_size_bytes": 4096229
+  },
+  "files": [
+    {
+      "path": "GWHBMSG00000000.genome.fasta.gz",
+      "size": 951761,
+      "sha256": "a3d79e9d3489102913b4ee50fcc2b8a6f4a1d14ea6f51c63cac222c15ac8066b",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "SOURCE.md",
+      "size": 1371,
+      "sha256": "883d36e49695e9258e68a56cc447829fdde45b25381ae18ae678a032f40dc037",
+      "role": "documentation",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/GWHBMSG00000000.genome.fasta",
+      "size": 3143097,
+      "sha256": "d39f661e414c5013e0669d802e7ceaf63acc85b7554ee17cc8b7edc39aa0b276",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    }
+  ]
+}

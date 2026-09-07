@@ -1,11 +1,11 @@
-from typing import Dict, Optional, List, Type, TypeVar, Generic, get_args, Self
+from typing import Dict, Optional, List, Literal, Type, TypeVar, Generic, get_args, Self
 from datetime import date, datetime, timezone, UTC
 import uuid
 from beanie import Document
 from pydantic import BaseModel, Field
 from app.domain.models.agent import Agent
 from app.domain.models.memory import Memory
-from app.domain.models.event import AgentEvent
+from app.domain.models.event import AgentEvent, MAX_EVENT_SEQUENCE
 from app.domain.models.session import Session, SessionStatus
 from app.domain.models.file import FileInfo
 from app.domain.models.user import User, UserRole, RegistrationStatus
@@ -32,6 +32,14 @@ from app.domain.models.execution_node import (
 )
 from app.domain.models.dataset import DataCenterDataset, DatasetFile, DatasetLocation
 from app.domain.models.data_product import DataProduct
+from app.domain.models.execution_environment import (
+    CordisCatalogIdentity,
+    ExecutionEnvironmentSnapshot,
+    ModelExecutionIdentity,
+    SandboxExecutionIdentity,
+    ToolsetExecutionIdentity,
+)
+from app.domain.models.spill import SpillArtifactRecord
 from pymongo import IndexModel, ASCENDING, DESCENDING
 from typing import Any
 
@@ -378,6 +386,7 @@ class DataCenterDatasetDocument(Document):
     name: str
     name_key: str
     description: str = ""
+    domain: str = ""
     temporal_coverage: str = ""
     spatial_coverage: str = ""
     data_type: str = ""
@@ -564,6 +573,14 @@ class SessionDocument(BaseDocument[Session], id_field="session_id", domain_model
     is_shared: Optional[bool] = False
     collaborator_user_ids: List[str] = Field(default_factory=list)
     client_message_ids: List[str] = Field(default_factory=list)
+    # Monotonic per-session allocator for the versioned event envelope.  It is
+    # deliberately stored on the session so Mongo can increment it atomically.
+    event_seq: int = Field(
+        default=0,
+        strict=True,
+        ge=0,
+        le=MAX_EVENT_SEQUENCE,
+    )
     class Settings:
         name = "sessions"
         indexes = [
@@ -577,10 +594,59 @@ class SessionDocument(BaseDocument[Session], id_field="session_id", domain_model
         ]
 
 
+class SessionEventReservationDocument(Document):
+    """Durable producer-identity to sequence reservation.
+
+    ``producer_event_key`` is a bounded SHA-256 identity rather than the raw
+    producer ID. The raw identity stays only on the in-memory event model and
+    never enters browser-visible events or replay recordings.
+    """
+
+    session_id: str
+    producer_event_key: str = Field(pattern=r"^[0-9a-f]{64}$")
+    payload_digest: str = Field(pattern=r"^[0-9a-f]{64}$")
+    seq: int = Field(strict=True, ge=1, le=MAX_EVENT_SEQUENCE)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+
+    class Settings:
+        name = "session_event_reservations"
+        indexes = [
+            IndexModel(
+                [("session_id", ASCENDING), ("producer_event_key", ASCENDING)],
+                unique=True,
+                name="session_event_producer_reservation_unique",
+            ),
+            IndexModel(
+                [("session_id", ASCENDING), ("seq", ASCENDING)],
+                unique=True,
+                name="session_event_reservation_seq_unique",
+            ),
+            IndexModel([("session_id", ASCENDING), ("created_at", ASCENDING)]),
+        ]
+
+
 class SessionEventDocument(Document):
     """MongoDB document for a single session event (replaces embedded events array)"""
     session_id: str
+    # New writers link the durable event to its private reservation through a
+    # digest. ``event_key`` remains for existing documents and Redis-cursor
+    # idempotency during rolling data migration.
+    producer_event_key: Optional[str] = Field(
+        default=None,
+        pattern=r"^[0-9a-f]{64}$",
+    )
+    payload_digest: Optional[str] = Field(
+        default=None,
+        pattern=r"^[0-9a-f]{64}$",
+    )
     event_key: Optional[str] = None
+    seq: Optional[int] = Field(
+        default=None,
+        strict=True,
+        ge=1,
+        le=MAX_EVENT_SEQUENCE,
+    )
+    version: Literal[1] = 1
     event: Dict[str, Any]
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
@@ -588,10 +654,104 @@ class SessionEventDocument(Document):
         name = "session_events"
         indexes = [
             IndexModel([("session_id", ASCENDING), ("created_at", ASCENDING)]),
+            IndexModel(
+                [("session_id", ASCENDING), ("seq", ASCENDING)],
+                unique=True,
+                name="session_event_seq_unique",
+                partialFilterExpression={"seq": {"$type": "number"}},
+            ),
             IndexModel([("event_key", ASCENDING)], unique=True, sparse=True),
+            IndexModel(
+                [("session_id", ASCENDING), ("producer_event_key", ASCENDING)],
+                unique=True,
+                name="session_event_producer_unique",
+                partialFilterExpression={"producer_event_key": {"$type": "string"}},
+            ),
             IndexModel(
                 [("event.metadata.dataset_ids", ASCENDING), ("event.role", ASCENDING), ("session_id", ASCENDING)],
                 name="dataset_chat_history_lookup",
+            ),
+        ]
+
+
+class ExecutionEnvironmentSnapshotDocument(Document):
+    """Immutable task provenance kept separate from browser-visible events."""
+
+    schema_version: int = 1
+    task_id: str
+    session_id: str
+    execution_mode: str
+    catalog: Optional[CordisCatalogIdentity] = None
+    sandbox: Optional[SandboxExecutionIdentity] = None
+    models: List[ModelExecutionIdentity] = Field(default_factory=list)
+    toolset: Optional[ToolsetExecutionIdentity] = None
+    fingerprint: str
+    trigger_event_seq: Optional[int] = Field(
+        default=None,
+        strict=True,
+        ge=1,
+        le=MAX_EVENT_SEQUENCE,
+    )
+    captured_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+
+    def to_domain(self) -> ExecutionEnvironmentSnapshot:
+        return ExecutionEnvironmentSnapshot.model_validate(
+            self.model_dump(exclude={"id"})
+        )
+
+    class Settings:
+        name = "execution_environment_snapshots"
+        indexes = [
+            IndexModel([("task_id", ASCENDING)], unique=True),
+            IndexModel([("session_id", ASCENDING), ("captured_at", ASCENDING)]),
+            IndexModel([("session_id", ASCENDING), ("trigger_event_seq", ASCENDING)]),
+            IndexModel([("fingerprint", ASCENDING)]),
+        ]
+
+
+class SpillArtifactDocument(Document):
+    """Private locator index for durable oversized tool results."""
+
+    artifact_id: str
+    storage_file_id: str
+    storage_user_id: Optional[str] = None
+    owner_user_id: str
+    owner_session_id: str
+    byte_count: int
+    sha256: str
+    media_type: str
+    source_tool_ref: str
+    source_call_ref: str
+    reconcile_artifact_id: Optional[str] = None
+    status: Literal["active", "deleting"] = "active"
+    cleanup_attempted_at: Optional[datetime] = None
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    expires_at: datetime
+
+    @classmethod
+    def from_domain(cls, record: SpillArtifactRecord) -> "SpillArtifactDocument":
+        return cls.model_validate(record.model_dump())
+
+    def to_domain(self) -> SpillArtifactRecord:
+        return SpillArtifactRecord.model_validate(self.model_dump(exclude={"id"}))
+
+    class Settings:
+        name = "spill_artifacts"
+        indexes = [
+            IndexModel([("artifact_id", ASCENDING)], unique=True),
+            IndexModel(
+                [
+                    ("owner_user_id", ASCENDING),
+                    ("owner_session_id", ASCENDING),
+                    ("created_at", DESCENDING),
+                ],
+                name="spill_owner_created",
+            ),
+            IndexModel([("expires_at", ASCENDING)], name="spill_expiry"),
+            IndexModel([("status", ASCENDING)], name="spill_cleanup_status"),
+            IndexModel(
+                [("cleanup_attempted_at", ASCENDING), ("expires_at", ASCENDING)],
+                name="spill_cleanup_rotation",
             ),
         ]
 

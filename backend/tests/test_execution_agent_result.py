@@ -292,7 +292,14 @@ def test_netcdf_operator_result_finishes_without_followup_shell_or_model_call():
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("placeholder", ["placeholder", "placeholder-not-used", "TBD.", "待补充", "暂无结果"])
+@pytest.mark.parametrize("placeholder", [
+    "placeholder",
+    "placeholder-not-used",
+    "placeholder - do not send",
+    "TBD.",
+    "待补充",
+    "暂无结果",
+])
 async def test_execution_result_rejects_standalone_placeholder_text(placeholder):
     agent = object.__new__(ExecutionAgent)
 
@@ -317,6 +324,180 @@ async def test_execution_result_accepts_substantive_text_containing_placeholder_
 
     assert result is not None
     assert result.result == "The placeholder attribute is empty in this file."
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("ask_text", [
+    "placeholder - do not send",
+    "",
+    {"placeholder": True},
+    ["Which year?"],
+    2024,
+])
+async def test_non_substantive_ask_user_is_not_invoked_or_emitted(ask_text):
+    agent = object.__new__(ExecutionAgent)
+    agent.max_iterations = 2
+    agent._dataset_fast_path_mode = True
+    agent._dataset_intent = ExecutionAgent.DATASET_INTENT_ANALYSIS
+    agent._current_plan = Plan(language="zh")
+    agent._current_message = Message(message="这个数据集的空间范围是多少")
+    agent.ask = AsyncMock(return_value=AIMessage(content="", tool_calls=[{
+        "name": "message_ask_user",
+        "args": {"text": ask_text},
+        "id": "ask-placeholder",
+    }]))
+    agent.ask_with_messages = AsyncMock(return_value=AIMessage(content=(
+        '{"success":true,"result":"当前文件不包含可验证的空间坐标范围。","attachments":[]}'
+    )))
+    agent.get_tool = MagicMock(side_effect=AssertionError(
+        "placeholder ask_user must be rejected before tool lookup"
+    ))
+    agent.invoke_tool = AsyncMock(side_effect=AssertionError(
+        "placeholder ask_user must never be invoked"
+    ))
+
+    events = [event async for event in agent.execute("inspect coverage")]
+
+    assert not any(isinstance(event, ToolEvent) for event in events)
+    assert not any(
+        isinstance(event, MessageEvent) and "placeholder" in event.message
+        for event in events
+    )
+    final_event = next(event for event in events if isinstance(event, MessageEvent))
+    assert "当前文件不包含可验证的空间坐标范围" in final_event.message
+    corrective_messages = agent.ask_with_messages.await_args.args[0]
+    assert len(corrective_messages) == 1
+    assert isinstance(corrective_messages[0], ToolMessage)
+    assert corrective_messages[0].tool_call_id == "ask-placeholder"
+    assert "invalid_user_question" in corrective_messages[0].content
+
+
+@pytest.mark.asyncio
+async def test_execute_step_ignores_non_substantive_ask_user_events():
+    agent = object.__new__(ExecutionAgent)
+    agent.reset_context = AsyncMock()
+
+    async def fake_execute(_message):
+        for status in (ToolStatus.CALLING, ToolStatus.CALLED):
+            yield ToolEvent(
+                status=status,
+                tool_call_id="ask-placeholder",
+                tool_name="message",
+                function_name="message_ask_user",
+                function_args={"text": "placeholder - do not send"},
+            )
+        yield MessageEvent(message=(
+            '{"success":true,"result":"当前文件不包含空间坐标。","attachments":[]}'
+        ))
+
+    agent.execute = fake_execute
+    step = Step(description="inspect coverage")
+
+    events = [
+        event
+        async for event in agent.execute_step(
+            Plan(language="zh", steps=[step]),
+            step,
+            Message(message="这个数据集的空间范围是多少"),
+        )
+    ]
+
+    assert step.status == ExecutionStatus.COMPLETED
+    assert not any(event.type == "wait" for event in events)
+    assert not any(
+        isinstance(event, MessageEvent) and "placeholder" in event.message
+        for event in events
+    )
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("failed_result", [
+    None,
+    object(),
+    {},
+    {"success": False},
+    ToolResult(success=False, message="not delivered"),
+])
+async def test_execute_step_does_not_wait_when_ask_user_fails(failed_result):
+    agent = object.__new__(ExecutionAgent)
+    agent.reset_context = AsyncMock()
+
+    async def fake_execute(_message):
+        yield ToolEvent(
+            status=ToolStatus.CALLING,
+            tool_call_id="ask-failed",
+            tool_name="message",
+            function_name="message_ask_user",
+            function_args={"text": "Which year?"},
+        )
+        yield ToolEvent(
+            status=ToolStatus.CALLED,
+            tool_call_id="ask-failed",
+            tool_name="message",
+            function_name="message_ask_user",
+            function_args={"text": "Which year?"},
+            function_result=failed_result,
+        )
+        yield MessageEvent(message=(
+            '{"success":true,"result":"已基于现有证据完成分析。","attachments":[]}'
+        ))
+
+    agent.execute = fake_execute
+    step = Step(description="inspect coverage")
+
+    events = [
+        event
+        async for event in agent.execute_step(
+            Plan(language="zh", steps=[step]),
+            step,
+            Message(message="分析当前数据集"),
+        )
+    ]
+
+    assert step.status == ExecutionStatus.COMPLETED
+    assert not any(event.type == "wait" for event in events)
+    assert not any(
+        isinstance(event, MessageEvent) and event.message == "Which year?"
+        for event in events
+    )
+
+
+@pytest.mark.asyncio
+async def test_execute_step_emits_valid_ask_only_after_success_then_waits():
+    agent = object.__new__(ExecutionAgent)
+    agent.reset_context = AsyncMock()
+
+    async def fake_execute(_message):
+        yield ToolEvent(
+            status=ToolStatus.CALLING,
+            tool_call_id="ask-valid",
+            tool_name="message",
+            function_name="message_ask_user",
+            function_args={"text": "Which year?"},
+        )
+        yield ToolEvent(
+            status=ToolStatus.CALLED,
+            tool_call_id="ask-valid",
+            tool_name="message",
+            function_name="message_ask_user",
+            function_args={"text": "Which year?"},
+            function_result=ToolResult(success=True),
+        )
+
+    agent.execute = fake_execute
+    step = Step(description="inspect coverage")
+
+    events = [
+        event
+        async for event in agent.execute_step(
+            Plan(language="zh", steps=[step]),
+            step,
+            Message(message="分析当前数据集"),
+        )
+    ]
+
+    assert [event.type for event in events[-2:]] == ["message", "wait"]
+    assert events[-2].message == "Which year?"
 
 
 @pytest.mark.asyncio

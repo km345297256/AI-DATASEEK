@@ -1,0 +1,66 @@
+{
+  "dataset_id": "scidb-potato-fertilizer",
+  "external_id": "8f2879f50cf34d4cba2cffea657f3183",
+  "data_center_id": "reviewed-scidb-catalog",
+  "data_center_name": "ScienceDB 科学数据银行",
+  "name": "马铃薯施肥与产量田间试验",
+  "description": "埃塞俄比亚2019年马铃薯田间试验：4种NPS肥料用量×4种蚯蚓堆肥用量、3个重复，适合试验设计、方差分析及产量响应探查。",
+  "domain": "tabular",
+  "data_type": "xlsx",
+  "tags": [
+    "tabular",
+    "ScienceDB 科学数据银行",
+    "公开数据"
+  ],
+  "metadata": {
+    "curated": true,
+    "catalog_version": 1,
+    "source_catalog": "scidb",
+    "publisher": "ScienceDB 科学数据银行",
+    "source_url": "https://www.scidb.cn/en/detail?dataSetId=8f2879f50cf34d4cba2cffea657f3183",
+    "license": "CC BY 4.0",
+    "license_url": "https://creativecommons.org/licenses/by/4.0/",
+    "license_details": "Creative Commons Attribution 4.0；须署名、链接许可并说明修改。",
+    "sample_scope": "完整 V1 公开 XLSX 数据；不是合成示例。",
+    "sample_note": "完整 V1 公开 XLSX 数据；不是合成示例。",
+    "download_date": "2026-09-07",
+    "provenance": [
+      {
+        "path": "Dataset_Vermicompost and NPS application on potato.xlsx",
+        "size": 16827,
+        "sha256": "25cb82905c2dd0fdea7d39f78d9bf12516410116d501104aa9ab02326e70ccdc",
+        "role": "data",
+        "content_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "download_url": "https://china.scidb.cn/download?fileId=62ac823d8e66a93f11a07ac4",
+        "publisher_md5": "fe3e498b5af0dd932e340bd28b291416"
+      }
+    ],
+    "inventory_complete": true,
+    "recursive_file_count": 2,
+    "total_size_bytes": 17866,
+    "source_version": "V1",
+    "doi": "https://doi.org/10.57760/sciencedb.01864",
+    "authors": [
+      "1.\tAlemayehu Wagari",
+      "Zerihun Jalata",
+      "Amsalu Gobena"
+    ],
+    "source_descriptor_sha256": "f14b5e4677e6d1d29db7fc790f0fde5b078362996e45d5592418602543ab46b2"
+  },
+  "files": [
+    {
+      "path": "Dataset_Vermicompost and NPS application on potato.xlsx",
+      "size": 16827,
+      "sha256": "25cb82905c2dd0fdea7d39f78d9bf12516410116d501104aa9ab02326e70ccdc",
+      "role": "data",
+      "content_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    },
+    {
+      "path": "SOURCE.md",
+      "size": 1039,
+      "sha256": "3b6f9a1138d37352f33591a33ef1c948b2097a4df05790ecd625a1e7b5ce10b0",
+      "role": "documentation",
+      "content_type": "application/octet-stream"
+    }
+  ]
+}

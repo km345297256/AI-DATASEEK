@@ -1,0 +1,72 @@
+{
+  "dataset_id": "cn-ngdc-gwhaaib00000000",
+  "external_id": "GWHAAIB00000000",
+  "data_center_id": "reviewed-ngdc-catalog",
+  "data_center_name": "国家基因组科学数据中心 NGDC / CNCB",
+  "name": "阿萨姆茶完整叶绿体基因组",
+  "description": "NGDC Genome Warehouse公开发布的Camellia sinensis var. assamica（chloroplast genome）基因组序列，组装级别为Complete。导入叶绿体组装，不包含核基因组，也不是群体遗传或个人临床数据。 可用于序列统计、GC组成与片段长度探查。",
+  "domain": "sequence",
+  "data_type": "FASTA",
+  "tags": [
+    "sequence",
+    "国家基因组科学数据中心 NGDC / CNCB",
+    "公开数据"
+  ],
+  "metadata": {
+    "curated": true,
+    "catalog_version": 1,
+    "source_catalog": "ngdc",
+    "publisher": "国家基因组科学数据中心 NGDC / CNCB",
+    "source_url": "https://ngdc.cncb.ac.cn/gwh/Assembly/212/show",
+    "license": "NGDC GWH academic-use terms",
+    "license_url": "https://ngdc.cncb.ac.cn/gwh/statistics/genome",
+    "license_details": "GWH官方页面声明数据库仅免费用于学术研究；商业使用需另询商业许可。未发现本记录单独CC许可，不标为CC0或CC BY。引用GWH/NGDC与accession，并在有论文时引用原研究。",
+    "sample_scope": "完整已发布的叶绿体基因组FASTA，不含核基因组。",
+    "sample_note": "完整已发布的叶绿体基因组FASTA，不含核基因组。",
+    "authors": [],
+    "doi": "",
+    "source_version": "",
+    "source_descriptor_sha256": "82fc46db208e3829e6ae466b69fa4d05621d19d71cac7240ced9481c6ea12524",
+    "organism": "Camellia sinensis var. assamica",
+    "assembly_level": "Complete",
+    "bioproject": "PRJCA001249",
+    "release_time": "2019-05-05 09:47:44.0",
+    "download_date": "2026-09-07",
+    "provenance": [
+      {
+        "path": "GWHAAIB00000000.genome.fasta.gz",
+        "size": 48238,
+        "sha256": "93478d8dbfff9d4f0f7e21443dee013d20733a132be53dc1436db7aa78390930",
+        "role": "data",
+        "content_type": "application/octet-stream",
+        "download_url": "https://download.cncb.ac.cn/gwh/Plants/Camellia_sinensis_var._assamica_chloroplast_genome_GWHAAIB00000000/GWHAAIB00000000.genome.fasta.gz"
+      }
+    ],
+    "inventory_complete": true,
+    "recursive_file_count": 3,
+    "total_size_bytes": 208294
+  },
+  "files": [
+    {
+      "path": "GWHAAIB00000000.genome.fasta.gz",
+      "size": 48238,
+      "sha256": "93478d8dbfff9d4f0f7e21443dee013d20733a132be53dc1436db7aa78390930",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "SOURCE.md",
+      "size": 1305,
+      "sha256": "9896a029b0a51e0893d7a871a5b9fad82150fae578474dd70ad43ed21c3b0e38",
+      "role": "documentation",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/GWHAAIB00000000.genome.fasta",
+      "size": 158751,
+      "sha256": "96b9610f8c91db8de5a4db58970e19edcdc760af0ebc6de5e1dff081c8078de1",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    }
+  ]
+}

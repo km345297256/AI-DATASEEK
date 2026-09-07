@@ -1,0 +1,60 @@
+{
+  "dataset_id": "open-uci-concrete",
+  "external_id": "open-uci-concrete",
+  "data_center_id": "international-open-catalog",
+  "data_center_name": "I-Cheng Yeh · UCI Machine Learning Repository",
+  "name": "Concrete 混凝土抗压强度工作簿",
+  "description": "1030 组混凝土配比、养护龄期和抗压强度测量。包含 8 个输入变量与强度输出，适合测试 Excel 读取、字段单位识别及回归分析。原始 XLS 工作簿未转换。",
+  "domain": "tabular",
+  "data_type": "XLS",
+  "tags": [
+    "tabular",
+    "XLS",
+    "开放数据"
+  ],
+  "metadata": {
+    "curated": true,
+    "catalog_version": 1,
+    "publisher": "I-Cheng Yeh · UCI Machine Learning Repository",
+    "source_url": "https://archive.ics.uci.edu/dataset/165/concrete+compressive+strength",
+    "license": "CC BY 4.0",
+    "license_url": "https://creativecommons.org/licenses/by/4.0/",
+    "license_details": "CC BY 4.0",
+    "sample_scope": "完整工作簿 · 1030 条记录",
+    "sample_note": "1030 组混凝土配比、养护龄期和抗压强度测量。包含 8 个输入变量与强度输出，适合测试 Excel 读取、字段单位识别及回归分析。原始 XLS 工作簿未转换。",
+    "provenance": [
+      {
+        "path": "Concrete_Data.xls",
+        "download_url": "https://archive.ics.uci.edu/static/public/165/concrete+compressive+strength.zip",
+        "sha256": "710076c66b9ca3f8050e7942f3dcbdbe04013534daeb0077ffd3079a52d8e0c4",
+        "size": 124928
+      },
+      {
+        "path": "Concrete_Readme.txt",
+        "download_url": "https://archive.ics.uci.edu/static/public/165/concrete+compressive+strength.zip",
+        "sha256": "5cd3cdb31d3cfd68287daa6b22ed0541d6932113e83ee0980ced63641af3441d",
+        "size": 3808
+      }
+    ],
+    "inventory_complete": true,
+    "recursive_file_count": 2,
+    "total_size_bytes": 128736
+  },
+  "files": [
+    {
+      "path": "Concrete_Data.xls",
+      "size": 124928,
+      "sha256": "710076c66b9ca3f8050e7942f3dcbdbe04013534daeb0077ffd3079a52d8e0c4",
+      "role": "data",
+      "content_type": "application/vnd.ms-excel"
+    },
+    {
+      "path": "Concrete_Readme.txt",
+      "size": 3808,
+      "sha256": "5cd3cdb31d3cfd68287daa6b22ed0541d6932113e83ee0980ced63641af3441d",
+      "role": "documentation",
+      "content_type": "text/plain"
+    }
+  ]
+}
+

@@ -1,0 +1,376 @@
+{
+  "reviewed_at": "2026-09-07",
+  "source": "tpdc",
+  "note": "Reviewed download inputs. Download/HEAD observations here are research evidence, not current import status; use matching external-datasets manifests for verified inventories.",
+  "datasets": [
+    {
+      "dataset_id": "tpdc-tp-boundaries",
+      "external_id": "61701a2b-31e5-41bf-b0a3-607c2a9bd3b3",
+      "name": "青藏高原边界数据总集",
+      "description": "五类青藏高原边界，包含高程阈值边界、文献边界、2021年更新边界和参考矩形范围，用于地理裁剪与区域统计。",
+      "domain": "geoscience",
+      "data_type": "SHP",
+      "source_url": "https://data.tpdc.ac.cn/zh-hans/data/61701a2b-31e5-41bf-b0a3-607c2a9bd3b3",
+      "license": "CC BY-NC-SA 4.0",
+      "license_url": "https://creativecommons.org/licenses/by-nc-sa/4.0/",
+      "license_details": "官方许可原文：Attribution-NonCommercial-ShareAlike 4.0 International (CC BY-NC-SA 4.0)。公开共享策略 A/online；需注明数据作者、国家青藏高原科学数据中心及数据/文章引用要求；限非商业使用，演绎须相同方式共享。 DOI: 10.11888/Geogra.tpdc.270099",
+      "sample_scope": "原官方全包；保留五类不同边界，不混称同一口径。",
+      "source_size_bytes": 272247,
+      "files": [
+        {
+          "path": "tpdc-tp-boundaries.zip",
+          "format": "zip",
+          "method": "POST",
+          "url": "https://data.tpdc.ac.cn/file/file/batchDownloadFile?metadataId=61701a2b-31e5-41bf-b0a3-607c2a9bd3b3",
+          "headers": {
+            "Content-Type": "application/json"
+          },
+          "body": {
+            "noToken": true
+          }
+        }
+      ],
+      "authors": [
+        "张镱锂"
+      ],
+      "doi": "10.11888/Geogra.tpdc.270099"
+    },
+    {
+      "dataset_id": "tpdc-tp-lake-storage",
+      "external_id": "5e537e53-9532-4acd-9b17-65ff43bb0eff",
+      "name": "青藏高原大于1平方公里湖泊水量变化（1976-2020）v2.0",
+      "description": "涵盖1132个大于1平方公里湖泊的多年水储量变化估计，适合流域汇总、时期比较以及冰川补给湖与非冰川补给湖对比。",
+      "domain": "geoscience",
+      "data_type": "SHP / XLSX",
+      "source_url": "https://data.tpdc.ac.cn/zh-hans/data/5e537e53-9532-4acd-9b17-65ff43bb0eff",
+      "license": "CC BY-NC-SA 4.0",
+      "license_url": "https://creativecommons.org/licenses/by-nc-sa/4.0/",
+      "license_details": "官方许可原文：Attribution-NonCommercial-ShareAlike 4.0 International (CC BY-NC-SA 4.0)。公开共享策略 A/online；需注明数据作者、国家青藏高原科学数据中心及数据/文章引用要求；限非商业使用，演绎须相同方式共享。 DOI: 10.11888/Hydro.tpdc.271169",
+      "sample_scope": "原官方全包；标题1976–2020，正文统计重点1976–2019，分析应以文件具体年份为准。",
+      "source_size_bytes": 16941421,
+      "files": [
+        {
+          "path": "tpdc-tp-lake-storage.zip",
+          "format": "zip",
+          "method": "POST",
+          "url": "https://data.tpdc.ac.cn/file/file/batchDownloadFile?metadataId=5e537e53-9532-4acd-9b17-65ff43bb0eff",
+          "headers": {
+            "Content-Type": "application/json"
+          },
+          "body": {
+            "noToken": true
+          }
+        }
+      ],
+      "authors": [
+        "张国庆"
+      ],
+      "doi": "10.11888/Hydro.tpdc.271169"
+    },
+    {
+      "dataset_id": "tpdc-asian-loess-proxies",
+      "external_id": "d478815c-2192-4cc3-8036-62f03e9ec1ec",
+      "name": "亚洲黄土释光测年与古气候代用指标数据集",
+      "description": "亚洲128条黄土—古土壤剖面的释光年代、年龄—深度模型及粒度、磁化率、碳酸盐、色度等古气候指标，适合年代与代理指标关联分析。",
+      "domain": "geoscience",
+      "data_type": "XLSX",
+      "source_url": "https://data.tpdc.ac.cn/zh-hans/data/d478815c-2192-4cc3-8036-62f03e9ec1ec",
+      "license": "CC BY 4.0",
+      "license_url": "https://creativecommons.org/licenses/by/4.0/",
+      "license_details": "官方许可原文：1；官方前端枚举 1 = Attribution 4.0 International (CC BY 4.0)。公开共享策略 A/online；需注明数据作者、国家青藏高原科学数据中心及数据/文章引用要求； DOI: 10.11888/Paleoenv.tpdc.300496",
+      "sample_scope": "原官方全包；非原始仪器逐次采样记录。",
+      "source_size_bytes": 3738578,
+      "files": [
+        {
+          "path": "tpdc-asian-loess-proxies.zip",
+          "format": "zip",
+          "method": "POST",
+          "url": "https://data.tpdc.ac.cn/file/file/batchDownloadFile?metadataId=d478815c-2192-4cc3-8036-62f03e9ec1ec",
+          "headers": {
+            "Content-Type": "application/json"
+          },
+          "body": {
+            "noToken": true
+          }
+        }
+      ],
+      "authors": [
+        "Li Guoqiang",
+        "Yan Zhongfeng",
+        "Song Yougui",
+        "Kathryn E. Fitzsimmons",
+        "Yi Shuangwen",
+        "Kang Shugang",
+        "E Chongyi",
+        "Thomas Stevens",
+        "Lai Zhongping",
+        "Aditi K. Dave",
+        "Zhang Xiaojian",
+        "Chen Chunzhu",
+        "Deng Yanqing",
+        "Yang He",
+        "Zhao Qiuyue",
+        "Jan-Pieter Buylaert",
+        "Lu Tao",
+        "Wang Yixuan",
+        "Liu Xiangjun",
+        "Ling Zhiyong",
+        "Chang Qiufang",
+        "Wei Haitao",
+        "Wang Xiaoyan",
+        "Qin Caixin"
+      ],
+      "doi": "10.11888/Paleoenv.tpdc.300496"
+    },
+    {
+      "dataset_id": "tpdc-alpine-zinc-isotopes",
+      "external_id": "29c18c26-adef-451b-a4bc-2b1eb56ef6b5",
+      "name": "西阿尔卑斯沉积物Zn同位素数据（2023）",
+      "description": "西阿尔卑斯变质沉积物锌同位素测量数据，用于分析俯冲带碳酸盐—硅酸盐相互作用；官方说明每个样品重复测试三次，分析精度约0.04‰。",
+      "domain": "geoscience",
+      "data_type": "XLSX",
+      "source_url": "https://data.tpdc.ac.cn/zh-hans/data/29c18c26-adef-451b-a4bc-2b1eb56ef6b5",
+      "license": "CC BY 4.0",
+      "license_url": "https://creativecommons.org/licenses/by/4.0/",
+      "license_details": "官方许可原文：1；官方前端枚举 1 = Attribution 4.0 International (CC BY 4.0)。公开共享策略 A/online；需注明数据作者、国家青藏高原科学数据中心及数据/文章引用要求； DOI: 10.11888/SolidEar.tpdc.302666",
+      "sample_scope": "原官方全包；地质样品，非个人生物医学数据。",
+      "source_size_bytes": 19667,
+      "files": [
+        {
+          "path": "tpdc-alpine-zinc-isotopes.zip",
+          "format": "zip",
+          "method": "POST",
+          "url": "https://data.tpdc.ac.cn/file/file/batchDownloadFile?metadataId=29c18c26-adef-451b-a4bc-2b1eb56ef6b5",
+          "headers": {
+            "Content-Type": "application/json"
+          },
+          "body": {
+            "noToken": true
+          }
+        }
+      ],
+      "authors": [
+        "瞿瑗汝"
+      ],
+      "doi": "10.11888/SolidEar.tpdc.302666"
+    },
+    {
+      "dataset_id": "tpdc-tp-precipitation-isotopes",
+      "external_id": "8b5495b9-7d52-41e8-ba62-8c06e7131950",
+      "name": "青藏高原降水稳定氧18同位素数据集（1991–2008）",
+      "description": "高原20多个站点的月尺度降水δ18O汇总，适合比较西风、印度季风及过渡区域的同位素—温度—降水联系。",
+      "domain": "geoscience",
+      "data_type": "XLS",
+      "source_url": "https://data.tpdc.ac.cn/zh-hans/data/8b5495b9-7d52-41e8-ba62-8c06e7131950",
+      "license": "CC BY-NC-SA 4.0",
+      "license_url": "https://creativecommons.org/licenses/by-nc-sa/4.0/",
+      "license_details": "官方许可原文：Attribution-NonCommercial-ShareAlike 4.0 International (CC BY-NC-SA 4.0)。公开共享策略 A/online；需注明数据作者、国家青藏高原科学数据中心及数据/文章引用要求；限非商业使用，演绎须相同方式共享。 DOI: 10.11888/Geogra.tpdc.270940",
+      "sample_scope": "原官方全包；月尺度站点数据，不是全国格点降水。",
+      "source_size_bytes": 216576,
+      "files": [
+        {
+          "path": "tpdc-tp-precipitation-isotopes.zip",
+          "format": "zip",
+          "method": "POST",
+          "url": "https://data.tpdc.ac.cn/file/file/batchDownloadFile?metadataId=8b5495b9-7d52-41e8-ba62-8c06e7131950",
+          "headers": {
+            "Content-Type": "application/json"
+          },
+          "body": {
+            "noToken": true
+          }
+        }
+      ],
+      "authors": [
+        "高晶"
+      ],
+      "doi": "10.11888/Geogra.tpdc.270940"
+    },
+    {
+      "dataset_id": "tpdc-china-plant-functional-types",
+      "external_id": "ab193a70-63a5-4df6-9bc1-d9b5ac5fb044",
+      "name": "中国植物功能型图（1 km）",
+      "description": "由MICLCover土地覆盖及气候规则转换而成的中国1公里植物功能型分类图，共20类，适合分类面积统计与陆面生态分区比较。",
+      "domain": "geoscience",
+      "data_type": "Arc/Info Binary Grid (ADF)",
+      "source_url": "https://data.tpdc.ac.cn/zh-hans/data/ab193a70-63a5-4df6-9bc1-d9b5ac5fb044",
+      "license": "CC BY-NC-SA 4.0",
+      "license_url": "https://creativecommons.org/licenses/by-nc-sa/4.0/",
+      "license_details": "官方许可原文：Attribution-NonCommercial-ShareAlike 4.0 International (CC BY-NC-SA 4.0)。公开共享策略 A/online；需注明数据作者、国家青藏高原科学数据中心及数据/文章引用要求；限非商业使用，演绎须相同方式共享。 DOI: 10.11888/Ecolo.tpdc.270101",
+      "sample_scope": "原官方全包；分类栅格，不是连续浓度或逐年变化产品。",
+      "source_size_bytes": 5906714,
+      "files": [
+        {
+          "path": "tpdc-china-plant-functional-types.zip",
+          "format": "zip",
+          "method": "POST",
+          "url": "https://data.tpdc.ac.cn/file/file/batchDownloadFile?metadataId=ab193a70-63a5-4df6-9bc1-d9b5ac5fb044",
+          "headers": {
+            "Content-Type": "application/json"
+          },
+          "body": {
+            "noToken": true
+          }
+        }
+      ],
+      "authors": [
+        "冉有华",
+        "李新"
+      ],
+      "doi": "10.11888/Ecolo.tpdc.270101"
+    },
+    {
+      "dataset_id": "tpdc-tp-permafrost-observations",
+      "external_id": "789e838e-16ac-4539-bb7e-906217305a1d",
+      "name": "青藏高原多年冻土综合监测数据集（2002-2018）",
+      "description": "包括6个自动气象站、12个活动层观测点及84个钻孔的多要素时序，涵盖气象、土壤水热、活动层厚度和冻土地温。",
+      "domain": "geoscience",
+      "data_type": "XLSX / DOCX",
+      "source_url": "https://data.tpdc.ac.cn/zh-hans/data/789e838e-16ac-4539-bb7e-906217305a1d",
+      "license": "CC BY-NC-SA 4.0",
+      "license_url": "https://creativecommons.org/licenses/by-nc-sa/4.0/",
+      "license_details": "官方许可原文：Attribution-NonCommercial-ShareAlike 4.0 International (CC BY-NC-SA 4.0)。公开共享策略 A/online；需注明数据作者、国家青藏高原科学数据中心及数据/文章引用要求；限非商业使用，演绎须相同方式共享。 DOI: 10.11888/Geocry.tpdc.271107",
+      "sample_scope": "原官方全包；各观测点的实际时间覆盖可能不同。",
+      "source_size_bytes": 5275062,
+      "files": [
+        {
+          "path": "tpdc-tp-permafrost-observations.zip",
+          "format": "zip",
+          "method": "POST",
+          "url": "https://data.tpdc.ac.cn/file/file/batchDownloadFile?metadataId=789e838e-16ac-4539-bb7e-906217305a1d",
+          "headers": {
+            "Content-Type": "application/json"
+          },
+          "body": {
+            "noToken": true
+          }
+        }
+      ],
+      "authors": [
+        "赵林",
+        "胡国杰",
+        "邹德富",
+        "吴通华",
+        "杜二计",
+        "刘广岳",
+        "肖瑶",
+        "李韧",
+        "庞强强",
+        "乔永平",
+        "吴晓东",
+        "孙哲",
+        "幸赞品",
+        "盛煜",
+        "赵拥华",
+        "史健宗",
+        "谢昌卫",
+        "汪凌霄",
+        "王翀",
+        "程国栋"
+      ],
+      "doi": "10.11888/Geocry.tpdc.271107"
+    },
+    {
+      "dataset_id": "tpdc-qinghai-lake-hydrometeorology",
+      "external_id": "12cb9320-e6ba-4938-a9ac-5b0ebb656825",
+      "name": "青海湖水文气象数据（1956-2020）",
+      "description": "青海湖水位、面积、流域径流、湖面温度、冰厚与结冰期，以及刚察站气温和降水；适合多年趋势和湖泊—气候关系分析。",
+      "domain": "geoscience",
+      "data_type": "XLSX",
+      "source_url": "https://data.tpdc.ac.cn/zh-hans/data/12cb9320-e6ba-4938-a9ac-5b0ebb656825",
+      "license": "CC BY-NC-SA 4.0",
+      "license_url": "https://creativecommons.org/licenses/by-nc-sa/4.0/",
+      "license_details": "官方许可原文：Attribution-NonCommercial-ShareAlike 4.0 International (CC BY-NC-SA 4.0)。公开共享策略 A/online；需注明数据作者、国家青藏高原科学数据中心及数据/文章引用要求；限非商业使用，演绎须相同方式共享。 DOI: 10.1080/27669645.2021.2015870",
+      "sample_scope": "原官方全包；湖面温度1967–2020，冰厚1994–2020，气温/降水1958–2019，水位/径流1956–2020；DOI为关联论文DOI。",
+      "source_size_bytes": 31264,
+      "files": [
+        {
+          "path": "tpdc-qinghai-lake-hydrometeorology.zip",
+          "format": "zip",
+          "method": "POST",
+          "url": "https://data.tpdc.ac.cn/file/file/batchDownloadFile?metadataId=12cb9320-e6ba-4938-a9ac-5b0ebb656825",
+          "headers": {
+            "Content-Type": "application/json"
+          },
+          "body": {
+            "noToken": true
+          }
+        }
+      ],
+      "authors": [
+        "张国庆"
+      ],
+      "doi": "10.1080/27669645.2021.2015870"
+    },
+    {
+      "dataset_id": "tpdc-tp-glacier-circulation",
+      "external_id": "439b01bd-1799-4171-b9ed-16e82ccc43df",
+      "name": "青藏高原与周边地区冰川变化及其与大气环流关系（1970s-2000s）",
+      "description": "整理自Yao等2012年论文补充材料的8个表，涵盖冰川面积和长度变化、近期及长期质量平衡，适合不同流域冰川状态对比。",
+      "domain": "geoscience",
+      "data_type": "XLSX",
+      "source_url": "https://data.tpdc.ac.cn/zh-hans/data/439b01bd-1799-4171-b9ed-16e82ccc43df",
+      "license": "CC BY-NC-SA 4.0",
+      "license_url": "https://creativecommons.org/licenses/by-nc-sa/4.0/",
+      "license_details": "官方许可原文：Attribution-NonCommercial-ShareAlike 4.0 International (CC BY-NC-SA 4.0)。公开共享策略 A/online；需注明数据作者、国家青藏高原科学数据中心及数据/文章引用要求；限非商业使用，演绎须相同方式共享。 DOI: 10.11888/Glacio.tpdc.270100",
+      "sample_scope": "原官方表格全包；论文补充表整理，不是中国第二次冰川编目的逐条高精矢量原始集。",
+      "source_size_bytes": 37499,
+      "files": [
+        {
+          "path": "tpdc-tp-glacier-circulation.zip",
+          "format": "zip",
+          "method": "POST",
+          "url": "https://data.tpdc.ac.cn/file/file/batchDownloadFile?metadataId=439b01bd-1799-4171-b9ed-16e82ccc43df",
+          "headers": {
+            "Content-Type": "application/json"
+          },
+          "body": {
+            "noToken": true
+          }
+        }
+      ],
+      "authors": [
+        "姚檀栋"
+      ],
+      "doi": "10.11888/Glacio.tpdc.270100"
+    },
+    {
+      "dataset_id": "tpdc-northern-permafrost-ecosystem",
+      "external_id": "53b58111-e5a9-45c3-989f-af028b6866c1",
+      "name": "北半球多年冻土气候-生态系统敏感性分区图（2000-2016）",
+      "description": "融合多年冻土范围、气候、植被、土壤、地形及富冰有机质冻土信息，划分气候驱动与生态系统作用相关的五类多年冻土。",
+      "domain": "geoscience",
+      "data_type": "SHP",
+      "source_url": "https://data.tpdc.ac.cn/zh-hans/data/53b58111-e5a9-45c3-989f-af028b6866c1",
+      "license": "CC BY-NC-SA 4.0",
+      "license_url": "https://creativecommons.org/licenses/by-nc-sa/4.0/",
+      "license_details": "官方许可原文：Attribution-NonCommercial-ShareAlike 4.0 International (CC BY-NC-SA 4.0)。公开共享策略 A/online；需注明数据作者、国家青藏高原科学数据中心及数据/文章引用要求；限非商业使用，演绎须相同方式共享。 DOI: 10.11888/Geocry.tpdc.271659",
+      "sample_scope": "原官方全包；实际主要实体为多年冻土分区矢量 Shapefile（含 DBF 属性表），附图层/预览辅助文件，不是栅格。所述面积不含冰川和湖泊。",
+      "source_size_bytes": 36820498,
+      "files": [
+        {
+          "path": "tpdc-northern-permafrost-ecosystem.zip",
+          "format": "zip",
+          "method": "POST",
+          "url": "https://data.tpdc.ac.cn/file/file/batchDownloadFile?metadataId=53b58111-e5a9-45c3-989f-af028b6866c1",
+          "headers": {
+            "Content-Type": "application/json"
+          },
+          "body": {
+            "noToken": true
+          }
+        }
+      ],
+      "authors": [
+        "冉有华",
+        "M. Torre Jorgenson",
+        "李新",
+        "金会军",
+        "吴通华",
+        "李韧",
+        "程国栋"
+      ],
+      "doi": "10.11888/Geocry.tpdc.271659"
+    }
+  ]
+}

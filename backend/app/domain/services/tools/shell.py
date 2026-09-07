@@ -1,10 +1,20 @@
+import asyncio
 import json
+import logging
 import shlex
-from typing import Any, ClassVar, Optional
+from typing import Any, Awaitable, Callable, ClassVar, Optional
 from app.domain.external.sandbox import Sandbox
 from app.domain.services.tools.base import BaseToolkit
 from langchain.tools import tool
 from app.domain.models.tool_result import ToolResult
+
+
+logger = logging.getLogger(__name__)
+
+_MAX_BOUNDED_TIMEOUT_SECONDS = 120
+_OUTER_DEADLINE_RESERVE_SECONDS = 0.5
+_SANDBOX_WAIT_TRANSPORT_GRACE_SECONDS = 1
+_PROCESS_CANCELLATION_TIMEOUT_SECONDS = 5
 
 class ShellToolkit(BaseToolkit):
     """Shell tool class, providing Shell interaction related functions"""
@@ -63,7 +73,10 @@ class ShellToolkit(BaseToolkit):
             exec_dir: Working directory for command execution (must use absolute path)
             command: Shell command to execute
         """
-        return await self.sandbox.exec_command(id, exec_dir, command)
+        dispose_cancellation, _ = self._process_cancellation(id)
+        result = await self.sandbox.exec_command(id, exec_dir, command)
+        dispose_cancellation()
+        return result
 
     @tool(parse_docstring=True)
     async def shell_run(
@@ -671,31 +684,59 @@ class ShellToolkit(BaseToolkit):
         command: str,
         timeout_seconds: int,
     ) -> ToolResult:
-        timeout_seconds = max(1, min(timeout_seconds, 120))
+        timeout_seconds = max(
+            1,
+            min(timeout_seconds, _MAX_BOUNDED_TIMEOUT_SECONDS),
+        )
+        dispose_cancellation, kill_once = self._process_cancellation(id)
         exec_result = await self.sandbox.exec_command(id, exec_dir, command)
         exec_data = self._result_data(exec_result)
         if exec_data.get("status") != "running":
+            dispose_cancellation()
             return exec_result
 
-        wait_result = await self.sandbox.wait_for_process(id, timeout_seconds)
+        # The production interceptor owns a 120 second outer deadline. Asking
+        # the sandbox to wait for that exact duration lets the outer deadline
+        # win just before the sandbox can report its bounded running state.
+        # Reserve transport/cleanup headroom only at that shared ceiling.
+        sandbox_wait_seconds = timeout_seconds
+        if timeout_seconds == _MAX_BOUNDED_TIMEOUT_SECONDS:
+            sandbox_wait_seconds -= _SANDBOX_WAIT_TRANSPORT_GRACE_SECONDS
+        local_wait_deadline = min(
+            timeout_seconds + _SANDBOX_WAIT_TRANSPORT_GRACE_SECONDS,
+            _MAX_BOUNDED_TIMEOUT_SECONDS - _OUTER_DEADLINE_RESERVE_SECONDS,
+        )
+
+        try:
+            async with asyncio.timeout(local_wait_deadline):
+                wait_result = await self.sandbox.wait_for_process(
+                    id,
+                    sandbox_wait_seconds,
+                )
+        except TimeoutError:
+            await self._kill_after_bounded_timeout(kill_once)
+            dispose_cancellation()
+            return self._bounded_timeout_result(
+                id=id,
+                command=command,
+                timeout_seconds=timeout_seconds,
+            )
+
         wait_data = self._result_data(wait_result)
         if wait_data.get("status") != "completed":
-            return ToolResult(
-                success=wait_result.success,
-                message=f"Command is still running after {timeout_seconds} seconds",
-                data={
-                    "session_id": id,
-                    "command": command,
-                    "status": "running",
-                    "returncode": None,
-                },
+            await self._kill_after_bounded_timeout(kill_once)
+            dispose_cancellation()
+            return self._bounded_timeout_result(
+                id=id,
+                command=command,
+                timeout_seconds=timeout_seconds,
             )
 
         view_result = await self.sandbox.view_shell(id)
         view_data = self._result_data(view_result)
         returncode = wait_data.get("returncode")
         succeeded = returncode == 0 and view_result.success
-        return ToolResult(
+        result = ToolResult(
             success=succeeded,
             message=(
                 "Command completed successfully"
@@ -708,6 +749,67 @@ class ShellToolkit(BaseToolkit):
                 "status": "completed",
                 "returncode": returncode,
                 "output": view_data.get("output", ""),
+            },
+        )
+        dispose_cancellation()
+        return result
+
+    def _process_cancellation(
+        self,
+        session_id: str,
+    ) -> tuple[Callable[[], None], Callable[[str], Awaitable[None]]]:
+        """Return one idempotent kill callback tied to the current invocation."""
+        kill_task: asyncio.Task[Any] | None = None
+
+        async def kill_once(_reason: str) -> None:
+            nonlocal kill_task
+            if kill_task is None:
+                kill_task = asyncio.create_task(
+                    self.sandbox.kill_process(session_id),
+                    name="kill-shell-process",
+                )
+            # If the invoking task is cancelled, keep the cleanup request alive
+            # so the timeout interceptor can await the same operation once.
+            await asyncio.shield(kill_task)
+
+        disposer = self.register_tool_cancellation_callback(kill_once)
+        return disposer, kill_once
+
+    @staticmethod
+    async def _kill_after_bounded_timeout(
+        kill_once: Callable[[str], Awaitable[None]],
+    ) -> None:
+        try:
+            async with asyncio.timeout(_PROCESS_CANCELLATION_TIMEOUT_SECONDS):
+                await kill_once("bounded_timeout")
+        except asyncio.CancelledError:
+            raise
+        except Exception as error:
+            # The command result must remain a timeout failure even when a
+            # best-effort sandbox cleanup endpoint is temporarily unavailable.
+            logger.warning(
+                "Bounded shell cleanup failed error_type=%s",
+                type(error).__name__,
+            )
+
+    @staticmethod
+    def _bounded_timeout_result(
+        *,
+        id: str,
+        command: str,
+        timeout_seconds: int,
+    ) -> ToolResult:
+        return ToolResult(
+            success=False,
+            message=(
+                f"Command timed out after {timeout_seconds} seconds; "
+                "process termination was requested"
+            ),
+            data={
+                "session_id": id,
+                "command": command,
+                "status": "timed_out",
+                "returncode": None,
             },
         )
 
@@ -736,7 +838,10 @@ class ShellToolkit(BaseToolkit):
             id: Unique identifier of the target shell session
             seconds: Wait duration in seconds
         """
-        return await self.sandbox.wait_for_process(id, seconds)
+        dispose_cancellation, _ = self._process_cancellation(id)
+        result = await self.sandbox.wait_for_process(id, seconds)
+        dispose_cancellation()
+        return result
     
     @tool(parse_docstring=True)
     async def shell_write_to_process(

@@ -41,6 +41,22 @@ class FileStorage(Protocol):
             FileDownloadResult containing file data and metadata for FastAPI streaming
         """
         ...
+
+    async def download_file_range(
+        self,
+        file_id: str,
+        user_id: Optional[str],
+        *,
+        offset: int,
+        length: int,
+    ) -> Tuple[bytes, FileInfo]:
+        """Read one exact byte range without materializing the complete file.
+
+        Implementations must enforce the same ownership checks as
+        :meth:`download_file`. Returning fewer bytes is only valid when the
+        requested range reaches the recorded end of the object.
+        """
+        ...
     
 
     
@@ -75,4 +91,3 @@ class FileStorage(Protocol):
             FileInfo containing file metadata, None if file not found
         """
         ...
-

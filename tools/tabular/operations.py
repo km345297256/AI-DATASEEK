@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 import base64
+import csv
 import json
 import math
 import os
@@ -41,7 +42,17 @@ def read_table(path: str, sheet: Any = None, header_row: int | None = 1, max_row
     source, suffix = Path(path), Path(path).suffix.lower()
     header = None if header_row is None else header_row - 1
     if suffix in {".csv", ".tsv"}:
-        frame = pd.read_csv(source, sep="\t" if suffix == ".tsv" else ",", header=header, nrows=max_rows)
+        delimiter = "\t" if suffix == ".tsv" else ","
+        if suffix == ".csv":
+            # International datasets commonly use semicolons (e.g. UCI Wine
+            # Quality). Sniff a bounded sample while preserving CSV quoting.
+            with source.open(encoding="utf-8-sig", newline="") as stream:
+                sample = stream.read(8192)
+            try:
+                delimiter = csv.Sniffer().sniff(sample, delimiters=",;\t|").delimiter
+            except csv.Error:
+                pass  # Ordinary comma-separated and single-column CSV.
+        frame = pd.read_csv(source, sep=delimiter, header=header, nrows=max_rows)
     elif suffix in {".xlsx", ".xlsm", ".xls", ".ods"}:
         frame = pd.read_excel(source, sheet_name=0 if sheet is None else sheet, header=header, nrows=max_rows)
     else: raise ValueError("supported table formats are CSV, TSV, XLSX, XLSM, XLS and ODS")
@@ -95,8 +106,11 @@ def column_profile(series: pd.Series) -> dict[str, Any]:
     values=series.dropna(); item={"dtype":str(series.dtype),"missing":int(series.isna().sum()),"unique":int(values.nunique()),"examples":scalar(values.head(5).tolist())}
     numeric=pd.to_numeric(values,errors="coerce").dropna()
     if len(numeric) >= max(1,len(values)//2): item["numeric"]={"min":numeric.min(),"max":numeric.max(),"mean":numeric.mean(),"median":numeric.median()}
-    dates=pd.to_datetime(values,errors="coerce").dropna()
-    if len(dates) >= max(1,len(values)//2): item["time_range"]=[dates.min(),dates.max()]
+    # Numeric measurements are not nanoseconds since the Unix epoch. Only
+    # infer dates when the values are not already numeric candidates.
+    if numeric.empty and len(values):
+        dates=pd.to_datetime(values,errors="coerce").dropna()
+        if len(dates) >= max(1,len(values)//2): item["time_range"]=[dates.min(),dates.max()]
     return scalar(item)
 
 

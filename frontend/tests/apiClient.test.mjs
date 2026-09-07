@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 
 import { ApiError, apiClient } from '../src/api/client.ts';
@@ -61,4 +62,27 @@ test('Axios-like failures are rejected as ApiError instances with response metad
   } finally {
     console.error = originalConsoleError;
   }
+});
+
+
+test('requests never send legacy authentication headers', async () => {
+  await apiClient.request({
+    url: '/test-no-auth-headers',
+    headers: {
+      Authorization: 'Bearer legacy-token',
+      'X-API-Key': 'legacy-key',
+    },
+    adapter: async (config) => {
+      assert.equal(config.headers.get('Authorization'), undefined);
+      assert.equal(config.headers.get('X-API-Key'), undefined);
+      return adapterResponse(config, { code: 0, msg: 'success', data: null });
+    },
+  });
+});
+
+
+test('API transports contain no SSO redirect dependency', async () => {
+  const source = await readFile(new URL('../src/api/client.ts', import.meta.url), 'utf8');
+
+  assert.doesNotMatch(source, /space\.4fair\.cn|requireSSOToken|redirectToSSO/);
 });

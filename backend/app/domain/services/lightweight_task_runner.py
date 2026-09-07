@@ -6,12 +6,17 @@ from app.application.services.dataset_request_resolver import FrontControllerRes
 from app.domain.external.task import Task, TaskRunner
 from app.domain.external.file import FileStorage
 from app.domain.models.file import FileInfo
+from app.domain.models.execution_environment import ExecutionEnvironmentSnapshot
 from app.domain.models.audit import AuditRiskLevel, AuditStatus
 from app.domain.models.event import AgentEvent, DoneEvent, ErrorEvent, MessageEvent
 from app.domain.models.session import SessionStatus
 from app.domain.repositories.session_repository import SessionRepository
 from app.domain.services.audit_service import AuditService
 from app.domain.services.completion_advice_service import get_completion_advice_service
+from app.domain.services.tools.pipeline import opaque_log_identifier
+from app.domain.services.execution_environment import (
+    create_lightweight_execution_snapshot,
+)
 from app.domain.utils.public_error import public_error_message
 from pydantic import TypeAdapter
 
@@ -29,16 +34,86 @@ class LightweightTaskRunner(TaskRunner):
         resolution: FrontControllerResolution,
         session_repository: SessionRepository,
         file_storage: FileStorage,
+        llm_overrides: dict[str, Any] | None = None,
     ):
         self._session_id = session_id
         self._user_id = user_id
         self._resolution = resolution
         self._session_repository = session_repository
         self._file_storage = file_storage
+        self._llm_overrides = dict(llm_overrides or {})
+        self._execution_snapshot: ExecutionEnvironmentSnapshot | None = None
         self._audit_service = AuditService()
         self._completion_advice = get_completion_advice_service()
 
+    async def _record_execution_snapshot(
+        self,
+        task_id: str,
+        trigger_event_seq: int | None = None,
+    ) -> ExecutionEnvironmentSnapshot:
+        snapshot = create_lightweight_execution_snapshot(
+            task_id=task_id,
+            session_id=self._session_id,
+            resolution=self._resolution,
+            llm_overrides=getattr(self, "_llm_overrides", None),
+            trigger_event_seq=trigger_event_seq,
+        )
+        existing = getattr(self, "_execution_snapshot", None)
+        if existing is not None:
+            if (
+                existing.task_id != task_id
+                or existing.fingerprint != snapshot.fingerprint
+                or existing.trigger_event_seq != snapshot.trigger_event_seq
+            ):
+                raise RuntimeError("Task execution environment changed after it was frozen")
+            return existing
+        persist = getattr(self._session_repository, "add_execution_snapshot", None)
+        if callable(persist):
+            try:
+                await persist(snapshot)
+            except Exception as exc:
+                logger.error(
+                    "Failed to persist lightweight execution snapshot session=%s task=%s error_type=%s",
+                    opaque_log_identifier(self._session_id, namespace="session"),
+                    opaque_log_identifier(task_id, namespace="task"),
+                    type(exc).__name__,
+                )
+                raise RuntimeError(
+                    "The task execution environment could not be recorded"
+                ) from exc
+        else:
+            logger.warning(
+                "Session repository has no execution snapshot store session=%s",
+                opaque_log_identifier(self._session_id, namespace="session"),
+            )
+        self._execution_snapshot = snapshot
+        return snapshot
+
+    def _execution_task_id(self, task: Task) -> str:
+        """Read the required production task id without trusting test doubles."""
+        task_id = getattr(task, "id", None)
+        if isinstance(task_id, str) and task_id.strip():
+            return task_id
+        if callable(getattr(self._session_repository, "add_execution_snapshot", None)):
+            raise RuntimeError("Persisted lightweight task is missing its task id")
+        # A few isolated legacy tests use a deliberately incomplete Task fake
+        # and repository. They cannot persist a snapshot; keep them compatible
+        # without allowing a production repository to bypass provenance.
+        logger.warning(
+            "Legacy untracked lightweight task session=%s",
+            opaque_log_identifier(self._session_id, namespace="session"),
+        )
+        return "legacy-untracked-task"
+
     async def _publish(self, task: Task, event: AgentEvent) -> None:
+        event.bind_producer_event_id()
+        reserve_sequence = getattr(
+            self._session_repository,
+            "reserve_event_sequence",
+            None,
+        )
+        if callable(reserve_sequence):
+            await reserve_sequence(self._session_id, event)
         event_id = await task.output_stream.put(event.model_dump_json())
         event.id = event_id
         await self._session_repository.add_event(self._session_id, event)
@@ -56,6 +131,10 @@ class LightweightTaskRunner(TaskRunner):
             user_event = TypeAdapter(AgentEvent).validate_json(event_str)
             if not isinstance(user_event, MessageEvent):
                 raise RuntimeError("Lightweight task requires a user message")
+            await self._record_execution_snapshot(
+                self._execution_task_id(task),
+                trigger_event_seq=user_event.seq,
+            )
             review = self._resolution.decision.safety
             await self._record_safety_audit(review)
             if not review.allowed:
@@ -92,7 +171,11 @@ class LightweightTaskRunner(TaskRunner):
             await self._publish(task, DoneEvent(advice=self._completion_advice.to_payload(advice)))
             await self._session_repository.update_status(self._session_id, SessionStatus.COMPLETED)
         except Exception as exc:
-            logger.exception("Lightweight task failed for session %s", self._session_id)
+            logger.error(
+                "Lightweight task failed session=%s error_type=%s",
+                opaque_log_identifier(self._session_id, namespace="session"),
+                type(exc).__name__,
+            )
             await self._publish(task, ErrorEvent(error=public_error_message(exc)))
             await self._session_repository.update_status(self._session_id, SessionStatus.COMPLETED)
 
@@ -143,7 +226,11 @@ class LightweightTaskRunner(TaskRunner):
                 },
             )
         except Exception as exc:
-            logger.warning("Failed to persist lightweight safety audit: %s", exc)
+            logger.warning(
+                "Failed to persist lightweight safety audit session=%s error_type=%s",
+                opaque_log_identifier(self._session_id, namespace="session"),
+                type(exc).__name__,
+            )
 
     async def on_done(self, task: Task) -> None:
         return None

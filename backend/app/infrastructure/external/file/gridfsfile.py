@@ -1,5 +1,6 @@
 import logging
 import io
+import hashlib
 from typing import BinaryIO, Optional, Dict, Any, Tuple
 from datetime import datetime
 from bson import ObjectId
@@ -12,6 +13,13 @@ from app.core.config import get_settings
 from functools import lru_cache
 
 logger = logging.getLogger(__name__)
+
+
+def _opaque_file_ref(value: Any) -> str:
+    digest = hashlib.sha256(
+        str(value or "missing").encode("utf-8", errors="replace")
+    ).hexdigest()[:12]
+    return f"file:sha256:{digest}"
 
 
 class GridFSFileStorage(FileStorage):
@@ -94,7 +102,11 @@ class GridFSFileStorage(FileStorage):
             file_info = await files_collection.find_one({"_id": file_id})
             file_size = file_info.get('length', 0) if file_info else 0
             
-            logger.info(f"File uploaded successfully: {filename} (ID: {file_id}) for user {user_id}")
+            logger.info(
+                "File uploaded to GridFS file=%s bytes=%d",
+                _opaque_file_ref(file_id),
+                file_size,
+            )
             
             return FileInfo(
                 file_id=str(file_id),
@@ -107,7 +119,11 @@ class GridFSFileStorage(FileStorage):
             )
             
         except Exception as e:
-            logger.error(f"Failed to upload file {filename} for user {user_id}: {str(e)}")
+            logger.error(
+                "Failed to upload GridFS file=%s error_type=%s",
+                _opaque_file_ref(filename),
+                type(e).__name__,
+            )
             raise
     
     async def download_file(self, file_id: str, user_id: Optional[str] = None) -> Tuple[BinaryIO, FileInfo]:
@@ -142,8 +158,52 @@ class GridFSFileStorage(FileStorage):
         except (FileNotFoundError, PermissionError):
             raise
         except Exception as e:
-            logger.error(f"Failed to download file {file_id} for user {user_id}: {str(e)}")
+            logger.error(
+                "Failed to download GridFS file=%s error_type=%s",
+                _opaque_file_ref(file_id),
+                type(e).__name__,
+            )
             raise
+
+    async def download_file_range(
+        self,
+        file_id: str,
+        user_id: Optional[str],
+        *,
+        offset: int,
+        length: int,
+    ) -> Tuple[bytes, FileInfo]:
+        """Read a bounded GridFS range without copying the full object."""
+        if isinstance(offset, bool) or not isinstance(offset, int) or offset < 0:
+            raise ValueError("offset must be a non-negative integer")
+        if isinstance(length, bool) or not isinstance(length, int) or length < 0:
+            raise ValueError("length must be a non-negative integer")
+        try:
+            obj_id = ObjectId(file_id)
+        except Exception as exc:
+            raise ValueError("Invalid file ID format") from exc
+
+        files_collection = self._get_files_collection()
+        stored = await files_collection.find_one({"_id": obj_id})
+        if not stored:
+            raise FileNotFoundError("File not found")
+        file_user_id = stored.get("metadata", {}).get("user_id")
+        if user_id is not None and file_user_id != user_id:
+            raise PermissionError("Access denied")
+        info = self._create_file_info(stored, file_id)
+        if offset > info.size:
+            raise ValueError("offset exceeds file size")
+        requested = min(length, max(0, info.size - offset))
+        if requested == 0:
+            return b"", info
+
+        grid_out = await self._get_gridfs_bucket().open_download_stream(obj_id)
+        try:
+            await grid_out.seek(offset)
+            data = await grid_out.read(requested)
+        finally:
+            await grid_out.close()
+        return bytes(data), info
     
     async def delete_file(self, file_id: str, user_id: str) -> bool:
         """Delete file"""
@@ -165,17 +225,24 @@ class GridFSFileStorage(FileStorage):
             # Check if file belongs to the user
             file_user_id = file_info.get('metadata', {}).get('user_id')
             if file_user_id != user_id:
-                logger.warning(f"Delete access denied: file {file_id} does not belong to user {user_id}")
+                logger.warning(
+                    "Delete access denied file=%s",
+                    _opaque_file_ref(file_id),
+                )
                 return False
             
             # Delete file
             await bucket.delete(obj_id)
-            logger.info(f"File deleted successfully: {file_id} by user {user_id}")
+            logger.info("File deleted from GridFS file=%s", _opaque_file_ref(file_id))
             return True
             
         except Exception as e:
-            logger.error(f"Failed to delete file {file_id} for user {user_id}: {str(e)}")
-            return False
+            logger.error(
+                "Failed to delete GridFS file=%s error_type=%s",
+                _opaque_file_ref(file_id),
+                type(e).__name__,
+            )
+            raise
     
     async def get_file_info(self, file_id: str, user_id: Optional[str] = None) -> Optional[FileInfo]:
         """Get file information"""
@@ -196,14 +263,18 @@ class GridFSFileStorage(FileStorage):
             # Check if file belongs to the user
             file_user_id = file_info.get('metadata', {}).get('user_id')
             if user_id is not None and file_user_id != user_id:
-                logger.warning(f"Access denied: file {file_id} does not belong to user {user_id}")
+                logger.warning("Access denied file=%s", _opaque_file_ref(file_id))
                 return None
             
             return self._create_file_info(file_info, file_id)
             
         except Exception as e:
-            logger.error(f"Failed to get file info {file_id} for user {user_id}: {str(e)}")
-            return None
+            logger.error(
+                "Failed to get GridFS file info file=%s error_type=%s",
+                _opaque_file_ref(file_id),
+                type(e).__name__,
+            )
+            raise
 
     async def storage_usage(self) -> Dict[str, Any]:
         files_collection = self._get_files_collection()

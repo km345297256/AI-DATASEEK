@@ -1,0 +1,266 @@
+{
+  "dataset_id": "scidb-pamirs-warming",
+  "external_id": "633694461058088963",
+  "data_center_id": "reviewed-scidb-catalog",
+  "data_center_name": "ScienceDB 科学数据银行",
+  "name": "帕米尔高原极端升温过程（1961—2017）",
+  "description": "基于帕米尔高原3个气象站1961—2017年逐日最高温度形成的极端升温过程指标，适合频率、持续时间、强度和长期变化分析。",
+  "domain": "geoscience",
+  "data_type": "zip,rar",
+  "tags": [
+    "geoscience",
+    "ScienceDB 科学数据银行",
+    "公开数据"
+  ],
+  "metadata": {
+    "curated": true,
+    "catalog_version": 1,
+    "source_catalog": "scidb",
+    "publisher": "ScienceDB 科学数据银行",
+    "source_url": "https://www.scidb.cn/en/detail?dataSetId=633694461058088963",
+    "license": "CC BY 4.0",
+    "license_url": "https://creativecommons.org/licenses/by/4.0/",
+    "license_details": "Creative Commons Attribution 4.0；须署名、链接许可并说明修改。",
+    "sample_scope": "完整 V1 发布的3个压缩包（文件名含 V3、2 等历史命名）。应分别解压到不同子目录，不能混写覆盖；包内格式与重复版本须下载后核验。",
+    "sample_note": "完整 V1 发布的3个压缩包（文件名含 V3、2 等历史命名）。应分别解压到不同子目录，不能混写覆盖；包内格式与重复版本须下载后核验。",
+    "download_date": "2026-09-07",
+    "provenance": [
+      {
+        "path": "中巴经济走廊北端帕米尔高原区域极端升温过程数据集-V3.zip",
+        "size": 327229,
+        "sha256": "41de7283912e227154d4a635bc8729bcf5231a681b3db7a7e6e1bcece448b4fd",
+        "role": "data",
+        "content_type": "application/zip",
+        "download_url": "https://china.scidb.cn/download?fileId=5ed5fcab5e972d1f52dfe6b2",
+        "publisher_md5": "ad625b93be7c8c9b9170099f114f5539"
+      },
+      {
+        "path": "中巴经济走廊北端帕米尔高原区域极端升温过程数据集.rar",
+        "size": 219270,
+        "sha256": "8de8744fd509921bce902fd73a946102507af3369425d8928a83e7b056bacd3b",
+        "role": "data",
+        "content_type": "application/x-rar-compressed",
+        "download_url": "https://china.scidb.cn/download?fileId=5ed5fcab5e972d1f52dfe6b4",
+        "publisher_md5": "67a23ea133b97b42b509d0e7438dae59"
+      },
+      {
+        "path": "中巴经济走廊北端帕米尔高原区域极端升温过程数据集2.zip",
+        "size": 322487,
+        "sha256": "616a067442c6a13d11670f7f152ce8580b0788ffd0fe3c98981e3373e4f91960",
+        "role": "data",
+        "content_type": "application/zip",
+        "download_url": "https://china.scidb.cn/download?fileId=5ed5fcab5e972d1f52dfe6b3",
+        "publisher_md5": "720ccc648772b48371fc086d4e8314b2"
+      }
+    ],
+    "inventory_complete": true,
+    "recursive_file_count": 28,
+    "total_size_bytes": 3419665,
+    "source_version": "V1",
+    "doi": "https://doi.org/10.11922/sciencedb.595",
+    "authors": [
+      "毛炜峄",
+      "姚俊强",
+      "陈静"
+    ],
+    "source_descriptor_sha256": "e8fc6e437fe060aed850b0b26cebc527268a093328908cf64f10f593e552a8e1"
+  },
+  "files": [
+    {
+      "path": "SOURCE.md",
+      "size": 1144,
+      "sha256": "2f82e2d39548fec9e88ca58ec8ed50451b02ae16a871fd8e164673de0c23de9d",
+      "role": "documentation",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/中巴经济走廊北端帕米尔高原区域极端升温过程数据集-V3/╓╨░═╛¡╝├╫▀└╚▒▒╢╦┼┴├╫╢√╕▀╘¡╟°╙≥╝½╢╦╔²╬┬╣²│╠╩²╛▌╝»-V3/extreme_temperature_rising_process_PER05_51701_1961_2017.csv",
+      "size": 16537,
+      "sha256": "b540462aea830e1269d5e6e37c85e73f3fc4c37031793198fdcf60d4f97e98fc",
+      "role": "data",
+      "content_type": "text/csv"
+    },
+    {
+      "path": "extracted/中巴经济走廊北端帕米尔高原区域极端升温过程数据集-V3/╓╨░═╛¡╝├╫▀└╚▒▒╢╦┼┴├╫╢√╕▀╘¡╟°╙≥╝½╢╦╔²╬┬╣²│╠╩²╛▌╝»-V3/extreme_temperature_rising_process_PER05_51705_1961_2017.csv",
+      "size": 16560,
+      "sha256": "3e50b1f703815c9583098b4adde1077daf28a668190a74bac40c7ff301ea4186",
+      "role": "data",
+      "content_type": "text/csv"
+    },
+    {
+      "path": "extracted/中巴经济走廊北端帕米尔高原区域极端升温过程数据集-V3/╓╨░═╛¡╝├╫▀└╚▒▒╢╦┼┴├╫╢√╕▀╘¡╟°╙≥╝½╢╦╔²╬┬╣²│╠╩²╛▌╝»-V3/extreme_temperature_rising_process_PER05_51804_1961_2017.csv",
+      "size": 15017,
+      "sha256": "b33a3b046d5ad42872a4de601b0ea3a1290ae984cad5a9d6c3cd907f117ee234",
+      "role": "data",
+      "content_type": "text/csv"
+    },
+    {
+      "path": "extracted/中巴经济走廊北端帕米尔高原区域极端升温过程数据集-V3/╓╨░═╛¡╝├╫▀└╚▒▒╢╦┼┴├╫╢√╕▀╘¡╟°╙≥╝½╢╦╔²╬┬╣²│╠╩²╛▌╝»-V3/temperature_day_51705-1961_2017.csv",
+      "size": 103684,
+      "sha256": "0a87fc3f43751dafaa16017d1f0b44d48af376fdea8a8c049beceb7027ae39bc",
+      "role": "data",
+      "content_type": "text/csv"
+    },
+    {
+      "path": "extracted/中巴经济走廊北端帕米尔高原区域极端升温过程数据集-V3/╓╨░═╛¡╝├╫▀└╚▒▒╢╦┼┴├╫╢√╕▀╘¡╟°╙≥╝½╢╦╔²╬┬╣²│╠╩²╛▌╝»-V3/temperature_day_ano_51705-1961_2017.csv",
+      "size": 96859,
+      "sha256": "7d1867a68441314070fc1c096ff1246a4bbe9adafc2c84f6bd0dba243a6037ac",
+      "role": "data",
+      "content_type": "text/csv"
+    },
+    {
+      "path": "extracted/中巴经济走廊北端帕米尔高原区域极端升温过程数据集-V3/╓╨░═╛¡╝├╫▀└╚▒▒╢╦┼┴├╫╢√╕▀╘¡╟°╙≥╝½╢╦╔²╬┬╣²│╠╩²╛▌╝»-V3/temperature_day_ave_51705-1961_2017.csv",
+      "size": 1898,
+      "sha256": "7ef98d748d98497579fe7d1aee7011cf222dd1671f80396bbf54da5564a7c47a",
+      "role": "data",
+      "content_type": "text/csv"
+    },
+    {
+      "path": "extracted/中巴经济走廊北端帕米尔高原区域极端升温过程数据集-V3/╓╨░═╛¡╝├╫▀└╚▒▒╢╦┼┴├╫╢√╕▀╘¡╟°╙≥╝½╢╦╔²╬┬╣²│╠╩²╛▌╝»-V3/temperature_day_max_51705-1961_2017.csv",
+      "size": 102293,
+      "sha256": "2779f8634c0937ce55cba82d8db10666046d36b001035ac2eb3adc1663e4384f",
+      "role": "data",
+      "content_type": "text/csv"
+    },
+    {
+      "path": "extracted/中巴经济走廊北端帕米尔高原区域极端升温过程数据集-V3/╓╨░═╛¡╝├╫▀└╚▒▒╢╦┼┴├╫╢√╕▀╘¡╟°╙≥╝½╢╦╔²╬┬╣²│╠╩²╛▌╝»-V3/temperature_day_max_ano_51705-1961_2017.csv",
+      "size": 96916,
+      "sha256": "7c2b38e143c7c78077fa3c59e05cac3d34b61f46a2236cdbb54ac026b3cd0c93",
+      "role": "data",
+      "content_type": "text/csv"
+    },
+    {
+      "path": "extracted/中巴经济走廊北端帕米尔高原区域极端升温过程数据集-V3/╓╨░═╛¡╝├╫▀└╚▒▒╢╦┼┴├╫╢√╕▀╘¡╟°╙≥╝½╢╦╔²╬┬╣²│╠╩²╛▌╝»-V3/temperature_day_max_ave_51705-1961_2017.csv",
+      "size": 1857,
+      "sha256": "fd2d6000fe2c244de082814b8cdeb97781324fa497e9e37608b76f1ffab95359",
+      "role": "data",
+      "content_type": "text/csv"
+    },
+    {
+      "path": "extracted/中巴经济走廊北端帕米尔高原区域极端升温过程数据集-V3/╓╨░═╛¡╝├╫▀└╚▒▒╢╦┼┴├╫╢√╕▀╘¡╟°╙≥╝½╢╦╔²╬┬╣²│╠╩²╛▌╝»-V3/temperature_rising_process_51701_1961_2017.csv",
+      "size": 288420,
+      "sha256": "e6b068a94e1378136856f6011189f370d828db382e389c30fd7fa07c8861e4d5",
+      "role": "data",
+      "content_type": "text/csv"
+    },
+    {
+      "path": "extracted/中巴经济走廊北端帕米尔高原区域极端升温过程数据集-V3/╓╨░═╛¡╝├╫▀└╚▒▒╢╦┼┴├╫╢√╕▀╘¡╟°╙≥╝½╢╦╔²╬┬╣²│╠╩²╛▌╝»-V3/temperature_rising_process_51705_1961_2017.csv",
+      "size": 286097,
+      "sha256": "c6dc7a1e54eddfe09af7b06ee2f6cd879d84c20403569ff2f13f4c17d14af513",
+      "role": "data",
+      "content_type": "text/csv"
+    },
+    {
+      "path": "extracted/中巴经济走廊北端帕米尔高原区域极端升温过程数据集-V3/╓╨░═╛¡╝├╫▀└╚▒▒╢╦┼┴├╫╢√╕▀╘¡╟°╙≥╝½╢╦╔²╬┬╣²│╠╩²╛▌╝»-V3/temperature_rising_process_51804_1961_2017.csv",
+      "size": 258784,
+      "sha256": "1c441495ce31d80d0412cd376502990d5031c1071809277b4277d65c24249f61",
+      "role": "data",
+      "content_type": "text/csv"
+    },
+    {
+      "path": "extracted/中巴经济走廊北端帕米尔高原区域极端升温过程数据集2/╓╨░═╛¡╝├╫▀└╚▒▒╢╦┼┴├╫╢√╕▀╘¡╟°╙≥╝½╢╦╔²╬┬╣²│╠╩²╛▌╝»2/extreme_temperature_rising_process_PER05_51701_1961_2017.csv",
+      "size": 16537,
+      "sha256": "b540462aea830e1269d5e6e37c85e73f3fc4c37031793198fdcf60d4f97e98fc",
+      "role": "data",
+      "content_type": "text/csv"
+    },
+    {
+      "path": "extracted/中巴经济走廊北端帕米尔高原区域极端升温过程数据集2/╓╨░═╛¡╝├╫▀└╚▒▒╢╦┼┴├╫╢√╕▀╘¡╟°╙≥╝½╢╦╔²╬┬╣²│╠╩²╛▌╝»2/extreme_temperature_rising_process_PER05_51705_1961_2017.csv",
+      "size": 16560,
+      "sha256": "3e50b1f703815c9583098b4adde1077daf28a668190a74bac40c7ff301ea4186",
+      "role": "data",
+      "content_type": "text/csv"
+    },
+    {
+      "path": "extracted/中巴经济走廊北端帕米尔高原区域极端升温过程数据集2/╓╨░═╛¡╝├╫▀└╚▒▒╢╦┼┴├╫╢√╕▀╘¡╟°╙≥╝½╢╦╔²╬┬╣²│╠╩²╛▌╝»2/extreme_temperature_rising_process_PER05_51804_1961_2017.csv",
+      "size": 15017,
+      "sha256": "b33a3b046d5ad42872a4de601b0ea3a1290ae984cad5a9d6c3cd907f117ee234",
+      "role": "data",
+      "content_type": "text/csv"
+    },
+    {
+      "path": "extracted/中巴经济走廊北端帕米尔高原区域极端升温过程数据集2/╓╨░═╛¡╝├╫▀└╚▒▒╢╦┼┴├╫╢√╕▀╘¡╟°╙≥╝½╢╦╔²╬┬╣²│╠╩²╛▌╝»2/temperature_day_51705_1961_2017.csv",
+      "size": 98065,
+      "sha256": "d31cde19ed082507a442223b4166834ae139ffe05691e325075a612bd0709168",
+      "role": "data",
+      "content_type": "text/csv"
+    },
+    {
+      "path": "extracted/中巴经济走廊北端帕米尔高原区域极端升温过程数据集2/╓╨░═╛¡╝├╫▀└╚▒▒╢╦┼┴├╫╢√╕▀╘¡╟°╙≥╝½╢╦╔²╬┬╣²│╠╩²╛▌╝»2/temperature_day_ano_51705_1961_2017.csv",
+      "size": 91147,
+      "sha256": "ec563ddc82377b4a8bc0ff9e7c60687a23be86a24d863c239dc57edde25e2016",
+      "role": "data",
+      "content_type": "text/csv"
+    },
+    {
+      "path": "extracted/中巴经济走廊北端帕米尔高原区域极端升温过程数据集2/╓╨░═╛¡╝├╫▀└╚▒▒╢╦┼┴├╫╢√╕▀╘¡╟°╙≥╝½╢╦╔²╬┬╣²│╠╩²╛▌╝»2/temperature_day_ave_51705_1961_2017.csv",
+      "size": 3046,
+      "sha256": "40aaf73c7a7fe1c6432f20a32f21c53000c97e9d4d7ec5f2eaa8885539c4dad2",
+      "role": "data",
+      "content_type": "text/csv"
+    },
+    {
+      "path": "extracted/中巴经济走廊北端帕米尔高原区域极端升温过程数据集2/╓╨░═╛¡╝├╫▀└╚▒▒╢╦┼┴├╫╢√╕▀╘¡╟°╙≥╝½╢╦╔²╬┬╣²│╠╩²╛▌╝»2/temperature_day_max_51705_1961_2017.csv",
+      "size": 96597,
+      "sha256": "298399889d91db84ea2af6c79763ee59d0e5eea897501e908f14a1ea347fb70d",
+      "role": "data",
+      "content_type": "text/csv"
+    },
+    {
+      "path": "extracted/中巴经济走廊北端帕米尔高原区域极端升温过程数据集2/╓╨░═╛¡╝├╫▀└╚▒▒╢╦┼┴├╫╢√╕▀╘¡╟°╙≥╝½╢╦╔²╬┬╣²│╠╩²╛▌╝»2/temperature_day_max_ano_51705_1961_2017.csv",
+      "size": 91338,
+      "sha256": "8a0dd0a1a3eefcd453fc0933e692fd24f668ea0d010656d7fae1da13119d98b3",
+      "role": "data",
+      "content_type": "text/csv"
+    },
+    {
+      "path": "extracted/中巴经济走廊北端帕米尔高原区域极端升温过程数据集2/╓╨░═╛¡╝├╫▀└╚▒▒╢╦┼┴├╫╢√╕▀╘¡╟°╙≥╝½╢╦╔²╬┬╣²│╠╩²╛▌╝»2/temperature_day_max_ave_51705_1961_2017.csv",
+      "size": 3005,
+      "sha256": "c5aff4ea7e76586a367e0176f0e30f6fc475fedef9d29af04696b4652dac60d7",
+      "role": "data",
+      "content_type": "text/csv"
+    },
+    {
+      "path": "extracted/中巴经济走廊北端帕米尔高原区域极端升温过程数据集2/╓╨░═╛¡╝├╫▀└╚▒▒╢╦┼┴├╫╢√╕▀╘¡╟°╙≥╝½╢╦╔²╬┬╣²│╠╩²╛▌╝»2/temperature_rising_process_51701_1961_2017.csv",
+      "size": 288420,
+      "sha256": "e6b068a94e1378136856f6011189f370d828db382e389c30fd7fa07c8861e4d5",
+      "role": "data",
+      "content_type": "text/csv"
+    },
+    {
+      "path": "extracted/中巴经济走廊北端帕米尔高原区域极端升温过程数据集2/╓╨░═╛¡╝├╫▀└╚▒▒╢╦┼┴├╫╢√╕▀╘¡╟°╙≥╝½╢╦╔²╬┬╣²│╠╩²╛▌╝»2/temperature_rising_process_51705_1961_2017.csv",
+      "size": 286097,
+      "sha256": "c6dc7a1e54eddfe09af7b06ee2f6cd879d84c20403569ff2f13f4c17d14af513",
+      "role": "data",
+      "content_type": "text/csv"
+    },
+    {
+      "path": "extracted/中巴经济走廊北端帕米尔高原区域极端升温过程数据集2/╓╨░═╛¡╝├╫▀└╚▒▒╢╦┼┴├╫╢√╕▀╘¡╟°╙≥╝½╢╦╔²╬┬╣²│╠╩²╛▌╝»2/temperature_rising_process_51804_1961_2017.csv",
+      "size": 258784,
+      "sha256": "1c441495ce31d80d0412cd376502990d5031c1071809277b4277d65c24249f61",
+      "role": "data",
+      "content_type": "text/csv"
+    },
+    {
+      "path": "中巴经济走廊北端帕米尔高原区域极端升温过程数据集-V3.zip",
+      "size": 327229,
+      "sha256": "41de7283912e227154d4a635bc8729bcf5231a681b3db7a7e6e1bcece448b4fd",
+      "role": "data",
+      "content_type": "application/zip"
+    },
+    {
+      "path": "中巴经济走廊北端帕米尔高原区域极端升温过程数据集.rar",
+      "size": 219270,
+      "sha256": "8de8744fd509921bce902fd73a946102507af3369425d8928a83e7b056bacd3b",
+      "role": "data",
+      "content_type": "application/x-rar-compressed"
+    },
+    {
+      "path": "中巴经济走廊北端帕米尔高原区域极端升温过程数据集2.zip",
+      "size": 322487,
+      "sha256": "616a067442c6a13d11670f7f152ce8580b0788ffd0fe3c98981e3373e4f91960",
+      "role": "data",
+      "content_type": "application/zip"
+    }
+  ]
+}

@@ -32,16 +32,31 @@ const SECRET_KEY_PATTERN = [
   'private[-_]?key',
   'signature',
 ].join('|');
-const SECRET_IDENTIFIER_PATTERN = `(?:[A-Za-z][A-Za-z0-9]*[-_])*(?:${SECRET_KEY_PATTERN})`;
+const SECRET_IDENTIFIER_PATTERN = `(?:[A-Za-z][A-Za-z0-9_-]{0,80})?(?:${SECRET_KEY_PATTERN})`;
+const SECRET_KEY_SUFFIXES = [
+  'apikey',
+  'accesskey',
+  'secret',
+  'secretkey',
+  'clientsecret',
+  'password',
+  'passwd',
+  'token',
+  'credential',
+  'authorization',
+  'cookie',
+  'privatekey',
+  'signature',
+] as const;
 
 const isRecord = (value: unknown): value is Record<string, unknown> => (
   !!value && typeof value === 'object' && !Array.isArray(value)
 );
 
-const isSensitiveKey = (key: string): boolean => new RegExp(
-  `(?:^|[-_])(?:${SECRET_KEY_PATTERN})$`,
-  'i',
-).test(key.replace(/^--?/, ''));
+export const isSensitiveToolDisplayKey = (key: string): boolean => {
+  const normalized = key.replace(/^--?/, '').toLowerCase().replace(/[^a-z0-9]/g, '');
+  return SECRET_KEY_SUFFIXES.some((suffix) => normalized.endsWith(suffix));
+};
 
 /**
  * Remove credentials and host-only paths before rendering tool arguments.
@@ -126,7 +141,7 @@ export const sanitizeToolDisplayValue = (value: unknown, depth = 0): unknown => 
 
   return Object.fromEntries(Object.entries(value as Record<string, unknown>).map(([key, item]) => [
     key,
-    isSensitiveKey(key) ? REDACTED_SECRET : sanitizeToolDisplayValue(item, depth + 1),
+    isSensitiveToolDisplayKey(key) ? REDACTED_SECRET : sanitizeToolDisplayValue(item, depth + 1),
   ]));
 };
 
@@ -224,7 +239,9 @@ export const getToolDisplayDetail = (tool: ToolContent): ToolDisplayDetail => {
     const preferredKey = preferredKeys[functionName];
     if (preferredKey) detail = safeStringArg(args, preferredKey);
     if (!detail) {
-      const firstSafeEntry = Object.entries(args).find(([key]) => !isSensitiveKey(key));
+      const firstSafeEntry = Object.entries(args).find(
+        ([key]) => !isSensitiveToolDisplayKey(key),
+      );
       if (firstSafeEntry) detail = safeStringArg(args, firstSafeEntry[0]);
     }
   }

@@ -1,7 +1,8 @@
 from typing import Any, Dict, List, Optional
 from datetime import datetime, UTC
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 import secrets
+from app.domain.models.tool_runtime import ToolRuntimeConfig
 
 class AgentPlannerConfig(BaseModel):
     system_prompt: Optional[str] = None
@@ -29,6 +30,24 @@ class AgentSubAgentConfig(BaseModel):
     model_config_id: Optional[str] = None
     model_settings: Dict[str, Any] = Field(default_factory=dict, alias="model_config")
     tool_permissions: Dict[str, Any] = Field(default_factory=dict)
+    preset_id: Optional[str] = None
+
+    @field_validator("preset_id")
+    @classmethod
+    def validate_preset(cls, value: Optional[str]) -> Optional[str]:
+        if value is not None:
+            ToolRuntimeConfig(preset_id=value)
+        return value
+
+    @model_validator(mode="after")
+    def validate_domain_handler(self):
+        if self.preset_id is not None and self.handler_type != "execution":
+            raise ValueError("domain presets require an execution handler")
+        if self.preset_id is not None and self.key in {"execution", "vision"}:
+            # These identities retain core routing/fallback semantics and must
+            # survive disabling the experimental domain-agent feature.
+            raise ValueError("domain presets cannot use reserved core subagent keys")
+        return self
 
     @field_validator("key")
     @classmethod
@@ -91,6 +110,7 @@ class AgentProfile(BaseModel):
     system_prompt: Optional[str] = None
     planner_config: AgentPlannerConfig = Field(default_factory=AgentPlannerConfig)
     subagents: List[AgentSubAgentConfig] = Field(default_factory=default_subagents)
+    tool_runtime: ToolRuntimeConfig = Field(default_factory=ToolRuntimeConfig)
     is_active: bool = True
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))

@@ -1,0 +1,330 @@
+{
+  "dataset_id": "scidb-co2-plasmon-sensor",
+  "external_id": "9a1b3383cfa54d90b067a26828b3fa0d",
+  "data_center_id": "reviewed-scidb-catalog",
+  "data_center_name": "ScienceDB 科学数据银行",
+  "name": "二氧化碳等离激元传感器计算数据",
+  "description": "单、双、三层银膜结构的二氧化碳传感模拟数据，含波长、传播长度、磁场、材料光学常数和变化率，用于光学数值结果探查。",
+  "domain": "spectroscopy",
+  "data_type": "xlsx,m",
+  "tags": [
+    "spectroscopy",
+    "ScienceDB 科学数据银行",
+    "公开数据"
+  ],
+  "metadata": {
+    "curated": true,
+    "catalog_version": 1,
+    "source_catalog": "scidb",
+    "publisher": "ScienceDB 科学数据银行",
+    "source_url": "https://www.scidb.cn/en/detail?dataSetId=9a1b3383cfa54d90b067a26828b3fa0d",
+    "license": "CC BY 4.0",
+    "license_url": "https://creativecommons.org/licenses/by/4.0/",
+    "license_details": "Creative Commons Attribution 4.0；须署名、链接许可并说明修改。",
+    "sample_scope": "完整 V1 的17个数据/代码文件；MATLAB .m 仅作为原始参考文件保留，不自动执行。目录层级必须保持。",
+    "sample_note": "完整 V1 的17个数据/代码文件；MATLAB .m 仅作为原始参考文件保留，不自动执行。目录层级必须保持。",
+    "download_date": "2026-09-07",
+    "provenance": [
+      {
+        "path": "Ag.xlsx",
+        "size": 11118,
+        "sha256": "247daaa34f4b06103a4eed3792c3e434d50bc4561ec9ca0a2d9b78691314a319",
+        "role": "data",
+        "content_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "download_url": "https://china.scidb.cn/download?fileId=a1cd61fcd510ad588553ac2a6a3fe5bb",
+        "publisher_md5": "9fb82507a8d757306e9c00fa47a8018f"
+      },
+      {
+        "path": "PHMB.xlsx",
+        "size": 10734,
+        "sha256": "f21f15f7f662e9c91b3aa1f814f012ef18a5a60f48a1d3245d493fca71fb9163",
+        "role": "data",
+        "content_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "download_url": "https://china.scidb.cn/download?fileId=c188d69f6a6c0b9788af9fd48b26bf76",
+        "publisher_md5": "776699a181d4dee41acc3ffc5abc1da0"
+      },
+      {
+        "path": "multilayered1.m",
+        "size": 6160,
+        "sha256": "8cffd3767f9723124669453eff7f7f0db2d03170bb716992a4c8a2f8af8ae156",
+        "role": "data",
+        "content_type": "application/octet-stream",
+        "download_url": "https://china.scidb.cn/download?fileId=9312be1c29bce553b8ee93c570dd4795",
+        "publisher_md5": "4838489cf2dbc1104ae9460bef0147d6"
+      },
+      {
+        "path": "multilayered2.m",
+        "size": 6117,
+        "sha256": "919ea908eb8b6fef556a4d66aac4434a12dffec4b754071a2db926f6fe8c94c4",
+        "role": "data",
+        "content_type": "application/octet-stream",
+        "download_url": "https://china.scidb.cn/download?fileId=bffb7da0c2c6bab92f31a78fc6c617b6",
+        "publisher_md5": "fe4a8681e4a3e4fe5c21f40fb76bc6ab"
+      },
+      {
+        "path": "不同层变化率、变化量.xlsx",
+        "size": 13326,
+        "sha256": "7a27fdde1d6e2cfc6659e8aeaaf95fb99401af8753f43a982c6f84244198c376",
+        "role": "data",
+        "content_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "download_url": "https://china.scidb.cn/download?fileId=21f253d277981d065b4deb645828e695",
+        "publisher_md5": "f8e20373e06dd6522aea4fbd950d611b"
+      },
+      {
+        "path": "三层/三层Hy.xlsx",
+        "size": 82403,
+        "sha256": "92766dc7cc5c794b68842bc6d0bd7e6ec7ed13bd24173e89624a2256f4522288",
+        "role": "data",
+        "content_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "download_url": "https://china.scidb.cn/download?fileId=033136718dc7a923289bce5eb98064fb",
+        "publisher_md5": "922c5c780bfadf7c154d6e03fff45e86"
+      },
+      {
+        "path": "三层/三层传播长度.xlsx",
+        "size": 19031,
+        "sha256": "cd875af04e0d4258d8ede95164c06232cad415539d77510dae0580e88f1fd3fe",
+        "role": "data",
+        "content_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "download_url": "https://china.scidb.cn/download?fileId=e1c590a32d3ecdc63e5de789aaed5535",
+        "publisher_md5": "cc9b7c6fdd572fa36a018d78bd622fdd"
+      },
+      {
+        "path": "三层/三层传播长度变化量、变化率.xlsx",
+        "size": 19140,
+        "sha256": "28918c16906f8637e6e5a402ca100ad8eb33e67230f7de3159ce464e4d7af0c0",
+        "role": "data",
+        "content_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "download_url": "https://china.scidb.cn/download?fileId=3a728041fd42f4dcbf371861f2effc13",
+        "publisher_md5": "2822e2a2f3b65d969903cb45702af1dd"
+      },
+      {
+        "path": "单层/单层Hy.xlsx",
+        "size": 35456,
+        "sha256": "32fb3714f9a51e516828ea339520f9fb46a6b086fbef0197a2514871a77195aa",
+        "role": "data",
+        "content_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "download_url": "https://china.scidb.cn/download?fileId=bd7389cd9d7cd1e3e11d508f62472b4e",
+        "publisher_md5": "7fb1c8f09ef1be2405dce8561227a0af"
+      },
+      {
+        "path": "单层/单层传播长度变化量、变化率.xlsx",
+        "size": 20083,
+        "sha256": "c433e65ec36e170dcd4de264921fe4a44f191388c27bf3b7b361a0f89f48f613",
+        "role": "data",
+        "content_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "download_url": "https://china.scidb.cn/download?fileId=de160221aea35d9fadb9dd0d385e9beb",
+        "publisher_md5": "7beb49aaa15b275e24a00b0eac20a3b8"
+      },
+      {
+        "path": "单层/单层模式1传播长度(t1=50~150nm).xlsx",
+        "size": 20262,
+        "sha256": "31aad507e91e67db3d525f314f1f3dff108a31a9b34361189b92314192d1d9ed",
+        "role": "data",
+        "content_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "download_url": "https://china.scidb.cn/download?fileId=4f3618bc59b6a6d7e398e2f05e0b3c6b",
+        "publisher_md5": "ad448091b6c1e4d2521ab104723d85be"
+      },
+      {
+        "path": "单层/单层模式1模式2传播长度(t1=100nm,0ppm).xlsx",
+        "size": 13221,
+        "sha256": "db6668ebbe0e4dd17e54518a17e929131daeb92c3879403e209dc691b7441158",
+        "role": "data",
+        "content_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "download_url": "https://china.scidb.cn/download?fileId=13eeeb6478029c44b4c46171eadd5092",
+        "publisher_md5": "25adba232cd694f69b24c22d03d9b1d0"
+      },
+      {
+        "path": "双层/双层Hy.xlsx",
+        "size": 46690,
+        "sha256": "60e03cd7f9e364a456bbb889c3ea543eb0875ddb907e88abc5725012caa52891",
+        "role": "data",
+        "content_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "download_url": "https://china.scidb.cn/download?fileId=10cd05d72e8013c57e379e5e522e0ae4",
+        "publisher_md5": "8e4fe0caae8859f1af7ffd32a074c2f5"
+      },
+      {
+        "path": "双层/双层传播长度变化量、变化率(不同t1、波长).xlsx",
+        "size": 19250,
+        "sha256": "f6a3accc44eb58562a340634e244306786b5c72d944ea6aeca2b4ef40b452e1a",
+        "role": "data",
+        "content_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "download_url": "https://china.scidb.cn/download?fileId=d7aae0bda66e3df4319eb8220dc7636c",
+        "publisher_md5": "8dc61e99de0ec6bed970bda96a243260"
+      },
+      {
+        "path": "双层/双层传播长度变化量、变化率(不同t2、波长).xlsx",
+        "size": 23340,
+        "sha256": "8ae4849b713649ead62d1442cd624d381a778a51d4c6b434b7d1e06af37b85b9",
+        "role": "data",
+        "content_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "download_url": "https://china.scidb.cn/download?fileId=7abb915039eee23ab1227fbd0b75779b",
+        "publisher_md5": "79be7cebf5b75aafe5b36f54ee741b35"
+      },
+      {
+        "path": "双层/双层模式1、2传播长度(t1=t2=100nm,0ppm).xlsx",
+        "size": 13191,
+        "sha256": "e9f7eed3d678d9e69624338d3096272876b0285f6b6835235e872daba7cc4c2c",
+        "role": "data",
+        "content_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "download_url": "https://china.scidb.cn/download?fileId=7ecdb3a458c989dba1abe01e2fa3b889",
+        "publisher_md5": "0334b48fdb1cdf92183a35f8370abc67"
+      },
+      {
+        "path": "双层/双层模式1传播长度(t2=100nm).xlsx",
+        "size": 16468,
+        "sha256": "c0388431f788f0eb0effa0b1cbb0cf46d359badd58ddafc62322f3a7aed0d732",
+        "role": "data",
+        "content_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "download_url": "https://china.scidb.cn/download?fileId=60ec327d346ffef1ae9538e2a461ae6e",
+        "publisher_md5": "9d6b63a6a0b0d9765125c05c465851ad"
+      }
+    ],
+    "inventory_complete": true,
+    "recursive_file_count": 18,
+    "total_size_bytes": 377211,
+    "source_version": "V1",
+    "doi": "https://doi.org/10.57760/sciencedb.j00213.00271",
+    "authors": [
+      "qu wei min",
+      "Zhu Chixian",
+      "Sun Tianwen",
+      "Zou Yunfei",
+      "Tingting Hu",
+      "Yang Tianfang",
+      "Duan Gaoyan",
+      "Lang Peilin",
+      "Wang ",
+      "Wang Chen",
+      "Song Gang"
+    ],
+    "source_descriptor_sha256": "9b499be9e906eb67d03c494e9dcfaa21157da13944106618c28896181308a406"
+  },
+  "files": [
+    {
+      "path": "Ag.xlsx",
+      "size": 11118,
+      "sha256": "247daaa34f4b06103a4eed3792c3e434d50bc4561ec9ca0a2d9b78691314a319",
+      "role": "data",
+      "content_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    },
+    {
+      "path": "PHMB.xlsx",
+      "size": 10734,
+      "sha256": "f21f15f7f662e9c91b3aa1f814f012ef18a5a60f48a1d3245d493fca71fb9163",
+      "role": "data",
+      "content_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    },
+    {
+      "path": "SOURCE.md",
+      "size": 1221,
+      "sha256": "5420a878fa698ad46dafd58e6a554018432f79559725d5d75f735536aef91df9",
+      "role": "documentation",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "multilayered1.m",
+      "size": 6160,
+      "sha256": "8cffd3767f9723124669453eff7f7f0db2d03170bb716992a4c8a2f8af8ae156",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "multilayered2.m",
+      "size": 6117,
+      "sha256": "919ea908eb8b6fef556a4d66aac4434a12dffec4b754071a2db926f6fe8c94c4",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "三层/三层Hy.xlsx",
+      "size": 82403,
+      "sha256": "92766dc7cc5c794b68842bc6d0bd7e6ec7ed13bd24173e89624a2256f4522288",
+      "role": "data",
+      "content_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    },
+    {
+      "path": "三层/三层传播长度.xlsx",
+      "size": 19031,
+      "sha256": "cd875af04e0d4258d8ede95164c06232cad415539d77510dae0580e88f1fd3fe",
+      "role": "data",
+      "content_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    },
+    {
+      "path": "三层/三层传播长度变化量、变化率.xlsx",
+      "size": 19140,
+      "sha256": "28918c16906f8637e6e5a402ca100ad8eb33e67230f7de3159ce464e4d7af0c0",
+      "role": "data",
+      "content_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    },
+    {
+      "path": "不同层变化率、变化量.xlsx",
+      "size": 13326,
+      "sha256": "7a27fdde1d6e2cfc6659e8aeaaf95fb99401af8753f43a982c6f84244198c376",
+      "role": "data",
+      "content_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    },
+    {
+      "path": "单层/单层Hy.xlsx",
+      "size": 35456,
+      "sha256": "32fb3714f9a51e516828ea339520f9fb46a6b086fbef0197a2514871a77195aa",
+      "role": "data",
+      "content_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    },
+    {
+      "path": "单层/单层传播长度变化量、变化率.xlsx",
+      "size": 20083,
+      "sha256": "c433e65ec36e170dcd4de264921fe4a44f191388c27bf3b7b361a0f89f48f613",
+      "role": "data",
+      "content_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    },
+    {
+      "path": "单层/单层模式1传播长度(t1=50~150nm).xlsx",
+      "size": 20262,
+      "sha256": "31aad507e91e67db3d525f314f1f3dff108a31a9b34361189b92314192d1d9ed",
+      "role": "data",
+      "content_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    },
+    {
+      "path": "单层/单层模式1模式2传播长度(t1=100nm,0ppm).xlsx",
+      "size": 13221,
+      "sha256": "db6668ebbe0e4dd17e54518a17e929131daeb92c3879403e209dc691b7441158",
+      "role": "data",
+      "content_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    },
+    {
+      "path": "双层/双层Hy.xlsx",
+      "size": 46690,
+      "sha256": "60e03cd7f9e364a456bbb889c3ea543eb0875ddb907e88abc5725012caa52891",
+      "role": "data",
+      "content_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    },
+    {
+      "path": "双层/双层传播长度变化量、变化率(不同t1、波长).xlsx",
+      "size": 19250,
+      "sha256": "f6a3accc44eb58562a340634e244306786b5c72d944ea6aeca2b4ef40b452e1a",
+      "role": "data",
+      "content_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    },
+    {
+      "path": "双层/双层传播长度变化量、变化率(不同t2、波长).xlsx",
+      "size": 23340,
+      "sha256": "8ae4849b713649ead62d1442cd624d381a778a51d4c6b434b7d1e06af37b85b9",
+      "role": "data",
+      "content_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    },
+    {
+      "path": "双层/双层模式1、2传播长度(t1=t2=100nm,0ppm).xlsx",
+      "size": 13191,
+      "sha256": "e9f7eed3d678d9e69624338d3096272876b0285f6b6835235e872daba7cc4c2c",
+      "role": "data",
+      "content_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    },
+    {
+      "path": "双层/双层模式1传播长度(t2=100nm).xlsx",
+      "size": 16468,
+      "sha256": "c0388431f788f0eb0effa0b1cbb0cf46d359badd58ddafc62322f3a7aed0d732",
+      "role": "data",
+      "content_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    }
+  ]
+}

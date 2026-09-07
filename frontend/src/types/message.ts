@@ -1,5 +1,8 @@
 import type { FileInfo } from '../api/file';
-import type { MessageEventData } from './event';
+import type { MessageEventData, SpillArtifactNotice } from './event';
+import type { ToolPresentation } from './toolPresentation';
+import type { AnalysisJobView } from './analysisJob';
+import type { ToolApprovalView } from './toolApproval';
 
 export type MessageType = "user" | "assistant" | "tool" | "step" | "task-summary" | "attachments";
 
@@ -28,6 +31,10 @@ export interface ToolContent extends BaseContent {
   function: string;
   args: any;
   content?: any;
+  presentation?: ToolPresentation | null;
+  spill?: SpillArtifactNotice | null;
+  analysis_job?: AnalysisJobView | null;
+  tool_approval?: ToolApprovalView | null;
   status: "calling" | "called";
 }
 

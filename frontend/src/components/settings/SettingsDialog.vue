@@ -1,6 +1,6 @@
 <template>
   <Dialog v-model:open="isSettingsDialogOpen">
-    <DialogContent class="w-[380px] md:w-[95vw] md:max-w-[920px]">
+    <DialogContent class="w-[calc(100vw-24px)] md:w-[95vw] md:max-w-[920px]">
       <DialogTitle></DialogTitle>
       <DialogDescription></DialogDescription>
       
@@ -17,6 +17,10 @@
           <SkillSettings />
         </template>
 
+        <template #agent-profiles>
+          <AgentProfileRuntimeSettings />
+        </template>
+
       </SettingsTabs>
       
     </DialogContent>
@@ -25,7 +29,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
-import { Settings2, Puzzle } from 'lucide-vue-next'
+import { Settings2, Puzzle, BotMessageSquare } from 'lucide-vue-next'
 import {
   Dialog,
   DialogContent,
@@ -36,6 +40,7 @@ import { useSettingsDialog } from '@/composables/useSettingsDialog'
 import SettingsTabs from './SettingsTabs.vue'
 import GeneralSettings from './GeneralSettings.vue'
 import SkillSettings from './SkillSettings.vue'
+import AgentProfileRuntimeSettings from './AgentProfileRuntimeSettings.vue'
 import type { TabItem } from './SettingsTabs.vue'
 
 // Use global settings dialog state
@@ -52,6 +57,11 @@ const tabs: TabItem[] = [
     id: 'skills',
     label: 'Skills',
     icon: Puzzle
+  },
+  {
+    id: 'agent-profiles',
+    label: 'Agent Profiles',
+    icon: BotMessageSquare
   }
 ]
 

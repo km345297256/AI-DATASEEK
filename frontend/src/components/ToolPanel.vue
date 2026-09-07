@@ -1,9 +1,10 @@
 <template>
   <div
     ref="toolPanelRef"
+    data-testid="tool-panel"
     v-if="visible"
     :class="{
-      'h-full w-full top-0 ltr:right-0 rtl:left-0 z-50 fixed sm:sticky sm:top-0 sm:right-0 sm:h-[100vh] sm:ml-3 sm:py-3 sm:mr-4': isShow,
+      'h-full w-full top-0 ltr:right-0 rtl:left-0 z-50 fixed max-sm:!w-full max-sm:!left-0 max-sm:!right-0 sm:sticky sm:top-0 sm:right-0 sm:h-[100vh] sm:ml-3 sm:py-3 sm:mr-4': isShow,
       'h-full overflow-hidden': !isShow 
     }"
     :style="{ 'width': isShow ? `${parentSize/2}px` : '0px', 'opacity': isShow ? '1' : '0', 'transition': '0.2s ease-in-out' }">

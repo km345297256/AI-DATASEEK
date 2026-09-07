@@ -3,6 +3,7 @@ from typing import List, Optional
 from datetime import datetime
 
 from app.domain.models.agent_profile import AgentPlannerConfig, AgentSubAgentConfig, default_subagents
+from app.domain.models.tool_runtime import ToolRuntimeConfig
 
 
 class CreateAgentProfileRequest(BaseModel):
@@ -17,6 +18,7 @@ class CreateAgentProfileRequest(BaseModel):
     system_prompt: Optional[str] = None
     planner_config: AgentPlannerConfig = Field(default_factory=AgentPlannerConfig)
     subagents: List[AgentSubAgentConfig] = Field(default_factory=default_subagents)
+    tool_runtime: ToolRuntimeConfig = Field(default_factory=ToolRuntimeConfig)
     is_global: bool = False
 
 
@@ -32,6 +34,7 @@ class UpdateAgentProfileRequest(BaseModel):
     system_prompt: Optional[str] = None
     planner_config: Optional[AgentPlannerConfig] = None
     subagents: Optional[List[AgentSubAgentConfig]] = None
+    tool_runtime: Optional[ToolRuntimeConfig] = None
     is_global: Optional[bool] = None
 
 
@@ -54,6 +57,13 @@ class AgentProfileResponse(BaseModel):
     system_prompt: Optional[str] = None
     planner_config: AgentPlannerConfig = Field(default_factory=AgentPlannerConfig)
     subagents: List[AgentSubAgentConfig] = Field(default_factory=default_subagents)
+    tool_runtime: ToolRuntimeConfig = Field(default_factory=ToolRuntimeConfig)
     is_active: bool
     created_at: datetime
     updated_at: datetime
+
+
+class CreateRuntimePresetProfileRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    name: str = Field(min_length=1, max_length=100)
+    tool_runtime: ToolRuntimeConfig

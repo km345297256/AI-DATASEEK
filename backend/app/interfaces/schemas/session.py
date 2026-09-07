@@ -2,6 +2,7 @@ from pydantic import BaseModel, Field, field_validator
 from typing import Optional, List
 from app.interfaces.schemas.event import AgentSSEEvent
 from app.domain.models.session import SessionStatus
+from app.domain.models.event import MAX_EVENT_SEQUENCE
 
 
 class CreateSessionRequest(BaseModel):
@@ -31,6 +32,12 @@ class ChatRequest(BaseModel):
     mcp_servers: Optional[List[str]] = None
     dataset_ids: Optional[List[str]] = None
     event_id: Optional[str] = None
+    event_seq: Optional[int] = Field(
+        default=None,
+        strict=True,
+        ge=0,
+        le=MAX_EVENT_SEQUENCE,
+    )
 
 
 class ShellViewRequest(BaseModel):

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, Query, Request
 from fastapi.responses import FileResponse, Response, StreamingResponse
 from starlette.background import BackgroundTask
 from tempfile import SpooledTemporaryFile
@@ -9,6 +9,7 @@ from app.application.errors.exceptions import ForbiddenError, UpstreamServiceErr
 from app.application.services.data_center_dataset_service import DataCenterDatasetService
 from app.application.services.dataset_suggested_question_service import DatasetSuggestedQuestionService
 from app.application.services.data_product_service import DataProductService
+from app.core.config import get_settings
 from app.domain.models.user import User, UserRole
 from app.infrastructure.external.sso_client import resolve_sso_uid
 from app.application.services.agent_service import AgentService
@@ -18,6 +19,8 @@ from app.interfaces.schemas.base import APIResponse
 from app.interfaces.schemas.dataset import (
     DataCenterDatasetCatalogResponse,
     DataCenterDatasetResponse,
+    DatasetMetadataUpdateRequest,
+    DatasetRegistrationRequest,
     DatasetSubmissionRequest,
     DatasetSuggestedQuestionsResponse,
     DatasetSessionHistoryItem,
@@ -36,6 +39,11 @@ def _require_dataset_demo_admin(user: User) -> None:
         raise ForbiddenError("Only administrators can submit server directories for analysis")
 
 
+def _require_dataset_manager(user: User) -> None:
+    if user.role not in {UserRole.ADMIN, UserRole.USER}:
+        raise ForbiddenError("Dataset management is available to administrators and users")
+
+
 @router.get("", response_model=APIResponse[DataCenterDatasetCatalogResponse])
 async def list_data_center_datasets(
     _current_user: User = Depends(get_current_user),
@@ -49,6 +57,29 @@ async def list_data_center_datasets(
     )
 
 
+@router.get("/manage", response_model=APIResponse[DataCenterDatasetCatalogResponse])
+async def list_managed_datasets(
+    query: str | None = Query(default=None, max_length=200),
+    include_archived: bool = Query(default=False),
+    limit: int = Query(default=100, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
+    current_user: User = Depends(get_current_user),
+) -> APIResponse[DataCenterDatasetCatalogResponse]:
+    _require_dataset_manager(current_user)
+    datasets, total = await DataCenterDatasetService().list_managed_datasets(
+        actor_id=current_user.id,
+        is_admin=current_user.role == UserRole.ADMIN,
+        query=query,
+        include_archived=include_archived,
+        limit=limit,
+        offset=offset,
+    )
+    return APIResponse.success(DataCenterDatasetCatalogResponse(
+        datasets=[dataset_response(item) for item in datasets],
+        total=total,
+    ))
+
+
 @router.post("/submissions", response_model=APIResponse[DataCenterDatasetResponse])
 async def create_dataset_submission(
     submission: DatasetSubmissionRequest,
@@ -56,14 +87,18 @@ async def create_dataset_submission(
     current_user: User = Depends(get_current_user),
 ) -> APIResponse[DataCenterDatasetResponse]:
     _require_dataset_demo_admin(current_user)
-    try:
-        sso_uid = await resolve_sso_uid(submission.token)
-    except UpstreamServiceError:
-        # This is an API-to-API contract. Never redirect the caller's POST to
-        # the SSO website because 307 would preserve the POST and cause a 405.
-        return Response(status_code=401)
+    sso_uid = None
+    if get_settings().auth_provider != "none":
+        if not submission.token:
+            return Response(status_code=401)
+        try:
+            sso_uid = await resolve_sso_uid(submission.token)
+        except UpstreamServiceError:
+            # This is an API-to-API contract. Never redirect the caller's POST to
+            # the SSO website because 307 would preserve the POST and cause a 405.
+            return Response(status_code=401)
     dataset = await DataCenterDatasetService().create_submission(
-        external_id=submission.external_id,
+        external_id=submission.external_id or "",
         name=submission.name,
         summary=submission.summary,
         keywords=submission.keywords,
@@ -71,6 +106,54 @@ async def create_dataset_submission(
         nc_view_url=str(submission.ncViewUrl) if submission.ncViewUrl else None,
         created_by=current_user.id,
         sso_uid=sso_uid,
+    )
+    return APIResponse.success(dataset_response(dataset))
+
+
+@router.post("/registrations", response_model=APIResponse[DataCenterDatasetResponse])
+async def create_dataset_registration(
+    registration: DatasetRegistrationRequest,
+    current_user: User = Depends(get_current_user),
+) -> APIResponse[DataCenterDatasetResponse]:
+    # Registering a host directory expands the set of paths the product can
+    # mount. Keep the existing administrator-only submission boundary.
+    _require_dataset_demo_admin(current_user)
+    dataset = await DataCenterDatasetService().create_registration(
+        name=registration.name,
+        description=registration.description,
+        domain=registration.domain,
+        storage_directory=registration.storage_directory,
+        created_by=current_user.id,
+    )
+    return APIResponse.success(dataset_response(dataset))
+
+
+@router.patch("/{dataset_id}", response_model=APIResponse[DataCenterDatasetResponse])
+async def update_dataset_registration(
+    dataset_id: str,
+    changes: DatasetMetadataUpdateRequest,
+    current_user: User = Depends(get_current_user),
+) -> APIResponse[DataCenterDatasetResponse]:
+    _require_dataset_manager(current_user)
+    dataset = await DataCenterDatasetService().update_registration(
+        dataset_id,
+        actor_id=current_user.id,
+        is_admin=current_user.role == UserRole.ADMIN,
+        **changes.model_dump(exclude_none=True),
+    )
+    return APIResponse.success(dataset_response(dataset))
+
+
+@router.delete("/{dataset_id}", response_model=APIResponse[DataCenterDatasetResponse])
+async def archive_dataset_registration(
+    dataset_id: str,
+    current_user: User = Depends(get_current_user),
+) -> APIResponse[DataCenterDatasetResponse]:
+    _require_dataset_manager(current_user)
+    dataset = await DataCenterDatasetService().archive_dataset(
+        dataset_id,
+        actor_id=current_user.id,
+        is_admin=current_user.role == UserRole.ADMIN,
     )
     return APIResponse.success(dataset_response(dataset))
 

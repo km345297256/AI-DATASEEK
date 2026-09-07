@@ -8,6 +8,29 @@
       "description": "Inspect a PPTX presentation and report slide dimensions, titles, text, notes, tables, charts and pictures without rendering every slide.",
       "scopes": ["dataset_fast_path"],
       "timeout_seconds": 60,
+      "output_schema": {
+        "type": "object",
+        "properties": {
+          "success": {"type": "boolean"},
+          "operation": {"const": "presentation_inspect"},
+          "summary": {"type": "object"},
+          "artifacts": {"type": "array"},
+          "warnings": {"type": "array"}
+        },
+        "required": ["success", "operation", "summary"],
+        "additionalProperties": true
+      },
+      "execution": {
+        "timeout_seconds": 60,
+        "cancellable": false,
+        "concurrency": "parallel",
+        "effects": ["sandbox_read"],
+        "permissions": []
+      },
+      "presentation": {
+        "kind": "generic",
+        "title": "Presentation inspection"
+      },
       "parameters": {"type":"object","properties":{"input_path":{"type":"string"}},"required":["input_path"],"additionalProperties":false}
     },
     {

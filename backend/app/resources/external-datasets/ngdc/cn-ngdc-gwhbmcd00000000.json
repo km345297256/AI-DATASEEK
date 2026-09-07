@@ -1,0 +1,72 @@
+{
+  "dataset_id": "cn-ngdc-gwhbmcd00000000",
+  "external_id": "GWHBMCD00000000",
+  "data_center_id": "reviewed-ngdc-catalog",
+  "data_center_name": "国家基因组科学数据中心 NGDC / CNCB",
+  "name": "乳酸乳球菌AF03-11基因组组装",
+  "description": "NGDC Genome Warehouse公开发布的Lactococcus lactis（AF03-11）基因组序列，组装级别为Scaffold。导入该独立菌株的全部已发布组装FASTA，不是原始测序reads，也不包含人类个人基因序列。 可用于序列统计、GC组成与片段长度探查。",
+  "domain": "sequence",
+  "data_type": "FASTA",
+  "tags": [
+    "sequence",
+    "国家基因组科学数据中心 NGDC / CNCB",
+    "公开数据"
+  ],
+  "metadata": {
+    "curated": true,
+    "catalog_version": 1,
+    "source_catalog": "ngdc",
+    "publisher": "国家基因组科学数据中心 NGDC / CNCB",
+    "source_url": "https://ngdc.cncb.ac.cn/gwh/Assembly/27511/show",
+    "license": "NGDC GWH academic-use terms",
+    "license_url": "https://ngdc.cncb.ac.cn/gwh/statistics/genome",
+    "license_details": "GWH官方页面声明数据库仅免费用于学术研究；商业使用需另询商业许可。未发现本记录单独CC许可，不标为CC0或CC BY。引用GWH/NGDC与accession，并在有论文时引用原研究。",
+    "sample_scope": "完整已发布的该菌株组装文件；库内为Scaffold草图，不宣称无缺口完整染色体",
+    "sample_note": "完整已发布的该菌株组装文件；库内为Scaffold草图，不宣称无缺口完整染色体",
+    "authors": [],
+    "doi": "",
+    "source_version": "",
+    "source_descriptor_sha256": "4700b5d6a0f3bafd7e3ad70752a9035a2cb8164c029ad638ccb7a88e0547d53d",
+    "organism": "Lactococcus lactis",
+    "assembly_level": "Scaffold",
+    "bioproject": "PRJCA011976",
+    "release_time": "2025-01-02 07:26:42.0",
+    "download_date": "2026-09-07",
+    "provenance": [
+      {
+        "path": "GWHBMCD00000000.genome.fasta.gz",
+        "size": 708697,
+        "sha256": "1115c9be2f7a557c15d6cac3d45601c0b543ee024c52a514a85be89196fbcf59",
+        "role": "data",
+        "content_type": "application/octet-stream",
+        "download_url": "https://download.cncb.ac.cn/gwh/Bacteria/Lactococcus_lactis_AF03-11_GWHBMCD00000000/GWHBMCD00000000.genome.fasta.gz"
+      }
+    ],
+    "inventory_complete": true,
+    "recursive_file_count": 3,
+    "total_size_bytes": 3074856
+  },
+  "files": [
+    {
+      "path": "GWHBMCD00000000.genome.fasta.gz",
+      "size": 708697,
+      "sha256": "1115c9be2f7a557c15d6cac3d45601c0b543ee024c52a514a85be89196fbcf59",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "SOURCE.md",
+      "size": 1345,
+      "sha256": "245d1bc3ee8c3258655fa207af18e77add9ef0d93782a39a9b3ecea155176376",
+      "role": "documentation",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/GWHBMCD00000000.genome.fasta",
+      "size": 2364814,
+      "sha256": "cb754bd95dc99e8cd182ee93211fb725054f1f546f9959a8dc4a02fc92c17647",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    }
+  ]
+}

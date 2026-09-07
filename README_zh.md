@@ -13,6 +13,8 @@ AI-DataSeek 是从 AI-MANUS 中抽取出的数据集智能探查与分析系统�
 - 系统管理仅保留：资源用量与配置、任务管理、MCP 管理和技能管理。
 - 会话历史、分析文件和沙箱桌面。
 - 用于运维和容量分析的 Token 用量统计，不设置用户额度。
+- 统一 ModelDriver、任务级执行预算和仅含元数据的上下文压缩追踪，详见 [模型驱动与上下文预算](docs/model-driver-and-context-budget.md)。
+- 领域 Preset 与 Cordis 工具按需加载，以及默认关闭的受限 Code Mode、领域 SubAgent 试点，详见 [领域预设与实验执行模式](docs/domain-presets-and-code-mode.md)。
 
 为保证这些功能可真实运行，Agent 执行、会话事件、安全审核、审计、权限、文件存储、MongoDB、Redis 和 Sandbox 等传递依赖也会保留。详细边界见 [架构范围说明](docs/architecture-scope.md)。
 
@@ -42,6 +44,8 @@ cp .env.example .env
 AI-DataSeek 固定采用免登录模式。浏览器和 API 请求均不使用 Bearer Token
 或 `X-API-Key`，所有调用者统一以系统内置管理员身份操作。Token 消耗只用于
 用量报表，不校验用户额度，也不从用户余额中扣减。
+模型运行时另外设置可配置的安全上限，约束单次请求的估算上下文，以及每轮 Agent
+任务的累计 Token 和调用次数。这些属于执行限制，不是账户余额或计费额度。
 
 如果宿主机使用 Snap 版 Docker，需要配置：
 

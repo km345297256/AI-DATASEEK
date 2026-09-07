@@ -1,0 +1,72 @@
+{
+  "dataset_id": "mendeley-high-entropy-alloys",
+  "external_id": "mendeley-high-entropy-alloys",
+  "data_center_id": "international-open-catalog",
+  "data_center_name": "Nicholas Derimow / University of California Riverside / Mendeley Data",
+  "name": "CoCrCuFeNi 高熵合金工艺对比 XRD 样本",
+  "description": "选自 Nicholas Derimow 发布的高熵合金加工路径研究，包含 CoCrCuFeNi_AC、CoCrCuFeNi_800 与 CoCrCuFeNi_900 三个原始 XRDML 文件，可用于检查原始衍射谱、比较峰位与相对峰强变化。 选取原始公开研究中的 CoCrCuFeNi 三条谱线子集，不包含全部合金和力学数据；原文件未经变换，文件后缀的具体处理条件请结合研究原文。DOI 10.17632/x35xrkxpjb.1；公开原始文件按 CC BY 4.0 使用并保留作者署名。",
+  "domain": "spectroscopy",
+  "data_type": "XRDML",
+  "tags": [
+    "spectroscopy",
+    "XRDML",
+    "开放数据"
+  ],
+  "metadata": {
+    "curated": true,
+    "catalog_version": 1,
+    "publisher": "Nicholas Derimow / University of California Riverside / Mendeley Data",
+    "source_url": "https://data.mendeley.com/datasets/x35xrkxpjb/1",
+    "license": "CC-BY-4.0",
+    "license_url": "https://creativecommons.org/licenses/by/4.0/",
+    "sample_scope": "研究子集 · 3 条原始衍射谱",
+    "sample_note": "选取原始公开研究中的 CoCrCuFeNi 三条谱线子集，不包含全部合金和力学数据；原文件未经变换，文件后缀的具体处理条件请结合研究原文。DOI 10.17632/x35xrkxpjb.1；公开原始文件按 CC BY 4.0 使用并保留作者署名。",
+    "provenance": [
+      {
+        "path": "CoCrCuFeNi_AC.xrdml",
+        "download_url": "https://data.mendeley.com/public-files/datasets/x35xrkxpjb/files/5368dc1a-118a-43df-85c6-85a3a1bbce47/file_downloaded",
+        "sha256": "8dd4de1cb5596d57f62e7ca8357d2adb8644dde9b4e9134c120748bbf724b895",
+        "size": 19827
+      },
+      {
+        "path": "CoCrCuFeNi_800.xrdml",
+        "download_url": "https://data.mendeley.com/public-files/datasets/x35xrkxpjb/files/71a4a803-9bcb-4db4-9194-19d7b5c01204/file_downloaded",
+        "sha256": "b18c4e6079e2142d968daaaec154d2f615531ec97130d924919913035dd664db",
+        "size": 19855
+      },
+      {
+        "path": "CoCrCuFeNi_900.xrdml",
+        "download_url": "https://data.mendeley.com/public-files/datasets/x35xrkxpjb/files/d9eab335-e9e8-4626-89ab-ffa7702c49f2/file_downloaded",
+        "sha256": "6ba005c503a56131ea7ec5abfed6605d2afaca5d65abfc8ee466ed20d4454694",
+        "size": 19843
+      }
+    ],
+    "inventory_complete": true,
+    "recursive_file_count": 3,
+    "total_size_bytes": 59525
+  },
+  "files": [
+    {
+      "path": "CoCrCuFeNi_AC.xrdml",
+      "size": 19827,
+      "sha256": "8dd4de1cb5596d57f62e7ca8357d2adb8644dde9b4e9134c120748bbf724b895",
+      "role": "data",
+      "content_type": "application/xml"
+    },
+    {
+      "path": "CoCrCuFeNi_800.xrdml",
+      "size": 19855,
+      "sha256": "b18c4e6079e2142d968daaaec154d2f615531ec97130d924919913035dd664db",
+      "role": "data",
+      "content_type": "application/xml"
+    },
+    {
+      "path": "CoCrCuFeNi_900.xrdml",
+      "size": 19843,
+      "sha256": "6ba005c503a56131ea7ec5abfed6605d2afaca5d65abfc8ee466ed20d4454694",
+      "role": "data",
+      "content_type": "application/xml"
+    }
+  ]
+}
+

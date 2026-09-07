@@ -1,0 +1,72 @@
+{
+  "dataset_id": "cn-ngdc-gwhamlq01000000",
+  "external_id": "GWHAMLQ01000000",
+  "data_center_id": "reviewed-ngdc-catalog",
+  "data_center_name": "国家基因组科学数据中心 NGDC / CNCB",
+  "name": "小叶杨完整叶绿体基因组",
+  "description": "NGDC Genome Warehouse公开发布的Populus simonii（Chloroplast genome of Populus simonii）基因组序列，组装级别为Complete。导入叶绿体组装，不包含核基因组，也不是群体遗传或个人临床数据。 可用于序列统计、GC组成与片段长度探查。",
+  "domain": "sequence",
+  "data_type": "FASTA",
+  "tags": [
+    "sequence",
+    "国家基因组科学数据中心 NGDC / CNCB",
+    "公开数据"
+  ],
+  "metadata": {
+    "curated": true,
+    "catalog_version": 1,
+    "source_catalog": "ngdc",
+    "publisher": "国家基因组科学数据中心 NGDC / CNCB",
+    "source_url": "https://ngdc.cncb.ac.cn/gwh/Assembly/8848/show",
+    "license": "NGDC GWH academic-use terms",
+    "license_url": "https://ngdc.cncb.ac.cn/gwh/statistics/genome",
+    "license_details": "GWH官方页面声明数据库仅免费用于学术研究；商业使用需另询商业许可。未发现本记录单独CC许可，不标为CC0或CC BY。引用GWH/NGDC与accession，并在有论文时引用原研究。",
+    "sample_scope": "完整已发布的叶绿体基因组FASTA，不含核基因组。",
+    "sample_note": "完整已发布的叶绿体基因组FASTA，不含核基因组。",
+    "authors": [],
+    "doi": "",
+    "source_version": "",
+    "source_descriptor_sha256": "4ec93eae9367b9d2e298e8556efbbd5552ab18937b79b77d514a12f804d70708",
+    "organism": "Populus simonii",
+    "assembly_level": "Complete",
+    "bioproject": "PRJCA002626",
+    "release_time": "2020-05-19 16:16:46.0",
+    "download_date": "2026-09-07",
+    "provenance": [
+      {
+        "path": "GWHAMLQ01000000.genome.fasta.gz",
+        "size": 48034,
+        "sha256": "83994862de96e14068203cdf8794f98b32f0b7749302c524f071e6c97fb17d41",
+        "role": "data",
+        "content_type": "application/octet-stream",
+        "download_url": "https://download.cncb.ac.cn/gwh/Plants/Populus_simonii_Chloroplast_genome_of_Populus_simonii_GWHAMLQ01000000/GWHAMLQ01000000.genome.fasta.gz"
+      }
+    ],
+    "inventory_complete": true,
+    "recursive_file_count": 3,
+    "total_size_bytes": 207563
+  },
+  "files": [
+    {
+      "path": "GWHAMLQ01000000.genome.fasta.gz",
+      "size": 48034,
+      "sha256": "83994862de96e14068203cdf8794f98b32f0b7749302c524f071e6c97fb17d41",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "SOURCE.md",
+      "size": 1306,
+      "sha256": "2fda91f2d2d8ad8a8767d9aba2b40014cc6e82b2ecd52616f74dda335536b1a0",
+      "role": "documentation",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/GWHAMLQ01000000.genome.fasta",
+      "size": 158223,
+      "sha256": "bc6091031a776866e9479f1cddbf3eb61b2a217c46450322851a8ab03b5d3cf9",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    }
+  ]
+}

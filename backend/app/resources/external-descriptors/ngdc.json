@@ -1,0 +1,307 @@
+{
+  "reviewed_at": "2026-09-07",
+  "source": "ngdc",
+  "note": "Reviewed download inputs. Download/HEAD observations here are research evidence, not current import status; use matching external-datasets manifests for verified inventories.",
+  "datasets": [
+    {
+      "dataset_id": "cn-ngdc-gwhanrg01000000",
+      "external_id": "GWHANRG01000000",
+      "name": "小球藻完整叶绿体基因组",
+      "description": "NGDC Genome Warehouse公开发布的Chlorella vulgaris（chloroplast）基因组序列，组装级别为Complete。导入叶绿体组装，不包含核基因组，也不是群体遗传或个人临床数据。 可用于序列统计、GC组成与片段长度探查。",
+      "domain": "sequence",
+      "data_type": "FASTA",
+      "source_url": "https://ngdc.cncb.ac.cn/gwh/Assembly/9671/show",
+      "api_url": "https://ngdc.cncb.ac.cn/gwh/api/public/assembly/GWHANRG01000000",
+      "license": "NGDC GWH academic-use terms",
+      "license_url": "https://ngdc.cncb.ac.cn/gwh/statistics/genome",
+      "license_details": "GWH官方页面声明数据库仅免费用于学术研究；商业使用需另询商业许可。未发现本记录单独CC许可，不标为CC0或CC BY。引用GWH/NGDC与accession，并在有论文时引用原研究。",
+      "sample_scope": "完整已发布的叶绿体基因组FASTA，不含核基因组。",
+      "organism": "Chlorella vulgaris",
+      "assembly_level": "Complete",
+      "bioproject": "PRJCA002707",
+      "biosample": "SAMC185943",
+      "publication_url": "https://doi.org/10.1080/23802359.2020.1844090",
+      "release_time": "2020-07-06 12:57:41.0",
+      "files": [
+        {
+          "path": "GWHANRG01000000.genome.fasta.gz",
+          "url": "https://download.cncb.ac.cn/gwh/Plants/Chlorella_vulgaris_chloroplast_GWHANRG01000000/GWHANRG01000000.genome.fasta.gz",
+          "method": "GET",
+          "expected_size": 50463,
+          "format": "gzip-fasta",
+          "header_verified": true
+        }
+      ]
+    },
+    {
+      "dataset_id": "cn-ngdc-gwhaaib00000000",
+      "external_id": "GWHAAIB00000000",
+      "name": "阿萨姆茶完整叶绿体基因组",
+      "description": "NGDC Genome Warehouse公开发布的Camellia sinensis var. assamica（chloroplast genome）基因组序列，组装级别为Complete。导入叶绿体组装，不包含核基因组，也不是群体遗传或个人临床数据。 可用于序列统计、GC组成与片段长度探查。",
+      "domain": "sequence",
+      "data_type": "FASTA",
+      "source_url": "https://ngdc.cncb.ac.cn/gwh/Assembly/212/show",
+      "api_url": "https://ngdc.cncb.ac.cn/gwh/api/public/assembly/GWHAAIB00000000",
+      "license": "NGDC GWH academic-use terms",
+      "license_url": "https://ngdc.cncb.ac.cn/gwh/statistics/genome",
+      "license_details": "GWH官方页面声明数据库仅免费用于学术研究；商业使用需另询商业许可。未发现本记录单独CC许可，不标为CC0或CC BY。引用GWH/NGDC与accession，并在有论文时引用原研究。",
+      "sample_scope": "完整已发布的叶绿体基因组FASTA，不含核基因组。",
+      "organism": "Camellia sinensis var. assamica",
+      "assembly_level": "Complete",
+      "bioproject": "PRJCA001249",
+      "biosample": "SAMC056907",
+      "publication_url": null,
+      "release_time": "2019-05-05 09:47:44.0",
+      "files": [
+        {
+          "path": "GWHAAIB00000000.genome.fasta.gz",
+          "url": "https://download.cncb.ac.cn/gwh/Plants/Camellia_sinensis_var._assamica_chloroplast_genome_GWHAAIB00000000/GWHAAIB00000000.genome.fasta.gz",
+          "method": "GET",
+          "expected_size": 48238,
+          "format": "gzip-fasta",
+          "header_verified": true
+        }
+      ]
+    },
+    {
+      "dataset_id": "cn-ngdc-gwhdrir01000000",
+      "external_id": "GWHDRIR01000000",
+      "name": "西双版纳柑橘DYC002叶绿体组装",
+      "description": "NGDC Genome Warehouse公开发布的Citrus xishuangbannaensis S.H.Wang & F.S.Wang（DYC002 chloroplast complete genome）基因组序列，组装级别为Scaffold。导入叶绿体组装，不包含核基因组，也不是群体遗传或个人临床数据。 可用于序列统计、GC组成与片段长度探查。",
+      "domain": "sequence",
+      "data_type": "FASTA",
+      "source_url": "https://ngdc.cncb.ac.cn/gwh/Assembly/66231/show",
+      "api_url": "https://ngdc.cncb.ac.cn/gwh/api/public/assembly/GWHDRIR01000000",
+      "license": "NGDC GWH academic-use terms",
+      "license_url": "https://ngdc.cncb.ac.cn/gwh/statistics/genome",
+      "license_details": "GWH官方页面声明数据库仅免费用于学术研究；商业使用需另询商业许可。未发现本记录单独CC许可，不标为CC0或CC BY。引用GWH/NGDC与accession，并在有论文时引用原研究。",
+      "sample_scope": "完整已发布的DYC002叶绿体FASTA；记录名称标complete genome，但官方组装级别为Scaffold，不能宣称无缺口完整染色体。不含核基因组。",
+      "organism": "Citrus xishuangbannaensis S.H.Wang & F.S.Wang",
+      "assembly_level": "Scaffold",
+      "bioproject": "PRJCA009572",
+      "biosample": "SAMC786316",
+      "publication_url": null,
+      "release_time": "2024-12-20 20:44:00.0",
+      "files": [
+        {
+          "path": "GWHDRIR01000000.genome.fasta.gz",
+          "url": "https://download.cncb.ac.cn/gwh/Plants/Citrus_xishuangbannaensis_S.H.Wang_&_F.S.Wang_DYC002_chloroplast_complete_genome_GWHDRIR01000000/GWHDRIR01000000.genome.fasta.gz",
+          "method": "GET",
+          "expected_size": 49058,
+          "format": "gzip-fasta",
+          "header_verified": true
+        }
+      ]
+    },
+    {
+      "dataset_id": "cn-ngdc-gwhbhep01000000",
+      "external_id": "GWHBHEP01000000",
+      "name": "参薯完整叶绿体基因组",
+      "description": "NGDC Genome Warehouse公开发布的Dioscorea alata（Chloroplast）基因组序列，组装级别为Complete。导入叶绿体组装，不包含核基因组，也不是群体遗传或个人临床数据。 可用于序列统计、GC组成与片段长度探查。",
+      "domain": "sequence",
+      "data_type": "FASTA",
+      "source_url": "https://ngdc.cncb.ac.cn/gwh/Assembly/24173/show",
+      "api_url": "https://ngdc.cncb.ac.cn/gwh/api/public/assembly/GWHBHEP01000000",
+      "license": "NGDC GWH academic-use terms",
+      "license_url": "https://ngdc.cncb.ac.cn/gwh/statistics/genome",
+      "license_details": "GWH官方页面声明数据库仅免费用于学术研究；商业使用需另询商业许可。未发现本记录单独CC许可，不标为CC0或CC BY。引用GWH/NGDC与accession，并在有论文时引用原研究。",
+      "sample_scope": "完整已发布的叶绿体基因组FASTA，不含核基因组。",
+      "organism": "Dioscorea alata",
+      "assembly_level": "Complete",
+      "bioproject": "PRJCA007984",
+      "biosample": "SAMC557271",
+      "publication_url": null,
+      "release_time": "2022-01-21 00:00:17.0",
+      "files": [
+        {
+          "path": "GWHBHEP01000000.genome.fasta.gz",
+          "url": "https://download.cncb.ac.cn/gwh/Plants/Dioscorea_alata_Chloroplast_GWHBHEP01000000/GWHBHEP01000000.genome.fasta.gz",
+          "method": "GET",
+          "expected_size": 47054,
+          "format": "gzip-fasta",
+          "header_verified": true
+        }
+      ]
+    },
+    {
+      "dataset_id": "cn-ngdc-gwhamlq01000000",
+      "external_id": "GWHAMLQ01000000",
+      "name": "小叶杨完整叶绿体基因组",
+      "description": "NGDC Genome Warehouse公开发布的Populus simonii（Chloroplast genome of Populus simonii）基因组序列，组装级别为Complete。导入叶绿体组装，不包含核基因组，也不是群体遗传或个人临床数据。 可用于序列统计、GC组成与片段长度探查。",
+      "domain": "sequence",
+      "data_type": "FASTA",
+      "source_url": "https://ngdc.cncb.ac.cn/gwh/Assembly/8848/show",
+      "api_url": "https://ngdc.cncb.ac.cn/gwh/api/public/assembly/GWHAMLQ01000000",
+      "license": "NGDC GWH academic-use terms",
+      "license_url": "https://ngdc.cncb.ac.cn/gwh/statistics/genome",
+      "license_details": "GWH官方页面声明数据库仅免费用于学术研究；商业使用需另询商业许可。未发现本记录单独CC许可，不标为CC0或CC BY。引用GWH/NGDC与accession，并在有论文时引用原研究。",
+      "sample_scope": "完整已发布的叶绿体基因组FASTA，不含核基因组。",
+      "organism": "Populus simonii",
+      "assembly_level": "Complete",
+      "bioproject": "PRJCA002626",
+      "biosample": "SAMC185801",
+      "publication_url": null,
+      "release_time": "2020-05-19 16:16:46.0",
+      "files": [
+        {
+          "path": "GWHAMLQ01000000.genome.fasta.gz",
+          "url": "https://download.cncb.ac.cn/gwh/Plants/Populus_simonii_Chloroplast_genome_of_Populus_simonii_GWHAMLQ01000000/GWHAMLQ01000000.genome.fasta.gz",
+          "method": "GET",
+          "expected_size": 48034,
+          "format": "gzip-fasta",
+          "header_verified": true
+        }
+      ]
+    },
+    {
+      "dataset_id": "cn-ngdc-gwhbokv00000000",
+      "external_id": "GWHBOKV00000000",
+      "name": "枯草芽孢杆菌TM114-134基因组组装",
+      "description": "NGDC Genome Warehouse公开发布的Bacillus subtilis（TM114-134）基因组序列，组装级别为Scaffold。导入该独立菌株的全部已发布组装FASTA，不是原始测序reads，也不包含人类个人基因序列。 可用于序列统计、GC组成与片段长度探查。",
+      "domain": "sequence",
+      "data_type": "FASTA",
+      "source_url": "https://ngdc.cncb.ac.cn/gwh/Assembly/29089/show",
+      "api_url": "https://ngdc.cncb.ac.cn/gwh/api/public/assembly/GWHBOKV00000000",
+      "license": "NGDC GWH academic-use terms",
+      "license_url": "https://ngdc.cncb.ac.cn/gwh/statistics/genome",
+      "license_details": "GWH官方页面声明数据库仅免费用于学术研究；商业使用需另询商业许可。未发现本记录单独CC许可，不标为CC0或CC BY。引用GWH/NGDC与accession，并在有论文时引用原研究。",
+      "sample_scope": "完整已发布的该菌株组装文件；库内为Scaffold草图，不宣称无缺口完整染色体",
+      "organism": "Bacillus subtilis",
+      "assembly_level": "Scaffold",
+      "bioproject": "PRJCA011976",
+      "biosample": "SAMC897482",
+      "publication_url": null,
+      "release_time": "2025-02-10 10:53:22.0",
+      "files": [
+        {
+          "path": "GWHBOKV00000000.genome.fasta.gz",
+          "url": "https://download.cncb.ac.cn/gwh/Bacteria/Bacillus_subtilis_TM114-134_GWHBOKV00000000/GWHBOKV00000000.genome.fasta.gz",
+          "method": "GET",
+          "expected_size": 1223950,
+          "format": "gzip-fasta",
+          "header_verified": true
+        }
+      ]
+    },
+    {
+      "dataset_id": "cn-ngdc-gwhbmsg00000000",
+      "external_id": "GWHBMSG00000000",
+      "name": "植物乳植杆菌AF91-04IFC-1A基因组组装",
+      "description": "NGDC Genome Warehouse公开发布的Lactiplantibacillus plantarum（AF91-04IFC-1A）基因组序列，组装级别为Scaffold。导入该独立菌株的全部已发布组装FASTA，不是原始测序reads，也不包含人类个人基因序列。 可用于序列统计、GC组成与片段长度探查。",
+      "domain": "sequence",
+      "data_type": "FASTA",
+      "source_url": "https://ngdc.cncb.ac.cn/gwh/Assembly/27930/show",
+      "api_url": "https://ngdc.cncb.ac.cn/gwh/api/public/assembly/GWHBMSG00000000",
+      "license": "NGDC GWH academic-use terms",
+      "license_url": "https://ngdc.cncb.ac.cn/gwh/statistics/genome",
+      "license_details": "GWH官方页面声明数据库仅免费用于学术研究；商业使用需另询商业许可。未发现本记录单独CC许可，不标为CC0或CC BY。引用GWH/NGDC与accession，并在有论文时引用原研究。",
+      "sample_scope": "完整已发布的该菌株组装文件；库内为Scaffold草图，不宣称无缺口完整染色体",
+      "organism": "Lactiplantibacillus plantarum",
+      "assembly_level": "Scaffold",
+      "bioproject": "PRJCA011976",
+      "biosample": "SAMC896323",
+      "publication_url": null,
+      "release_time": "2025-02-10 09:30:46.0",
+      "files": [
+        {
+          "path": "GWHBMSG00000000.genome.fasta.gz",
+          "url": "https://download.cncb.ac.cn/gwh/Bacteria/Lactiplantibacillus_plantarum_AF91-04IFC-1A_GWHBMSG00000000/GWHBMSG00000000.genome.fasta.gz",
+          "method": "GET",
+          "expected_size": 951761,
+          "format": "gzip-fasta",
+          "header_verified": true
+        }
+      ]
+    },
+    {
+      "dataset_id": "cn-ngdc-gwhhopi01000000",
+      "external_id": "GWHHOPI01000000",
+      "name": "动物双歧杆菌Nourse12001完整基因组",
+      "description": "NGDC Genome Warehouse公开发布的Bifidobacterium animalis（Bifidobacteriumanimalis_Nourse12001）基因组序列，组装级别为Complete。导入该独立菌株的全部已发布组装FASTA，不是原始测序reads，也不包含人类个人基因序列。 可用于序列统计、GC组成与片段长度探查。",
+      "domain": "sequence",
+      "data_type": "FASTA",
+      "source_url": "https://ngdc.cncb.ac.cn/gwh/Assembly/111608/show",
+      "api_url": "https://ngdc.cncb.ac.cn/gwh/api/public/assembly/GWHHOPI01000000",
+      "license": "NGDC GWH academic-use terms",
+      "license_url": "https://ngdc.cncb.ac.cn/gwh/statistics/genome",
+      "license_details": "GWH官方页面声明数据库仅免费用于学术研究；商业使用需另询商业许可。未发现本记录单独CC许可，不标为CC0或CC BY。引用GWH/NGDC与accession，并在有论文时引用原研究。",
+      "sample_scope": "完整已发布的该菌株组装文件；库内为Complete组装",
+      "organism": "Bifidobacterium animalis",
+      "assembly_level": "Complete",
+      "bioproject": "PRJCA058252",
+      "biosample": "SAMC7084981",
+      "publication_url": null,
+      "release_time": "2026-02-27 00:01:56.0",
+      "files": [
+        {
+          "path": "GWHHOPI01000000.genome.fasta.gz",
+          "url": "https://download.cncb.ac.cn/gwh/Bacteria/Bifidobacterium_animalis_Bifidobacteriumanimalis_Nourse12001_GWHHOPI01000000/GWHHOPI01000000.genome.fasta.gz",
+          "method": "GET",
+          "expected_size": 584775,
+          "format": "gzip-fasta",
+          "header_verified": true
+        }
+      ]
+    },
+    {
+      "dataset_id": "cn-ngdc-gwhbpbn00000000",
+      "external_id": "GWHBPBN00000000",
+      "name": "粟酒裂殖酵母SP-LT18基因组组装",
+      "description": "NGDC Genome Warehouse公开发布的Schizosaccharomyces pombe（SP-LT18）基因组序列，组装级别为Scaffold。导入该独立菌株的全部已发布组装FASTA，不是原始测序reads，也不包含人类个人基因序列。 可用于序列统计、GC组成与片段长度探查。",
+      "domain": "sequence",
+      "data_type": "FASTA",
+      "source_url": "https://ngdc.cncb.ac.cn/gwh/Assembly/29521/show",
+      "api_url": "https://ngdc.cncb.ac.cn/gwh/api/public/assembly/GWHBPBN00000000",
+      "license": "NGDC GWH academic-use terms",
+      "license_url": "https://ngdc.cncb.ac.cn/gwh/statistics/genome",
+      "license_details": "GWH官方页面声明数据库仅免费用于学术研究；商业使用需另询商业许可。未发现本记录单独CC许可，不标为CC0或CC BY。引用GWH/NGDC与accession，并在有论文时引用原研究。",
+      "sample_scope": "完整已发布的该菌株组装文件；库内为Scaffold草图，不宣称无缺口完整染色体",
+      "organism": "Schizosaccharomyces pombe",
+      "assembly_level": "Scaffold",
+      "bioproject": "PRJCA013520",
+      "biosample": "SAMC1008254",
+      "publication_url": null,
+      "release_time": "2023-01-30 00:00:00.0",
+      "files": [
+        {
+          "path": "GWHBPBN00000000.genome.fasta.gz",
+          "url": "https://download.cncb.ac.cn/gwh/Fungi/Schizosaccharomyces_pombe_SP-LT18_GWHBPBN00000000/GWHBPBN00000000.genome.fasta.gz",
+          "method": "GET",
+          "expected_size": 3802038,
+          "format": "gzip-fasta",
+          "header_verified": true
+        }
+      ]
+    },
+    {
+      "dataset_id": "cn-ngdc-gwhbmcd00000000",
+      "external_id": "GWHBMCD00000000",
+      "name": "乳酸乳球菌AF03-11基因组组装",
+      "description": "NGDC Genome Warehouse公开发布的Lactococcus lactis（AF03-11）基因组序列，组装级别为Scaffold。导入该独立菌株的全部已发布组装FASTA，不是原始测序reads，也不包含人类个人基因序列。 可用于序列统计、GC组成与片段长度探查。",
+      "domain": "sequence",
+      "data_type": "FASTA",
+      "source_url": "https://ngdc.cncb.ac.cn/gwh/Assembly/27511/show",
+      "api_url": "https://ngdc.cncb.ac.cn/gwh/api/public/assembly/GWHBMCD00000000",
+      "license": "NGDC GWH academic-use terms",
+      "license_url": "https://ngdc.cncb.ac.cn/gwh/statistics/genome",
+      "license_details": "GWH官方页面声明数据库仅免费用于学术研究；商业使用需另询商业许可。未发现本记录单独CC许可，不标为CC0或CC BY。引用GWH/NGDC与accession，并在有论文时引用原研究。",
+      "sample_scope": "完整已发布的该菌株组装文件；库内为Scaffold草图，不宣称无缺口完整染色体",
+      "organism": "Lactococcus lactis",
+      "assembly_level": "Scaffold",
+      "bioproject": "PRJCA011976",
+      "biosample": "SAMC895904",
+      "publication_url": null,
+      "release_time": "2025-01-02 07:26:42.0",
+      "files": [
+        {
+          "path": "GWHBMCD00000000.genome.fasta.gz",
+          "url": "https://download.cncb.ac.cn/gwh/Bacteria/Lactococcus_lactis_AF03-11_GWHBMCD00000000/GWHBMCD00000000.genome.fasta.gz",
+          "method": "GET",
+          "expected_size": 708697,
+          "format": "gzip-fasta",
+          "header_verified": true
+        }
+      ]
+    }
+  ]
+}

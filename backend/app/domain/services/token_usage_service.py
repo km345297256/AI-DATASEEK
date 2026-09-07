@@ -41,7 +41,10 @@ class TokenUsageService:
             await doc.insert()
             return doc.to_domain()
         except Exception as exc:
-            logger.warning("Failed to record token usage: %s", exc)
+            logger.warning(
+                "Failed to record token usage error_type=%s",
+                type(exc).__name__,
+            )
             return None
 
     def extract_usage(self, message: AIMessage) -> Optional[dict[str, int]]:

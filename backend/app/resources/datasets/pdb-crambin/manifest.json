@@ -1,0 +1,46 @@
+{
+  "dataset_id": "pdb-crambin",
+  "external_id": "pdb-crambin",
+  "data_center_id": "international-open-catalog",
+  "data_center_name": "RCSB Protein Data Bank / W. A. Hendrickson 与 M. M. Teeter",
+  "name": "RCSB Crambin 小蛋白晶体结构（1CRN）",
+  "description": "RCSB PDB 发布的 Crambin 植物小蛋白 X 射线衍射结构，PDB 编号 1CRN，分辨率 1.50 Å。保留完整原始 PDB 文件，可用于原子、残基、链、几何与三维结构探查；不是人工生成的演示结构。 公开数据库单个完整条目；适用 chemistry Preset 中的 molecular 工具。引用原论文 DOI 10.1073/pnas.81.19.6014。",
+  "domain": "chemistry",
+  "data_type": "PDB",
+  "tags": [
+    "chemistry",
+    "PDB",
+    "开放数据"
+  ],
+  "metadata": {
+    "curated": true,
+    "catalog_version": 1,
+    "publisher": "RCSB Protein Data Bank / W. A. Hendrickson 与 M. M. Teeter",
+    "source_url": "https://www.rcsb.org/structure/1CRN",
+    "license": "CC0-1.0",
+    "license_url": "https://www.rcsb.org/pages/usage-policy",
+    "sample_scope": "完整 PDB 条目 · 原始结构文件",
+    "sample_note": "公开数据库单个完整条目；适用 chemistry Preset 中的 molecular 工具。引用原论文 DOI 10.1073/pnas.81.19.6014。",
+    "provenance": [
+      {
+        "path": "1CRN.pdb",
+        "download_url": "https://files.rcsb.org/download/1CRN.pdb",
+        "sha256": "42199a30a0701864a2a5cc76cd7f35cc544cd0e65fbcf63e03c166543249b811",
+        "size": 49491
+      }
+    ],
+    "inventory_complete": true,
+    "recursive_file_count": 1,
+    "total_size_bytes": 49491
+  },
+  "files": [
+    {
+      "path": "1CRN.pdb",
+      "size": 49491,
+      "sha256": "42199a30a0701864a2a5cc76cd7f35cc544cd0e65fbcf63e03c166543249b811",
+      "role": "data",
+      "content_type": "chemical/x-pdb"
+    }
+  ]
+}
+

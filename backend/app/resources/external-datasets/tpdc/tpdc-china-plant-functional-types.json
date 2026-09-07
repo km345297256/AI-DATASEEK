@@ -1,0 +1,218 @@
+{
+  "dataset_id": "tpdc-china-plant-functional-types",
+  "external_id": "ab193a70-63a5-4df6-9bc1-d9b5ac5fb044",
+  "data_center_id": "reviewed-tpdc-catalog",
+  "data_center_name": "国家青藏高原科学数据中心",
+  "name": "中国植物功能型图（1 km）",
+  "description": "由MICLCover土地覆盖及气候规则转换而成的中国1公里植物功能型分类图，共20类，适合分类面积统计与陆面生态分区比较。",
+  "domain": "geoscience",
+  "data_type": "Arc/Info Binary Grid (ADF)",
+  "tags": [
+    "geoscience",
+    "国家青藏高原科学数据中心",
+    "公开数据"
+  ],
+  "metadata": {
+    "curated": true,
+    "catalog_version": 1,
+    "source_catalog": "tpdc",
+    "publisher": "国家青藏高原科学数据中心",
+    "source_url": "https://data.tpdc.ac.cn/zh-hans/data/ab193a70-63a5-4df6-9bc1-d9b5ac5fb044",
+    "license": "CC BY-NC-SA 4.0",
+    "license_url": "https://creativecommons.org/licenses/by-nc-sa/4.0/",
+    "license_details": "官方许可原文：Attribution-NonCommercial-ShareAlike 4.0 International (CC BY-NC-SA 4.0)。公开共享策略 A/online；需注明数据作者、国家青藏高原科学数据中心及数据/文章引用要求；限非商业使用，演绎须相同方式共享。 DOI: 10.11888/Ecolo.tpdc.270101",
+    "sample_scope": "原官方全包；分类栅格，不是连续浓度或逐年变化产品。",
+    "sample_note": "原官方全包；分类栅格，不是连续浓度或逐年变化产品。",
+    "authors": [
+      "冉有华",
+      "李新"
+    ],
+    "doi": "10.11888/Ecolo.tpdc.270101",
+    "source_version": "",
+    "source_descriptor_sha256": "4c33241e600bfd6630c193181dac465a4cccd94fb13de0464228663665a2a6e2",
+    "download_date": "2026-09-07",
+    "provenance": [
+      {
+        "path": "tpdc-china-plant-functional-types.zip",
+        "size": 5872624,
+        "sha256": "95a98ae58ecd991966577d68dc456ff779e622620341d3b54951e4681ee376c8",
+        "role": "data",
+        "content_type": "application/zip",
+        "download_url": "https://data.tpdc.ac.cn/file/file/batchDownloadFile?metadataId=ab193a70-63a5-4df6-9bc1-d9b5ac5fb044"
+      }
+    ],
+    "inventory_complete": true,
+    "recursive_file_count": 24,
+    "total_size_bytes": 22147248
+  },
+  "files": [
+    {
+      "path": "SOURCE.md",
+      "size": 1251,
+      "sha256": "5ed0a378ba218570b3f210889e3877c94368269b755f188a32e3ac9346300d26",
+      "role": "documentation",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/nested-v1/Plant functional types map in China (1 km)/Plant functional types map in China (1 km)/PFTs_China_1km/RanYH2012.A Multi-source Integrated Chinese Land Cover map.pdf",
+      "size": 1392887,
+      "sha256": "49324b4ce3a5c932b7c4d6743450d5b26b021b7b0d1244297addff7c908dc547",
+      "role": "data",
+      "content_type": "application/pdf"
+    },
+    {
+      "path": "extracted/nested-v1/Plant functional types map in China (1 km)/Plant functional types map in China (1 km)/PFTs_China_1km/info/arc.dir",
+      "size": 4560,
+      "sha256": "3d958474432546af606487cdf8548ed459d8f4f1949c43e3870768fb80b63dc6",
+      "role": "data",
+      "content_type": "application/x-director"
+    },
+    {
+      "path": "extracted/nested-v1/Plant functional types map in China (1 km)/Plant functional types map in China (1 km)/PFTs_China_1km/info/arc0009.dat",
+      "size": 80,
+      "sha256": "8c08f92b40ac805f986618ab775d94a2eeb5579b2aba3cfd0ba6e83c15f6e24e",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/nested-v1/Plant functional types map in China (1 km)/Plant functional types map in China (1 km)/PFTs_China_1km/info/arc0009.nit",
+      "size": 576,
+      "sha256": "0d01226a66f27ad3091db250515d9fa22805a23884035454627646e6587d654a",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/nested-v1/Plant functional types map in China (1 km)/Plant functional types map in China (1 km)/PFTs_China_1km/info/arc0010.dat",
+      "size": 80,
+      "sha256": "3fda7e281e9bc50badd111d259522cbe9d67f9fa4b90b8ef06b537e83fc2ddf2",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/nested-v1/Plant functional types map in China (1 km)/Plant functional types map in China (1 km)/PFTs_China_1km/info/arc0010.nit",
+      "size": 576,
+      "sha256": "28982fb573a5202f4bc59c869f7441f807c90fce6e4559ac9bc62bb95e441b32",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/nested-v1/Plant functional types map in China (1 km)/Plant functional types map in China (1 km)/PFTs_China_1km/info/arc0011.dat",
+      "size": 80,
+      "sha256": "2475605b41c0a58b5bbdedc9383078321d3b5c08200573aee92ec925d55a335b",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/nested-v1/Plant functional types map in China (1 km)/Plant functional types map in China (1 km)/PFTs_China_1km/info/arc0011.nit",
+      "size": 288,
+      "sha256": "e73e8abe3edebdd4fc2a4c501880c0ce40aeb6c1268f50bea43af4ed2bb3eb69",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/nested-v1/Plant functional types map in China (1 km)/Plant functional types map in China (1 km)/PFTs_China_1km/info/arc0011r.001",
+      "size": 2048,
+      "sha256": "783b475770cff45857082a975d28f2632859002aad07a046bfb491df3dfd777c",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/nested-v1/Plant functional types map in China (1 km)/Plant functional types map in China (1 km)/PFTs_China_1km/pfts/dblbnd.adf",
+      "size": 32,
+      "sha256": "be994ee4b1ca4d9327d6e5feef055d8ac9e70955aba8d504e21d5fd15079af40",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/nested-v1/Plant functional types map in China (1 km)/Plant functional types map in China (1 km)/PFTs_China_1km/pfts/hdr.adf",
+      "size": 308,
+      "sha256": "ca2571f0a576f86126f7e4ee4981ba1601e8cea317d7af6caf7c4c02bc5b44ee",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/nested-v1/Plant functional types map in China (1 km)/Plant functional types map in China (1 km)/PFTs_China_1km/pfts/log",
+      "size": 192,
+      "sha256": "4912b43a271edbb215ea53c517409013a12c98118900cbc6c16b9f70af921604",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/nested-v1/Plant functional types map in China (1 km)/Plant functional types map in China (1 km)/PFTs_China_1km/pfts/prj.adf",
+      "size": 365,
+      "sha256": "f6a74721e3d4bfcbbe2135946bc05986ff40dca816c3a23ae54fa40adef2e830",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/nested-v1/Plant functional types map in China (1 km)/Plant functional types map in China (1 km)/PFTs_China_1km/pfts/sta.adf",
+      "size": 32,
+      "sha256": "ac66475b0c8b25b30c0e02397046815ae4135f4f83718deddf7a4a92484815f3",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/nested-v1/Plant functional types map in China (1 km)/Plant functional types map in China (1 km)/PFTs_China_1km/pfts/vat.adf",
+      "size": 136,
+      "sha256": "3d6663fb4c2b63bb5196cb266f11090a8520305c45becc997bd9b6ca4ed9d054",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/nested-v1/Plant functional types map in China (1 km)/Plant functional types map in China (1 km)/PFTs_China_1km/pfts/w001001.adf",
+      "size": 6285036,
+      "sha256": "834c72c46612dc4ccb7ce7d8ac0331c23ccb9f63ee4351f9b94ef44f7c128ebb",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/nested-v1/Plant functional types map in China (1 km)/Plant functional types map in China (1 km)/PFTs_China_1km/pfts/w001001x.adf",
+      "size": 331364,
+      "sha256": "dbdbb9bfadaff1d585f812fb9b1c6181b69af39ea73da3ddb8393b1255d0b803",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/nested-v1/Plant functional types map in China (1 km)/Plant functional types map in China (1 km)/PFTs_China_1km/pfts.aux.xml",
+      "size": 119,
+      "sha256": "4d9ec9b866f0793c1a40a97142ab32dfdc34e572383c037dc7cd79eb44ed41c6",
+      "role": "data",
+      "content_type": "application/xml"
+    },
+    {
+      "path": "extracted/nested-v1/Plant functional types map in China (1 km)/Plant functional types map in China (1 km)/PFTs_China_1km/pfts.ovr",
+      "size": 912796,
+      "sha256": "e7e6e6c2b38828765082f640aa0f68df2d3f1e9ea88b59b589a7e103c1664d00",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/nested-v1/Plant functional types map in China (1 km)/Plant functional types map in China (1 km)/PFTs_China_1km/pfts.png",
+      "size": 448172,
+      "sha256": "f65cc688cbe656209db91487e14cdb855d0286cc0d1ed1d74a905595b646a98f",
+      "role": "data",
+      "content_type": "image/png"
+    },
+    {
+      "path": "extracted/nested-v1/Plant functional types map in China (1 km)/Plant functional types map in China (1 km)/PFTs_China_1km/冉有华2016_中国2000年1km植物功能型分布图.pdf",
+      "size": 986932,
+      "sha256": "c432691dad13423081d3ab8a7a0f30e580e86365851c92bada41669c733fd95c",
+      "role": "data",
+      "content_type": "application/pdf"
+    },
+    {
+      "path": "extracted/tpdc-china-plant-functional-types/中国植物功能型图（1 km）/Plant functional types map in China (1 km).zip",
+      "size": 5906714,
+      "sha256": "d22f3cf70c68ff8c4f2c77a13f4a02ffd63497cdba488f5353a74aa81caa4fff",
+      "role": "data",
+      "content_type": "application/zip"
+    },
+    {
+      "path": "tpdc-china-plant-functional-types.zip",
+      "size": 5872624,
+      "sha256": "95a98ae58ecd991966577d68dc456ff779e622620341d3b54951e4681ee376c8",
+      "role": "data",
+      "content_type": "application/zip"
+    }
+  ]
+}

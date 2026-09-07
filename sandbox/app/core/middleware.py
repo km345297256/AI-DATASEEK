@@ -24,9 +24,14 @@ async def auto_extend_timeout_middleware(request: Request, call_next):
         supervisor_service.auto_expand_enabled):
         try:
             await supervisor_service.extend_timeout()
-            logger.debug("Timeout automatically extended due to API request: %s", request.url.path)
-        except Exception as e:
-            logger.warning("Failed to auto-extend timeout: %s", str(e))
+            # A route path can contain user-controlled identifiers or encoded
+            # filesystem paths. Logging the operation is enough for diagnosis.
+            logger.debug("Timeout automatically extended due to API request")
+        except Exception as error:
+            logger.warning(
+                "Failed to auto-extend timeout error_type=%s",
+                type(error).__name__,
+            )
     
     response = await call_next(request)
-    return response 
+    return response

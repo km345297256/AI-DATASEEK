@@ -1,3 +1,4 @@
+from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
 import pytest
@@ -74,8 +75,17 @@ def _http_request() -> Request:
     })
 
 
+def _use_authenticated_provider(monkeypatch) -> None:
+    monkeypatch.setattr(
+        dataset_routes,
+        "get_settings",
+        lambda: SimpleNamespace(auth_provider="sso"),
+    )
+
+
 @pytest.mark.asyncio
 async def test_submission_route_allows_admin_and_passes_one_directory(monkeypatch):
+    _use_authenticated_provider(monkeypatch)
     dataset = _dataset()
     dataset_service = AsyncMock()
     dataset_service.create_submission.return_value = dataset
@@ -122,6 +132,7 @@ async def test_submission_route_rejects_non_admin_before_directory_inspection(mo
 
 @pytest.mark.asyncio
 async def test_submission_route_returns_401_when_body_token_is_rejected(monkeypatch):
+    _use_authenticated_provider(monkeypatch)
     dataset_service = AsyncMock()
     monkeypatch.setattr(dataset_routes, "DataCenterDatasetService", lambda: dataset_service)
 
@@ -136,6 +147,68 @@ async def test_submission_route_returns_401_when_body_token_is_rejected(monkeypa
     )
 
     assert response.status_code == 401
+    dataset_service.create_submission.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_submission_route_skips_sso_for_local_no_auth_form(monkeypatch):
+    dataset = _dataset()
+    dataset_service = AsyncMock()
+    dataset_service.create_submission.return_value = dataset
+    resolve_uid = AsyncMock()
+    monkeypatch.setattr(dataset_routes, "DataCenterDatasetService", lambda: dataset_service)
+    monkeypatch.setattr(dataset_routes, "resolve_sso_uid", resolve_uid)
+    monkeypatch.setattr(
+        dataset_routes,
+        "get_settings",
+        lambda: SimpleNamespace(auth_provider="none"),
+    )
+
+    response = await dataset_routes.create_dataset_submission(
+        DatasetSubmissionRequest(
+            name="Local dataset",
+            summary="Local analysis request",
+            storage_directory="/srv/datasets/example",
+        ),
+        _http_request(),
+        current_user=_user(),
+    )
+
+    resolve_uid.assert_not_awaited()
+    dataset_service.create_submission.assert_awaited_once_with(
+        external_id="",
+        name="Local dataset",
+        summary="Local analysis request",
+        keywords=[],
+        storage_directory="/srv/datasets/example",
+        created_by="owner-a",
+        nc_view_url=None,
+        sso_uid=None,
+    )
+    assert response.data is not None
+    assert response.data.dataset_id == dataset.dataset_id
+
+
+@pytest.mark.asyncio
+async def test_submission_route_requires_token_for_authenticated_provider(monkeypatch):
+    _use_authenticated_provider(monkeypatch)
+    dataset_service = AsyncMock()
+    resolve_uid = AsyncMock()
+    monkeypatch.setattr(dataset_routes, "DataCenterDatasetService", lambda: dataset_service)
+    monkeypatch.setattr(dataset_routes, "resolve_sso_uid", resolve_uid)
+
+    response = await dataset_routes.create_dataset_submission(
+        DatasetSubmissionRequest(
+            name="Authenticated dataset",
+            summary="Authenticated analysis request",
+            storage_directory="/srv/datasets/example",
+        ),
+        _http_request(),
+        current_user=_user(),
+    )
+
+    assert response.status_code == 401
+    resolve_uid.assert_not_awaited()
     dataset_service.create_submission.assert_not_awaited()
 
 

@@ -1,0 +1,73 @@
+{
+  "dataset_id": "open-uci-wine-quality",
+  "external_id": "open-uci-wine-quality",
+  "data_center_id": "international-open-catalog",
+  "data_center_name": "P. Cortez 等 · UCI Machine Learning Repository",
+  "name": "Wine Quality 红白葡萄酒质量表",
+  "description": "葡萄牙 Vinho Verde 红、白葡萄酒的理化指标与感官质量评分。分别包含 1599 和 4898 条记录，可对比表结构、评分分布与酒精度关系；原始 CSV 使用分号分隔。",
+  "domain": "tabular",
+  "data_type": "CSV",
+  "tags": [
+    "tabular",
+    "CSV",
+    "开放数据"
+  ],
+  "metadata": {
+    "curated": true,
+    "catalog_version": 1,
+    "publisher": "P. Cortez 等 · UCI Machine Learning Repository",
+    "source_url": "https://archive.ics.uci.edu/dataset/186/wine+quality",
+    "license": "CC BY 4.0",
+    "license_url": "https://creativecommons.org/licenses/by/4.0/",
+    "license_details": "CC BY 4.0",
+    "sample_scope": "完整数据 · 红、白葡萄酒两张表",
+    "sample_note": "葡萄牙 Vinho Verde 红、白葡萄酒的理化指标与感官质量评分。分别包含 1599 和 4898 条记录，可对比表结构、评分分布与酒精度关系；原始 CSV 使用分号分隔。",
+    "provenance": [
+      {
+        "path": "winequality-red.csv",
+        "download_url": "https://archive.ics.uci.edu/static/public/186/wine+quality.zip",
+        "sha256": "4a402cf041b025d4566d954c3b9ba8635a3a8a01e039005d97d6a710278cf05e",
+        "size": 84199
+      },
+      {
+        "path": "winequality-white.csv",
+        "download_url": "https://archive.ics.uci.edu/static/public/186/wine+quality.zip",
+        "sha256": "76c3f809815c17c07212622f776311faeb31e87610d52c26d87d6e361b169836",
+        "size": 264426
+      },
+      {
+        "path": "winequality.names",
+        "download_url": "https://archive.ics.uci.edu/static/public/186/wine+quality.zip",
+        "sha256": "15d215e73b39105952380fd487e4ce1bf5a6b83a425abb285c2ec55193d3ca92",
+        "size": 3305
+      }
+    ],
+    "inventory_complete": true,
+    "recursive_file_count": 3,
+    "total_size_bytes": 351930
+  },
+  "files": [
+    {
+      "path": "winequality-red.csv",
+      "size": 84199,
+      "sha256": "4a402cf041b025d4566d954c3b9ba8635a3a8a01e039005d97d6a710278cf05e",
+      "role": "data",
+      "content_type": "text/csv"
+    },
+    {
+      "path": "winequality-white.csv",
+      "size": 264426,
+      "sha256": "76c3f809815c17c07212622f776311faeb31e87610d52c26d87d6e361b169836",
+      "role": "data",
+      "content_type": "text/csv"
+    },
+    {
+      "path": "winequality.names",
+      "size": 3305,
+      "sha256": "15d215e73b39105952380fd487e4ce1bf5a6b83a425abb285c2ec55193d3ca92",
+      "role": "documentation",
+      "content_type": "text/plain"
+    }
+  ]
+}
+

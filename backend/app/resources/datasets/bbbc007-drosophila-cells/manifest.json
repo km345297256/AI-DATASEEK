@@ -1,0 +1,90 @@
+{
+  "dataset_id": "bbbc007-drosophila-cells",
+  "external_id": "bbbc007-drosophila-cells",
+  "data_center_id": "international-open-catalog",
+  "data_center_name": "Broad Institute / Whitehead Institute; Anne Carpenter; David Sabatini laboratory",
+  "name": "BBBC007 果蝇细胞双通道显微图像（2 视野样本）",
+  "description": "Broad Bioimage Benchmark Collection 的真实果蝇 Kc167 细胞显微图像。从 BBBC007 v1 的 16 个视野中选取 POS0007、POS0011 两个视野，每个包含 DNA（D_1UL）与肌动蛋白（F_2UL）通道，共 4 张原始 TIFF，未修改像素。适合图像尺寸与强度检查、核/细胞分割和跨通道比较。本地是明确筛选的教学样本，并非完整基准数据集。",
+  "domain": "image_science",
+  "data_type": "TIF",
+  "tags": [
+    "image_science",
+    "TIF",
+    "开放数据"
+  ],
+  "metadata": {
+    "curated": true,
+    "catalog_version": 1,
+    "publisher": "Broad Institute / Whitehead Institute; Anne Carpenter; David Sabatini laboratory",
+    "source_url": "https://bbbc.broadinstitute.org/BBBC007",
+    "license": "CC0-1.0",
+    "license_url": "https://bbbc.broadinstitute.org/BBBC007",
+    "license_details": "Official Copyright section includes CC0 logo linking to https://creativecommons.org/publicdomain/zero/1.0/ and Anne Carpenter's waiver for images and ground truth.",
+    "sample_scope": "选取子集 · 2 个视野、4 张原始 TIFF",
+    "sample_note": "Unmodified TIFF files for two selected fields, both DNA and actin channels; extracted from the official BBBC007_v1_images.zip archive. No ground-truth masks are included.",
+    "provenance": [
+      {
+        "path": "17P1_POS0007_D_1UL.tif",
+        "download_url": "https://data.broadinstitute.org/bbbc/BBBC007/BBBC007_v1_images.zip",
+        "archive_member": "BBBC007_v1_images/f96 (17)/17P1_POS0007_D_1UL.tif",
+        "sha256": "bee69d4ec89d6110ffc84c170dc947fd0982207f0608ca12c1e3c496a0f5bb9c",
+        "size": 105508
+      },
+      {
+        "path": "17P1_POS0007_F_2UL.tif",
+        "download_url": "https://data.broadinstitute.org/bbbc/BBBC007/BBBC007_v1_images.zip",
+        "archive_member": "BBBC007_v1_images/f96 (17)/17P1_POS0007_F_2UL.tif",
+        "sha256": "e26b8267a3375228fadbd1b522965d2e6da2e59af8c5b16a526931b2f654e346",
+        "size": 152762
+      },
+      {
+        "path": "17P1_POS0011_D_1UL.tif",
+        "download_url": "https://data.broadinstitute.org/bbbc/BBBC007/BBBC007_v1_images.zip",
+        "archive_member": "BBBC007_v1_images/f96 (17)/17P1_POS0011_D_1UL.tif",
+        "sha256": "e38aebb811fefc25856fac2e8341dfea836351768deab9424ece7d06ab5ad624",
+        "size": 122710
+      },
+      {
+        "path": "17P1_POS0011_F_2UL.tif",
+        "download_url": "https://data.broadinstitute.org/bbbc/BBBC007/BBBC007_v1_images.zip",
+        "archive_member": "BBBC007_v1_images/f96 (17)/17P1_POS0011_F_2UL.tif",
+        "sha256": "c0bca0b97997de8dccdcb5e188fef3ddc6675389cb5667c026a0de6f2fe19fef",
+        "size": 155236
+      }
+    ],
+    "inventory_complete": true,
+    "recursive_file_count": 4,
+    "total_size_bytes": 536216
+  },
+  "files": [
+    {
+      "path": "17P1_POS0007_D_1UL.tif",
+      "size": 105508,
+      "sha256": "bee69d4ec89d6110ffc84c170dc947fd0982207f0608ca12c1e3c496a0f5bb9c",
+      "role": "data",
+      "content_type": "image/tiff"
+    },
+    {
+      "path": "17P1_POS0007_F_2UL.tif",
+      "size": 152762,
+      "sha256": "e26b8267a3375228fadbd1b522965d2e6da2e59af8c5b16a526931b2f654e346",
+      "role": "data",
+      "content_type": "image/tiff"
+    },
+    {
+      "path": "17P1_POS0011_D_1UL.tif",
+      "size": 122710,
+      "sha256": "e38aebb811fefc25856fac2e8341dfea836351768deab9424ece7d06ab5ad624",
+      "role": "data",
+      "content_type": "image/tiff"
+    },
+    {
+      "path": "17P1_POS0011_F_2UL.tif",
+      "size": 155236,
+      "sha256": "c0bca0b97997de8dccdcb5e188fef3ddc6675389cb5667c026a0de6f2fe19fef",
+      "role": "data",
+      "content_type": "image/tiff"
+    }
+  ]
+}
+

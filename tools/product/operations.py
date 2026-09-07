@@ -7,9 +7,13 @@ import json
 import os
 import shutil
 import zipfile
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+
+
+# datetime.UTC was added in Python 3.11, while the analysis sandbox runs 3.10.
+UTC = timezone.utc
 
 
 def output_path(raw: str, *, directory: bool = False) -> Path:

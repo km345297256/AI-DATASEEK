@@ -1,0 +1,1332 @@
+{
+  "reviewed_at": "2026-09-07",
+  "source": "scidb",
+  "note": "Reviewed download inputs. Download/HEAD observations here are research evidence, not current import status; use matching external-datasets manifests for verified inventories.",
+  "datasets": [
+    {
+      "dataset_id": "scidb-sanjiaolongwan-core",
+      "external_id": "e83385d5bb244101a06840f35ffcb97e",
+      "name": "三角龙湾 SJLW-2 湖泊岩芯代用指标",
+      "original_title": "Proxy‑indicator data of core SJLW‑2 from Sanjiao Longwan",
+      "description": "东北中国龙岗火山群三角龙湾岩芯约240年的深度—年龄、有机碳氮、稳定同位素和沉积通量数据，适合时间序列、相关性与古环境探查。",
+      "domain": "geoscience",
+      "data_type": "xlsx",
+      "source": "ScienceDB",
+      "source_url": "https://www.scidb.cn/en/detail?dataSetId=e83385d5bb244101a06840f35ffcb97e",
+      "doi": "https://doi.org/10.57760/sciencedb.jee.0000h",
+      "source_version": "V1",
+      "license": "CC BY 4.0",
+      "license_url": "https://creativecommons.org/licenses/by/4.0/",
+      "license_details": "Creative Commons Attribution 4.0；须署名、链接许可并说明修改。",
+      "authors": [
+        "huang sheng"
+      ],
+      "access_status": "PUBLIC",
+      "sample_scope": "完整 V1 公开 XLSX 表格；保留原始列名与单位。",
+      "source_total_file_count": 1,
+      "source_total_size": 13580,
+      "selected_file_count": 1,
+      "selected_total_size": 13580,
+      "files": [
+        {
+          "path": "三角龙湾SJLW-2岩芯代用指标数据.xlsx",
+          "url": "https://china.scidb.cn/download?fileId=8021f436d547d4e9081a90cdc9c90da9",
+          "method": "GET",
+          "expected_size": 13580,
+          "expected_md5": "e2bfefa666384c3657beec3dcd82573d",
+          "format": "xlsx",
+          "source_file_id": "8021f436d547d4e9081a90cdc9c90da9",
+          "verification": {
+            "method": "HEAD",
+            "status": 200,
+            "content_length": 13580,
+            "verified_at": "2026-09-07",
+            "anonymous": true
+          }
+        }
+      ],
+      "provenance": {
+        "metadata_url": "https://www.scidb.cn/api/sdb-dataset-service/dataset/details/e83385d5bb244101a06840f35ffcb97e?mode=front",
+        "file_list_url": "https://www.scidb.cn/api/gin-sdb-filetree/public/file/childrenFileListByPath",
+        "file_list_method": "POST",
+        "file_list_body": {
+          "dataSetId": "e83385d5bb244101a06840f35ffcb97e",
+          "version": "V1",
+          "path": "/V1",
+          "lastIndex": 0,
+          "pageSize": 100
+        },
+        "verified_at": "2026-09-07",
+        "downloaded": false,
+        "content_validated": false
+      }
+    },
+    {
+      "dataset_id": "scidb-pamirs-warming",
+      "external_id": "633694461058088963",
+      "name": "帕米尔高原极端升温过程（1961—2017）",
+      "original_title": "A dataset of extreme temperature-rising process over the Pamirs Plateau in the Northern of the China–Pakistan Economic Corridor (1961– 2017)",
+      "description": "基于帕米尔高原3个气象站1961—2017年逐日最高温度形成的极端升温过程指标，适合频率、持续时间、强度和长期变化分析。",
+      "domain": "geoscience",
+      "data_type": "zip,rar",
+      "source": "ScienceDB",
+      "source_url": "https://www.scidb.cn/en/detail?dataSetId=633694461058088963",
+      "doi": "https://doi.org/10.11922/sciencedb.595",
+      "source_version": "V1",
+      "license": "CC BY 4.0",
+      "license_url": "https://creativecommons.org/licenses/by/4.0/",
+      "license_details": "Creative Commons Attribution 4.0；须署名、链接许可并说明修改。",
+      "authors": [
+        "毛炜峄",
+        "姚俊强",
+        "陈静"
+      ],
+      "access_status": "PUBLIC",
+      "sample_scope": "完整 V1 发布的3个压缩包（文件名含 V3、2 等历史命名）。应分别解压到不同子目录，不能混写覆盖；包内格式与重复版本须下载后核验。",
+      "source_total_file_count": 3,
+      "source_total_size": 868986,
+      "selected_file_count": 3,
+      "selected_total_size": 868986,
+      "files": [
+        {
+          "path": "中巴经济走廊北端帕米尔高原区域极端升温过程数据集-V3.zip",
+          "url": "https://china.scidb.cn/download?fileId=5ed5fcab5e972d1f52dfe6b2",
+          "method": "GET",
+          "expected_size": 327229,
+          "expected_md5": "ad625b93be7c8c9b9170099f114f5539",
+          "format": "zip",
+          "source_file_id": "5ed5fcab5e972d1f52dfe6b2",
+          "verification": {
+            "method": "HEAD",
+            "status": 200,
+            "content_length": 327229,
+            "verified_at": "2026-09-07",
+            "anonymous": true
+          }
+        },
+        {
+          "path": "中巴经济走廊北端帕米尔高原区域极端升温过程数据集.rar",
+          "url": "https://china.scidb.cn/download?fileId=5ed5fcab5e972d1f52dfe6b4",
+          "method": "GET",
+          "expected_size": 219270,
+          "expected_md5": "67a23ea133b97b42b509d0e7438dae59",
+          "format": "rar",
+          "source_file_id": "5ed5fcab5e972d1f52dfe6b4",
+          "verification": {
+            "method": "HEAD",
+            "status": 200,
+            "content_length": 219270,
+            "verified_at": "2026-09-07",
+            "anonymous": true
+          }
+        },
+        {
+          "path": "中巴经济走廊北端帕米尔高原区域极端升温过程数据集2.zip",
+          "url": "https://china.scidb.cn/download?fileId=5ed5fcab5e972d1f52dfe6b3",
+          "method": "GET",
+          "expected_size": 322487,
+          "expected_md5": "720ccc648772b48371fc086d4e8314b2",
+          "format": "zip",
+          "source_file_id": "5ed5fcab5e972d1f52dfe6b3",
+          "verification": {
+            "method": "HEAD",
+            "status": 200,
+            "content_length": 322487,
+            "verified_at": "2026-09-07",
+            "anonymous": true
+          }
+        }
+      ],
+      "provenance": {
+        "metadata_url": "https://www.scidb.cn/api/sdb-dataset-service/dataset/details/633694461058088963?mode=front",
+        "file_list_url": "https://www.scidb.cn/api/gin-sdb-filetree/public/file/childrenFileListByPath",
+        "file_list_method": "POST",
+        "file_list_body": {
+          "dataSetId": "633694461058088963",
+          "version": "V1",
+          "path": "/V1",
+          "lastIndex": 0,
+          "pageSize": 100
+        },
+        "verified_at": "2026-09-07",
+        "downloaded": false,
+        "content_validated": false
+      }
+    },
+    {
+      "dataset_id": "scidb-potato-fertilizer",
+      "external_id": "8f2879f50cf34d4cba2cffea657f3183",
+      "name": "马铃薯施肥与产量田间试验",
+      "original_title": "Yield performance of potato (Solanum tuberosum L) under integrated use of blended NPS fertilizer and vermicompost in Horroguduru area, Western Ethiopia",
+      "description": "埃塞俄比亚2019年马铃薯田间试验：4种NPS肥料用量×4种蚯蚓堆肥用量、3个重复，适合试验设计、方差分析及产量响应探查。",
+      "domain": "tabular",
+      "data_type": "xlsx",
+      "source": "ScienceDB",
+      "source_url": "https://www.scidb.cn/en/detail?dataSetId=8f2879f50cf34d4cba2cffea657f3183",
+      "doi": "https://doi.org/10.57760/sciencedb.01864",
+      "source_version": "V1",
+      "license": "CC BY 4.0",
+      "license_url": "https://creativecommons.org/licenses/by/4.0/",
+      "license_details": "Creative Commons Attribution 4.0；须署名、链接许可并说明修改。",
+      "authors": [
+        "1.\tAlemayehu Wagari",
+        "Zerihun Jalata",
+        "Amsalu Gobena"
+      ],
+      "access_status": "PUBLIC",
+      "sample_scope": "完整 V1 公开 XLSX 数据；不是合成示例。",
+      "source_total_file_count": 1,
+      "source_total_size": 16827,
+      "selected_file_count": 1,
+      "selected_total_size": 16827,
+      "files": [
+        {
+          "path": "Dataset_Vermicompost and NPS application on potato.xlsx",
+          "url": "https://china.scidb.cn/download?fileId=62ac823d8e66a93f11a07ac4",
+          "method": "GET",
+          "expected_size": 16827,
+          "expected_md5": "fe3e498b5af0dd932e340bd28b291416",
+          "format": "xlsx",
+          "source_file_id": "62ac823d8e66a93f11a07ac4",
+          "verification": {
+            "method": "HEAD",
+            "status": 200,
+            "content_length": 16827,
+            "verified_at": "2026-09-07",
+            "anonymous": true
+          }
+        }
+      ],
+      "provenance": {
+        "metadata_url": "https://www.scidb.cn/api/sdb-dataset-service/dataset/details/8f2879f50cf34d4cba2cffea657f3183?mode=front",
+        "file_list_url": "https://www.scidb.cn/api/gin-sdb-filetree/public/file/childrenFileListByPath",
+        "file_list_method": "POST",
+        "file_list_body": {
+          "dataSetId": "8f2879f50cf34d4cba2cffea657f3183",
+          "version": "V1",
+          "path": "/V1",
+          "lastIndex": 0,
+          "pageSize": 100
+        },
+        "verified_at": "2026-09-07",
+        "downloaded": false,
+        "content_validated": false
+      }
+    },
+    {
+      "dataset_id": "scidb-co2-plasmon-sensor",
+      "external_id": "9a1b3383cfa54d90b067a26828b3fa0d",
+      "name": "二氧化碳等离激元传感器计算数据",
+      "original_title": "The data of the article \"Carbon Dioxide Sensor Based on Gas-Tuned Propagation Length in Hybrid Composite Silver-Layer Structures\"",
+      "description": "单、双、三层银膜结构的二氧化碳传感模拟数据，含波长、传播长度、磁场、材料光学常数和变化率，用于光学数值结果探查。",
+      "domain": "spectroscopy",
+      "data_type": "xlsx,m",
+      "source": "ScienceDB",
+      "source_url": "https://www.scidb.cn/en/detail?dataSetId=9a1b3383cfa54d90b067a26828b3fa0d",
+      "doi": "https://doi.org/10.57760/sciencedb.j00213.00271",
+      "source_version": "V1",
+      "license": "CC BY 4.0",
+      "license_url": "https://creativecommons.org/licenses/by/4.0/",
+      "license_details": "Creative Commons Attribution 4.0；须署名、链接许可并说明修改。",
+      "authors": [
+        "qu wei min",
+        "Zhu Chixian",
+        "Sun Tianwen",
+        "Zou Yunfei",
+        "Tingting Hu",
+        "Yang Tianfang",
+        "Duan Gaoyan",
+        "Lang Peilin",
+        "Wang ",
+        "Wang Chen",
+        "Song Gang"
+      ],
+      "access_status": "PUBLIC",
+      "sample_scope": "完整 V1 的17个数据/代码文件；MATLAB .m 仅作为原始参考文件保留，不自动执行。目录层级必须保持。",
+      "source_total_file_count": 17,
+      "source_total_size": 375990,
+      "selected_file_count": 17,
+      "selected_total_size": 375990,
+      "files": [
+        {
+          "path": "Ag.xlsx",
+          "url": "https://china.scidb.cn/download?fileId=a1cd61fcd510ad588553ac2a6a3fe5bb",
+          "method": "GET",
+          "expected_size": 11118,
+          "expected_md5": "9fb82507a8d757306e9c00fa47a8018f",
+          "format": "xlsx",
+          "source_file_id": "a1cd61fcd510ad588553ac2a6a3fe5bb",
+          "verification": {
+            "method": "HEAD",
+            "status": 200,
+            "content_length": 11118,
+            "verified_at": "2026-09-07",
+            "anonymous": true
+          }
+        },
+        {
+          "path": "PHMB.xlsx",
+          "url": "https://china.scidb.cn/download?fileId=c188d69f6a6c0b9788af9fd48b26bf76",
+          "method": "GET",
+          "expected_size": 10734,
+          "expected_md5": "776699a181d4dee41acc3ffc5abc1da0",
+          "format": "xlsx",
+          "source_file_id": "c188d69f6a6c0b9788af9fd48b26bf76",
+          "verification": {
+            "method": "HEAD",
+            "status": 200,
+            "content_length": 10734,
+            "verified_at": "2026-09-07",
+            "anonymous": true
+          }
+        },
+        {
+          "path": "multilayered1.m",
+          "url": "https://china.scidb.cn/download?fileId=9312be1c29bce553b8ee93c570dd4795",
+          "method": "GET",
+          "expected_size": 6160,
+          "expected_md5": "4838489cf2dbc1104ae9460bef0147d6",
+          "format": "m",
+          "source_file_id": "9312be1c29bce553b8ee93c570dd4795",
+          "verification": {
+            "method": "HEAD",
+            "status": 200,
+            "content_length": 6160,
+            "verified_at": "2026-09-07",
+            "anonymous": true
+          }
+        },
+        {
+          "path": "multilayered2.m",
+          "url": "https://china.scidb.cn/download?fileId=bffb7da0c2c6bab92f31a78fc6c617b6",
+          "method": "GET",
+          "expected_size": 6117,
+          "expected_md5": "fe4a8681e4a3e4fe5c21f40fb76bc6ab",
+          "format": "m",
+          "source_file_id": "bffb7da0c2c6bab92f31a78fc6c617b6",
+          "verification": {
+            "method": "HEAD",
+            "status": 200,
+            "content_length": 6117,
+            "verified_at": "2026-09-07",
+            "anonymous": true
+          }
+        },
+        {
+          "path": "不同层变化率、变化量.xlsx",
+          "url": "https://china.scidb.cn/download?fileId=21f253d277981d065b4deb645828e695",
+          "method": "GET",
+          "expected_size": 13326,
+          "expected_md5": "f8e20373e06dd6522aea4fbd950d611b",
+          "format": "xlsx",
+          "source_file_id": "21f253d277981d065b4deb645828e695",
+          "verification": {
+            "method": "HEAD",
+            "status": 200,
+            "content_length": 13326,
+            "verified_at": "2026-09-07",
+            "anonymous": true
+          }
+        },
+        {
+          "path": "三层/三层Hy.xlsx",
+          "url": "https://china.scidb.cn/download?fileId=033136718dc7a923289bce5eb98064fb",
+          "method": "GET",
+          "expected_size": 82403,
+          "expected_md5": "922c5c780bfadf7c154d6e03fff45e86",
+          "format": "xlsx",
+          "source_file_id": "033136718dc7a923289bce5eb98064fb",
+          "verification": {
+            "method": "HEAD",
+            "status": 200,
+            "content_length": 82403,
+            "verified_at": "2026-09-07",
+            "anonymous": true
+          }
+        },
+        {
+          "path": "三层/三层传播长度.xlsx",
+          "url": "https://china.scidb.cn/download?fileId=e1c590a32d3ecdc63e5de789aaed5535",
+          "method": "GET",
+          "expected_size": 19031,
+          "expected_md5": "cc9b7c6fdd572fa36a018d78bd622fdd",
+          "format": "xlsx",
+          "source_file_id": "e1c590a32d3ecdc63e5de789aaed5535",
+          "verification": {
+            "method": "HEAD",
+            "status": 200,
+            "content_length": 19031,
+            "verified_at": "2026-09-07",
+            "anonymous": true
+          }
+        },
+        {
+          "path": "三层/三层传播长度变化量、变化率.xlsx",
+          "url": "https://china.scidb.cn/download?fileId=3a728041fd42f4dcbf371861f2effc13",
+          "method": "GET",
+          "expected_size": 19140,
+          "expected_md5": "2822e2a2f3b65d969903cb45702af1dd",
+          "format": "xlsx",
+          "source_file_id": "3a728041fd42f4dcbf371861f2effc13",
+          "verification": {
+            "method": "HEAD",
+            "status": 200,
+            "content_length": 19140,
+            "verified_at": "2026-09-07",
+            "anonymous": true
+          }
+        },
+        {
+          "path": "单层/单层Hy.xlsx",
+          "url": "https://china.scidb.cn/download?fileId=bd7389cd9d7cd1e3e11d508f62472b4e",
+          "method": "GET",
+          "expected_size": 35456,
+          "expected_md5": "7fb1c8f09ef1be2405dce8561227a0af",
+          "format": "xlsx",
+          "source_file_id": "bd7389cd9d7cd1e3e11d508f62472b4e",
+          "verification": {
+            "method": "HEAD",
+            "status": 200,
+            "content_length": 35456,
+            "verified_at": "2026-09-07",
+            "anonymous": true
+          }
+        },
+        {
+          "path": "单层/单层传播长度变化量、变化率.xlsx",
+          "url": "https://china.scidb.cn/download?fileId=de160221aea35d9fadb9dd0d385e9beb",
+          "method": "GET",
+          "expected_size": 20083,
+          "expected_md5": "7beb49aaa15b275e24a00b0eac20a3b8",
+          "format": "xlsx",
+          "source_file_id": "de160221aea35d9fadb9dd0d385e9beb",
+          "verification": {
+            "method": "HEAD",
+            "status": 200,
+            "content_length": 20083,
+            "verified_at": "2026-09-07",
+            "anonymous": true
+          }
+        },
+        {
+          "path": "单层/单层模式1传播长度(t1=50~150nm).xlsx",
+          "url": "https://china.scidb.cn/download?fileId=4f3618bc59b6a6d7e398e2f05e0b3c6b",
+          "method": "GET",
+          "expected_size": 20262,
+          "expected_md5": "ad448091b6c1e4d2521ab104723d85be",
+          "format": "xlsx",
+          "source_file_id": "4f3618bc59b6a6d7e398e2f05e0b3c6b",
+          "verification": {
+            "method": "HEAD",
+            "status": 200,
+            "content_length": 20262,
+            "verified_at": "2026-09-07",
+            "anonymous": true
+          }
+        },
+        {
+          "path": "单层/单层模式1模式2传播长度(t1=100nm,0ppm).xlsx",
+          "url": "https://china.scidb.cn/download?fileId=13eeeb6478029c44b4c46171eadd5092",
+          "method": "GET",
+          "expected_size": 13221,
+          "expected_md5": "25adba232cd694f69b24c22d03d9b1d0",
+          "format": "xlsx",
+          "source_file_id": "13eeeb6478029c44b4c46171eadd5092",
+          "verification": {
+            "method": "HEAD",
+            "status": 200,
+            "content_length": 13221,
+            "verified_at": "2026-09-07",
+            "anonymous": true
+          }
+        },
+        {
+          "path": "双层/双层Hy.xlsx",
+          "url": "https://china.scidb.cn/download?fileId=10cd05d72e8013c57e379e5e522e0ae4",
+          "method": "GET",
+          "expected_size": 46690,
+          "expected_md5": "8e4fe0caae8859f1af7ffd32a074c2f5",
+          "format": "xlsx",
+          "source_file_id": "10cd05d72e8013c57e379e5e522e0ae4",
+          "verification": {
+            "method": "HEAD",
+            "status": 200,
+            "content_length": 46690,
+            "verified_at": "2026-09-07",
+            "anonymous": true
+          }
+        },
+        {
+          "path": "双层/双层传播长度变化量、变化率(不同t1、波长).xlsx",
+          "url": "https://china.scidb.cn/download?fileId=d7aae0bda66e3df4319eb8220dc7636c",
+          "method": "GET",
+          "expected_size": 19250,
+          "expected_md5": "8dc61e99de0ec6bed970bda96a243260",
+          "format": "xlsx",
+          "source_file_id": "d7aae0bda66e3df4319eb8220dc7636c",
+          "verification": {
+            "method": "HEAD",
+            "status": 200,
+            "content_length": 19250,
+            "verified_at": "2026-09-07",
+            "anonymous": true
+          }
+        },
+        {
+          "path": "双层/双层传播长度变化量、变化率(不同t2、波长).xlsx",
+          "url": "https://china.scidb.cn/download?fileId=7abb915039eee23ab1227fbd0b75779b",
+          "method": "GET",
+          "expected_size": 23340,
+          "expected_md5": "79be7cebf5b75aafe5b36f54ee741b35",
+          "format": "xlsx",
+          "source_file_id": "7abb915039eee23ab1227fbd0b75779b",
+          "verification": {
+            "method": "HEAD",
+            "status": 200,
+            "content_length": 23340,
+            "verified_at": "2026-09-07",
+            "anonymous": true
+          }
+        },
+        {
+          "path": "双层/双层模式1、2传播长度(t1=t2=100nm,0ppm).xlsx",
+          "url": "https://china.scidb.cn/download?fileId=7ecdb3a458c989dba1abe01e2fa3b889",
+          "method": "GET",
+          "expected_size": 13191,
+          "expected_md5": "0334b48fdb1cdf92183a35f8370abc67",
+          "format": "xlsx",
+          "source_file_id": "7ecdb3a458c989dba1abe01e2fa3b889",
+          "verification": {
+            "method": "HEAD",
+            "status": 200,
+            "content_length": 13191,
+            "verified_at": "2026-09-07",
+            "anonymous": true
+          }
+        },
+        {
+          "path": "双层/双层模式1传播长度(t2=100nm).xlsx",
+          "url": "https://china.scidb.cn/download?fileId=60ec327d346ffef1ae9538e2a461ae6e",
+          "method": "GET",
+          "expected_size": 16468,
+          "expected_md5": "9d6b63a6a0b0d9765125c05c465851ad",
+          "format": "xlsx",
+          "source_file_id": "60ec327d346ffef1ae9538e2a461ae6e",
+          "verification": {
+            "method": "HEAD",
+            "status": 200,
+            "content_length": 16468,
+            "verified_at": "2026-09-07",
+            "anonymous": true
+          }
+        }
+      ],
+      "provenance": {
+        "metadata_url": "https://www.scidb.cn/api/sdb-dataset-service/dataset/details/9a1b3383cfa54d90b067a26828b3fa0d?mode=front",
+        "file_list_url": "https://www.scidb.cn/api/gin-sdb-filetree/public/file/childrenFileListByPath",
+        "file_list_method": "POST",
+        "file_list_body": {
+          "dataSetId": "9a1b3383cfa54d90b067a26828b3fa0d",
+          "version": "V1",
+          "path": "/V1",
+          "lastIndex": 0,
+          "pageSize": 100
+        },
+        "verified_at": "2026-09-07",
+        "downloaded": false,
+        "content_validated": false
+      }
+    },
+    {
+      "dataset_id": "scidb-medical-isotope-cross-sections",
+      "external_id": "79656e6850d442daa7dae2e984f8d47f",
+      "name": "医用同位素核反应截面实验数据",
+      "original_title": "The data of the article “Cross sections for the production of medically important radioisotopes via the p+232Th reaction in the energy range of 40–80 MeV”",
+      "description": "40—80 MeV区间医用放射性同位素反应截面的公开实验及比较数据，含能量、截面与不确定度，适合误差棒绘图和实验—理论比较。",
+      "domain": "tabular",
+      "data_type": "csv",
+      "source": "ScienceDB",
+      "source_url": "https://www.scidb.cn/en/detail?dataSetId=79656e6850d442daa7dae2e984f8d47f",
+      "doi": "https://doi.org/10.57760/sciencedb.j00213.0008d",
+      "source_version": "V1",
+      "license": "CC BY 4.0",
+      "license_url": "https://creativecommons.org/licenses/by/4.0/",
+      "license_details": "Creative Commons Attribution 4.0；须署名、链接许可并说明修改。",
+      "authors": [
+        "Jiang Bing",
+        "Liu Yuchen",
+        "Wu Fan",
+        "Hu Shengwei",
+        "Jiang Wei",
+        "Luo Wen",
+        "Jinghantao"
+      ],
+      "access_status": "PUBLIC",
+      "sample_scope": "完整 V1 的13个 CSV 表格；仅做已公开科研数据分析，不涉及生产工艺或设施操作。",
+      "source_total_file_count": 13,
+      "source_total_size": 35484,
+      "selected_file_count": 13,
+      "selected_total_size": 35484,
+      "files": [
+        {
+          "path": "数据包/p+232Th产生106Ru反应截面.csv",
+          "url": "https://china.scidb.cn/download?fileId=ebc022788f7c1a094604ba7359008128",
+          "method": "GET",
+          "expected_size": 935,
+          "expected_md5": "aea658b6045b3ca87bb36f144910fba5",
+          "format": "csv",
+          "source_file_id": "ebc022788f7c1a094604ba7359008128",
+          "verification": {
+            "method": "HEAD",
+            "status": 200,
+            "content_length": 935,
+            "verified_at": "2026-09-07",
+            "anonymous": true
+          }
+        },
+        {
+          "path": "数据包/p+232Th产生111Ag反应截面.csv",
+          "url": "https://china.scidb.cn/download?fileId=72bc23ae02326c4ec1b30cf312aadafc",
+          "method": "GET",
+          "expected_size": 1182,
+          "expected_md5": "0129fad69bbe5b0d0b10f00940c052ab",
+          "format": "csv",
+          "source_file_id": "72bc23ae02326c4ec1b30cf312aadafc",
+          "verification": {
+            "method": "HEAD",
+            "status": 200,
+            "content_length": 1182,
+            "verified_at": "2026-09-07",
+            "anonymous": true
+          }
+        },
+        {
+          "path": "数据包/p+232Th产生124Sb反应截面.csv",
+          "url": "https://china.scidb.cn/download?fileId=397d06d4a78f62bb328471cd92ce1d66",
+          "method": "GET",
+          "expected_size": 1346,
+          "expected_md5": "e303cf56f531ec0c9976810a7da54b64",
+          "format": "csv",
+          "source_file_id": "397d06d4a78f62bb328471cd92ce1d66",
+          "verification": {
+            "method": "HEAD",
+            "status": 200,
+            "content_length": 1346,
+            "verified_at": "2026-09-07",
+            "anonymous": true
+          }
+        },
+        {
+          "path": "数据包/p+232Th产生131I反应截面.csv",
+          "url": "https://china.scidb.cn/download?fileId=197f969d36aa77066b6880dac975053e",
+          "method": "GET",
+          "expected_size": 1555,
+          "expected_md5": "ff6d5af1d983e2daa21a5e9499847e4f",
+          "format": "csv",
+          "source_file_id": "197f969d36aa77066b6880dac975053e",
+          "verification": {
+            "method": "HEAD",
+            "status": 200,
+            "content_length": 1555,
+            "verified_at": "2026-09-07",
+            "anonymous": true
+          }
+        },
+        {
+          "path": "数据包/p+232Th产生140Ba反应截面.csv",
+          "url": "https://china.scidb.cn/download?fileId=b8eb4806fb4a5262297dddd159154b2c",
+          "method": "GET",
+          "expected_size": 1538,
+          "expected_md5": "f5e8f6d5734520d52192aaebce0fc40c",
+          "format": "csv",
+          "source_file_id": "b8eb4806fb4a5262297dddd159154b2c",
+          "verification": {
+            "method": "HEAD",
+            "status": 200,
+            "content_length": 1538,
+            "verified_at": "2026-09-07",
+            "anonymous": true
+          }
+        },
+        {
+          "path": "数据包/p+232Th产生153Sm反应截面.csv",
+          "url": "https://china.scidb.cn/download?fileId=d00fda39ecae533a11660db9d5b90ed6",
+          "method": "GET",
+          "expected_size": 701,
+          "expected_md5": "57fb73f7072ceff4379c0d8940c2b4c5",
+          "format": "csv",
+          "source_file_id": "d00fda39ecae533a11660db9d5b90ed6",
+          "verification": {
+            "method": "HEAD",
+            "status": 200,
+            "content_length": 701,
+            "verified_at": "2026-09-07",
+            "anonymous": true
+          }
+        },
+        {
+          "path": "数据包/p+232Th产生223Ra反应截面.csv",
+          "url": "https://china.scidb.cn/download?fileId=f6656128d8def5fa96495a587f6f7894",
+          "method": "GET",
+          "expected_size": 2691,
+          "expected_md5": "20392895ddb9e1a39ae7b2601339b5bc",
+          "format": "csv",
+          "source_file_id": "f6656128d8def5fa96495a587f6f7894",
+          "verification": {
+            "method": "HEAD",
+            "status": 200,
+            "content_length": 2691,
+            "verified_at": "2026-09-07",
+            "anonymous": true
+          }
+        },
+        {
+          "path": "数据包/p+232Th产生225Ra反应截面.csv",
+          "url": "https://china.scidb.cn/download?fileId=cb2bf8ab6e7d4413b605b1aa38e98d2c",
+          "method": "GET",
+          "expected_size": 13950,
+          "expected_md5": "4977bb2e6a2eed2599848b582bbe26ea",
+          "format": "csv",
+          "source_file_id": "cb2bf8ab6e7d4413b605b1aa38e98d2c",
+          "verification": {
+            "method": "HEAD",
+            "status": 200,
+            "content_length": 13950,
+            "verified_at": "2026-09-07",
+            "anonymous": true
+          }
+        },
+        {
+          "path": "数据包/p+232Th产生226Ac反应截面.csv",
+          "url": "https://china.scidb.cn/download?fileId=f4277830149828d2a3bd97915ad6ae70",
+          "method": "GET",
+          "expected_size": 2642,
+          "expected_md5": "4dfe81017d3bef18a668307366992a7b",
+          "format": "csv",
+          "source_file_id": "f4277830149828d2a3bd97915ad6ae70",
+          "verification": {
+            "method": "HEAD",
+            "status": 200,
+            "content_length": 2642,
+            "verified_at": "2026-09-07",
+            "anonymous": true
+          }
+        },
+        {
+          "path": "数据包/p+232Th产生230Pa反应截面.csv",
+          "url": "https://china.scidb.cn/download?fileId=5f9c1aada924675102608c82145ef34c",
+          "method": "GET",
+          "expected_size": 6077,
+          "expected_md5": "52dfeb23b0488bde4af49ef2587fbbdc",
+          "format": "csv",
+          "source_file_id": "5f9c1aada924675102608c82145ef34c",
+          "verification": {
+            "method": "HEAD",
+            "status": 200,
+            "content_length": 6077,
+            "verified_at": "2026-09-07",
+            "anonymous": true
+          }
+        },
+        {
+          "path": "数据包/p+232Th产生88Y反应截面.csv",
+          "url": "https://china.scidb.cn/download?fileId=9e9f82e47bf2510215ee11201e0d12c9",
+          "method": "GET",
+          "expected_size": 780,
+          "expected_md5": "b96be5d6fb389537605747bb928e899d",
+          "format": "csv",
+          "source_file_id": "9e9f82e47bf2510215ee11201e0d12c9",
+          "verification": {
+            "method": "HEAD",
+            "status": 200,
+            "content_length": 780,
+            "verified_at": "2026-09-07",
+            "anonymous": true
+          }
+        },
+        {
+          "path": "数据包/p+232Th产生99Mo反应截面.csv",
+          "url": "https://china.scidb.cn/download?fileId=9cb0655231139d1453eef49ac8d7387f",
+          "method": "GET",
+          "expected_size": 1569,
+          "expected_md5": "e13bbf95be03ac3f0241454afbb550dc",
+          "format": "csv",
+          "source_file_id": "9cb0655231139d1453eef49ac8d7387f",
+          "verification": {
+            "method": "HEAD",
+            "status": 200,
+            "content_length": 1569,
+            "verified_at": "2026-09-07",
+            "anonymous": true
+          }
+        },
+        {
+          "path": "数据包/医用放射性核素及用于核素测定的主要特征γ 射线.csv",
+          "url": "https://china.scidb.cn/download?fileId=e4df3f611b3bd494d52f17b0c3aab66a",
+          "method": "GET",
+          "expected_size": 518,
+          "expected_md5": "9290fd5001c4117453476aab189e0e78",
+          "format": "csv",
+          "source_file_id": "e4df3f611b3bd494d52f17b0c3aab66a",
+          "verification": {
+            "method": "HEAD",
+            "status": 200,
+            "content_length": 518,
+            "verified_at": "2026-09-07",
+            "anonymous": true
+          }
+        }
+      ],
+      "provenance": {
+        "metadata_url": "https://www.scidb.cn/api/sdb-dataset-service/dataset/details/79656e6850d442daa7dae2e984f8d47f?mode=front",
+        "file_list_url": "https://www.scidb.cn/api/gin-sdb-filetree/public/file/childrenFileListByPath",
+        "file_list_method": "POST",
+        "file_list_body": {
+          "dataSetId": "79656e6850d442daa7dae2e984f8d47f",
+          "version": "V1",
+          "path": "/V1",
+          "lastIndex": 0,
+          "pageSize": 100
+        },
+        "verified_at": "2026-09-07",
+        "downloaded": false,
+        "content_validated": false
+      }
+    },
+    {
+      "dataset_id": "scidb-anuvad-crystal",
+      "external_id": "3df4a7fb82a64f879a6bd84749253bbe",
+      "name": "ANUVAD/ANUVUD 分子结构计算样例",
+      "original_title": "ANUVAD Crystal structure",
+      "description": "研究 C—N 键异头效应的分子结构与几何优化文件，适合化学结构读取、键长及结构可视化。官方题名为 ANUVAD，文件和描述使用 ANUVUD，原样记录这一差异。",
+      "domain": "chemistry",
+      "data_type": "mol,cml,jpg",
+      "source": "ScienceDB",
+      "source_url": "https://www.scidb.cn/en/detail?dataSetId=3df4a7fb82a64f879a6bd84749253bbe",
+      "doi": "https://doi.org/10.11922/sciencedb.01522",
+      "source_version": "V1",
+      "license": "CC0",
+      "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "license_details": "CC0 1.0 公共领域贡献；保留来源、作者和DOI有助于科研溯源。",
+      "authors": [
+        "Henry Rzepa"
+      ],
+      "access_status": "PUBLIC",
+      "sample_scope": "精选3个结构相关文件（MOL、CML、JPG），不是完整计算档案。官方 .log 文件 HEAD 返回403，未获取或绕过；16.6 MB的检查点文件未选入。",
+      "source_total_file_count": 5,
+      "source_total_size": 21995911,
+      "selected_file_count": 3,
+      "selected_total_size": 491821,
+      "files": [
+        {
+          "path": "ANUVUD.jpg",
+          "url": "https://china.scidb.cn/download?fileId=620a9c4bdda0ef0a74b97cc0",
+          "method": "GET",
+          "expected_size": 477520,
+          "expected_md5": "4760513c62eaddf48ee3597f7c500683",
+          "format": "jpg",
+          "source_file_id": "620a9c4bdda0ef0a74b97cc0",
+          "verification": {
+            "method": "HEAD",
+            "status": 200,
+            "content_length": 477520,
+            "verified_at": "2026-09-07",
+            "anonymous": true
+          }
+        },
+        {
+          "path": "ANUVUD.mol",
+          "url": "https://china.scidb.cn/download?fileId=620a9c4bdda0ef0a74b97cbe",
+          "method": "GET",
+          "expected_size": 3863,
+          "expected_md5": "153878e38d48d421af6a5803143658d1",
+          "format": "mol",
+          "source_file_id": "620a9c4bdda0ef0a74b97cbe",
+          "verification": {
+            "method": "HEAD",
+            "status": 200,
+            "content_length": 3863,
+            "verified_at": "2026-09-07",
+            "anonymous": true
+          }
+        },
+        {
+          "path": "opt.cml",
+          "url": "https://china.scidb.cn/download?fileId=620a9c4bdda0ef0a74b97cbf",
+          "method": "GET",
+          "expected_size": 10438,
+          "expected_md5": "4333cb5fbbd9481ca969d752c1911d74",
+          "format": "cml",
+          "source_file_id": "620a9c4bdda0ef0a74b97cbf",
+          "verification": {
+            "method": "HEAD",
+            "status": 200,
+            "content_length": 10438,
+            "verified_at": "2026-09-07",
+            "anonymous": true
+          }
+        }
+      ],
+      "provenance": {
+        "metadata_url": "https://www.scidb.cn/api/sdb-dataset-service/dataset/details/3df4a7fb82a64f879a6bd84749253bbe?mode=front",
+        "file_list_url": "https://www.scidb.cn/api/gin-sdb-filetree/public/file/childrenFileListByPath",
+        "file_list_method": "POST",
+        "file_list_body": {
+          "dataSetId": "3df4a7fb82a64f879a6bd84749253bbe",
+          "version": "V1",
+          "path": "/V1",
+          "lastIndex": 0,
+          "pageSize": 100
+        },
+        "verified_at": "2026-09-07",
+        "downloaded": false,
+        "content_validated": false
+      }
+    },
+    {
+      "dataset_id": "scidb-glacial-hazards-cpec",
+      "external_id": "776016954459684864",
+      "name": "中巴经济走廊冰川冰湖灾害清单",
+      "original_title": " An inventory dataset of glacier and glacial lake related hazards (events) along the China-Pakistan Economic Corridor",
+      "description": "中巴经济走廊沿线上游冰川、冰湖、跃动冰川、冰湖溃决、泥石流沟、滑坡及历史地震相关空间数据，可用于多灾种空间分布和风险背景分析。",
+      "domain": "geoscience",
+      "data_type": "zip",
+      "source": "ScienceDB",
+      "source_url": "https://www.scidb.cn/en/detail?dataSetId=776016954459684864",
+      "doi": "https://doi.org/10.11922/sciencedb.j00001.00145",
+      "source_version": "V1",
+      "license": "CC BY 4.0",
+      "license_url": "https://creativecommons.org/licenses/by/4.0/",
+      "license_details": "Creative Commons Attribution 4.0；须署名、链接许可并说明修改。",
+      "authors": [
+        "Liu Qiao ",
+        "Nie Yong ",
+        "Wang Xin ",
+        "Shangguan Donghui "
+      ],
+      "access_status": "PUBLIC",
+      "sample_scope": "完整 V1 dataset.zip（44,966,957字节）；内部实际空间文件和坐标系须下载后逐一核验，不能把包内所有文件预先断言成同一种格式。",
+      "source_total_file_count": 1,
+      "source_total_size": 44966957,
+      "selected_file_count": 1,
+      "selected_total_size": 44966957,
+      "files": [
+        {
+          "path": "dataset.zip",
+          "url": "https://china.scidb.cn/download?fileId=5ff6ab1fb49a0c01b402186a",
+          "method": "GET",
+          "expected_size": 44966957,
+          "expected_md5": "e9d387ed093dfd129378acfece2c6c73",
+          "format": "zip",
+          "source_file_id": "5ff6ab1fb49a0c01b402186a",
+          "verification": {
+            "method": "HEAD",
+            "status": 200,
+            "content_length": 44966957,
+            "verified_at": "2026-09-07",
+            "anonymous": true
+          }
+        }
+      ],
+      "provenance": {
+        "metadata_url": "https://www.scidb.cn/api/sdb-dataset-service/dataset/details/776016954459684864?mode=front",
+        "file_list_url": "https://www.scidb.cn/api/gin-sdb-filetree/public/file/childrenFileListByPath",
+        "file_list_method": "POST",
+        "file_list_body": {
+          "dataSetId": "776016954459684864",
+          "version": "V1",
+          "path": "/V1",
+          "lastIndex": 0,
+          "pageSize": 100
+        },
+        "verified_at": "2026-09-07",
+        "downloaded": false,
+        "content_validated": false
+      }
+    },
+    {
+      "dataset_id": "scidb-fast-frb121102",
+      "external_id": "f172ff40142c4100855724b80a085deb",
+      "name": "FAST FRB 121102 爆发事件及动态谱样例",
+      "original_title": "A bimodal burst energy distribution of a repeating fast radio burst source",
+      "description": "FAST 2019年8—10月对FRB 121102检测到的1652次爆发事件表，含时间、色散、宽度、带宽、峰值流量、积分通量与能量；附一个爆发动态谱数据样例。",
+      "domain": "space",
+      "data_type": "csv,npy,png,pdf",
+      "source": "ScienceDB",
+      "source_url": "https://www.scidb.cn/en/detail?dataSetId=f172ff40142c4100855724b80a085deb",
+      "doi": "https://doi.org/10.11922/sciencedb.01092",
+      "source_version": "V4",
+      "license": "CC0",
+      "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "license_details": "CC0 1.0 公共领域贡献；保留来源、作者和DOI有助于科研溯源。",
+      "authors": [
+        "Di Li",
+        "Pei Wang",
+        "Weiwei Zhu",
+        "Bing Zhang",
+        "Xinxin Zhang",
+        "Ran Duan",
+        "Yongkun Zhang",
+        "Yi Feng",
+        "Ningyu Tang",
+        "S. Chatterjee",
+        "J. M. Cordes",
+        "M. Cruces",
+        "Shi Dai",
+        "V. Gajjar",
+        "G. Hobbs",
+        "C. Jin",
+        "M. Kramer",
+        "D. R. Lorimer",
+        "Chenchen Miao",
+        "Chenhui Niu",
+        "Jiarui Niu",
+        "Zhichen Pan",
+        "Lei Qian",
+        "L. Spitler",
+        "D. Werthimer",
+        "Guoqiang Zhang",
+        "Fayin Wang",
+        "Xiaoyao Xie",
+        "Youling Yue",
+        "Lei Zhang",
+        "Qijun Zhi",
+        "Yan Zhu"
+      ],
+      "access_status": "PUBLIC",
+      "sample_scope": "精选 V4 的完整1652事件CSV、Burst 433动态谱NPY和PNG、补充表PDF，共4文件。不是FAST全量原始FITS观测库，也不是全部27个ScienceDB附件。NPY读取应禁用pickle。",
+      "source_total_file_count": 27,
+      "source_total_size": 36742037,
+      "selected_file_count": 4,
+      "selected_total_size": 1587746,
+      "files": [
+        {
+          "path": "FRB121102_1652burstList.csv",
+          "url": "https://china.scidb.cn/download?fileId=c9e368237a9bd7f872dbb6efb440105f",
+          "method": "GET",
+          "expected_size": 185366,
+          "expected_md5": "1841659137e62706743102d34fe2a98b",
+          "format": "csv",
+          "source_file_id": "c9e368237a9bd7f872dbb6efb440105f",
+          "verification": {
+            "method": "HEAD",
+            "status": 200,
+            "content_length": 185366,
+            "verified_at": "2026-09-07",
+            "anonymous": true
+          }
+        },
+        {
+          "path": "Demo-burst-DynPlot/Burst-ID433_FRB121102.png",
+          "url": "https://china.scidb.cn/download?fileId=da56232994bb04e7a9fb25d790d67e7b",
+          "method": "GET",
+          "expected_size": 551214,
+          "expected_md5": "6946b80ccb9ed969287fa4760b53e521",
+          "format": "png",
+          "source_file_id": "da56232994bb04e7a9fb25d790d67e7b",
+          "verification": {
+            "method": "HEAD",
+            "status": 200,
+            "content_length": 551214,
+            "verified_at": "2026-09-07",
+            "anonymous": true
+          }
+        },
+        {
+          "path": "Demo-burst-DynPlot/BurstID433_FRB121102_Td8_Fd8_DM563.4.npy",
+          "url": "https://china.scidb.cn/download?fileId=6c17586872e69603b7aa535d087f553b",
+          "method": "GET",
+          "expected_size": 729216,
+          "expected_md5": "b3c614bb721132e503123452f167ff3c",
+          "format": "npy",
+          "source_file_id": "6c17586872e69603b7aa535d087f553b",
+          "verification": {
+            "method": "HEAD",
+            "status": 200,
+            "content_length": 729216,
+            "verified_at": "2026-09-07",
+            "anonymous": true
+          }
+        },
+        {
+          "path": "Supplementary_Table_1/SI.pdf",
+          "url": "https://china.scidb.cn/download?fileId=13e527553d57de47ffe25e4150f6cee9",
+          "method": "GET",
+          "expected_size": 121950,
+          "expected_md5": "59c1946d3b424b4c92aad47dd221b82a",
+          "format": "pdf",
+          "source_file_id": "13e527553d57de47ffe25e4150f6cee9",
+          "verification": {
+            "method": "HEAD",
+            "status": 200,
+            "content_length": 121950,
+            "verified_at": "2026-09-07",
+            "anonymous": true
+          }
+        }
+      ],
+      "provenance": {
+        "metadata_url": "https://www.scidb.cn/api/sdb-dataset-service/dataset/details/f172ff40142c4100855724b80a085deb?mode=front",
+        "file_list_url": "https://www.scidb.cn/api/gin-sdb-filetree/public/file/childrenFileListByPath",
+        "file_list_method": "POST",
+        "file_list_body": {
+          "dataSetId": "f172ff40142c4100855724b80a085deb",
+          "version": "V4",
+          "path": "/V4",
+          "lastIndex": 0,
+          "pageSize": 100
+        },
+        "verified_at": "2026-09-07",
+        "downloaded": false,
+        "content_validated": false
+      }
+    },
+    {
+      "dataset_id": "scidb-galactic-cosmic-rays",
+      "external_id": "1de994ad3c4140dba319b1522d7113b9",
+      "name": "银河宇宙线理论通量比较数据",
+      "original_title": "Theoretically calculated fluxes of Galactic cosmic ray protons, helium, boron, carbon, oxygen as supporting data for preprint arXiv:2511.06733",
+      "description": "GALPROP计算的质子、氦、硼、碳、氧理论通量，比较不同背景源与近邻源方案及太阳调制影响；每个文本文件含列定义。",
+      "domain": "space",
+      "data_type": "txt",
+      "source": "ScienceDB",
+      "source_url": "https://www.scidb.cn/en/detail?dataSetId=1de994ad3c4140dba319b1522d7113b9",
+      "doi": "https://doi.org/10.57760/sciencedb.36475",
+      "source_version": "V1",
+      "license": "CC BY-NC 4.0",
+      "license_url": "https://creativecommons.org/licenses/by-nc/4.0/",
+      "license_details": "Creative Commons Attribution-NonCommercial 4.0；须署名、链接许可并说明修改，禁止未经许可的商业使用。",
+      "authors": [
+        "Qiang Yuan"
+      ],
+      "access_status": "PUBLIC",
+      "sample_scope": "完整 V1 的7个文本表格，对应研究图2—5；理论模型结果，不是实测粒子事件。仅限非商业使用。",
+      "source_total_file_count": 7,
+      "source_total_size": 33638,
+      "selected_file_count": 7,
+      "selected_total_size": 33638,
+      "files": [
+        {
+          "path": "fig2.txt",
+          "url": "https://china.scidb.cn/download?fileId=5a69b4557a237f45c126c25bb83a6b56",
+          "method": "GET",
+          "expected_size": 7388,
+          "expected_md5": "ce2a02fe3a8dea05953d23aa4f281789",
+          "format": "txt",
+          "source_file_id": "5a69b4557a237f45c126c25bb83a6b56",
+          "verification": {
+            "method": "HEAD",
+            "status": 200,
+            "content_length": 7388,
+            "verified_at": "2026-09-07",
+            "anonymous": true
+          }
+        },
+        {
+          "path": "fig3a.txt",
+          "url": "https://china.scidb.cn/download?fileId=a3b8cd49ab995cdeb8bb36cdb38a20a6",
+          "method": "GET",
+          "expected_size": 3747,
+          "expected_md5": "4add6a8ed95fed45e5c7b3889d0dffc1",
+          "format": "txt",
+          "source_file_id": "a3b8cd49ab995cdeb8bb36cdb38a20a6",
+          "verification": {
+            "method": "HEAD",
+            "status": 200,
+            "content_length": 3747,
+            "verified_at": "2026-09-07",
+            "anonymous": true
+          }
+        },
+        {
+          "path": "fig3b.txt",
+          "url": "https://china.scidb.cn/download?fileId=8a75981a49af4ec5dc978aecf0ea84c2",
+          "method": "GET",
+          "expected_size": 3755,
+          "expected_md5": "0ed556166f17dffd42686a4999a36222",
+          "format": "txt",
+          "source_file_id": "8a75981a49af4ec5dc978aecf0ea84c2",
+          "verification": {
+            "method": "HEAD",
+            "status": 200,
+            "content_length": 3755,
+            "verified_at": "2026-09-07",
+            "anonymous": true
+          }
+        },
+        {
+          "path": "fig4a.txt",
+          "url": "https://china.scidb.cn/download?fileId=3bfba337bcc990383edf40231551040e",
+          "method": "GET",
+          "expected_size": 4928,
+          "expected_md5": "a2a7b16f1f6f467658f24a09ad916b11",
+          "format": "txt",
+          "source_file_id": "3bfba337bcc990383edf40231551040e",
+          "verification": {
+            "method": "HEAD",
+            "status": 200,
+            "content_length": 4928,
+            "verified_at": "2026-09-07",
+            "anonymous": true
+          }
+        },
+        {
+          "path": "fig4b.txt",
+          "url": "https://china.scidb.cn/download?fileId=16d45e90a6d17bd1a2275a7a87f3c1ad",
+          "method": "GET",
+          "expected_size": 4967,
+          "expected_md5": "3f35d21be7fd448854e07eb62307fc84",
+          "format": "txt",
+          "source_file_id": "16d45e90a6d17bd1a2275a7a87f3c1ad",
+          "verification": {
+            "method": "HEAD",
+            "status": 200,
+            "content_length": 4967,
+            "verified_at": "2026-09-07",
+            "anonymous": true
+          }
+        },
+        {
+          "path": "fig5a.txt",
+          "url": "https://china.scidb.cn/download?fileId=e8d807460d605059f6ad5960a68a9049",
+          "method": "GET",
+          "expected_size": 4390,
+          "expected_md5": "b185f4942d7a6ebe05f9947b95f5f3cf",
+          "format": "txt",
+          "source_file_id": "e8d807460d605059f6ad5960a68a9049",
+          "verification": {
+            "method": "HEAD",
+            "status": 200,
+            "content_length": 4390,
+            "verified_at": "2026-09-07",
+            "anonymous": true
+          }
+        },
+        {
+          "path": "fig5b.txt",
+          "url": "https://china.scidb.cn/download?fileId=fbccde64567aa66d1e950f59afd619ee",
+          "method": "GET",
+          "expected_size": 4463,
+          "expected_md5": "eb6c6a99d053ce2a8d9c5e448de2b59a",
+          "format": "txt",
+          "source_file_id": "fbccde64567aa66d1e950f59afd619ee",
+          "verification": {
+            "method": "HEAD",
+            "status": 200,
+            "content_length": 4463,
+            "verified_at": "2026-09-07",
+            "anonymous": true
+          }
+        }
+      ],
+      "provenance": {
+        "metadata_url": "https://www.scidb.cn/api/sdb-dataset-service/dataset/details/1de994ad3c4140dba319b1522d7113b9?mode=front",
+        "file_list_url": "https://www.scidb.cn/api/gin-sdb-filetree/public/file/childrenFileListByPath",
+        "file_list_method": "POST",
+        "file_list_body": {
+          "dataSetId": "1de994ad3c4140dba319b1522d7113b9",
+          "version": "V1",
+          "path": "/V1",
+          "lastIndex": 0,
+          "pageSize": 100
+        },
+        "verified_at": "2026-09-07",
+        "downloaded": false,
+        "content_validated": false
+      }
+    },
+    {
+      "dataset_id": "scidb-salvia-metabolomics",
+      "external_id": "8e5c50c6eb244689967ac6047ea47d97",
+      "name": "一串红克罗烷生物合成关联数据",
+      "original_title": "Data for work on clerodanes biosynthesis in Salvia splendens",
+      "description": "一串红研究中的自组织映射和互排名表、LC-MS代谢组数据及高分辨质谱展示，适合植物代谢物相关性与质谱数据探查。",
+      "domain": "spectroscopy",
+      "data_type": "xlsx,pptx",
+      "source": "ScienceDB",
+      "source_url": "https://www.scidb.cn/en/detail?dataSetId=8e5c50c6eb244689967ac6047ea47d97",
+      "doi": "https://doi.org/10.57760/sciencedb.20358",
+      "source_version": "V1",
+      "license": "CC BY-NC 4.0",
+      "license_url": "https://creativecommons.org/licenses/by-nc/4.0/",
+      "license_details": "Creative Commons Attribution-NonCommercial 4.0；须署名、链接许可并说明修改，禁止未经许可的商业使用。",
+      "authors": [
+        "Lin Ruoxi",
+        "Li Haixiu",
+        "Martin Cathie",
+        "Tatsis Evangelos"
+      ],
+      "access_status": "PUBLIC",
+      "sample_scope": "完整 V1 的3个附件（2个XLSX和1个PPTX）；PPTX为光谱展示，不能声称具备所有原始仪器谱文件。仅限非商业使用。",
+      "source_total_file_count": 3,
+      "source_total_size": 496102,
+      "selected_file_count": 3,
+      "selected_total_size": 496102,
+      "files": [
+        {
+          "path": "Dataset 1.xlsx",
+          "url": "https://china.scidb.cn/download?fileId=26c8edfcf06db852d4c41fd3668f4d36",
+          "method": "GET",
+          "expected_size": 43507,
+          "expected_md5": "6f809feb3a86493e1f874d2733fc4c55",
+          "format": "xlsx",
+          "source_file_id": "26c8edfcf06db852d4c41fd3668f4d36",
+          "verification": {
+            "method": "HEAD",
+            "status": 200,
+            "content_length": 43507,
+            "verified_at": "2026-09-07",
+            "anonymous": true
+          }
+        },
+        {
+          "path": "Dataset D2 .xlsx",
+          "url": "https://china.scidb.cn/download?fileId=dd3202e2e1ac82c1e8688a52a93bea29",
+          "method": "GET",
+          "expected_size": 42642,
+          "expected_md5": "2cab01fb60280c12862cff1e21f987ee",
+          "format": "xlsx",
+          "source_file_id": "dd3202e2e1ac82c1e8688a52a93bea29",
+          "verification": {
+            "method": "HEAD",
+            "status": 200,
+            "content_length": 42642,
+            "verified_at": "2026-09-07",
+            "anonymous": true
+          }
+        },
+        {
+          "path": "Dataset D3 I.pptx",
+          "url": "https://china.scidb.cn/download?fileId=57984cc8ad438fd64e403453093193c5",
+          "method": "GET",
+          "expected_size": 409953,
+          "expected_md5": "2ebf986050fd4be5b7f727b532640f04",
+          "format": "pptx",
+          "source_file_id": "57984cc8ad438fd64e403453093193c5",
+          "verification": {
+            "method": "HEAD",
+            "status": 200,
+            "content_length": 409953,
+            "verified_at": "2026-09-07",
+            "anonymous": true
+          }
+        }
+      ],
+      "provenance": {
+        "metadata_url": "https://www.scidb.cn/api/sdb-dataset-service/dataset/details/8e5c50c6eb244689967ac6047ea47d97?mode=front",
+        "file_list_url": "https://www.scidb.cn/api/gin-sdb-filetree/public/file/childrenFileListByPath",
+        "file_list_method": "POST",
+        "file_list_body": {
+          "dataSetId": "8e5c50c6eb244689967ac6047ea47d97",
+          "version": "V1",
+          "path": "/V1",
+          "lastIndex": 0,
+          "pageSize": 100
+        },
+        "verified_at": "2026-09-07",
+        "downloaded": false,
+        "content_validated": false
+      }
+    }
+  ]
+}

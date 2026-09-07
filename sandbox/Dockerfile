@@ -1,5 +1,7 @@
 FROM docker.1ms.run/ubuntu:22.04
 
+ARG TARGETARCH
+
 # Avoid interactive prompts during installation
 ENV DEBIAN_FRONTEND=noninteractive
 
@@ -147,9 +149,17 @@ COPY sandbox/scripts/install_noto_cjk_sc.py sandbox/scripts/verify_matplotlib_cj
 COPY sandbox/scientific_operators /usr/local/lib/ai-dataseek/scientific_operators
 
 # Install the exact locked runtime, including the common Excel and plotting
-# stack. Avoid retaining uv's download cache in the final image layer.
-RUN UV_INDEX_URL=https://pypi.org/simple/ \
-    uv sync --frozen --no-dev --no-install-project --no-cache
+# stack. numcodecs 0.13.1 does not publish a Linux arm64 wheel, and uv can
+# misread the test fixture metadata in its source-built wheel. Let pip handle
+# that one locked package on arm64, then keep uv in charge of everything else.
+RUN if [ "$TARGETARCH" = "arm64" ]; then \
+        UV_INDEX_URL=https://pypi.org/simple/ \
+        uv sync --frozen --no-dev --no-install-project --no-install-package numcodecs --no-cache && \
+        python -m pip install --no-cache-dir --no-deps numcodecs==0.13.1; \
+    else \
+        UV_INDEX_URL=https://pypi.org/simple/ \
+        uv sync --frozen --no-dev --no-install-project --no-cache; \
+    fi
 
 # Tool plugins change frequently and must not invalidate the scientific dependency layer.
 COPY sandbox/scripts/geoscience_ops.py /usr/local/lib/ai-dataseek/

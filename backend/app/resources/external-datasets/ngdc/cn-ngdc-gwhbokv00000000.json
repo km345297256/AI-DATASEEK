@@ -1,0 +1,72 @@
+{
+  "dataset_id": "cn-ngdc-gwhbokv00000000",
+  "external_id": "GWHBOKV00000000",
+  "data_center_id": "reviewed-ngdc-catalog",
+  "data_center_name": "国家基因组科学数据中心 NGDC / CNCB",
+  "name": "枯草芽孢杆菌TM114-134基因组组装",
+  "description": "NGDC Genome Warehouse公开发布的Bacillus subtilis（TM114-134）基因组序列，组装级别为Scaffold。导入该独立菌株的全部已发布组装FASTA，不是原始测序reads，也不包含人类个人基因序列。 可用于序列统计、GC组成与片段长度探查。",
+  "domain": "sequence",
+  "data_type": "FASTA",
+  "tags": [
+    "sequence",
+    "国家基因组科学数据中心 NGDC / CNCB",
+    "公开数据"
+  ],
+  "metadata": {
+    "curated": true,
+    "catalog_version": 1,
+    "source_catalog": "ngdc",
+    "publisher": "国家基因组科学数据中心 NGDC / CNCB",
+    "source_url": "https://ngdc.cncb.ac.cn/gwh/Assembly/29089/show",
+    "license": "NGDC GWH academic-use terms",
+    "license_url": "https://ngdc.cncb.ac.cn/gwh/statistics/genome",
+    "license_details": "GWH官方页面声明数据库仅免费用于学术研究；商业使用需另询商业许可。未发现本记录单独CC许可，不标为CC0或CC BY。引用GWH/NGDC与accession，并在有论文时引用原研究。",
+    "sample_scope": "完整已发布的该菌株组装文件；库内为Scaffold草图，不宣称无缺口完整染色体",
+    "sample_note": "完整已发布的该菌株组装文件；库内为Scaffold草图，不宣称无缺口完整染色体",
+    "authors": [],
+    "doi": "",
+    "source_version": "",
+    "source_descriptor_sha256": "5c1656c0486e2baa7e88b751bd567d89981ac0b6fe8f301fdea6eb1e98cc854c",
+    "organism": "Bacillus subtilis",
+    "assembly_level": "Scaffold",
+    "bioproject": "PRJCA011976",
+    "release_time": "2025-02-10 10:53:22.0",
+    "download_date": "2026-09-07",
+    "provenance": [
+      {
+        "path": "GWHBOKV00000000.genome.fasta.gz",
+        "size": 1223950,
+        "sha256": "8d911868527ca2c1b938da76a7651f724dee34ad7ec32b5aa529b3e7fab584a7",
+        "role": "data",
+        "content_type": "application/octet-stream",
+        "download_url": "https://download.cncb.ac.cn/gwh/Bacteria/Bacillus_subtilis_TM114-134_GWHBOKV00000000/GWHBOKV00000000.genome.fasta.gz"
+      }
+    ],
+    "inventory_complete": true,
+    "recursive_file_count": 3,
+    "total_size_bytes": 5269746
+  },
+  "files": [
+    {
+      "path": "GWHBOKV00000000.genome.fasta.gz",
+      "size": 1223950,
+      "sha256": "8d911868527ca2c1b938da76a7651f724dee34ad7ec32b5aa529b3e7fab584a7",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "SOURCE.md",
+      "size": 1351,
+      "sha256": "081f7732232a30e3cc932b8e644560274e6451638e2e927f3fa84cd9ca97131f",
+      "role": "documentation",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/GWHBOKV00000000.genome.fasta",
+      "size": 4044445,
+      "sha256": "70a8888116fa1291471270434917105fbf47c82c584aeb451389fb79792787b1",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    }
+  ]
+}

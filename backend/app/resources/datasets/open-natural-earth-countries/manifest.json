@@ -1,0 +1,112 @@
+{
+  "dataset_id": "open-natural-earth-countries",
+  "external_id": "open-natural-earth-countries",
+  "data_center_id": "international-open-catalog",
+  "data_center_name": "Natural Earth · Tom Patterson / Nathaniel Vaughn Kelso 等",
+  "name": "Natural Earth 全球国家与地区边界",
+  "description": "Natural Earth 1:110m 比例尺全球国家与地区边界，包含几何和属性字段。适合 Shapefile 检查、坐标系统识别、空间统计与地图预览。小比例尺制图数据不适合精确测量或法律边界认定。",
+  "domain": "geoscience",
+  "data_type": "Shapefile",
+  "tags": [
+    "geoscience",
+    "SHP",
+    "开放数据"
+  ],
+  "metadata": {
+    "curated": true,
+    "catalog_version": 1,
+    "publisher": "Natural Earth · Tom Patterson / Nathaniel Vaughn Kelso 等",
+    "source_url": "https://www.naturalearthdata.com/downloads/110m-cultural-vectors/110m-admin-0-countries/",
+    "license": "Public domain",
+    "license_url": "https://www.naturalearthdata.com/about/terms-of-use/",
+    "license_details": "Public domain",
+    "sample_scope": "完整 1:110m 图层 · 非高精度测绘数据",
+    "sample_note": "Natural Earth 1:110m 比例尺全球国家与地区边界，包含几何和属性字段。适合 Shapefile 检查、坐标系统识别、空间统计与地图预览。小比例尺制图数据不适合精确测量或法律边界认定。",
+    "provenance": [
+      {
+        "path": "ne_110m_admin_0_countries.shp",
+        "download_url": "https://naturalearth.s3.amazonaws.com/110m_cultural/ne_110m_admin_0_countries.zip",
+        "sha256": "08e341606e8391e458c3f08deb312de664b56bfae376064c5aa0aee6681a5f55",
+        "size": 180924
+      },
+      {
+        "path": "ne_110m_admin_0_countries.shx",
+        "download_url": "https://naturalearth.s3.amazonaws.com/110m_cultural/ne_110m_admin_0_countries.zip",
+        "sha256": "8b0be2ad97dd484aee5c2ebc98697d5372e832b8ae58a35a661aeef6b985668d",
+        "size": 1516
+      },
+      {
+        "path": "ne_110m_admin_0_countries.dbf",
+        "download_url": "https://naturalearth.s3.amazonaws.com/110m_cultural/ne_110m_admin_0_countries.zip",
+        "sha256": "1fee677cd4e03b367876e03861eb10197e4022a846bf92060e0313432863785b",
+        "size": 531808
+      },
+      {
+        "path": "ne_110m_admin_0_countries.prj",
+        "download_url": "https://naturalearth.s3.amazonaws.com/110m_cultural/ne_110m_admin_0_countries.zip",
+        "sha256": "3259f0e55290a82b1350646f604e8a7ee1e2136c0320a40fad838ab40819fff8",
+        "size": 147
+      },
+      {
+        "path": "ne_110m_admin_0_countries.cpg",
+        "download_url": "https://naturalearth.s3.amazonaws.com/110m_cultural/ne_110m_admin_0_countries.zip",
+        "sha256": "3ad3031f5503a4404af825262ee8232cc04d4ea6683d42c5dd0a2f2a27ac9824",
+        "size": 5
+      },
+      {
+        "path": "ne_110m_admin_0_countries.VERSION.txt",
+        "download_url": "https://naturalearth.s3.amazonaws.com/110m_cultural/ne_110m_admin_0_countries.zip",
+        "sha256": "548358969090d629b41888f5fe664ac31b7203dfd849f7c1ef820ac055b62191",
+        "size": 7
+      }
+    ],
+    "inventory_complete": true,
+    "recursive_file_count": 6,
+    "total_size_bytes": 714407
+  },
+  "files": [
+    {
+      "path": "ne_110m_admin_0_countries.shp",
+      "size": 180924,
+      "sha256": "08e341606e8391e458c3f08deb312de664b56bfae376064c5aa0aee6681a5f55",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "ne_110m_admin_0_countries.shx",
+      "size": 1516,
+      "sha256": "8b0be2ad97dd484aee5c2ebc98697d5372e832b8ae58a35a661aeef6b985668d",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "ne_110m_admin_0_countries.dbf",
+      "size": 531808,
+      "sha256": "1fee677cd4e03b367876e03861eb10197e4022a846bf92060e0313432863785b",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "ne_110m_admin_0_countries.prj",
+      "size": 147,
+      "sha256": "3259f0e55290a82b1350646f604e8a7ee1e2136c0320a40fad838ab40819fff8",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "ne_110m_admin_0_countries.cpg",
+      "size": 5,
+      "sha256": "3ad3031f5503a4404af825262ee8232cc04d4ea6683d42c5dd0a2f2a27ac9824",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "ne_110m_admin_0_countries.VERSION.txt",
+      "size": 7,
+      "sha256": "548358969090d629b41888f5fe664ac31b7203dfd849f7c1ef820ac055b62191",
+      "role": "documentation",
+      "content_type": "text/plain"
+    }
+  ]
+}
+

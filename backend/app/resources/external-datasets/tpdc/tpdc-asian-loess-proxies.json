@@ -1,0 +1,93 @@
+{
+  "dataset_id": "tpdc-asian-loess-proxies",
+  "external_id": "d478815c-2192-4cc3-8036-62f03e9ec1ec",
+  "data_center_id": "reviewed-tpdc-catalog",
+  "data_center_name": "国家青藏高原科学数据中心",
+  "name": "亚洲黄土释光测年与古气候代用指标数据集",
+  "description": "亚洲128条黄土—古土壤剖面的释光年代、年龄—深度模型及粒度、磁化率、碳酸盐、色度等古气候指标，适合年代与代理指标关联分析。",
+  "domain": "geoscience",
+  "data_type": "XLSX",
+  "tags": [
+    "geoscience",
+    "国家青藏高原科学数据中心",
+    "公开数据"
+  ],
+  "metadata": {
+    "curated": true,
+    "catalog_version": 1,
+    "source_catalog": "tpdc",
+    "publisher": "国家青藏高原科学数据中心",
+    "source_url": "https://data.tpdc.ac.cn/zh-hans/data/d478815c-2192-4cc3-8036-62f03e9ec1ec",
+    "license": "CC BY 4.0",
+    "license_url": "https://creativecommons.org/licenses/by/4.0/",
+    "license_details": "官方许可原文：1；官方前端枚举 1 = Attribution 4.0 International (CC BY 4.0)。公开共享策略 A/online；需注明数据作者、国家青藏高原科学数据中心及数据/文章引用要求； DOI: 10.11888/Paleoenv.tpdc.300496",
+    "sample_scope": "原官方全包；非原始仪器逐次采样记录。",
+    "sample_note": "原官方全包；非原始仪器逐次采样记录。",
+    "authors": [
+      "Li Guoqiang",
+      "Yan Zhongfeng",
+      "Song Yougui",
+      "Kathryn E. Fitzsimmons",
+      "Yi Shuangwen",
+      "Kang Shugang",
+      "E Chongyi",
+      "Thomas Stevens",
+      "Lai Zhongping",
+      "Aditi K. Dave",
+      "Zhang Xiaojian",
+      "Chen Chunzhu",
+      "Deng Yanqing",
+      "Yang He",
+      "Zhao Qiuyue",
+      "Jan-Pieter Buylaert",
+      "Lu Tao",
+      "Wang Yixuan",
+      "Liu Xiangjun",
+      "Ling Zhiyong",
+      "Chang Qiufang",
+      "Wei Haitao",
+      "Wang Xiaoyan",
+      "Qin Caixin"
+    ],
+    "doi": "10.11888/Paleoenv.tpdc.300496",
+    "source_version": "",
+    "source_descriptor_sha256": "b0a13e9963fb18ce50b68c868dadc12184b734d7f199684b09301619b5087f16",
+    "download_date": "2026-09-07",
+    "provenance": [
+      {
+        "path": "tpdc-asian-loess-proxies.zip",
+        "size": 3537493,
+        "sha256": "ceda5b18402828a90a68f96d69ba40d9329416b9e468b7df2110e4f4adce4b94",
+        "role": "data",
+        "content_type": "application/zip",
+        "download_url": "https://data.tpdc.ac.cn/file/file/batchDownloadFile?metadataId=d478815c-2192-4cc3-8036-62f03e9ec1ec"
+      }
+    ],
+    "inventory_complete": true,
+    "recursive_file_count": 3,
+    "total_size_bytes": 7277604
+  },
+  "files": [
+    {
+      "path": "SOURCE.md",
+      "size": 1533,
+      "sha256": "32956cebd1d1685c47711453f384cfbe5d6864ac237f0c30178f590e36bbfab8",
+      "role": "documentation",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/tpdc-asian-loess-proxies/亚洲黄土释光测年与古气候代用指标数据集/Asian Loess Dataset.xlsx",
+      "size": 3738578,
+      "sha256": "b98546fc60901d6a0c24c361df07d884ae6d86951420caf9d7b3b5ef90a4889b",
+      "role": "data",
+      "content_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    },
+    {
+      "path": "tpdc-asian-loess-proxies.zip",
+      "size": 3537493,
+      "sha256": "ceda5b18402828a90a68f96d69ba40d9329416b9e468b7df2110e4f4adce4b94",
+      "role": "data",
+      "content_type": "application/zip"
+    }
+  ]
+}

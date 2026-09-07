@@ -19,5 +19,5 @@ export function stripHiddenDatasetResultNotices(text: string): string {
 }
 
 export function isPlaceholderAssistantMessage(text: string): boolean {
-  return /^(?:placeholder|tbd|todo|n\/?a|待补充|占位(?:符|文本)?|暂无(?:内容|结果)?)\.?$/i.test(text.trim());
+  return /^(?:placeholder|tbd|todo|n\/?a|待补充|占位(?:符|文本)?|暂无(?:内容|结果)?)(?:\s*[-_:—–]*\s*(?:do[-_ ]+not[-_ ]+(?:send|use|display)|not[-_ ]+(?:used|for[-_ ]+(?:sending|display))|ignore(?:[-_ ]+this)?|不要发送|请勿发送|无需发送))?[.!。]?$/i.test(text.trim());
 }

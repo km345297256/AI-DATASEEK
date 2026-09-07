@@ -1,4 +1,4 @@
-import { apiClient, ApiResponse } from './client';
+import { apiClient, type ApiResponse } from './client.ts';
 
 export interface AgentProfile {
   id: string;
@@ -17,6 +17,7 @@ export interface AgentProfile {
   system_prompt: string | null;
   planner_config: AgentPlannerConfig;
   subagents: AgentSubAgentConfig[];
+  tool_runtime: AgentToolRuntimeConfig;
   is_active: boolean;
   created_at: string;
   updated_at: string;
@@ -46,6 +47,16 @@ export interface AgentSubAgentConfig {
   model_config_id?: string | null;
   model_config?: Record<string, unknown>;
   tool_permissions?: Record<string, unknown>;
+  preset_id?: string | null;
+}
+
+export type AgentToolSelectionMode = 'all' | 'on_demand';
+
+export interface AgentToolRuntimeConfig {
+  preset_id: string;
+  selection_mode: AgentToolSelectionMode;
+  code_mode_enabled: boolean;
+  domain_subagents_enabled: boolean;
 }
 
 export interface CreateAgentProfileRequest {
@@ -60,6 +71,7 @@ export interface CreateAgentProfileRequest {
   system_prompt?: string | null;
   planner_config?: AgentPlannerConfig;
   subagents?: AgentSubAgentConfig[];
+  tool_runtime?: AgentToolRuntimeConfig;
   is_global: boolean;
 }
 
@@ -75,7 +87,13 @@ export interface UpdateAgentProfileRequest {
   system_prompt?: string | null;
   planner_config?: AgentPlannerConfig;
   subagents?: AgentSubAgentConfig[];
+  tool_runtime?: AgentToolRuntimeConfig;
   is_global?: boolean;
+}
+
+export interface CreateRuntimePresetProfileRequest {
+  name: string;
+  tool_runtime: AgentToolRuntimeConfig;
 }
 
 export async function listAgentProfiles(): Promise<AgentProfile[]> {
@@ -85,6 +103,16 @@ export async function listAgentProfiles(): Promise<AgentProfile[]> {
 
 export async function createAgentProfile(request: CreateAgentProfileRequest): Promise<AgentProfile> {
   const response = await apiClient.post<ApiResponse<AgentProfile>>('/agent-profiles', request);
+  return response.data.data;
+}
+
+export async function createRuntimePresetProfile(
+  request: CreateRuntimePresetProfileRequest,
+): Promise<AgentProfile> {
+  const response = await apiClient.post<ApiResponse<AgentProfile>>(
+    '/agent-profiles/runtime-preset',
+    request,
+  );
   return response.data.data;
 }
 

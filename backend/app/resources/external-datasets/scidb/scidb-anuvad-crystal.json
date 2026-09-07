@@ -1,0 +1,96 @@
+{
+  "dataset_id": "scidb-anuvad-crystal",
+  "external_id": "3df4a7fb82a64f879a6bd84749253bbe",
+  "data_center_id": "reviewed-scidb-catalog",
+  "data_center_name": "ScienceDB 科学数据银行",
+  "name": "ANUVAD/ANUVUD 分子结构计算样例",
+  "description": "研究 C—N 键异头效应的分子结构与几何优化文件，适合化学结构读取、键长及结构可视化。官方题名为 ANUVAD，文件和描述使用 ANUVUD，原样记录这一差异。",
+  "domain": "chemistry",
+  "data_type": "mol,cml,jpg",
+  "tags": [
+    "chemistry",
+    "ScienceDB 科学数据银行",
+    "公开数据"
+  ],
+  "metadata": {
+    "curated": true,
+    "catalog_version": 1,
+    "source_catalog": "scidb",
+    "publisher": "ScienceDB 科学数据银行",
+    "source_url": "https://www.scidb.cn/en/detail?dataSetId=3df4a7fb82a64f879a6bd84749253bbe",
+    "license": "CC0",
+    "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "license_details": "CC0 1.0 公共领域贡献；保留来源、作者和DOI有助于科研溯源。",
+    "sample_scope": "精选3个结构相关文件（MOL、CML、JPG），不是完整计算档案。官方 .log 文件 HEAD 返回403，未获取或绕过；16.6 MB的检查点文件未选入。",
+    "sample_note": "精选3个结构相关文件（MOL、CML、JPG），不是完整计算档案。官方 .log 文件 HEAD 返回403，未获取或绕过；16.6 MB的检查点文件未选入。",
+    "download_date": "2026-09-07",
+    "provenance": [
+      {
+        "path": "ANUVUD.jpg",
+        "size": 477520,
+        "sha256": "52a7d3407e0e20adfd40dd66e4b2d051d65a7f930bac991784c50c73dc789e69",
+        "role": "data",
+        "content_type": "image/jpeg",
+        "download_url": "https://china.scidb.cn/download?fileId=620a9c4bdda0ef0a74b97cc0",
+        "publisher_md5": "4760513c62eaddf48ee3597f7c500683"
+      },
+      {
+        "path": "ANUVUD.mol",
+        "size": 3863,
+        "sha256": "afbb30eadfc154bc756fcb97b2cfa404f0e894ab4d7dd867060abb160fb7417f",
+        "role": "data",
+        "content_type": "application/octet-stream",
+        "download_url": "https://china.scidb.cn/download?fileId=620a9c4bdda0ef0a74b97cbe",
+        "publisher_md5": "153878e38d48d421af6a5803143658d1"
+      },
+      {
+        "path": "opt.cml",
+        "size": 10438,
+        "sha256": "a825752dc69937f294e3db86eee37ade382a7cfc05e851839cf201fd06f0050b",
+        "role": "data",
+        "content_type": "chemical/x-cml",
+        "download_url": "https://china.scidb.cn/download?fileId=620a9c4bdda0ef0a74b97cbf",
+        "publisher_md5": "4333cb5fbbd9481ca969d752c1911d74"
+      }
+    ],
+    "inventory_complete": true,
+    "recursive_file_count": 4,
+    "total_size_bytes": 492989,
+    "source_version": "V1",
+    "doi": "https://doi.org/10.11922/sciencedb.01522",
+    "authors": [
+      "Henry Rzepa"
+    ],
+    "source_descriptor_sha256": "7d1ca7978431b2effecefbd45ad726c9a59085a7ff3399d4eab4241c68db7622"
+  },
+  "files": [
+    {
+      "path": "ANUVUD.jpg",
+      "size": 477520,
+      "sha256": "52a7d3407e0e20adfd40dd66e4b2d051d65a7f930bac991784c50c73dc789e69",
+      "role": "data",
+      "content_type": "image/jpeg"
+    },
+    {
+      "path": "ANUVUD.mol",
+      "size": 3863,
+      "sha256": "afbb30eadfc154bc756fcb97b2cfa404f0e894ab4d7dd867060abb160fb7417f",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "SOURCE.md",
+      "size": 1168,
+      "sha256": "7c8a0f16e7597d762ac6b2a972a6227b072d1859c865219805074cf90c45a3e6",
+      "role": "documentation",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "opt.cml",
+      "size": 10438,
+      "sha256": "a825752dc69937f294e3db86eee37ade382a7cfc05e851839cf201fd06f0050b",
+      "role": "data",
+      "content_type": "chemical/x-cml"
+    }
+  ]
+}

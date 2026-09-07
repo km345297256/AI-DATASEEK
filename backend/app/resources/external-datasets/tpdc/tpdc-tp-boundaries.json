@@ -1,0 +1,336 @@
+{
+  "dataset_id": "tpdc-tp-boundaries",
+  "external_id": "61701a2b-31e5-41bf-b0a3-607c2a9bd3b3",
+  "data_center_id": "reviewed-tpdc-catalog",
+  "data_center_name": "国家青藏高原科学数据中心",
+  "name": "青藏高原边界数据总集",
+  "description": "五类青藏高原边界，包含高程阈值边界、文献边界、2021年更新边界和参考矩形范围，用于地理裁剪与区域统计。",
+  "domain": "geoscience",
+  "data_type": "SHP",
+  "tags": [
+    "geoscience",
+    "国家青藏高原科学数据中心",
+    "公开数据"
+  ],
+  "metadata": {
+    "curated": true,
+    "catalog_version": 1,
+    "source_catalog": "tpdc",
+    "publisher": "国家青藏高原科学数据中心",
+    "source_url": "https://data.tpdc.ac.cn/zh-hans/data/61701a2b-31e5-41bf-b0a3-607c2a9bd3b3",
+    "license": "CC BY-NC-SA 4.0",
+    "license_url": "https://creativecommons.org/licenses/by-nc-sa/4.0/",
+    "license_details": "官方许可原文：Attribution-NonCommercial-ShareAlike 4.0 International (CC BY-NC-SA 4.0)。公开共享策略 A/online；需注明数据作者、国家青藏高原科学数据中心及数据/文章引用要求；限非商业使用，演绎须相同方式共享。 DOI: 10.11888/Geogra.tpdc.270099",
+    "sample_scope": "原官方全包；保留五类不同边界，不混称同一口径。",
+    "sample_note": "原官方全包；保留五类不同边界，不混称同一口径。",
+    "authors": [
+      "张镱锂"
+    ],
+    "doi": "10.11888/Geogra.tpdc.270099",
+    "source_version": "",
+    "source_descriptor_sha256": "e6ffff68e3a59fe071d7113c7e5a126e085a12c186c36c62db882e2f175bccee",
+    "download_date": "2026-09-07",
+    "provenance": [
+      {
+        "path": "tpdc-tp-boundaries.zip",
+        "size": 199817,
+        "sha256": "15f17e360e7b749398bde85c50c9d56af1c81f6d5050931e333bb009f85b36fc",
+        "role": "data",
+        "content_type": "application/zip",
+        "download_url": "https://data.tpdc.ac.cn/file/file/batchDownloadFile?metadataId=61701a2b-31e5-41bf-b0a3-607c2a9bd3b3"
+      }
+    ],
+    "inventory_complete": true,
+    "recursive_file_count": 41,
+    "total_size_bytes": 473288
+  },
+  "files": [
+    {
+      "path": "SOURCE.md",
+      "size": 1224,
+      "sha256": "da3e53fe9c16b35cd35319b661287fd2a6f800d8039e5a071ef836ce2990a651",
+      "role": "documentation",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/tpdc-tp-boundaries/青藏高原边界数据总集/TPBoundary_2500m/TPBoundary_2500m.cpg",
+      "size": 5,
+      "sha256": "3ad3031f5503a4404af825262ee8232cc04d4ea6683d42c5dd0a2f2a27ac9824",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/tpdc-tp-boundaries/青藏高原边界数据总集/TPBoundary_2500m/TPBoundary_2500m.dbf",
+      "size": 73,
+      "sha256": "47da5661be8ae38a052a6dc7851b328023f7e25f7545ac9239ddb3efca6bfea5",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/tpdc-tp-boundaries/青藏高原边界数据总集/TPBoundary_2500m/TPBoundary_2500m.prj",
+      "size": 145,
+      "sha256": "a02a27b1d1982c8516d83398e85a3c8b1aef1713c13ef4d84d7bde17430c07c4",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/tpdc-tp-boundaries/青藏高原边界数据总集/TPBoundary_2500m/TPBoundary_2500m.sbn",
+      "size": 132,
+      "sha256": "17404aabfd977ca7d53ffb4667e54271a3431a9f1870abd6414df27c5c08ccba",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/tpdc-tp-boundaries/青藏高原边界数据总集/TPBoundary_2500m/TPBoundary_2500m.sbx",
+      "size": 116,
+      "sha256": "c2fdd56c06d902add6201bafcf2ad783bcbb876e862613527bedb266b1519ef7",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/tpdc-tp-boundaries/青藏高原边界数据总集/TPBoundary_2500m/TPBoundary_2500m.shp",
+      "size": 13036,
+      "sha256": "3dbf4e41daa62df69fc4f4b5e5c42fffce295c60835431c86c54950ef5d0731c",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/tpdc-tp-boundaries/青藏高原边界数据总集/TPBoundary_2500m/TPBoundary_2500m.shp.xml",
+      "size": 4364,
+      "sha256": "5308199d83eb51bc12ea2234a431f961a214462d9981f4886d470d8c5e3c104e",
+      "role": "data",
+      "content_type": "application/xml"
+    },
+    {
+      "path": "extracted/tpdc-tp-boundaries/青藏高原边界数据总集/TPBoundary_2500m/TPBoundary_2500m.shx",
+      "size": 108,
+      "sha256": "e0bfd6314d9d815ebb3bc4699bcde1d114f1a0b4ba5326eeb64e114908c3751b",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/tpdc-tp-boundaries/青藏高原边界数据总集/TPBoundary_3000m/TPBoundary_3000m.cpg",
+      "size": 5,
+      "sha256": "3ad3031f5503a4404af825262ee8232cc04d4ea6683d42c5dd0a2f2a27ac9824",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/tpdc-tp-boundaries/青藏高原边界数据总集/TPBoundary_3000m/TPBoundary_3000m.dbf",
+      "size": 73,
+      "sha256": "044422b2cfcd1e28386b6238f1079fd6ce682ce612d3f9c5b19c4bbd1c360b08",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/tpdc-tp-boundaries/青藏高原边界数据总集/TPBoundary_3000m/TPBoundary_3000m.prj",
+      "size": 145,
+      "sha256": "a02a27b1d1982c8516d83398e85a3c8b1aef1713c13ef4d84d7bde17430c07c4",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/tpdc-tp-boundaries/青藏高原边界数据总集/TPBoundary_3000m/TPBoundary_3000m.sbn",
+      "size": 132,
+      "sha256": "822476a709b51b3837e6ec77cbb514d0dbde486fd5f4d80df2ebd9e02a209a90",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/tpdc-tp-boundaries/青藏高原边界数据总集/TPBoundary_3000m/TPBoundary_3000m.sbx",
+      "size": 116,
+      "sha256": "5ab8033b77879b612e00a0b77036007931d125782814528a974c9bc0bf991f26",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/tpdc-tp-boundaries/青藏高原边界数据总集/TPBoundary_3000m/TPBoundary_3000m.shp",
+      "size": 10780,
+      "sha256": "6239bb065a8f86e1ca4ba6d86418660d16579aa1803f5736854daee043356811",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/tpdc-tp-boundaries/青藏高原边界数据总集/TPBoundary_3000m/TPBoundary_3000m.shp.xml",
+      "size": 4798,
+      "sha256": "90ee68f70e3a270bd552c6bb98e329677abb112e2e83d27573ad1fc8e6de20f1",
+      "role": "data",
+      "content_type": "application/xml"
+    },
+    {
+      "path": "extracted/tpdc-tp-boundaries/青藏高原边界数据总集/TPBoundary_3000m/TPBoundary_3000m.shx",
+      "size": 108,
+      "sha256": "b9c15307d14f9ec5b50eb3625ef67efec193cf0b92820e06afcf8ec9a82ef69b",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/tpdc-tp-boundaries/青藏高原边界数据总集/TPBoundary_HF/TPBoundary_HF.dbf",
+      "size": 219,
+      "sha256": "9d055fb8ad96ab57bf545aa784746b2ba57c2f2d0b986be9068b9354a6ac5468",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/tpdc-tp-boundaries/青藏高原边界数据总集/TPBoundary_HF/TPBoundary_HF.prj",
+      "size": 426,
+      "sha256": "59b1e020694159a85b966c40842705961fb16e3a457536e35cbcd836c1131c01",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/tpdc-tp-boundaries/青藏高原边界数据总集/TPBoundary_HF/TPBoundary_HF.sbn",
+      "size": 132,
+      "sha256": "8eeb6b2ba248b5f485af4354b9141b7805834914e5e5f537399535d03dfb619a",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/tpdc-tp-boundaries/青藏高原边界数据总集/TPBoundary_HF/TPBoundary_HF.sbx",
+      "size": 116,
+      "sha256": "c5c82f2d9f4c7746b12ba7bebc05d55538e3b6a5153cc68ae1fa191270b8ccc9",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/tpdc-tp-boundaries/青藏高原边界数据总集/TPBoundary_HF/TPBoundary_HF.shp",
+      "size": 102580,
+      "sha256": "2569bd6f8418582261311c99ceca4bb400ed35b303c548a3dad2e3f99cede198",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/tpdc-tp-boundaries/青藏高原边界数据总集/TPBoundary_HF/TPBoundary_HF.shp.xml",
+      "size": 7413,
+      "sha256": "f252c1109e8f05e7a232b35acf99212297201af93982963abc2cf58883b34073",
+      "role": "data",
+      "content_type": "application/xml"
+    },
+    {
+      "path": "extracted/tpdc-tp-boundaries/青藏高原边界数据总集/TPBoundary_HF/TPBoundary_HF.shx",
+      "size": 108,
+      "sha256": "519ca48e07556ad054b6d95fd391d1a95a14e8dfc1c618a7eabe19f89dfd1784",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/tpdc-tp-boundaries/青藏高原边界数据总集/TPBoundary_new(2021)/TPBoundary_new(2021).cpg",
+      "size": 5,
+      "sha256": "3ad3031f5503a4404af825262ee8232cc04d4ea6683d42c5dd0a2f2a27ac9824",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/tpdc-tp-boundaries/青藏高原边界数据总集/TPBoundary_new(2021)/TPBoundary_new(2021).dbf",
+      "size": 229,
+      "sha256": "cebbea09792d483e1fb19fe468ee23829ffcd03671d8d002b93c2c89fd700ba9",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/tpdc-tp-boundaries/青藏高原边界数据总集/TPBoundary_new(2021)/TPBoundary_new(2021).prj",
+      "size": 145,
+      "sha256": "a02a27b1d1982c8516d83398e85a3c8b1aef1713c13ef4d84d7bde17430c07c4",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/tpdc-tp-boundaries/青藏高原边界数据总集/TPBoundary_new(2021)/TPBoundary_new(2021).sbn",
+      "size": 132,
+      "sha256": "a38cf8f3f768a0fd80c7524566ea89b9f9882a450a28fa3b5cba1afd0b8da938",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/tpdc-tp-boundaries/青藏高原边界数据总集/TPBoundary_new(2021)/TPBoundary_new(2021).sbx",
+      "size": 116,
+      "sha256": "f0ba7ac09bb078d190e3de17638f051c5504fa9064641c0de5d9ac2dabc5d9b6",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/tpdc-tp-boundaries/青藏高原边界数据总集/TPBoundary_new(2021)/TPBoundary_new(2021).shp",
+      "size": 101676,
+      "sha256": "1b0026a11931b5fbd0a9ff51c05164a295f51c7fdcc4443ce56cb6e9d5bf5ea9",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/tpdc-tp-boundaries/青藏高原边界数据总集/TPBoundary_new(2021)/TPBoundary_new(2021).shp.xml",
+      "size": 19571,
+      "sha256": "46199e1bbf84566a9cc41f6876f092fee5a86e4fcd256e45fafa32b98463eeb9",
+      "role": "data",
+      "content_type": "application/xml"
+    },
+    {
+      "path": "extracted/tpdc-tp-boundaries/青藏高原边界数据总集/TPBoundary_new(2021)/TPBoundary_new(2021).shx",
+      "size": 108,
+      "sha256": "ce0aec06715c4edfce61261b0806f83647742397db6f045357b562fe6edaca03",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/tpdc-tp-boundaries/青藏高原边界数据总集/TPBoundary_rectangle/TPBoundary_rectangle.cpg",
+      "size": 5,
+      "sha256": "3ad3031f5503a4404af825262ee8232cc04d4ea6683d42c5dd0a2f2a27ac9824",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/tpdc-tp-boundaries/青藏高原边界数据总集/TPBoundary_rectangle/TPBoundary_rectangle.dbf",
+      "size": 73,
+      "sha256": "47da5661be8ae38a052a6dc7851b328023f7e25f7545ac9239ddb3efca6bfea5",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/tpdc-tp-boundaries/青藏高原边界数据总集/TPBoundary_rectangle/TPBoundary_rectangle.prj",
+      "size": 145,
+      "sha256": "a02a27b1d1982c8516d83398e85a3c8b1aef1713c13ef4d84d7bde17430c07c4",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/tpdc-tp-boundaries/青藏高原边界数据总集/TPBoundary_rectangle/TPBoundary_rectangle.sbn",
+      "size": 132,
+      "sha256": "fb45880c4922b3396563e0695de0feed50c636594184cc60d98dec1df19cccd7",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/tpdc-tp-boundaries/青藏高原边界数据总集/TPBoundary_rectangle/TPBoundary_rectangle.sbx",
+      "size": 116,
+      "sha256": "024fb9d3465f67576a1848bb79a8d4d9d5b2cc8b372c9b93680c8c0477975b39",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/tpdc-tp-boundaries/青藏高原边界数据总集/TPBoundary_rectangle/TPBoundary_rectangle.shp",
+      "size": 236,
+      "sha256": "3db2ced3c7bd96afbaf243263c0abc3556464d9479417172ae4c5540d751f9ba",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/tpdc-tp-boundaries/青藏高原边界数据总集/TPBoundary_rectangle/TPBoundary_rectangle.shp.xml",
+      "size": 4320,
+      "sha256": "1b9967c5d7b3b807f43dc25583aa0b3370f04e7b3b0bc04e3e89ead9bb1f1293",
+      "role": "data",
+      "content_type": "application/xml"
+    },
+    {
+      "path": "extracted/tpdc-tp-boundaries/青藏高原边界数据总集/TPBoundary_rectangle/TPBoundary_rectangle.shx",
+      "size": 108,
+      "sha256": "b59410abb48819f2e8ee08f3290683cc427e5764e6a0dc4d983e2f1780a988cd",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "tpdc-tp-boundaries.zip",
+      "size": 199817,
+      "sha256": "15f17e360e7b749398bde85c50c9d56af1c81f6d5050931e333bb009f85b36fc",
+      "role": "data",
+      "content_type": "application/zip"
+    }
+  ]
+}

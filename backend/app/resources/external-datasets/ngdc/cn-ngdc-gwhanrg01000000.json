@@ -1,0 +1,73 @@
+{
+  "dataset_id": "cn-ngdc-gwhanrg01000000",
+  "external_id": "GWHANRG01000000",
+  "data_center_id": "reviewed-ngdc-catalog",
+  "data_center_name": "国家基因组科学数据中心 NGDC / CNCB",
+  "name": "小球藻完整叶绿体基因组",
+  "description": "NGDC Genome Warehouse公开发布的Chlorella vulgaris（chloroplast）基因组序列，组装级别为Complete。导入叶绿体组装，不包含核基因组，也不是群体遗传或个人临床数据。 可用于序列统计、GC组成与片段长度探查。",
+  "domain": "sequence",
+  "data_type": "FASTA",
+  "tags": [
+    "sequence",
+    "国家基因组科学数据中心 NGDC / CNCB",
+    "公开数据"
+  ],
+  "metadata": {
+    "curated": true,
+    "catalog_version": 1,
+    "source_catalog": "ngdc",
+    "publisher": "国家基因组科学数据中心 NGDC / CNCB",
+    "source_url": "https://ngdc.cncb.ac.cn/gwh/Assembly/9671/show",
+    "license": "NGDC GWH academic-use terms",
+    "license_url": "https://ngdc.cncb.ac.cn/gwh/statistics/genome",
+    "license_details": "GWH官方页面声明数据库仅免费用于学术研究；商业使用需另询商业许可。未发现本记录单独CC许可，不标为CC0或CC BY。引用GWH/NGDC与accession，并在有论文时引用原研究。",
+    "sample_scope": "完整已发布的叶绿体基因组FASTA，不含核基因组。",
+    "sample_note": "完整已发布的叶绿体基因组FASTA，不含核基因组。",
+    "authors": [],
+    "doi": "",
+    "source_version": "",
+    "source_descriptor_sha256": "864bcac8588b9e08b2d948903befcb56940b4357e6a8d9adef5324abc231f6bc",
+    "organism": "Chlorella vulgaris",
+    "assembly_level": "Complete",
+    "bioproject": "PRJCA002707",
+    "publication_url": "https://doi.org/10.1080/23802359.2020.1844090",
+    "release_time": "2020-07-06 12:57:41.0",
+    "download_date": "2026-09-07",
+    "provenance": [
+      {
+        "path": "GWHANRG01000000.genome.fasta.gz",
+        "size": 50463,
+        "sha256": "05e0ba24881037eed37eb16b91a08df72798347539ed267b496900ec08754405",
+        "role": "data",
+        "content_type": "application/octet-stream",
+        "download_url": "https://download.cncb.ac.cn/gwh/Plants/Chlorella_vulgaris_chloroplast_GWHANRG01000000/GWHANRG01000000.genome.fasta.gz"
+      }
+    ],
+    "inventory_complete": true,
+    "recursive_file_count": 3,
+    "total_size_bytes": 221938
+  },
+  "files": [
+    {
+      "path": "GWHANRG01000000.genome.fasta.gz",
+      "size": 50463,
+      "sha256": "05e0ba24881037eed37eb16b91a08df72798347539ed267b496900ec08754405",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "SOURCE.md",
+      "size": 1313,
+      "sha256": "22baf054321410f82524751672b95ec161dceca1992c2b41c88fb175f1cd5f32",
+      "role": "documentation",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "extracted/GWHANRG01000000.genome.fasta",
+      "size": 170162,
+      "sha256": "fe8a3df1e8021ea59328c8c9a586492062c90d97d838487ce3efb8081615e428",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    }
+  ]
+}

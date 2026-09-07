@@ -1,0 +1,47 @@
+{
+  "dataset_id": "ncbi-arabidopsis-chloroplast",
+  "external_id": "ncbi-arabidopsis-chloroplast",
+  "data_center_id": "international-open-catalog",
+  "data_center_name": "NCBI / U.S. National Library of Medicine; NCBI RefSeq",
+  "name": "NCBI 拟南芥叶绿体完整参考基因组",
+  "description": "NCBI RefSeq 发布的模式植物 Arabidopsis thaliana 叶绿体完整参考基因组，登录号 NC_000932.1，154,478 个碱基，原版 FASTA。适合比较植物细胞器与噬菌体序列的长度、GC 含量、碱基组成和局部片段特征。本地保留该登录号的完整单条参考序列，无合成或裁剪，不涉及个人基因数据。",
+  "domain": "sequence",
+  "data_type": "FASTA",
+  "tags": [
+    "sequence",
+    "FASTA",
+    "开放数据"
+  ],
+  "metadata": {
+    "curated": true,
+    "catalog_version": 1,
+    "publisher": "NCBI / U.S. National Library of Medicine; NCBI RefSeq",
+    "source_url": "https://www.ncbi.nlm.nih.gov/nuccore/NC_000932.1",
+    "license": "NCBI 公共序列使用政策",
+    "license_url": "https://www.ncbi.nlm.nih.gov/genbank/about/",
+    "license_details": "NCBI GenBank Data Usage states that NCBI places no restrictions on use or distribution; it also notes possible third-party rights. This is not labeled CC0 or a blanket waiver of third-party rights.",
+    "sample_scope": "完整叶绿体参考序列 · 154,478 个碱基",
+    "sample_note": "Complete versioned chloroplast reference record NC_000932.1, 154,478 bases, downloaded through NCBI EFetch. Public plant reference sequence.",
+    "provenance": [
+      {
+        "path": "arabidopsis-chloroplast-NC_000932.1.fasta",
+        "download_url": "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=nuccore&id=NC_000932.1&rettype=fasta&retmode=text",
+        "sha256": "9439e8fd98eb7a98892e6bf3d13ceedc15d2b233b57176f01ca4274f6b692dc5",
+        "size": 156749
+      }
+    ],
+    "inventory_complete": true,
+    "recursive_file_count": 1,
+    "total_size_bytes": 156749
+  },
+  "files": [
+    {
+      "path": "arabidopsis-chloroplast-NC_000932.1.fasta",
+      "size": 156749,
+      "sha256": "9439e8fd98eb7a98892e6bf3d13ceedc15d2b233b57176f01ca4274f6b692dc5",
+      "role": "data",
+      "content_type": "text/plain"
+    }
+  ]
+}
+

@@ -17,7 +17,7 @@ from app.domain.models.plan import ExecutionResult, Plan, Step, ExecutionStatus
 from app.domain.models.file import FileInfo
 from app.domain.models.message import Message
 from app.domain.models.dataset import DatasetFile
-from app.domain.services.agents.base import BaseAgent
+from app.domain.services.agents.base import BaseAgent, is_non_substantive_message_text
 from app.domain.repositories.agent_repository import AgentRepository
 from app.domain.services.prompts.system import SYSTEM_PROMPT
 from app.domain.services.prompts.execution import EXECUTION_SYSTEM_PROMPT, EXECUTION_PROMPT, SUMMARIZE_PROMPT
@@ -33,6 +33,10 @@ from app.domain.models.event import (
     WaitEvent,
 )
 from app.domain.services.tools.base import BaseToolkit
+from app.domain.services.tools.spill_projection import (
+    projected_tool_artifact,
+    spill_notice_from_result,
+)
 from app.domain.models.tool_result import ToolResult
 from app.core.config import get_settings
 from app.domain.utils.public_error import public_error_message
@@ -2487,9 +2491,10 @@ class ExecutionAgent(BaseAgent):
         if isinstance(tool_result, ToolMessage):
             if tool_result.tool_call_id != tool_call["id"]:
                 tool_result.tool_call_id = tool_call["id"]
+            public_artifact = projected_tool_artifact(tool_result)
             function_result = (
-                tool_result.artifact
-                if isinstance(tool_result.artifact, ToolResult)
+                public_artifact
+                if isinstance(public_artifact, ToolResult)
                 else ToolResult(success=False, message="Safe preview copy returned no validated result")
             )
         else:
@@ -2672,7 +2677,7 @@ class ExecutionAgent(BaseAgent):
                 tool_name=find_tool.toolkit.name,
                 function_name=find_call["name"],
                 function_args=find_call["args"],
-                function_result=find_result.artifact,
+                function_result=projected_tool_artifact(find_result),
             )
 
             candidates: list[PurePosixPath] = []
@@ -2724,7 +2729,7 @@ class ExecutionAgent(BaseAgent):
                 tool_name=unpack_tool.toolkit.name,
                 function_name=unpack_call["name"],
                 function_args=unpack_call["args"],
-                function_result=unpack_result.artifact,
+                function_result=projected_tool_artifact(unpack_result),
             )
             completion = self._completion_from_tool_batch([unpack_result])
             if completion is not None:
@@ -2851,7 +2856,7 @@ class ExecutionAgent(BaseAgent):
                 tool_name=tool.toolkit.name,
                 function_name=tool_call["name"],
                 function_args=tool_call["args"],
-                function_result=tool_result.artifact,
+                function_result=projected_tool_artifact(tool_result),
             )
 
             deterministic_completion = self._completion_from_tool_batch([tool_result])
@@ -2954,8 +2959,8 @@ class ExecutionAgent(BaseAgent):
             ))
             active_synthesis_timeout = self.DATASET_SYNTHESIS_TIMEOUT_SECONDS
             try:
-                model_message = await asyncio.wait_for(
-                    self.ask_with_messages(
+                async with asyncio.timeout(self.DATASET_SYNTHESIS_TIMEOUT_SECONDS):
+                    model_message = await self.ask_with_messages(
                         [
                             HumanMessage(content=compact_request),
                             AIMessage(content="", tool_calls=[tool_call]),
@@ -2965,9 +2970,7 @@ class ExecutionAgent(BaseAgent):
                         self.format,
                         allow_tools=False,
                         max_tokens=self.DATASET_SYNTHESIS_MAX_TOKENS,
-                    ),
-                    timeout=self.DATASET_SYNTHESIS_TIMEOUT_SECONDS,
-                )
+                    )
                 response = (
                     None
                     if model_message.tool_calls
@@ -2981,8 +2984,8 @@ class ExecutionAgent(BaseAgent):
                         "Dataset quicklook synthesis returned a blank/invalid result; retrying once without tools"
                     )
                     active_synthesis_timeout = self.DATASET_SYNTHESIS_REPAIR_TIMEOUT_SECONDS
-                    repair_message = await asyncio.wait_for(
-                        self.ask_with_messages(
+                    async with asyncio.timeout(self.DATASET_SYNTHESIS_REPAIR_TIMEOUT_SECONDS):
+                        repair_message = await self.ask_with_messages(
                             [HumanMessage(content=(
                                 "Your previous synthesis result was blank or invalid. Return exactly one valid "
                                 "JSON object now whose only top-level keys are `success`, `result`, and "
@@ -2996,9 +2999,7 @@ class ExecutionAgent(BaseAgent):
                             self.format,
                             allow_tools=False,
                             max_tokens=self.DATASET_SYNTHESIS_REPAIR_MAX_TOKENS,
-                        ),
-                        timeout=self.DATASET_SYNTHESIS_REPAIR_TIMEOUT_SECONDS,
-                    )
+                        )
                     response = (
                         None
                         if repair_message.tool_calls
@@ -3339,11 +3340,7 @@ class ExecutionAgent(BaseAgent):
         if not result_text:
             logger.warning("Execution result omitted the required substantive result")
             return None
-        if re.fullmatch(
-            r"(?:placeholder|placeholder[-_ ]?not[-_ ]?used|tbd|todo|n/?a|待补充|占位(?:符|文本)?|暂无(?:内容|结果)?)\.?",
-            result_text,
-            re.IGNORECASE,
-        ):
+        if is_non_substantive_message_text(result_text):
             logger.warning("Execution result contained only placeholder text")
             return None
         return result
@@ -3351,8 +3348,8 @@ class ExecutionAgent(BaseAgent):
     async def _repair_execution_result(self) -> Optional[ExecutionResult]:
         """Request one bounded, tool-free repair for an unusable terminal result."""
         try:
-            repair_message = await asyncio.wait_for(
-                self.ask_with_messages(
+            async with asyncio.timeout(self.EXECUTION_RESULT_REPAIR_TIMEOUT_SECONDS):
+                repair_message = await self.ask_with_messages(
                     [HumanMessage(content=(
                         "Your previous final response could not be decoded as the required result object. "
                         "Using only the evidence already available in this conversation, return exactly one "
@@ -3362,9 +3359,7 @@ class ExecutionAgent(BaseAgent):
                     ))],
                     self.format,
                     allow_tools=False,
-                ),
-                timeout=self.EXECUTION_RESULT_REPAIR_TIMEOUT_SECONDS,
-            )
+                )
         except asyncio.TimeoutError:
             logger.warning(
                 "Execution result repair exceeded %.1fs",
@@ -3464,15 +3459,13 @@ class ExecutionAgent(BaseAgent):
             f"DATASETS:\n{json.dumps(dataset_records, ensure_ascii=False, separators=(',', ':'))}\n\n"
             f"FAILURE_CONTEXT:\n{failure_context[:4_000]}\n"
         )
-        response = await asyncio.wait_for(
-            self.ask_with_messages(
+        async with asyncio.timeout(self.DATASET_PROGRAM_TIMEOUT_SECONDS):
+            response = await self.ask_with_messages(
                 [HumanMessage(content=prompt)],
                 self.format,
                 allow_tools=False,
                 max_tokens=self.DATASET_PROGRAM_MAX_TOKENS,
-            ),
-            timeout=self.DATASET_PROGRAM_TIMEOUT_SECONDS,
-        )
+            )
         if response.tool_calls:
             raise ValueError("analysis program compiler returned a tool call")
         parsed = await self._parse_json(self._message_content_to_text(response.content))
@@ -3571,15 +3564,31 @@ class ExecutionAgent(BaseAgent):
                 "id": call_id,
             })
             result, runner_error = self._analysis_result_from_tool(tool_result)
+            public_artifact = projected_tool_artifact(tool_result)
             yield ToolEvent(
                 status=ToolStatus.CALLED,
                 tool_call_id=call_id,
                 tool_name=tool.toolkit.name,
                 function_name="dataset_analysis_run",
                 function_args=display_args,
-                function_result=(result.model_dump() if result else {"success": False, "error": runner_error}),
+                function_result=(
+                    public_artifact
+                    if spill_notice_from_result(tool_result) is not None
+                    else (result.model_dump() if result else {"success": False, "error": runner_error})
+                ),
             )
             if result is not None:
+                spill_notice = spill_notice_from_result(tool_result)
+                if spill_notice is not None:
+                    result = result.model_copy(update={
+                        "result": (
+                            "分析已完成，但工具输出超过内联上限。完整结果已保存在"
+                            "当前会话的私有溢出存储中，可通过工具详情里的受控引用按页读取。"
+                            if spill_notice.status == "stored"
+                            else
+                            "分析已完成，但工具输出超过内联上限，且私有溢出存储暂时不可用。"
+                        ),
+                    })
                 yield MessageEvent(message=json.dumps(result.model_dump(), ensure_ascii=False))
                 return
             failure_context = runner_error or "analysis runner failed without a structured error"
@@ -3654,6 +3663,7 @@ class ExecutionAgent(BaseAgent):
         yield StepEvent(status=StepStatus.STARTED, step=event_step())
         scoped_request = f"{step_context}\n\n{request}"
         observed_shell_results: list[ToolMessage] = []
+        pending_ask_user_texts: dict[str, str] = {}
         terminal_result_seen = False
         previous_authoritative_targets = getattr(self, "_authoritative_target_files", False)
         self._authoritative_target_files = bool(target_files)
@@ -3744,9 +3754,42 @@ class ExecutionAgent(BaseAgent):
                             artifact=event.function_result,
                         ))
                     if event.function_name == "message_ask_user":
+                        ask_user_text = (
+                            event.function_args.get("text")
+                            if isinstance(event.function_args, dict)
+                            else None
+                        )
+                        if is_non_substantive_message_text(ask_user_text):
+                            logger.warning(
+                                "Execution step %s ignored a non-substantive message_ask_user event %s",
+                                step.id,
+                                event.tool_call_id,
+                            )
+                            continue
                         if event.status == ToolStatus.CALLING:
-                            yield MessageEvent(message=event.function_args.get("text", ""))
+                            pending_ask_user_texts[event.tool_call_id] = ask_user_text
                         elif event.status == ToolStatus.CALLED:
+                            tool_result = event.function_result
+                            ask_succeeded = (
+                                isinstance(tool_result, ToolResult)
+                                and tool_result.success is True
+                            ) or (
+                                isinstance(tool_result, dict)
+                                and tool_result.get("success") is True
+                            )
+                            if not ask_succeeded:
+                                pending_ask_user_texts.pop(event.tool_call_id, None)
+                                logger.warning(
+                                    "Execution step %s ignored a failed message_ask_user event %s",
+                                    step.id,
+                                    event.tool_call_id,
+                                )
+                                continue
+                            question_text = pending_ask_user_texts.pop(
+                                event.tool_call_id,
+                                ask_user_text,
+                            )
+                            yield MessageEvent(message=question_text)
                             yield WaitEvent()
                             return
                         continue
@@ -3796,7 +3839,10 @@ class ExecutionAgent(BaseAgent):
         message = f"{plan_context}\n\n{SUMMARIZE_PROMPT}" if plan_context else SUMMARIZE_PROMPT
         async for event in self.execute(message):
             if isinstance(event, MessageEvent):
-                logger.debug(f"Execution agent summary: {event.message}")
+                logger.debug(
+                    "Execution agent summary received chars=%d",
+                    len(event.message or ""),
+                )
                 parsed_response = await self._parse_json(event.message)
                 message = Message.model_validate(parsed_response)
                 attachments = [FileInfo(file_path=file_path) for file_path in message.attachments]

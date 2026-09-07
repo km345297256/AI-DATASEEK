@@ -11,10 +11,12 @@ from app.interfaces.schemas.agent_profile import (
     CreateAgentProfileRequest,
     UpdateAgentProfileRequest,
     AgentProfileResponse,
+    CreateRuntimePresetProfileRequest,
 )
 from app.interfaces.schemas.base import APIResponse
 from app.infrastructure.models.documents import ModelConfigurationDocument
 from app.domain.models.model_configuration import ModelType
+from app.core.config import get_settings
 
 router = APIRouter(prefix="/agent-profiles", tags=["agent-profiles"])
 
@@ -75,6 +77,7 @@ async def create_profile(
         planner_config=request.planner_config,
         subagents=request.subagents,
         is_global=request.is_global,
+        tool_runtime=request.tool_runtime,
     )
     await audit_service.record(
         actor_user_id=current_user.id,
@@ -84,6 +87,37 @@ async def create_profile(
         workspace_id=profile.workspace_id,
         risk_level=AuditRiskLevel.HIGH if profile.api_key else AuditRiskLevel.MEDIUM,
         metadata={"name": profile.name, "scope": profile.scope, "model_provider": profile.model_provider, "model_name": profile.model_name},
+    )
+    return APIResponse.success(_response(profile))
+
+
+@router.post("/runtime-preset", response_model=APIResponse[AgentProfileResponse])
+async def create_runtime_preset_profile(
+    request: CreateRuntimePresetProfileRequest,
+    current_user: User = Depends(get_current_user),
+    service: AgentProfileService = Depends(get_agent_profile_service),
+    permission_service: PermissionService = Depends(get_permission_service),
+    audit_service: AuditService = Depends(get_audit_service),
+):
+    """Explicit UI action: create a runtime profile using the current model.
+
+    Provider credentials remain in deployment configuration, not this profile.
+    This never alters already-created sessions or another saved profile.
+    """
+    _ensure_admin(current_user)
+    settings = get_settings()
+    profile = await service.create_profile(
+        user_id=current_user.id, user_role=current_user.role,
+        workspace_id=await permission_service.default_workspace_id(current_user),
+        name=request.name, model_name=settings.model_name,
+        model_provider=settings.model_provider, temperature=settings.temperature,
+        max_tokens=settings.max_tokens, tool_runtime=request.tool_runtime,
+    )
+    await audit_service.record(
+        actor_user_id=current_user.id, action="agent_profile.create",
+        resource_type="agent_profile", resource_id=profile.id,
+        workspace_id=profile.workspace_id, risk_level=AuditRiskLevel.MEDIUM,
+        metadata={"runtime_preset": request.tool_runtime.model_dump()},
     )
     return APIResponse.success(_response(profile))
 

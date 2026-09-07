@@ -83,15 +83,13 @@ class SafetyReviewAgent:
                 return deterministic
 
             runnable = self._model.bind(response_format={"type": "json_object"}, tool_choice="none")
-            response = await asyncio.wait_for(
-                runnable.ainvoke(
+            async with asyncio.timeout(self._timeout_seconds):
+                response = await runnable.ainvoke(
                     [
                         SystemMessage(content=SAFETY_REVIEW_SYSTEM_PROMPT),
                         HumanMessage(content=json.dumps(payload, ensure_ascii=False)),
                     ]
-                ),
-                timeout=self._timeout_seconds,
-            )
+                )
             await self._record_token_usage(response)
             content = response.content if hasattr(response, "content") else response
             raw = content if isinstance(content, str) else json.dumps(content, ensure_ascii=False)
@@ -102,7 +100,10 @@ class SafetyReviewAgent:
                 verdict.suggestion = "请移除可能造成伤害、越权或违反系统策略的内容，并明确合法目的与授权范围后重试。"
             return verdict
         except Exception as exc:
-            logger.error("Safety review failed closed: %s", exc)
+            logger.error(
+                "Safety review failed closed error_type=%s",
+                type(exc).__name__,
+            )
             return SafetyReview(
                 decision="reject",
                 risk_level="high",
@@ -123,4 +124,7 @@ class SafetyReviewAgent:
                 model_name=self._model_name,
             )
         except Exception as exc:
-            logger.warning("Failed to record safety review token usage: %s", exc)
+            logger.warning(
+                "Failed to record safety review token usage error_type=%s",
+                type(exc).__name__,
+            )

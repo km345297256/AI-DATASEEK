@@ -1,0 +1,64 @@
+{
+  "dataset_id": "scidb-sanjiaolongwan-core",
+  "external_id": "e83385d5bb244101a06840f35ffcb97e",
+  "data_center_id": "reviewed-scidb-catalog",
+  "data_center_name": "ScienceDB 科学数据银行",
+  "name": "三角龙湾 SJLW-2 湖泊岩芯代用指标",
+  "description": "东北中国龙岗火山群三角龙湾岩芯约240年的深度—年龄、有机碳氮、稳定同位素和沉积通量数据，适合时间序列、相关性与古环境探查。",
+  "domain": "geoscience",
+  "data_type": "xlsx",
+  "tags": [
+    "geoscience",
+    "ScienceDB 科学数据银行",
+    "公开数据"
+  ],
+  "metadata": {
+    "curated": true,
+    "catalog_version": 1,
+    "source_catalog": "scidb",
+    "publisher": "ScienceDB 科学数据银行",
+    "source_url": "https://www.scidb.cn/en/detail?dataSetId=e83385d5bb244101a06840f35ffcb97e",
+    "license": "CC BY 4.0",
+    "license_url": "https://creativecommons.org/licenses/by/4.0/",
+    "license_details": "Creative Commons Attribution 4.0；须署名、链接许可并说明修改。",
+    "sample_scope": "完整 V1 公开 XLSX 表格；保留原始列名与单位。",
+    "sample_note": "完整 V1 公开 XLSX 表格；保留原始列名与单位。",
+    "download_date": "2026-09-07",
+    "provenance": [
+      {
+        "path": "三角龙湾SJLW-2岩芯代用指标数据.xlsx",
+        "size": 13580,
+        "sha256": "b9199e4e3d3767cf3e312b243ac182820a2018816d7b2202c285a3ba3c104d1f",
+        "role": "data",
+        "content_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "download_url": "https://china.scidb.cn/download?fileId=8021f436d547d4e9081a90cdc9c90da9",
+        "publisher_md5": "e2bfefa666384c3657beec3dcd82573d"
+      }
+    ],
+    "inventory_complete": true,
+    "recursive_file_count": 2,
+    "total_size_bytes": 14619,
+    "source_version": "V1",
+    "doi": "https://doi.org/10.57760/sciencedb.jee.0000h",
+    "authors": [
+      "huang sheng"
+    ],
+    "source_descriptor_sha256": "3f8973ce01b4bbd93b5074e579d7a7a1f63ff203f640dd9e6e34d3e57c5a5263"
+  },
+  "files": [
+    {
+      "path": "SOURCE.md",
+      "size": 1039,
+      "sha256": "0a471ae2b09699d3683ae2cfcab7f0e7d3bbdc9910a8978a3d93d554ec5e59f3",
+      "role": "documentation",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "三角龙湾SJLW-2岩芯代用指标数据.xlsx",
+      "size": 13580,
+      "sha256": "b9199e4e3d3767cf3e312b243ac182820a2018816d7b2202c285a3ba3c104d1f",
+      "role": "data",
+      "content_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    }
+  ]
+}

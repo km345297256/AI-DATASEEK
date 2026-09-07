@@ -160,6 +160,7 @@
 </template>
 
 <script setup lang="ts">
+import { findAnalysisTool, mergeAnalysisToolEvent } from '@/utils/analysisJob';
 import SimpleBar from '../components/SimpleBar.vue';
 import { ref, onMounted, watch, nextTick, onUnmounted, reactive, toRefs } from 'vue';
 import { useRouter, onBeforeRouteUpdate } from 'vue-router';
@@ -206,6 +207,12 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import LoadingIndicator from '@/components/ui/LoadingIndicator.vue';
 import { eventBus } from '../utils/eventBus';
 import { EVENT_REFRESH_SESSION_LIST, EVENT_SESSION_RENAMED } from '../constants/event';
+import { isPlaceholderAssistantMessage } from '../utils/datasetResultPresentation';
+import {
+  acceptAgentEvent,
+  createAgentEventCursor,
+  resetAgentEventCursor,
+} from '../utils/agentEventCursor';
 
 const router = useRouter()
 const { t } = useI18n()
@@ -230,6 +237,7 @@ const createInitialState = () => ({
   lastMessageTool: undefined as ToolContent | undefined,
   lastTool: undefined as ToolContent | undefined,
   lastEventId: undefined as string | undefined,
+  lastEventSeq: undefined as number | undefined,
   cancelCurrentChat: null as (() => void) | null,
   attachments: [] as FileInfo[],
   selectedSkills: [] as string[],
@@ -259,6 +267,7 @@ const {
   lastNoMessageTool,
   lastTool,
   lastEventId,
+  lastEventSeq,
   cancelCurrentChat,
   attachments,
   selectedSkills,
@@ -275,6 +284,7 @@ const toolPanel = ref<InstanceType<typeof ToolPanel>>()
 const simpleBarRef = ref<InstanceType<typeof SimpleBar>>();
 const observerRef = ref<HTMLDivElement>();
 const chatContainerRef = ref<HTMLDivElement>();
+const eventCursor = createAgentEventCursor();
 
 // Reset all refs to their initial values
 const resetState = () => {
@@ -282,6 +292,8 @@ const resetState = () => {
   if (cancelCurrentChat.value) {
     cancelCurrentChat.value();
   }
+
+  resetAgentEventCursor(eventCursor);
 
   // Reset reactive state to initial values
   Object.assign(state, createInitialState());
@@ -329,6 +341,10 @@ const handleMessageEvent = (messageData: MessageEventData) => {
   if (messageData.role === 'user') {
     startUserTurn();
   }
+  if (
+    messageData.role === 'assistant'
+    && isPlaceholderAssistantMessage(messageData.content)
+  ) return;
   messages.value.push({
     type: messageData.role,
     content: {
@@ -352,8 +368,10 @@ const handleToolEvent = (toolData: ToolEventData) => {
   let toolContent: ToolContent = {
     ...toolData
   }
-  if (lastTool.value && lastTool.value.tool_call_id === toolContent.tool_call_id) {
-    Object.assign(lastTool.value, toolContent);
+  const existingTool = findAnalysisTool(messages.value, toolContent.tool_call_id);
+  if (existingTool) {
+    Object.assign(existingTool, mergeAnalysisToolEvent(existingTool, toolContent));
+    toolContent = existingTool;
   } else {
     if (lastStep?.status === 'running') {
       lastStep.tools.push(toolContent);
@@ -365,7 +383,7 @@ const handleToolEvent = (toolData: ToolEventData) => {
     }
     lastTool.value = toolContent;
   }
-  if (toolContent.name !== 'message') {
+  if (toolContent.name !== 'message' && (!existingTool || lastTool.value?.tool_call_id === toolContent.tool_call_id)) {
     lastNoMessageTool.value = toolContent;
   }
 }
@@ -470,6 +488,7 @@ const isTerminalStepStatus = (status: StepEventData['status']) => {
 
 // Main event handler function
 const handleEvent = (event: AgentSSEEvent) => {
+  if (!acceptAgentEvent(eventCursor, event)) return;
   if (event.event === 'message') {
     handleMessageEvent(event.data as MessageEventData);
   } else if (event.event === 'tool') {
@@ -497,7 +516,8 @@ const handleEvent = (event: AgentSSEEvent) => {
   } else if (event.event === 'plan') {
     handlePlanEvent(event.data as PlanEventData);
   }
-  lastEventId.value = event.data.event_id;
+  if (event.data.event_id) lastEventId.value = event.data.event_id;
+  lastEventSeq.value = eventCursor.lastSeq;
 }
 
 const isCurrentSession = (targetSessionId: string) => {
@@ -568,6 +588,7 @@ const chat = async (
       activeSessionId,
       message,
       lastEventId.value,
+      lastEventSeq.value,
       files
         .filter((file: FileInfo) => file.file_id && !file.file_id.startsWith('temp-'))
         .map((file: FileInfo) => ({file_id : file.file_id, 

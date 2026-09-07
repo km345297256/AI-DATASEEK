@@ -1,0 +1,73 @@
+{
+  "dataset_id": "open-uci-iris",
+  "external_id": "open-uci-iris",
+  "data_center_id": "international-open-catalog",
+  "data_center_name": "R. A. Fisher · UCI Machine Learning Repository",
+  "name": "Iris 鸢尾花形态数据",
+  "description": "150 株鸢尾花的四项形态测量与三个品种标签，适合练习数据概览、分组统计和分类可视化。完整 UCI 数据；为原始数值添加英文 CSV 表头，未改动观测值。",
+  "domain": "general",
+  "data_type": "CSV",
+  "tags": [
+    "general",
+    "CSV",
+    "开放数据"
+  ],
+  "metadata": {
+    "curated": true,
+    "catalog_version": 1,
+    "publisher": "R. A. Fisher · UCI Machine Learning Repository",
+    "source_url": "https://archive.ics.uci.edu/dataset/53/iris",
+    "license": "CC BY 4.0",
+    "license_url": "https://creativecommons.org/licenses/by/4.0/",
+    "license_details": "CC BY 4.0",
+    "sample_scope": "完整数据 · 150 条记录；附原始文件",
+    "sample_note": "150 株鸢尾花的四项形态测量与三个品种标签，适合练习数据概览、分组统计和分类可视化。完整 UCI 数据；为原始数值添加英文 CSV 表头，未改动观测值。",
+    "provenance": [
+      {
+        "path": "iris.csv",
+        "download_url": "https://archive.ics.uci.edu/static/public/53/iris.zip",
+        "sha256": "b9c2c79bfac42185ece47e3c0ac4b646594eccc0cf279546dd336b626ec9e70c",
+        "size": 4620
+      },
+      {
+        "path": "iris.data",
+        "download_url": "https://archive.ics.uci.edu/static/public/53/iris.zip",
+        "sha256": "6f608b71a7317216319b4d27b4d9bc84e6abd734eda7872b71a458569e2656c0",
+        "size": 4551
+      },
+      {
+        "path": "iris.names",
+        "download_url": "https://archive.ics.uci.edu/static/public/53/iris.zip",
+        "sha256": "71a09fb3ee237614cdb9c09d06e8ae1f610ce2a274c0d77272fea8a233e5eea3",
+        "size": 2998
+      }
+    ],
+    "inventory_complete": true,
+    "recursive_file_count": 3,
+    "total_size_bytes": 12169
+  },
+  "files": [
+    {
+      "path": "iris.csv",
+      "size": 4620,
+      "sha256": "b9c2c79bfac42185ece47e3c0ac4b646594eccc0cf279546dd336b626ec9e70c",
+      "role": "data",
+      "content_type": "text/csv"
+    },
+    {
+      "path": "iris.data",
+      "size": 4551,
+      "sha256": "6f608b71a7317216319b4d27b4d9bc84e6abd734eda7872b71a458569e2656c0",
+      "role": "documentation",
+      "content_type": "text/plain"
+    },
+    {
+      "path": "iris.names",
+      "size": 2998,
+      "sha256": "71a09fb3ee237614cdb9c09d06e8ae1f610ce2a274c0d77272fea8a233e5eea3",
+      "role": "documentation",
+      "content_type": "text/plain"
+    }
+  ]
+}
+

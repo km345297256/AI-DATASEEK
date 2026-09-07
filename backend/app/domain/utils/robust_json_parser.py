@@ -40,6 +40,7 @@ from langchain_core.output_parsers import JsonOutputParser
 from langchain_core.runnables import Runnable, RunnableConfig
 from langchain_core.utils.json import parse_json_markdown, parse_partial_json
 from langchain_classic.output_parsers.fix import OutputFixingParser
+from app.domain.services.model_runtime import model_call_role
 
 logger = logging.getLogger(__name__)
 
@@ -276,7 +277,8 @@ class RobustJsonParser(Runnable[AIMessage, AIMessage]):
     async def _stage3_output_fixing(self, raw: str) -> Optional[dict]:
         """Stage 3: asks LLM to rewrite the broken JSON string."""
         try:
-            result = await self._fixing_parser.aparse(raw)
+            with model_call_role("tool_json_repair"):
+                result = await self._fixing_parser.aparse(raw)
             if isinstance(result, dict):
                 return result
         except Exception:

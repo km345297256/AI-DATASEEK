@@ -710,6 +710,106 @@ def test_session_context_supports_dataset_followups_and_excludes_current_duplica
     assert "再按月份比较" not in context
 
 
+def test_session_context_excludes_internal_placeholder_messages():
+    flow = _flow()
+
+    context = flow._render_session_context([
+        MessageEvent(role="user", message="这个数据集的空间范围是多少"),
+        MessageEvent(role="assistant", message="placeholder - do not send"),
+        MessageEvent(role="assistant", message="The placeholder attribute is empty."),
+    ])
+
+    payload = json.loads(context)
+    assert payload["messages"] == [
+        {"role": "user", "content": "这个数据集的空间范围是多少"},
+        {"role": "assistant", "content": "The placeholder attribute is empty."},
+    ]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("resume_waiting_question", "expected_step_id"),
+    [
+        (False, "dataset-fast-path"),
+        (True, "stale-step"),
+    ],
+    ids=["invalid-pending-question-replans", "valid-pending-question-resumes"],
+)
+async def test_waiting_session_only_resumes_a_valid_pending_question(
+    resume_waiting_question,
+    expected_step_id,
+):
+    message = Message(message="这个数据集的空间范围是多少", datasets=[_dataset()])
+    stale_plan = _flow()._create_dataset_fast_path_plan(message)
+    stale_plan.steps[0].id = "stale-step"
+
+    class Repository:
+        async def find_by_id(self, _session_id):
+            return SimpleNamespace(status=SessionStatus.WAITING)
+
+        async def update_status(self, _session_id, _status):
+            return None
+
+        async def get_events(self, _session_id):
+            return [
+                PlanEvent(status=PlanStatus.CREATED, plan=stale_plan),
+                MessageEvent(role="user", message=message.message),
+            ]
+
+    class Planner:
+        rolled_back = False
+
+        async def roll_back(self, _message):
+            self.rolled_back = True
+
+    class Executor:
+        def __init__(self):
+            self.executed_step_ids = []
+
+        async def roll_back(self, _message):
+            return resume_waiting_question
+
+        async def execute_step(self, _plan, step, _message):
+            self.executed_step_ids.append(step.id)
+            yield MessageEvent(message="resumed")
+
+        async def compact_memory(self):
+            return None
+
+    flow = _flow()
+    flow._session_id = "session-waiting"
+    flow._agent_id = "agent-waiting"
+    flow._session_repository = Repository()
+    flow.status = AgentStatus.IDLE
+    flow.plan = None
+    flow.session_context = ""
+    flow.dataset_context = ""
+    flow.active_skill_context = ""
+    flow._activate_skills = lambda _names: []
+    flow.planner = Planner()
+    flow.executor = Executor()
+    flow.vision = object()
+    flow._sandbox = object()
+
+    observed_step_id = None
+    event_stream = flow.run(message)
+    async for event in event_stream:
+        if not resume_waiting_question and isinstance(event, PlanEvent):
+            if event.status == PlanStatus.CREATED:
+                observed_step_id = event.plan.steps[0].id
+                break
+        if resume_waiting_question and isinstance(event, MessageEvent):
+            observed_step_id = flow.executor.executed_step_ids[0]
+            break
+    await event_stream.aclose()
+
+    assert flow.planner.rolled_back is True
+    assert observed_step_id == expected_step_id
+    assert flow.executor.executed_step_ids == (
+        ["stale-step"] if resume_waiting_question else []
+    )
+
+
 def test_successful_single_step_plan_skips_duplicate_summary():
     flow = _flow()
     step = flow._create_dataset_fast_path_plan(

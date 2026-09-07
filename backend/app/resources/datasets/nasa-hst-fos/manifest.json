@@ -1,0 +1,45 @@
+{
+  "dataset_id": "nasa-hst-fos",
+  "external_id": "nasa-hst-fos",
+  "data_center_id": "international-open-catalog",
+  "data_center_name": "NASA FITS Support Office / HST / MAST",
+  "name": "NASA 哈勃 FOS 光谱误差数据样本",
+  "description": "NASA FITS Support Office 提供的哈勃 Faint Object Spectrograph 光谱相关误差数据。FITS 头 FILETYPE=ERR，主数组为 2×2064，坐标轴标注为 PIXEL，另附小型表扩展。适合探查 HDU、头信息与数组质量；不能把两行直接当成通量和波长，也不能按普通天空照片解释。NASA 官方格式互操作教学样本，原文件未改动，不代表完整观测库。NASA 任务观测数据默认 CC0；行的物理含义和单位以原始头与任务文档为准。",
+  "domain": "space",
+  "data_type": "FITS",
+  "tags": [
+    "space",
+    "FITS",
+    "开放数据"
+  ],
+  "metadata": {
+    "curated": true,
+    "catalog_version": 1,
+    "publisher": "NASA FITS Support Office / HST / MAST",
+    "source_url": "https://fits.gsfc.nasa.gov/fits_samples.html",
+    "license": "CC0-1.0",
+    "license_url": "https://science.data.nasa.gov/about/license",
+    "sample_scope": "NASA 官方教学样本 · 非完整观测库",
+    "sample_note": "NASA 官方格式互操作教学样本，原文件原样保存。实际 FILETYPE=ERR，CTYPE1=PIXEL，不把两行解释为通量/波长对。物理含义和单位以原始头及任务文档为准；另见 MAST 数据使用政策 https://stdatu.stsci.edu/publishing/data-use 。",
+    "provenance": [
+      {
+        "path": "FOSy19g0309t_c2f.fits",
+        "download_url": "https://fits.gsfc.nasa.gov/samples/FOSy19g0309t_c2f.fits",
+        "sha256": "059710c4f988f6319e0146f932a68a0ec6ba09d82293b978a294da0c58281086",
+        "size": 43200
+      }
+    ],
+    "inventory_complete": true,
+    "recursive_file_count": 1,
+    "total_size_bytes": 43200
+  },
+  "files": [
+    {
+      "path": "FOSy19g0309t_c2f.fits",
+      "size": 43200,
+      "sha256": "059710c4f988f6319e0146f932a68a0ec6ba09d82293b978a294da0c58281086",
+      "role": "data",
+      "content_type": "application/fits"
+    }
+  ]
+}

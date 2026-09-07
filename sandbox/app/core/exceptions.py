@@ -21,7 +21,6 @@ class AppException(Exception):
         self.message = message
         self.status_code = status_code
         self.data = data
-        logger.error("AppException: %s (code: %d)", message, status_code)
         super().__init__(self.message)
 
 class ResourceNotFoundException(AppException):
@@ -42,7 +41,11 @@ class UnauthorizedException(AppException):
 # Exception handlers
 async def app_exception_handler(request: Request, exc: AppException):
     """Handle application custom exceptions"""
-    logger.error("Processing application exception: %s", exc.message)
+    logger.error(
+        "Processing application exception error_type=%s status_code=%d",
+        type(exc).__name__,
+        exc.status_code,
+    )
     response = Response.error(
         message=exc.message,
         data=exc.data
@@ -54,7 +57,7 @@ async def app_exception_handler(request: Request, exc: AppException):
 
 async def http_exception_handler(request: Request, exc: StarletteHTTPException):
     """Handle HTTP exceptions"""
-    logger.error("Processing HTTP exception: %s (code: %d)", exc.detail, exc.status_code)
+    logger.error("Processing HTTP exception status_code=%d", exc.status_code)
     response = Response.error(
         message=str(exc.detail)
     )
@@ -74,7 +77,11 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
             "type": error.get("type", "")
         })
     
-    logger.error("Validation error: %s", error_messages)
+    logger.error(
+        "Request validation failed error_count=%d error_types=%s",
+        len(error_messages),
+        sorted({str(error.get("type", "unknown"))[:80] for error in errors})[:8],
+    )
     response = Response.error(
         message="Request data validation failed",
         data=error_messages
@@ -86,12 +93,12 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
 
 async def general_exception_handler(request: Request, exc: Exception):
     """Handle all other exceptions"""
-    error_message = f"Internal server error: {str(exc)}"
-    logger.error("Unhandled exception: %s", error_message, exc_info=True)
+    error_message = "Internal server error"
+    logger.error("Unhandled exception error_type=%s", type(exc).__name__)
     response = Response.error(
         message=error_message
     )
     return JSONResponse(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
         content=response.model_dump()
-    ) 
+    )

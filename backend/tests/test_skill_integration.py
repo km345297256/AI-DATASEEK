@@ -1512,13 +1512,16 @@ async def test_agent_domain_service_hydrates_replacement_sandbox_from_session_fi
 
 
 @pytest.mark.asyncio
-async def test_agent_task_runner_pauses_sandbox_on_done_after_browser_cleanup():
+async def test_agent_task_runner_cleans_resources_on_done_in_existing_order():
+    actions = []
+
     class FakeBrowser:
         def __init__(self):
             self.cleaned = False
 
         async def cleanup(self):
             self.cleaned = True
+            actions.append("browser_cleanup")
 
     class FakeSandbox:
         id = "sandbox-1"
@@ -1528,19 +1531,32 @@ async def test_agent_task_runner_pauses_sandbox_on_done_after_browser_cleanup():
 
         async def pause(self):
             self.paused = True
+            actions.append("sandbox_pause")
             return True
+
+    class FakeMCPToolkit:
+        def __init__(self):
+            self.cleaned = False
+
+        async def cleanup(self):
+            self.cleaned = True
+            actions.append("mcp_cleanup")
 
     browser = FakeBrowser()
     sandbox = FakeSandbox()
+    mcp_tool = FakeMCPToolkit()
     runner = AgentTaskRunner.__new__(AgentTaskRunner)
     runner._agent_id = "agent-1"
     runner._browser = browser
     runner._sandbox = sandbox
+    runner._mcp_tool = mcp_tool
 
     await runner.on_done(object())
 
     assert browser.cleaned is True
     assert sandbox.paused is True
+    assert mcp_tool.cleaned is True
+    assert actions == ["browser_cleanup", "sandbox_pause", "mcp_cleanup"]
 
 
 @pytest.mark.asyncio

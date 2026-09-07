@@ -41,7 +41,7 @@
 
     <div class="flex-1 overflow-y-auto px-4 py-4 sm:px-6 sm:py-5">
       <div class="mx-auto flex max-w-[1080px] flex-col gap-4 sm:gap-6">
-        <div class="rounded-xl border border-[var(--border-main)] bg-[var(--background-menu-white)] p-3 sm:p-4">
+        <div v-if="activeTab !== 'credentials'" class="rounded-xl border border-[var(--border-main)] bg-[var(--background-menu-white)] p-3 sm:p-4">
           <label class="flex items-center gap-3 rounded-xl border border-[var(--border-main)] bg-[var(--background-gray-main)] px-3 py-2">
             <Search :size="18" class="shrink-0 text-[var(--icon-secondary)]" />
             <input
@@ -50,7 +50,7 @@
               :placeholder="activeSearchPlaceholder"
             />
           </label>
-          <div class="mt-3 flex gap-1 overflow-x-auto" role="tablist" :aria-label="t('Publisher')">
+          <div v-if="showSourceFilters" class="mt-3 flex gap-1 overflow-x-auto" role="tablist" :aria-label="t('Publisher')">
             <button
               v-for="source in sourceFilters"
               :key="source.key"
@@ -63,6 +63,172 @@
             </button>
           </div>
         </div>
+
+        <ToolCredentialsPanel v-if="activeTab === 'credentials'" />
+
+        <section v-if="activeTab === 'presets'" class="rounded-xl border border-[var(--border-main)] bg-[var(--background-menu-white)] p-4 sm:p-5">
+          <div class="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div class="min-w-0">
+              <h2 class="text-lg font-semibold text-[var(--text-primary)]">{{ t('Domain Presets') }}</h2>
+              <p class="mt-1 text-sm leading-5 text-[var(--text-tertiary)]">
+                {{ t('Presets define a trusted domain tool scope. Configure one on an Agent Profile in Settings.') }}
+              </p>
+            </div>
+            <div class="flex max-w-full shrink-0 flex-col items-start gap-2 sm:items-end">
+              <button
+                type="button"
+                class="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg bg-[var(--Button-primary-black)] px-4 py-2 text-sm font-medium text-[var(--text-onblack)]"
+                @click="openSettingsDialog('agent-profiles')"
+              >
+                <Settings2 :size="16" />
+                {{ t('Configure Agent / Enable pilots') }}
+              </button>
+              <span v-if="presetCatalog?.catalog_revision" class="max-w-full truncate rounded border border-[var(--border-main)] px-2 py-1 font-mono text-[11px] text-[var(--text-tertiary)]" :title="presetCatalog.catalog_revision">
+                {{ t('Revision') }} {{ shortPresetRevision }}
+              </span>
+            </div>
+          </div>
+
+          <div v-if="presetCatalog" class="mb-4 rounded-lg border border-[var(--border-main)] bg-[var(--background-gray-main)] p-3">
+            <div class="text-xs font-medium text-[var(--text-primary)]">{{ t('Default without a profile') }}</div>
+            <div class="mt-2 flex flex-wrap gap-2 text-[11px] text-[var(--text-secondary)]">
+              <span class="rounded border border-[var(--border-main)] bg-[var(--background-menu-white)] px-1.5 py-0.5">{{ presetName(presetCatalog.defaults.preset_id) }}</span>
+              <span class="rounded border border-[var(--border-main)] bg-[var(--background-menu-white)] px-1.5 py-0.5">{{ presetCatalog.defaults.selection_mode === 'on_demand' ? t('On demand') : t('All preset tools') }}</span>
+              <span class="rounded border border-[var(--border-main)] bg-[var(--background-menu-white)] px-1.5 py-0.5">{{ t('Code Mode') }}: {{ t(presetCatalog.defaults.code_mode_enabled ? 'Enabled' : 'Disabled') }}</span>
+              <span class="rounded border border-[var(--border-main)] bg-[var(--background-menu-white)] px-1.5 py-0.5">{{ t('Domain SubAgents') }}: {{ t(presetCatalog.defaults.domain_subagents_enabled ? 'Enabled' : 'Disabled') }}</span>
+            </div>
+          </div>
+
+          <div v-if="presetLoading" class="py-8 text-center text-sm text-[var(--text-tertiary)]">{{ t('Loading') }}...</div>
+          <div v-else-if="presetError" class="rounded-lg border border-[var(--function-error)]/30 bg-[var(--function-error)]/5 p-3 text-sm text-[var(--function-error)]">{{ presetError }}</div>
+          <div v-else-if="filteredPresets.length === 0" class="rounded-xl border border-dashed border-[var(--border-main)] py-8 text-center text-sm text-[var(--text-tertiary)]">
+            {{ t('No domain presets found') }}
+          </div>
+          <div v-else class="grid gap-3 lg:grid-cols-2">
+            <article v-for="preset in filteredPresets" :key="preset.id" class="min-w-0 rounded-lg border border-[var(--border-main)] bg-[var(--background-gray-main)] p-4">
+              <div class="flex items-start justify-between gap-3">
+                <div class="min-w-0">
+                  <div class="break-words text-sm font-semibold text-[var(--text-primary)]">{{ preset.name }}</div>
+                  <div class="mt-0.5 font-mono text-[11px] text-[var(--text-tertiary)]">{{ preset.id }}</div>
+                </div>
+                <div class="flex shrink-0 gap-1 text-[11px] text-[var(--text-tertiary)]">
+                  <span class="rounded border border-[var(--border-main)] px-1.5 py-0.5">{{ preset.initial_tool_count }} / {{ preset.available_tool_count }}</span>
+                </div>
+              </div>
+              <p class="mt-2 break-words text-xs leading-5 text-[var(--text-tertiary)]">{{ preset.description }}</p>
+
+              <div v-if="preset.plugin_ids.length" class="mt-3">
+                <div class="text-[11px] font-medium text-[var(--text-secondary)]">{{ t('Included plugins') }}</div>
+                <div class="mt-1 flex flex-wrap gap-1">
+                  <span v-for="pluginId in preset.plugin_ids" :key="pluginId" class="max-w-full break-all rounded border border-[var(--border-main)] bg-[var(--background-menu-white)] px-1.5 py-0.5 font-mono text-[11px] text-[var(--text-tertiary)]">{{ pluginId }}</span>
+                </div>
+              </div>
+
+              <div class="mt-3">
+                <div class="text-[11px] font-medium text-[var(--text-secondary)]">{{ t('Initial tools for on-demand mode') }}</div>
+                <div v-if="preset.initial_tools.length" class="mt-1 flex flex-wrap gap-1">
+                  <span v-for="toolName in preset.initial_tools" :key="toolName" class="max-w-full break-all rounded border border-[var(--border-main)] bg-[var(--background-menu-white)] px-1.5 py-0.5 font-mono text-[11px] text-[var(--text-tertiary)]">{{ toolName }}</span>
+                </div>
+                <div v-else class="mt-1 text-[11px] text-[var(--text-tertiary)]">{{ t('No initial tools') }}</div>
+              </div>
+
+              <p class="mt-3 text-[11px] leading-4 text-[var(--text-tertiary)]">
+                {{ t('All mode means all tools in this preset. On-demand mode starts with the initial tools and expands within the same preset only.') }}
+              </p>
+            </article>
+          </div>
+        </section>
+
+        <section v-if="activeTab === 'runtime'" class="rounded-xl border border-[var(--border-main)] bg-[var(--background-menu-white)] p-4 sm:p-5">
+          <div class="mb-4 flex flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div class="min-w-0">
+              <h2 class="text-lg font-semibold text-[var(--text-primary)]">{{ t('Analysis Tools') }}</h2>
+              <p class="mt-1 text-sm text-[var(--text-tertiary)]">{{ t('Cordis-managed domain analysis tools available to the agent.') }}</p>
+            </div>
+            <button
+              type="button"
+              class="inline-flex h-11 w-full items-center justify-center gap-1.5 rounded-lg border border-[var(--border-btn-main)] px-3 text-sm text-[var(--text-primary)] hover:bg-[var(--fill-tsp-white-light)] disabled:cursor-not-allowed disabled:opacity-60 sm:h-9 sm:w-auto"
+              :disabled="runtimeLoading || runtimeReloading"
+              @click="reloadRuntime"
+            >
+              <RefreshCw :size="15" :class="runtimeReloading ? 'animate-spin' : ''" />
+              {{ runtimeReloading ? t('Reloading...') : t('Reload runtime') }}
+            </button>
+          </div>
+
+          <div class="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-4 sm:gap-3">
+            <div class="min-w-0 rounded-lg border border-[var(--border-main)] bg-[var(--background-gray-main)] p-3">
+              <div class="text-xs text-[var(--text-tertiary)]">{{ t('Runtime status') }}</div>
+              <div class="mt-1 flex items-center gap-1.5 text-sm font-semibold text-[var(--text-primary)]">
+                <span class="size-2 rounded-full" :class="runtimeSnapshot?.status === 'healthy' && runtimeSnapshot.healthy ? 'bg-[var(--function-success)]' : 'bg-[var(--function-error)]'"></span>
+                {{ runtimeStatusLabel }}
+              </div>
+            </div>
+            <div class="min-w-0 rounded-lg border border-[var(--border-main)] bg-[var(--background-gray-main)] p-3">
+              <div class="text-xs text-[var(--text-tertiary)]">{{ t('Revision') }}</div>
+              <div class="mt-1 truncate font-mono text-sm font-semibold text-[var(--text-primary)]" :title="runtimeSnapshot?.revision || undefined">
+                {{ runtimeRevision }}
+              </div>
+            </div>
+            <div class="min-w-0 rounded-lg border border-[var(--border-main)] bg-[var(--background-gray-main)] p-3">
+              <div class="text-xs text-[var(--text-tertiary)]">{{ t('Plugin count') }}</div>
+              <div class="mt-1 text-sm font-semibold text-[var(--text-primary)]">{{ runtimeSnapshot?.plugin_count ?? '—' }}</div>
+            </div>
+            <div class="min-w-0 rounded-lg border border-[var(--border-main)] bg-[var(--background-gray-main)] p-3">
+              <div class="text-xs text-[var(--text-tertiary)]">{{ t('Tool count') }}</div>
+              <div class="mt-1 text-sm font-semibold text-[var(--text-primary)]">{{ runtimeSnapshot?.tool_count ?? '—' }}</div>
+            </div>
+          </div>
+
+          <div v-if="runtimeSnapshot?.last_error" class="mb-4 rounded-lg border border-[var(--function-error)]/30 bg-[var(--function-error)]/5 p-3 text-sm text-[var(--function-error)]">
+            <div class="font-medium">{{ t('Last reload error') }}</div>
+            <div class="mt-1 break-words text-xs leading-5">{{ runtimeSnapshot.last_error }}</div>
+          </div>
+          <div v-if="runtimeError" class="mb-4 rounded-lg border border-[var(--function-error)]/30 bg-[var(--function-error)]/5 p-3 text-sm text-[var(--function-error)]">
+            {{ runtimeError }}
+          </div>
+
+          <div v-if="runtimeLoading" class="py-8 text-center text-sm text-[var(--text-tertiary)]">{{ t('Loading') }}...</div>
+          <div v-else-if="filteredRuntimePlugins.length === 0" class="rounded-xl border border-dashed border-[var(--border-main)] py-8 text-center text-sm text-[var(--text-tertiary)]">
+            {{ t('No analysis tools found') }}
+          </div>
+          <div v-else class="grid gap-3 lg:grid-cols-2">
+            <article v-for="plugin in pagedRuntimePlugins" :key="plugin.plugin" class="min-w-0 rounded-lg border border-[var(--border-main)] bg-[var(--background-gray-main)] p-4">
+              <div class="flex min-w-0 items-start justify-between gap-3">
+                <div class="min-w-0">
+                  <div class="break-words text-sm font-semibold text-[var(--text-primary)]">{{ plugin.plugin }}</div>
+                  <div class="mt-1 text-xs text-[var(--text-tertiary)]">{{ t('Version') }} {{ plugin.version }}</div>
+                </div>
+                <span class="shrink-0 rounded border border-[var(--border-main)] px-1.5 py-0.5 text-[11px] text-[var(--text-tertiary)]">
+                  {{ plugin.tool_count }} {{ t('Tools') }}
+                </span>
+              </div>
+
+              <div v-if="plugin.errors.length" class="mt-3 rounded-lg border border-[var(--function-error)]/30 bg-[var(--function-error)]/5 p-2.5 text-xs text-[var(--function-error)]">
+                <div class="font-medium">{{ t('Plugin errors') }}</div>
+                <ul class="mt-1 list-disc space-y-1 pl-4">
+                  <li v-for="error in plugin.errors" :key="error" class="break-words">{{ error }}</li>
+                </ul>
+              </div>
+
+              <div v-if="plugin.tools.length" class="mt-3 space-y-2">
+                <div v-for="tool in plugin.tools" :key="tool.name" class="rounded-lg border border-[var(--border-main)] bg-[var(--background-menu-white)] p-2.5">
+                  <div class="break-words font-mono text-xs font-semibold text-[var(--text-primary)]">{{ tool.name }}</div>
+                  <div v-if="tool.description" class="mt-1 break-words text-xs leading-5 text-[var(--text-tertiary)]">{{ tool.description }}</div>
+                  <div v-if="tool.scopes.length" class="mt-2 flex flex-wrap gap-1">
+                    <span v-for="scope in tool.scopes" :key="scope" class="max-w-full break-all rounded border border-[var(--border-main)] px-1.5 py-0.5 text-[11px] text-[var(--text-tertiary)]">{{ scope }}</span>
+                  </div>
+                </div>
+              </div>
+              <div v-else class="mt-3 text-xs text-[var(--text-tertiary)]">{{ t('No tools registered') }}</div>
+            </article>
+          </div>
+          <div v-if="runtimeTotalPages > 1" class="mt-4 flex items-center justify-end gap-2">
+            <button class="rounded-lg border border-[var(--border-main)] px-2 py-1 text-xs text-[var(--text-secondary)] disabled:opacity-40" :disabled="runtimePage === 1" @click="runtimePage--">{{ t('Previous') }}</button>
+            <span class="text-xs text-[var(--text-tertiary)]">{{ runtimePage }} / {{ runtimeTotalPages }}</span>
+            <button class="rounded-lg border border-[var(--border-main)] px-2 py-1 text-xs text-[var(--text-secondary)] disabled:opacity-40" :disabled="runtimePage === runtimeTotalPages" @click="runtimePage++">{{ t('Next') }}</button>
+          </div>
+        </section>
 
         <section v-if="activeTab === 'mcp'" class="rounded-xl border border-[var(--border-main)] bg-[var(--background-menu-white)] p-4 sm:p-5">
           <div class="mb-4 flex flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -385,38 +551,47 @@
 import { computed, defineComponent, h, nextTick, onMounted, reactive, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useRoute, useRouter } from 'vue-router';
-import { Check, Plus, Pencil, Trash2, Upload, Folder, FileText, Search, PanelLeft } from 'lucide-vue-next';
+import { Check, Plus, Pencil, Trash2, Upload, Folder, FileText, Search, PanelLeft, RefreshCw, Settings2 } from 'lucide-vue-next';
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { deleteMCPServer, installMCPServer, listMCPCatalog, saveMCPServer, uninstallMCPServer, type MCPServerInfo, type MCPTransport } from '@/api/mcp';
 import { getSkillDetail, installSkill, listSkillCatalog, uninstallSkill, updateSkillFile, updateSkillScope, uploadSkill, type SkillDetailResponse, type SkillFileContent, type SkillFileNode, type SkillInfo } from '@/api/skill';
 import { createRendererConfig, deleteRendererConfig, installRenderer, listRendererCatalog, uninstallRenderer, updateRendererConfig, type RendererInfo, type RendererRequest } from '@/api/renderer';
+import { getPluginRuntime, reloadPluginRuntime, type PluginRuntimePlugin, type PluginRuntimeSnapshot } from '@/api/pluginRuntime';
+import { getDomainPresetCatalog, type DomainPreset, type DomainPresetCatalog } from '@/api/domainPreset';
+import ToolCredentialsPanel from '@/components/ToolCredentialsPanel.vue';
 import { listBuiltinRenderers, listRenderers, rendererDefinitionsFromConfigs, type RendererDefinition } from '@/renderers/registry';
 import { showErrorToast, showSuccessToast } from '@/utils/toast';
 import { useLeftPanel } from '@/composables/useLeftPanel';
 import { useAuth } from '@/composables/useAuth';
+import { useSettingsDialog } from '@/composables/useSettingsDialog';
 
 const { t } = useI18n();
 const route = useRoute();
 const router = useRouter();
+const { openSettingsDialog } = useSettingsDialog();
 const { isLeftPanelShow, toggleLeftPanel } = useLeftPanel();
 const { currentUser } = useAuth();
 const PAGE_SIZE = 6;
 
-type PluginTab = 'skills' | 'mcp' | 'renderers';
+type PluginTab = 'skills' | 'mcp' | 'renderers' | 'runtime' | 'presets' | 'credentials';
 const tabs = computed<Array<{ key: PluginTab; label: string }>>(() => [
   { key: 'skills', label: t('Skills') },
   { key: 'mcp', label: t('MCP') },
   { key: 'renderers', label: t('Renderers') },
+  { key: 'runtime', label: t('Analysis Tools') },
+  { key: 'presets', label: t('Domain Presets') },
+  { key: 'credentials', label: t('Credentials') },
 ]);
-const tabKeys = new Set<PluginTab>(['skills', 'mcp', 'renderers']);
+const tabKeys = new Set<PluginTab>(['skills', 'mcp', 'renderers', 'runtime', 'presets', 'credentials']);
 const routeTab = typeof route.query.tab === 'string' && tabKeys.has(route.query.tab as PluginTab)
   ? route.query.tab as PluginTab
   : 'skills';
 const activeTab = ref<PluginTab>(routeTab);
 type PluginSource = 'all' | 'official' | 'personal' | 'community';
 const pluginSource = ref<PluginSource>('all');
+const showSourceFilters = computed(() => ['skills', 'mcp', 'renderers'].includes(activeTab.value));
 const sourceFilters = computed<Array<{ key: PluginSource; label: string }>>(() => {
   const filters: Array<{ key: PluginSource; label: string }> = [
     { key: 'all', label: t('All') },
@@ -432,22 +607,32 @@ const pluginUpdating = ref<string | null>(null);
 const skillSearchQuery = ref('');
 const mcpSearchQuery = ref('');
 const rendererSearchQuery = ref('');
+const runtimeSearchQuery = ref('');
+const presetSearchQuery = ref('');
 const activeSearchQuery = computed({
   get: () => ({
     skills: skillSearchQuery.value,
     mcp: mcpSearchQuery.value,
     renderers: rendererSearchQuery.value,
+    runtime: runtimeSearchQuery.value,
+    presets: presetSearchQuery.value,
+    credentials: '',
   })[activeTab.value],
   set: (value: string) => {
     if (activeTab.value === 'skills') skillSearchQuery.value = value;
     else if (activeTab.value === 'mcp') mcpSearchQuery.value = value;
-    else rendererSearchQuery.value = value;
+    else if (activeTab.value === 'renderers') rendererSearchQuery.value = value;
+    else if (activeTab.value === 'runtime') runtimeSearchQuery.value = value;
+    else if (activeTab.value === 'presets') presetSearchQuery.value = value;
   },
 });
 const activeSearchPlaceholder = computed(() => ({
   skills: t('Search skills'),
   mcp: t('Search MCP servers'),
   renderers: t('Search renderers'),
+  runtime: t('Search analysis tools'),
+  presets: t('Search domain presets'),
+  credentials: '',
 })[activeTab.value]);
 
 const setActiveTab = (tab: PluginTab) => {
@@ -506,10 +691,20 @@ const rendererForm = reactive<RendererRequest>({
   config: {},
   is_global: false,
 });
+const runtimeSnapshot = ref<PluginRuntimeSnapshot | null>(null);
+const runtimeLoading = ref(false);
+const runtimeReloading = ref(false);
+const runtimeError = ref('');
+const runtimePage = ref(1);
+const presetCatalog = ref<DomainPresetCatalog | null>(null);
+const presetLoading = ref(false);
+const presetError = ref('');
 
 const normalizedMcpSearch = computed(() => mcpSearchQuery.value.trim().toLowerCase());
 const normalizedSkillSearch = computed(() => skillSearchQuery.value.trim().toLowerCase());
 const normalizedRendererSearch = computed(() => rendererSearchQuery.value.trim().toLowerCase());
+const normalizedRuntimeSearch = computed(() => runtimeSearchQuery.value.trim().toLowerCase());
+const normalizedPresetSearch = computed(() => presetSearchQuery.value.trim().toLowerCase());
 
 const filteredMcpServers = computed(() => {
   const query = normalizedMcpSearch.value;
@@ -542,17 +737,109 @@ const filteredRenderers = computed(() => {
   ].some((value) => String(value || '').toLowerCase().includes(query))));
 });
 
+const filteredRuntimePlugins = computed<PluginRuntimePlugin[]>(() => {
+  const query = normalizedRuntimeSearch.value;
+  const plugins = runtimeSnapshot.value?.plugins || [];
+  if (!query) return plugins;
+  return plugins.filter((plugin) => [
+    plugin.plugin,
+    plugin.version,
+    ...plugin.tools.flatMap((tool) => [tool.name, tool.description, ...tool.scopes]),
+    ...plugin.errors,
+  ].some((value) => String(value || '').toLowerCase().includes(query)));
+});
+
+const filteredPresets = computed<DomainPreset[]>(() => {
+  const query = normalizedPresetSearch.value;
+  const presets = presetCatalog.value?.presets || [];
+  if (!query) return presets;
+  return presets.filter((preset) => [
+    preset.id,
+    preset.name,
+    preset.description,
+    ...preset.plugin_ids,
+    ...preset.initial_tools,
+  ].some((value) => String(value || '').toLowerCase().includes(query)));
+});
+
+const shortPresetRevision = computed(() => {
+  const revision = presetCatalog.value?.catalog_revision || '';
+  return revision.length > 12 ? revision.slice(0, 12) : revision;
+});
+
+const presetName = (presetId: string) => presetCatalog.value?.presets.find((preset) => preset.id === presetId)?.name || presetId;
+
+const runtimeRevision = computed(() => {
+  const revision = runtimeSnapshot.value?.revision;
+  if (!revision) return '—';
+  return revision.length > 12 ? revision.slice(0, 12) : revision;
+});
+
+const runtimeStatusLabel = computed(() => {
+  if (!runtimeSnapshot.value) return t('Unavailable');
+  if (runtimeSnapshot.value.status === 'error') return t('Error');
+  if (runtimeSnapshot.value.healthy) return t('Healthy');
+  return t('Unavailable');
+});
+
 const mcpTotalPages = computed(() => Math.max(1, Math.ceil(filteredMcpServers.value.length / PAGE_SIZE)));
 const skillTotalPages = computed(() => Math.max(1, Math.ceil(filteredSkills.value.length / PAGE_SIZE)));
 const rendererTotalPages = computed(() => Math.max(1, Math.ceil(filteredRenderers.value.length / PAGE_SIZE)));
+const runtimeTotalPages = computed(() => Math.max(1, Math.ceil(filteredRuntimePlugins.value.length / PAGE_SIZE)));
 const pagedMcpServers = computed(() => filteredMcpServers.value.slice((mcpPage.value - 1) * PAGE_SIZE, mcpPage.value * PAGE_SIZE));
 const pagedSkills = computed(() => filteredSkills.value.slice((skillPage.value - 1) * PAGE_SIZE, skillPage.value * PAGE_SIZE));
 const pagedRenderers = computed(() => filteredRenderers.value.slice((rendererPage.value - 1) * PAGE_SIZE, rendererPage.value * PAGE_SIZE));
+const pagedRuntimePlugins = computed(() => filteredRuntimePlugins.value.slice((runtimePage.value - 1) * PAGE_SIZE, runtimePage.value * PAGE_SIZE));
 
 const selectedSkillFile = computed<SkillFileContent | null>(() => {
   if (!selectedSkillDetail.value || !selectedSkillFilePath.value) return null;
   return selectedSkillDetail.value.files.find((file) => file.path === selectedSkillFilePath.value) || null;
 });
+
+const loadRuntime = async () => {
+  runtimeLoading.value = true;
+  runtimeError.value = '';
+  try {
+    runtimeSnapshot.value = await getPluginRuntime();
+  } catch (error) {
+    console.error('Failed to load analysis tools:', error);
+    runtimeError.value = t('Failed to load analysis tools');
+    showErrorToast(runtimeError.value);
+  } finally {
+    runtimeLoading.value = false;
+  }
+};
+
+const loadPresets = async () => {
+  presetLoading.value = true;
+  presetError.value = '';
+  try {
+    presetCatalog.value = await getDomainPresetCatalog();
+  } catch {
+    presetError.value = t('Failed to load domain presets');
+  } finally {
+    presetLoading.value = false;
+  }
+};
+
+const reloadRuntime = async () => {
+  runtimeReloading.value = true;
+  runtimeError.value = '';
+  try {
+    runtimeSnapshot.value = await reloadPluginRuntime();
+    if (runtimeSnapshot.value.status === 'error') {
+      showErrorToast(t('Failed to reload analysis tools'));
+    } else {
+      showSuccessToast(t('Analysis tools reloaded'));
+    }
+  } catch (error) {
+    console.error('Failed to reload analysis tools:', error);
+    runtimeError.value = t('Failed to reload analysis tools');
+    showErrorToast(runtimeError.value);
+  } finally {
+    runtimeReloading.value = false;
+  }
+};
 
 const resetMcpForm = () => {
   mcpForm.name = '';
@@ -989,6 +1276,10 @@ watch(rendererSearchQuery, () => {
   rendererPage.value = 1;
 });
 
+watch(runtimeSearchQuery, () => {
+  runtimePage.value = 1;
+});
+
 watch(pluginSource, () => {
   mcpPage.value = 1;
   skillPage.value = 1;
@@ -1007,6 +1298,15 @@ watch(() => route.query.tab, (tab) => {
   }
 });
 
+// A navigational shortcut only: opening the editor never saves or enables a pilot.
+watch(() => route.query.settings, (settings) => {
+  if (settings !== 'agent-profiles') return;
+  openSettingsDialog('agent-profiles');
+  const query = { ...route.query };
+  delete query.settings;
+  void router.replace({ query });
+}, { immediate: true });
+
 watch(filteredMcpServers, () => {
   if (mcpPage.value > mcpTotalPages.value) mcpPage.value = mcpTotalPages.value;
 });
@@ -1019,10 +1319,16 @@ watch(filteredRenderers, () => {
   if (rendererPage.value > rendererTotalPages.value) rendererPage.value = rendererTotalPages.value;
 });
 
+watch(filteredRuntimePlugins, () => {
+  if (runtimePage.value > runtimeTotalPages.value) runtimePage.value = runtimeTotalPages.value;
+});
+
 onMounted(() => {
   loadMcpServers();
   loadSkills();
   loadRenderers();
+  loadRuntime();
+  loadPresets();
 });
 </script>
 

@@ -149,12 +149,25 @@ async def _worker_headers(node: ExecutionNodeDocument) -> dict[str, str]:
 
 
 class WorkerAgentSandbox(DockerSandbox):
-    def __init__(self, sandbox_id: str, api_url: str, vnc_url: str, cdp_url: str, worker_url: str, headers: Optional[dict[str, str]] = None):
+    def __init__(
+        self,
+        sandbox_id: str,
+        api_url: str,
+        vnc_url: str,
+        cdp_url: str,
+        worker_url: str,
+        headers: Optional[dict[str, str]] = None,
+        image_reference: str | None = None,
+        image_digest: str | None = None,
+    ):
         self._worker_url = worker_url.rstrip("/")
         self._worker_headers = headers or {}
         self.client = httpx.AsyncClient(timeout=600)
         self._container_name = sandbox_id
         self._docker_host = None
+        self._image_reference = image_reference
+        self._image_digest = image_digest
+        self._execution_runtime_kind = "worker_agent"
         self.ip = api_url.split("://", 1)[-1].split(":", 1)[0]
         self.base_url = api_url
         self._vnc_url = vnc_url
@@ -180,7 +193,13 @@ class WorkerAgentSandbox(DockerSandbox):
         return True
 
 
-def _worker_sandbox_from_payload(payload: dict, worker_url: str, headers: Optional[dict[str, str]] = None) -> WorkerAgentSandbox:
+def _worker_sandbox_from_payload(
+    payload: dict,
+    worker_url: str,
+    headers: Optional[dict[str, str]] = None,
+    *,
+    image_reference: str | None = None,
+) -> WorkerAgentSandbox:
     return WorkerAgentSandbox(
         sandbox_id=payload["id"],
         api_url=payload["api_url"],
@@ -188,6 +207,8 @@ def _worker_sandbox_from_payload(payload: dict, worker_url: str, headers: Option
         cdp_url=payload["cdp_url"],
         worker_url=worker_url,
         headers=headers,
+        image_reference=payload.get("image") or image_reference,
+        image_digest=payload.get("image_digest") or payload.get("image_id"),
     )
 
 
@@ -212,7 +233,12 @@ async def _create_worker_sandbox(
     async with httpx.AsyncClient(timeout=30) as client:
         response = await client.post(f"{node.base_url.rstrip('/')}/sandboxes", json=payload, headers=headers)
         response.raise_for_status()
-        return _worker_sandbox_from_payload(response.json(), node.base_url, headers)
+        return _worker_sandbox_from_payload(
+            response.json(),
+            node.base_url,
+            headers,
+            image_reference=payload.get("image"),
+        )
 
 
 async def _get_worker_sandbox(node: ExecutionNodeDocument, sandbox_id: str) -> WorkerAgentSandbox:
@@ -226,7 +252,12 @@ async def _get_worker_sandbox(node: ExecutionNodeDocument, sandbox_id: str) -> W
             params={"public_base_url": node.runtime_config.get("public_base_url") or node.base_url},
         )
         response.raise_for_status()
-        return _worker_sandbox_from_payload(response.json(), node.base_url, headers)
+        return _worker_sandbox_from_payload(
+            response.json(),
+            node.base_url,
+            headers,
+            image_reference=(node.runtime_config or {}).get("image"),
+        )
 
 
 async def _find_worker_sandbox_by_id(sandbox_id: str) -> tuple[Optional[ExecutionNodeDocument], Optional[WorkerAgentSandbox]]:
@@ -259,9 +290,19 @@ async def _assign_worker_sandbox(sandbox: WorkerAgentSandbox, session: Session, 
                     "Worker sandbox %s does not support assign endpoint; using existing sandbox response",
                     sandbox.id,
                 )
-                return _worker_sandbox_from_payload(fallback.json(), sandbox._worker_url, sandbox._worker_headers)
+                return _worker_sandbox_from_payload(
+                    fallback.json(),
+                    sandbox._worker_url,
+                    sandbox._worker_headers,
+                    image_reference=sandbox._image_reference,
+                )
         response.raise_for_status()
-        return _worker_sandbox_from_payload(response.json(), sandbox._worker_url, sandbox._worker_headers)
+        return _worker_sandbox_from_payload(
+            response.json(),
+            sandbox._worker_url,
+            sandbox._worker_headers,
+            image_reference=sandbox._image_reference,
+        )
 
 
 async def _restore_allocation_for_sandbox(sandbox_id: str) -> Optional[SandboxAllocationDocument]:
@@ -284,6 +325,7 @@ def _worker_sandbox_from_allocation(
     allocation: SandboxAllocationDocument,
     worker_url: Optional[str] = None,
     headers: Optional[dict[str, str]] = None,
+    image_reference: str | None = None,
 ) -> WorkerAgentSandbox:
     if not allocation.api_url or not allocation.vnc_url or not allocation.cdp_url:
         raise RuntimeError(f"Sandbox allocation {allocation.sandbox_id} is missing runtime URLs")
@@ -294,6 +336,7 @@ def _worker_sandbox_from_allocation(
         cdp_url=allocation.cdp_url,
         worker_url=worker_url or allocation.api_url,
         headers=headers,
+        image_reference=image_reference,
     )
 
 
@@ -464,6 +507,7 @@ class LocalDockerRuntime:
                 allocation,
                 worker_url=node.base_url if node and node.base_url else allocation.api_url,
                 headers=headers,
+                image_reference=(node.runtime_config or {}).get("image") if node else None,
             )
         if allocation:
             raise RuntimeError(f"Sandbox {sandbox_id} allocation cannot be restored from node {allocation.node_id}")

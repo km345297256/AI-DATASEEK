@@ -4,7 +4,7 @@ from os import PathLike, fspath
 from pathlib import PurePosixPath
 from typing import Any, Dict, List
 
-from pydantic import BaseModel, ConfigDict, Field, HttpUrl, field_validator
+from pydantic import BaseModel, ConfigDict, Field, HttpUrl, field_validator, model_validator
 
 from app.domain.models.dataset import DatasetStorageType
 from app.domain.models.session import SessionStatus
@@ -195,6 +195,7 @@ class DataCenterDatasetResponse(BaseModel):
     data_center_name: str
     name: str
     description: str
+    domain: str = ""
     temporal_coverage: str
     spatial_coverage: str
     data_type: str
@@ -278,17 +279,27 @@ class DataCenterDatasetCatalogResponse(BaseModel):
 class DatasetSubmissionRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    external_id: str = Field(min_length=1, max_length=200)
+    external_id: str | None = Field(default=None, min_length=1, max_length=200)
     name: str = Field(min_length=1, max_length=300)
     summary: str = Field(min_length=1, max_length=4000)
-    keywords: List[str] = Field(min_length=1, max_length=100)
+    keywords: List[str] = Field(default_factory=list, max_length=100)
     storage_directory: str = Field(min_length=1, max_length=4096)
-    token: str = Field(min_length=1, max_length=4096)
+    token: str | None = Field(default=None, min_length=1, max_length=4096)
     ncViewUrl: HttpUrl | None = None
 
-    @field_validator("external_id", "name", "summary", "token")
+    @field_validator("name", "summary")
     @classmethod
     def normalize_required_text(cls, value: str) -> str:
+        normalized = value.strip()
+        if not normalized:
+            raise ValueError("field must not be blank")
+        return normalized
+
+    @field_validator("external_id", "token")
+    @classmethod
+    def normalize_optional_text(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
         normalized = value.strip()
         if not normalized:
             raise ValueError("field must not be blank")
@@ -305,7 +316,7 @@ class DatasetSubmissionRequest(BaseModel):
             if len(item) > 200:
                 raise ValueError("keyword must contain at most 200 characters")
             normalized.append(item)
-        if not normalized:
+        if values and not normalized:
             raise ValueError("at least one keyword is required")
         return normalized
 
@@ -318,6 +329,89 @@ class DatasetSubmissionRequest(BaseModel):
         if any(ord(character) < 32 for character in normalized):
             raise ValueError("server storage directory contains control characters")
         return normalized
+
+
+class DatasetRegistrationRequest(BaseModel):
+    """Persist one owner-scoped, already-present server directory."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    name: str = Field(min_length=1, max_length=300)
+    description: str = Field(default="", max_length=4000)
+    domain: str = Field(min_length=1, max_length=100)
+    storage_directory: str = Field(min_length=1, max_length=4096)
+
+    @field_validator("name", "domain")
+    @classmethod
+    def normalize_required_text(cls, value: str) -> str:
+        normalized = value.strip()
+        if not normalized:
+            raise ValueError("field must not be blank")
+        return normalized
+
+    @field_validator("domain")
+    @classmethod
+    def validate_domain(cls, value: str) -> str:
+        from app.domain.services.domain_presets import get_domain_preset
+
+        get_domain_preset(value)
+        return value
+
+    @field_validator("description")
+    @classmethod
+    def normalize_description(cls, value: str) -> str:
+        return value.strip()
+
+    @field_validator("storage_directory")
+    @classmethod
+    def normalize_storage_directory(cls, value: str) -> str:
+        normalized = value.strip()
+        if not normalized:
+            raise ValueError("server storage directory must not be blank")
+        if any(ord(character) < 32 for character in normalized):
+            raise ValueError("server storage directory contains control characters")
+        return normalized
+
+
+class DatasetMetadataUpdateRequest(BaseModel):
+    """Editable catalog fields; storage identity is deliberately immutable."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    name: str | None = Field(default=None, min_length=1, max_length=300)
+    description: str | None = Field(default=None, max_length=4000)
+    domain: str | None = Field(default=None, min_length=1, max_length=100)
+
+    @field_validator("name", "domain")
+    @classmethod
+    def normalize_optional_required_text(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        normalized = value.strip()
+        if not normalized:
+            raise ValueError("field must not be blank")
+        return normalized
+
+    @field_validator("domain")
+    @classmethod
+    def validate_domain(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        from app.domain.services.domain_presets import get_domain_preset
+
+        get_domain_preset(value)
+        return value
+
+    @field_validator("description")
+    @classmethod
+    def normalize_optional_description(cls, value: str | None) -> str | None:
+        return value.strip() if value is not None else None
+
+    @model_validator(mode="after")
+    def require_change(self) -> "DatasetMetadataUpdateRequest":
+        if self.name is None and self.description is None and self.domain is None:
+            raise ValueError("at least one editable field is required")
+        return self
 
 
 class DatasetSuggestedQuestionsResponse(BaseModel):

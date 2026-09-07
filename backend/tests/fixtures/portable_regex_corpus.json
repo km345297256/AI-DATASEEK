@@ -1,0 +1,23 @@
+[
+  {"pattern": "^[a-zA-Z0-9_+-]+$", "accepted": true},
+  {"pattern": "^-?[0-9]*:-?[0-9]*(?::-?[0-9]+)?$", "accepted": true},
+  {"pattern": "^[a-z]+(?:_[0-9]{1,4})?$", "accepted": true},
+  {"pattern": "^file\\.[a-z]+$", "accepted": true},
+  {"pattern": "\\p{L}+", "accepted": false},
+  {"pattern": "\\u{1F600}", "accepted": false},
+  {"pattern": "\\a", "accepted": false},
+  {"pattern": "\\_", "accepted": false},
+  {"pattern": "[^]", "accepted": false},
+  {"pattern": "[]", "accepted": false},
+  {"pattern": "[]a]", "accepted": false},
+  {"pattern": "{", "accepted": false},
+  {"pattern": "a{", "accepted": false},
+  {"pattern": "a}", "accepted": false},
+  {"pattern": "(?=a)", "accepted": false},
+  {"pattern": "(?<name>a)", "accepted": false},
+  {"pattern": "a++", "accepted": false},
+  {"pattern": "a{2}+", "accepted": false},
+  {"pattern": "^(a+)+$", "accepted": false},
+  {"pattern": "^(a|aa)+$", "accepted": false},
+  {"pattern": "^a*a*a*a*a*a*a*a*b$", "accepted": false}
+]

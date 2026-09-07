@@ -18,6 +18,8 @@ from app.domain.services.agent_task_runner import AgentTaskRunner
 from app.domain.external.task import Task, TaskInputClosedError
 from typing import Type
 from app.domain.external.file import FileStorage
+from app.domain.external.plugin_runtime import PluginRuntime, PluginRuntimeError
+from app.domain.external.spill import SpillArtifactStore
 from app.domain.external.sandbox_runtime import SandboxNotFoundError, SandboxRuntime
 from app.domain.models.file import FileInfo
 from app.domain.repositories.mcp_repository import MCPRepository
@@ -31,6 +33,7 @@ from app.application.services.data_center_dataset_service import DataCenterDatas
 from app.application.services.dataset_request_resolver import DatasetRequestResolver, FrontControllerResolution
 from app.application.services.jupyter_service import JupyterService
 from app.domain.services.lightweight_task_runner import LightweightTaskRunner
+from app.domain.services.tools.pipeline import opaque_log_identifier
 
 # Setup logging
 logger = logging.getLogger(__name__)
@@ -54,6 +57,11 @@ class AgentDomainService:
         mcp_repository: MCPRepository,
         search_engine: Optional[SearchEngine] = None,
         sandbox_runtime: Optional[SandboxRuntime] = None,
+        plugin_runtime: Optional[PluginRuntime] = None,
+        spill_artifact_store: Optional[SpillArtifactStore] = None,
+        analysis_job_service=None,
+        tool_approval_service=None,
+        credential_service=None,
     ):
         self._repository = agent_repository
         self._session_repository = session_repository
@@ -63,6 +71,11 @@ class AgentDomainService:
         self._file_storage = file_storage
         self._mcp_repository = mcp_repository
         self._sandbox_runtime = sandbox_runtime or get_default_sandbox_runtime(sandbox_cls)
+        self._plugin_runtime = plugin_runtime
+        self._spill_artifact_store = spill_artifact_store
+        self._analysis_job_service = analysis_job_service
+        self._tool_approval_service = tool_approval_service
+        self._credential_service = credential_service
         self._dataset_service = DataCenterDatasetService()
         self._dataset_request_resolver = DatasetRequestResolver()
         self._chat_bootstrap_tasks: set[asyncio.Task] = set()
@@ -75,6 +88,12 @@ class AgentDomainService:
     async def shutdown(self) -> None:
         """Clean up all Agent's resources"""
         logger.info("Starting to close all Agents")
+        bootstrap_tasks = list(self._chat_bootstrap_tasks)
+        for task in bootstrap_tasks:
+            task.cancel()
+        await asyncio.gather(*bootstrap_tasks, return_exceptions=True)
+
+        # No bootstrap can create a new Task after this registry teardown.
         await self._task_cls.destroy()
         prewarm_tasks = list(self._jupyter_prewarm_tasks)
         for task in prewarm_tasks:
@@ -88,18 +107,29 @@ class AgentDomainService:
             return
 
         async def warm() -> None:
+            session_ref = opaque_log_identifier(session.id, namespace="session")
             try:
                 await JupyterService().prewarm(
                     session_id=session.id,
                     user_id=session.user_id,
                     sandbox_id=session.sandbox_id,
                 )
-                logger.info("Prewarmed Jupyter for session %s", session.id)
+                logger.info("Prewarmed Jupyter session=%s", session_ref)
             except Exception as exc:
                 # Prewarming must never delay or fail the analysis request.
-                logger.warning("Jupyter prewarm failed for session %s: %s", session.id, exc)
+                logger.warning(
+                    "Jupyter prewarm failed session=%s error_type=%s",
+                    session_ref,
+                    type(exc).__name__,
+                )
 
-        task = asyncio.create_task(warm(), name=f"jupyter-prewarm-{session.id}")
+        task = asyncio.create_task(
+            warm(),
+            name=(
+                "jupyter-prewarm-"
+                f"{opaque_log_identifier(session.id, namespace='session')}"
+            ),
+        )
         self._jupyter_prewarm_tasks.add(task)
         task.add_done_callback(self._jupyter_prewarm_tasks.discard)
 
@@ -110,6 +140,7 @@ class AgentDomainService:
         front_controller_resolution: Optional[FrontControllerResolution] = None,
     ) -> Task:
         """Create a new agent task"""
+        await self._ensure_plugin_runtime_ready()
         sandbox_runtime = self._sandbox_runtime
         sandbox = None
         sandbox_replaced = False
@@ -121,18 +152,22 @@ class AgentDomainService:
                 await self._retire_replaced_sandbox(stale_sandbox, sandbox_id)
             except SandboxNotFoundError:
                 logger.info(
-                    "Session %s sandbox %s was already gone before dataset remount",
-                    session.id,
-                    sandbox_id,
+                    "Sandbox already gone before dataset remount session=%s sandbox=%s",
+                    opaque_log_identifier(session.id, namespace="session"),
+                    opaque_log_identifier(sandbox_id, namespace="sandbox"),
                 )
             except Exception as exc:
-                logger.error("Failed to retire sandbox %s before dataset remount: %s", sandbox_id, exc)
+                logger.error(
+                    "Failed to retire sandbox before dataset remount sandbox=%s error_type=%s",
+                    opaque_log_identifier(sandbox_id, namespace="sandbox"),
+                    type(exc).__name__,
+                )
                 raise RuntimeError("The previous analysis environment could not be safely released") from exc
             logger.info(
-                "Replacing session %s sandbox because dataset mounts changed from %s to %s",
-                session.id,
-                session.sandbox_dataset_ids,
-                requested_dataset_ids,
+                "Replacing sandbox after dataset mounts changed session=%s old_count=%d new_count=%d",
+                opaque_log_identifier(session.id, namespace="session"),
+                len(session.sandbox_dataset_ids),
+                len(requested_dataset_ids),
             )
             session.sandbox_id = None
             session.sandbox_dataset_ids = []
@@ -144,24 +179,32 @@ class AgentDomainService:
             try:
                 sandbox = await sandbox_runtime.restore(sandbox_id)
                 if hasattr(sandbox, "is_paused") and await sandbox.is_paused():
-                    logger.info("Session %s sandbox %s is paused; resuming", session.id, sandbox_id)
+                    logger.info(
+                        "Sandbox is paused; resuming session=%s sandbox=%s",
+                        opaque_log_identifier(session.id, namespace="session"),
+                        opaque_log_identifier(sandbox_id, namespace="sandbox"),
+                    )
                     if not await sandbox.resume():
-                        logger.warning("Session %s sandbox %s failed to resume; creating a replacement", session.id, sandbox_id)
+                        logger.warning(
+                            "Sandbox failed to resume; creating replacement session=%s sandbox=%s",
+                            opaque_log_identifier(session.id, namespace="session"),
+                            opaque_log_identifier(sandbox_id, namespace="sandbox"),
+                        )
                         await self._retire_replaced_sandbox(sandbox, sandbox_id)
                         sandbox = None
                     elif not await self._wait_for_resumed_sandbox(sandbox):
                         logger.warning(
-                            "Session %s sandbox %s did not become ready after resume; retiring it before replacement",
-                            session.id,
-                            sandbox_id,
+                            "Sandbox not ready after resume; retiring before replacement session=%s sandbox=%s",
+                            opaque_log_identifier(session.id, namespace="session"),
+                            opaque_log_identifier(sandbox_id, namespace="sandbox"),
                         )
                         await self._retire_replaced_sandbox(sandbox, sandbox_id)
                         sandbox = None
                 elif hasattr(sandbox, "is_available") and not await sandbox.is_available():
                     logger.warning(
-                        "Session %s sandbox %s is unavailable; retiring it before replacement",
-                        session.id,
-                        sandbox_id,
+                        "Sandbox unavailable; retiring before replacement session=%s sandbox=%s",
+                        opaque_log_identifier(session.id, namespace="session"),
+                        opaque_log_identifier(sandbox_id, namespace="sandbox"),
                     )
                     await self._retire_replaced_sandbox(sandbox, sandbox_id)
                     sandbox = None
@@ -172,16 +215,20 @@ class AgentDomainService:
                 # is still healthy and owned by this session. Never delete it
                 # just because the bounded admission queue timed out.
                 raise
-            except SandboxNotFoundError as exc:
+            except SandboxNotFoundError:
                 logger.info(
-                    "Session %s sandbox %s no longer exists: %s",
-                    session.id,
-                    sandbox_id,
-                    exc,
+                    "Sandbox no longer exists session=%s sandbox=%s",
+                    opaque_log_identifier(session.id, namespace="session"),
+                    opaque_log_identifier(sandbox_id, namespace="sandbox"),
                 )
                 sandbox = None
             except Exception as e:
-                logger.warning("Session %s sandbox %s could not be restored: %s", session.id, sandbox_id, e)
+                logger.warning(
+                    "Sandbox could not be restored session=%s sandbox=%s error_type=%s",
+                    opaque_log_identifier(session.id, namespace="session"),
+                    opaque_log_identifier(sandbox_id, namespace="sandbox"),
+                    type(e).__name__,
+                )
                 if sandbox is not None:
                     await self._retire_replaced_sandbox(sandbox, sandbox_id)
                     sandbox = None
@@ -236,7 +283,10 @@ class AgentDomainService:
 
         browser = await sandbox.get_browser()
         if not browser:
-            logger.error(f"Failed to get browser for Sandbox {sandbox_id}")
+            logger.error(
+                "Failed to get browser sandbox=%s",
+                opaque_log_identifier(sandbox_id, namespace="sandbox"),
+            )
             raise RuntimeError(f"Failed to get browser for Sandbox {sandbox_id}")
 
         await self._session_repository.save(session)
@@ -254,6 +304,11 @@ class AgentDomainService:
             mcp_repository=self._mcp_repository,
             llm_overrides=session.llm_overrides,
             front_controller_resolution=front_controller_resolution,
+            plugin_runtime=self._plugin_runtime,
+            spill_artifact_store=self._spill_artifact_store,
+            analysis_job_service=self._analysis_job_service,
+            tool_approval_service=self._tool_approval_service,
+            credential_service=self._credential_service,
         )
 
         task = self._task_cls.create(task_runner)
@@ -265,6 +320,23 @@ class AgentDomainService:
 
         return task
 
+    async def _ensure_plugin_runtime_ready(self) -> None:
+        """Recover a crashed Cordis child before capturing a task snapshot.
+
+        Startup remains fail-closed: if the catalog cannot be recovered, the
+        existing Agent flow is still created with zero Cordis tools.
+        """
+        runtime = self._plugin_runtime
+        if runtime is None or runtime.healthy:
+            return
+        try:
+            await runtime.start()
+        except PluginRuntimeError as exc:
+            logger.warning(
+                "Cordis plugin runtime is unavailable for this task error_type=%s",
+                type(exc).__name__,
+            )
+
     async def _create_lightweight_task(self, session: Session, resolution: FrontControllerResolution) -> Task:
         runner = LightweightTaskRunner(
             session_id=session.id,
@@ -272,13 +344,14 @@ class AgentDomainService:
             resolution=resolution,
             session_repository=self._session_repository,
             file_storage=self._file_storage,
+            llm_overrides=session.llm_overrides,
         )
         task = self._task_cls.create(runner)
         session.task_id = task.id
         await self._session_repository.save(session)
         logger.info(
-            "Session %s selected %s execution without sandbox allocation",
-            session.id,
+            "Selected execution without sandbox allocation session=%s mode=%s",
+            opaque_log_identifier(session.id, namespace="session"),
             resolution.mode,
         )
         return task
@@ -297,7 +370,11 @@ class AgentDomainService:
                 )
                 return True
             except Exception as exc:
-                logger.warning("Resumed sandbox %s did not become ready: %s", sandbox.id, exc)
+                logger.warning(
+                    "Resumed sandbox did not become ready sandbox=%s error_type=%s",
+                    opaque_log_identifier(sandbox.id, namespace="sandbox"),
+                    type(exc).__name__,
+                )
                 return False
         is_available = getattr(sandbox, "is_available", None)
         return bool(await is_available()) if callable(is_available) else True
@@ -319,8 +396,8 @@ class AgentDomainService:
         pause = getattr(sandbox, "pause", None)
         if callable(pause) and await pause():
             logger.warning(
-                "Sandbox %s could not be destroyed but was paused before replacement",
-                sandbox_id,
+                "Sandbox could not be destroyed but was paused before replacement sandbox=%s",
+                opaque_log_identifier(sandbox_id, namespace="sandbox"),
             )
             return
         raise _SandboxRetirementError(
@@ -374,19 +451,19 @@ class AgentDomainService:
                     if result.success:
                         return True
                     logger.warning(
-                        "Failed to hydrate file %s into replacement sandbox %s: %s",
-                        file_info.file_path,
-                        sandbox.id,
-                        result.message,
+                        "Failed to hydrate file into replacement sandbox file=%s sandbox=%s message_chars=%d",
+                        opaque_log_identifier(file_info.file_path, namespace="file"),
+                        opaque_log_identifier(sandbox.id, namespace="sandbox"),
+                        len(str(result.message or "")),
                     )
                 except Exception as exc:
                     logger.warning(
-                        "Failed to hydrate file %s (%s) for session %s into replacement sandbox %s: %s",
-                        file_info.file_path,
-                        file_info.file_id,
-                        session.id,
-                        sandbox.id,
-                        exc,
+                        "Failed to hydrate file into replacement sandbox file=%s object=%s session=%s sandbox=%s error_type=%s",
+                        opaque_log_identifier(file_info.file_path, namespace="file"),
+                        opaque_log_identifier(file_info.file_id, namespace="object"),
+                        opaque_log_identifier(session.id, namespace="session"),
+                        opaque_log_identifier(sandbox.id, namespace="sandbox"),
+                        type(exc).__name__,
                     )
                 finally:
                     if staged_file is not None:
@@ -409,10 +486,10 @@ class AgentDomainService:
             else:
                 failed += 1
         logger.info(
-            "Session %s hydrated replacement sandbox %s from previous sandbox %s: restored=%d failed=%d",
-            session.id,
-            sandbox.id,
-            previous_sandbox_id,
+            "Hydrated replacement sandbox session=%s sandbox=%s previous=%s restored=%d failed=%d",
+            opaque_log_identifier(session.id, namespace="session"),
+            opaque_log_identifier(sandbox.id, namespace="sandbox"),
+            opaque_log_identifier(previous_sandbox_id, namespace="sandbox"),
             restored,
             failed,
         )
@@ -430,7 +507,10 @@ class AgentDomainService:
         """Stop a session"""
         session = await self._session_repository.find_by_id(session_id)
         if not session:
-            logger.error(f"Attempted to stop non-existent Session {session_id}")
+            logger.error(
+                "Attempted to stop non-existent session=%s",
+                opaque_log_identifier(session_id, namespace="session"),
+            )
             raise RuntimeError("Session not found")
         task = await self._get_task(session)
         if task:
@@ -460,9 +540,9 @@ class AgentDomainService:
                 destroyed = await sandbox.destroy()
             except SandboxNotFoundError:
                 logger.info(
-                    "Session %s sandbox %s was already gone during deletion",
-                    session.id,
-                    session.sandbox_id,
+                    "Sandbox already gone during deletion session=%s sandbox=%s",
+                    opaque_log_identifier(session.id, namespace="session"),
+                    opaque_log_identifier(session.sandbox_id, namespace="sandbox"),
                 )
                 return
             if destroyed is False:
@@ -481,15 +561,24 @@ class AgentDomainService:
         return task
 
     async def _handle_chat_bootstrap_error(self, session_id: str, exc: BaseException) -> None:
-        logger.exception("Chat bootstrap failed for session %s: %s", session_id, exc)
+        session_ref = opaque_log_identifier(session_id, namespace="session")
+        logger.error(
+            "Chat bootstrap failed session=%s error_type=%s",
+            session_ref,
+            type(exc).__name__,
+        )
         try:
             await self._session_repository.add_event(
                 session_id,
                 ErrorEvent(error=public_error_message(exc)),
             )
             await self._session_repository.update_status(session_id, SessionStatus.COMPLETED)
-        except Exception:
-            logger.exception("Failed to persist chat bootstrap error for session %s", session_id)
+        except Exception as persist_error:
+            logger.error(
+                "Failed to persist chat bootstrap error session=%s error_type=%s",
+                session_ref,
+                type(persist_error).__name__,
+            )
 
     async def _resume_claimed_chat_task(self, session_id: str, task: Optional[Task]) -> None:
         """Restart a claimed task when its queued message has not started yet."""
@@ -498,7 +587,11 @@ class AgentDomainService:
         is_empty = getattr(task.input_stream, "is_empty", None)
         if not callable(is_empty) or await is_empty():
             return
-        logger.info("Restarting task %s with a previously claimed queued message", task.id)
+        logger.info(
+            "Restarting task with previously claimed queued message task=%s session=%s",
+            opaque_log_identifier(task.id, namespace="task"),
+            opaque_log_identifier(session_id, namespace="session"),
+        )
         await self._session_repository.update_status(session_id, SessionStatus.RUNNING)
         await task.run()
 
@@ -576,9 +669,9 @@ class AgentDomainService:
                 )
                 if not client_message_claimed:
                     logger.info(
-                        "Ignoring duplicate client message %s for session %s",
-                        client_message_id,
-                        session.id,
+                        "Ignoring duplicate client message=%s session=%s",
+                        opaque_log_identifier(client_message_id, namespace="message"),
+                        opaque_log_identifier(session.id, namespace="session"),
                     )
                     if task is not None or session.status != SessionStatus.RUNNING:
                         await self._resume_claimed_chat_task(session.id, task)
@@ -588,9 +681,9 @@ class AgentDomainService:
                     # lost on a backend restart. Reclaim the orphaned claim while
                     # holding the per-session bootstrap lock.
                     logger.warning(
-                        "Reclaiming client message %s for session %s after task registry loss",
-                        client_message_id,
-                        session.id,
+                        "Reclaiming client message=%s session=%s after task registry loss",
+                        opaque_log_identifier(client_message_id, namespace="message"),
+                        opaque_log_identifier(session.id, namespace="session"),
                     )
                     await self._session_repository.release_client_message_id(
                         session.id,
@@ -659,18 +752,18 @@ class AgentDomainService:
                     )
                 except Exception as exc:
                     logger.error(
-                        "Session %s Front Controller failed before task creation: %s",
-                        session.id,
-                        exc,
+                        "Front Controller failed before task creation session=%s error_type=%s",
+                        opaque_log_identifier(session.id, namespace="session"),
+                        type(exc).__name__,
                     )
                     raise RuntimeError("The request could not be safely classified") from exc
 
             if task is None or task.done:
                 if session.task_id and task is None:
                     logger.warning(
-                        "Session %s references missing task %s; creating a new task",
-                        session.id,
-                        session.task_id,
+                        "Session references missing task; creating a new task session=%s task=%s",
+                        opaque_log_identifier(session.id, namespace="session"),
+                        opaque_log_identifier(session.task_id, namespace="task"),
                     )
                 task = (
                     await self._create_lightweight_task(session, controller_resolution)
@@ -712,6 +805,20 @@ class AgentDomainService:
                     client_message_id,
                 )
 
+            # Seal the producer identity before Redis assigns its independent
+            # transport cursor. The private identity is never serialized.
+            message_event.bind_producer_event_id()
+
+            reserve_sequence = getattr(
+                self._session_repository,
+                "reserve_event_sequence",
+                None,
+            )
+            if callable(reserve_sequence):
+                # Input events use the same session sequence as output events.
+                # Reserve before serializing so every Redis payload carries the
+                # exact sequence later written to history.
+                await reserve_sequence(session.id, message_event)
             payload = message_event.model_dump_json()
             enqueue_input = getattr(task, "enqueue_input", None)
 
@@ -757,7 +864,11 @@ class AgentDomainService:
                 await self._session_repository.add_event(session.id, message_event)
 
             await task.run()
-            logger.debug("Put message into Session %s's event queue: %s...", session.id, message[:50])
+            logger.debug(
+                "Queued user message session=%s chars=%d",
+                opaque_log_identifier(session.id, namespace="session"),
+                len(message),
+            )
             return task
         except Exception as exc:
             release_claim = queued_event_id is None
@@ -766,13 +877,14 @@ class AgentDomainService:
                     release_claim = bool(
                         await task.input_stream.delete_message(queued_event_id)
                     )
-                except Exception:
+                except Exception as cleanup_error:
                     # Keep the claim when queue cleanup is uncertain. A retry can
                     # resume the same queued task without enqueueing a duplicate.
-                    logger.exception(
-                        "Failed to remove queued client message %s from task %s",
-                        client_message_id,
-                        task.id,
+                    logger.error(
+                        "Failed to remove queued client message=%s task=%s error_type=%s",
+                        opaque_log_identifier(client_message_id, namespace="message"),
+                        opaque_log_identifier(task.id, namespace="task"),
+                        type(cleanup_error).__name__,
                     )
             if client_message_claimed and release_claim and client_message_id:
                 try:
@@ -780,11 +892,12 @@ class AgentDomainService:
                         session.id,
                         client_message_id,
                     )
-                except Exception:
-                    logger.exception(
-                        "Failed to release client message %s for session %s",
-                        client_message_id,
-                        session.id,
+                except Exception as release_error:
+                    logger.error(
+                        "Failed to release client message=%s session=%s error_type=%s",
+                        opaque_log_identifier(client_message_id, namespace="message"),
+                        opaque_log_identifier(session.id, namespace="session"),
+                        type(release_error).__name__,
                     )
             await self._handle_chat_bootstrap_error(session.id, exc)
             raise
@@ -796,6 +909,7 @@ class AgentDomainService:
         message: Optional[str] = None,
         timestamp: Optional[datetime] = None,
         latest_event_id: Optional[str] = None,
+        latest_event_seq: Optional[int] = None,
         attachments: Optional[List[dict]] = None,
         skills: Optional[List[str]] = None,
         mcp_servers: Optional[List[str]] = None,
@@ -811,7 +925,11 @@ class AgentDomainService:
         try:
             session = await self._session_repository.find_by_id_and_user_id(session_id, user_id)
             if not session:
-                logger.error(f"Attempted to chat with non-existent Session {session_id} for user {user_id}")
+                logger.error(
+                    "Attempted to chat with non-existent session=%s user=%s",
+                    opaque_log_identifier(session_id, namespace="session"),
+                    opaque_log_identifier(user_id, namespace="user"),
+                )
                 raise RuntimeError("Session not found")
 
             if llm_overrides is not None:
@@ -840,35 +958,128 @@ class AgentDomainService:
                 )
                 task = await asyncio.shield(bootstrap_task)
             
-            logger.info(f"Session {session_id} started")
-            logger.debug(f"Session {session_id} task: {task}")
+            logger.info(
+                "Session stream started session=%s",
+                opaque_log_identifier(session_id, namespace="session"),
+            )
+            logger.debug(
+                "Session task selected session=%s task=%s",
+                opaque_log_identifier(session_id, namespace="session"),
+                opaque_log_identifier(getattr(task, "id", None), namespace="task"),
+            )
             await self._session_repository.update_unread_message_count(session_id, 0)
-           
-            while task and not task.done:
-                event_id, event_str = await task.output_stream.get(start_id=latest_event_id, block_ms=0)
+
+            # Versioned clients resume from durable history by sequence first,
+            # then attach to the current Redis task stream.  Legacy clients that
+            # only send a Redis ``event_id`` retain the previous behavior.
+            last_seen_seq = max(0, latest_event_seq) if latest_event_seq is not None else None
+            replay_terminal_seq: Optional[int] = None
+            if last_seen_seq is not None:
+                get_events_after = getattr(
+                    self._session_repository,
+                    "get_events_after",
+                    None,
+                )
+                if callable(get_events_after):
+                    replay_events = await get_events_after(session_id, last_seen_seq)
+                else:
+                    get_events = getattr(self._session_repository, "get_events", None)
+                    historical_events = await get_events(session_id) if callable(get_events) else []
+                    replay_events = [
+                        item
+                        for item in historical_events
+                        if item.seq is not None and item.seq > last_seen_seq
+                    ]
+                for replay_event in replay_events:
+                    event_seq = replay_event.seq
+                    if event_seq is None or event_seq <= last_seen_seq:
+                        continue
+                    last_seen_seq = event_seq
+                    # User messages have always been rendered optimistically and
+                    # were never emitted on the output SSE stream.  Advancing the
+                    # cursor without yielding preserves that UI contract.
+                    if isinstance(replay_event, MessageEvent) and replay_event.role == "user":
+                        continue
+                    yield replay_event
+                    replay_terminal_seq = (
+                        event_seq
+                        if isinstance(replay_event, (DoneEvent, ErrorEvent, WaitEvent))
+                        else None
+                    )
+
+                # A terminal event closes the stream even if the runner has not
+                # yet completed its final cleanup.  A later user event has a
+                # greater sequence and clears this condition for the next turn.
+                if replay_terminal_seq == last_seen_seq:
+                    return
+
+            redis_start_id = "0-0" if last_seen_seq is not None else latest_event_id
+            while task:
+                # A task can finish in the narrow window between the durable
+                # history query above and attaching to Redis. Always drain an
+                # already-finished stream non-blockingly before returning.
+                # While it is running, use a bounded block so a task that exits
+                # without publishing cannot leave the SSE request hung forever.
+                task_was_done = task.done
+                event_id, event_str = await task.output_stream.get(
+                    start_id=redis_start_id,
+                    block_ms=None if task_was_done else 1000,
+                )
                 latest_event_id = event_id
                 if event_str is None:
-                    logger.debug(f"No event found in Session {session_id}'s event queue")
+                    logger.debug(
+                        "No event found in session queue session=%s",
+                        opaque_log_identifier(session_id, namespace="session"),
+                    )
+                    # If the task completed during this bounded read, loop once
+                    # more: its final XADD may have landed immediately after
+                    # the timeout. Only an empty read that *started* after the
+                    # task was already done proves the stream is drained.
+                    if task_was_done:
+                        break
                     continue
+                redis_start_id = event_id
                 event = TypeAdapter(AgentEvent).validate_json(event_str)
                 event.id = event_id
-                logger.debug(f"Got event from Session {session_id}'s event queue: {type(event).__name__}")
+                if last_seen_seq is not None and event.seq is not None:
+                    if event.seq <= last_seen_seq:
+                        continue
+                    last_seen_seq = event.seq
+                logger.debug(
+                    "Got event from session queue session=%s event_type=%s",
+                    opaque_log_identifier(session_id, namespace="session"),
+                    type(event).__name__,
+                )
                 yield event
                 if isinstance(event, (DoneEvent, ErrorEvent, WaitEvent)):
                     break
             
-            logger.info(f"Session {session_id} completed")
+            logger.info(
+                "Session stream completed session=%s",
+                opaque_log_identifier(session_id, namespace="session"),
+            )
 
         except asyncio.CancelledError:
-            logger.info("Session %s stream disconnected; agent task continues", session_id)
+            logger.info(
+                "Session stream disconnected; agent task continues session=%s",
+                opaque_log_identifier(session_id, namespace="session"),
+            )
             raise
         except Exception as e:
-            logger.exception(f"Error in Session {session_id}")
+            logger.error(
+                "Session stream failed session=%s error_type=%s",
+                opaque_log_identifier(session_id, namespace="session"),
+                type(e).__name__,
+            )
             event = ErrorEvent(error=public_error_message(e))
             try:
                 await self._session_repository.add_event(session_id, event)
             except Exception as persist_error:
-                logger.warning("Failed to persist Session %s stream error: %s", session_id, persist_error)
+                logger.warning(
+                    "Failed to persist session stream error session=%s error_type=%s",
+                    opaque_log_identifier(session_id, namespace="session"),
+                    type(persist_error).__name__,
+                )
             yield event # TODO: raise api exception
 
     async def _resolve_message_attachments(
