@@ -5,6 +5,13 @@ reintroduce removed product domains (Claw, A2A, scientific-site publishing,
 knowledge-base indexing, or broad platform administration) without an explicit
 architecture decision.
 
+## Git workflow
+
+Unless the user explicitly specifies another branch, use `v2` as the default
+branch for commits and pushes in this repository. Do not commit directly to
+`main` by default. This branch preference does not authorize automatic commits
+or pushes; perform those actions only when the user requests them.
+
 ## Services
 
 | Service | Stack | Purpose |

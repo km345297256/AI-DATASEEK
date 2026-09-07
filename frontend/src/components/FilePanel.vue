@@ -247,16 +247,18 @@ watch([isShow, visible], ([shown, rendered]) => {
   if (!shown || !rendered) stopResize()
 })
 
+const handleToolPanelShown = () => {
+  hideFilePanel()
+  visible.value = false
+}
+
 onMounted(() => {
-  eventBus.on(EVENT_SHOW_TOOL_PANEL, () => {
-    isShow.value = false
-    visible.value = false
-  })
+  eventBus.on(EVENT_SHOW_TOOL_PANEL, handleToolPanelShown)
 })
 
 onUnmounted(() => {
   stopResize()
-  eventBus.off(EVENT_SHOW_TOOL_PANEL)
+  eventBus.off(EVENT_SHOW_TOOL_PANEL, handleToolPanelShown)
 })
 
 defineExpose({

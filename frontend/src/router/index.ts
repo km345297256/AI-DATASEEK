@@ -1,4 +1,5 @@
 import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router'
+import { installFilePanelRouteLifecycle } from '@/composables/useFilePanel'
 
 const MainLayout = () => import('@/pages/MainLayout.vue')
 const HomePage = () => import('@/pages/HomePage.vue')
@@ -82,6 +83,8 @@ export const router = createRouter({
   history: createWebHistory(),
   routes,
 })
+
+installFilePanelRouteLifecycle(router)
 
 let rendererConfigsLoaded = false
 

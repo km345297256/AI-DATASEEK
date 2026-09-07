@@ -547,7 +547,7 @@ const profileDomainMismatch = computed(() => {
   const preset = selectedProfile.value?.tool_runtime?.preset_id;
   return Boolean(dataset.value?.domain && preset && preset !== 'general' && preset !== dataset.value.domain);
 });
-const { showFilePanel } = useFilePanel();
+const { showFilePanel, hideFilePanel, beginFilePreview } = useFilePanel();
 const dataset = ref<DataCenterDataset>();
 const dataProducts = ref<DataProduct[]>([]);
 const productDialogVisible = ref(false);
@@ -1056,20 +1056,21 @@ async function openShapefilePreview() {
   const candidates = outputFiles.filter(file => /\.(?:shp|zip|rar)$/i.test(file.filename));
   const source = candidates[candidates.length - 1];
   if (!source) return;
+  const previewRequest = beginFilePreview();
   shapefilePreviewLoading.value = true;
   try {
     if (/\.shp$/i.test(source.filename)) {
       const stem = source.filename.replace(/\.[^.]+$/, '').toLowerCase();
-      showFilePanel(source, outputFiles.filter(file => file.filename.replace(/\.[^.]+$/, '').toLowerCase() === stem));
+      previewRequest.show(source, outputFiles.filter(file => file.filename.replace(/\.[^.]+$/, '').toLowerCase() === stem));
       return;
     }
     const prepared = await prepareShapefilePreview(source.file_id);
     const files = prepared.layers.flatMap(layer => layer.components);
     const layer = prepared.layers.find(item => item.complete) || prepared.layers[0];
     const selected = layer?.components.find(file => /\.shp$/i.test(file.filename));
-    if (selected) showFilePanel(selected, files);
+    if (selected) previewRequest.show(selected, files);
   } catch (error) {
-    showErrorToast(error instanceof Error ? error.message : 'Shapefile预览准备失败');
+    if (previewRequest.isCurrent()) showErrorToast(error instanceof Error ? error.message : 'Shapefile预览准备失败');
   } finally {
     shapefilePreviewLoading.value = false;
   }
@@ -1269,6 +1270,7 @@ function askSuggestion(question: string) {
 }
 
 function clearConversationState() {
+  hideFilePanel();
   closeToolPanel();
   shouldFollowTimeline.value = true;
   lastEventId.value = undefined;

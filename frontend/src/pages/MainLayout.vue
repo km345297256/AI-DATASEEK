@@ -34,11 +34,9 @@ import FilePanel from '@/components/FilePanel.vue';
 import SettingsDialog from '@/components/settings/SettingsDialog.vue';
 import { onMounted, watch } from 'vue';
 import { useRoute } from 'vue-router';
-import { useFilePanel } from '@/composables/useFilePanel';
 import { useLeftPanel } from '@/composables/useLeftPanel';
 
 const route = useRoute();
-const { hideFilePanel } = useFilePanel();
 const { isLeftPanelShow, hideLeftPanel } = useLeftPanel();
 
 const isMobileViewport = () => window.matchMedia('(max-width: 639px)').matches;
@@ -50,7 +48,6 @@ onMounted(() => {
 watch(
   () => route.fullPath,
   () => {
-    hideFilePanel();
     if (isMobileViewport()) hideLeftPanel();
   }
 );
