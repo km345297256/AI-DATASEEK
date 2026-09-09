@@ -23,8 +23,7 @@ import httpx
 
 from check_extended_visualization_workers import JCAMP, METPY_OPTIONS, _fixtures, _remove_owned
 from check_visualization_http import business_snapshot
-from app.application.services.extended_visualization import MAX_OUTPUT, validate_payload
-from app.application.services.scientific_visualization import ScientificVisualizationResult
+from app.application.services.unified_visualization import VisualizationResult
 from app.application.services.visualization_jobs import scope_for_file
 from app.core.config import get_settings
 from app.domain.models.spill import SpillArtifactOwner
@@ -50,7 +49,7 @@ async def snapshot(database):
 
 
 async def main():
-    prefix = "visualization-v2-http-" + uuid.uuid4().hex
+    prefix = "visualization-unified-http-" + uuid.uuid4().hex
     base = os.environ.get("DATASEEK_VERIFY_BASE_URL", "http://frontend")
     uploaded, deleted, scopes, cleanup_errors = [], [], {}, []
     checks, negatives, job_checks = [], {}, {}
@@ -86,7 +85,7 @@ async def main():
 
             async def upload(name, data, content_type="application/octet-stream"):
                 response = await client.post("/api/v1/files", files={"file": (prefix + "-" + name, data, content_type)},
-                                            data={"metadata": json.dumps({"source": "visualization_v2_http_regression", "regression_run": prefix})})
+                                            data={"metadata": json.dumps({"source": "visualization_unified_http_regression", "regression_run": prefix})})
                 response.raise_for_status()
                 envelope = response.json()
                 value = envelope.get("data", {})
@@ -103,13 +102,15 @@ async def main():
                 return file_id
 
             async def preview(file_id, plugin, reader, kind, options=None):
-                value = await request("POST", file_path(file_id, "/visualization-v2"),
-                                      json={"plugin_id": plugin, "kind": kind, "options": options or {}})
+                value = await request("POST", file_path(file_id, "/visualization"),
+                                      json={"plugin_id": plugin, "operation": "preview", "kind": kind, "options": options or {}})
                 assert value["plugin_id"] == plugin
                 assert re.fullmatch(r"[0-9a-f]{64}", value["version"]) and re.fullmatch(r"[0-9a-f]{64}", value["revision"])
-                validate_payload({k: v for k, v in value.items() if k not in {"plugin_id", "version", "revision"}}, reader, kind, MAX_OUTPUT)
-                checks.append({"plugin": plugin, "reader": reader, "kind": kind, "media_type": value["media_type"]})
-                return value
+                parsed = VisualizationResult.model_validate(value)
+                assert parsed.payload["view_kind"] == kind
+                assert parsed.kind in {"table", "array", "tree", "media", "report", "series"}
+                checks.append({"plugin": plugin, "reader": reader, "kind": parsed.kind, "media_type": parsed.payload.get("media_type")})
+                return {**parsed.payload, "metadata": parsed.metadata}
 
             async def wait_job(file_id, job_id, *, database_only=False):
                 deadline = time.monotonic() + 70
@@ -118,7 +119,7 @@ async def main():
                         value = await database.analysis_jobs.find_one({"job_id": job_id, "user_id": user_id, "session_id": scopes[file_id]})
                         assert value is not None, "Owned job disappeared before cleanup"
                     else:
-                        value = await request("GET", file_path(file_id, "/visualization-jobs/" + job_id))
+                        value = await request("GET", file_path(file_id, "/visualization/jobs/" + job_id))
                     if value["status"] in TERMINAL:
                         return value
                     await asyncio.sleep(.25)
@@ -136,20 +137,19 @@ async def main():
                 # /auth/me endpoint or a guessed administrator identifier.
                 user_id = (await get_current_user()).id
                 assert isinstance(user_id, str) and user_id
-                v1 = await request("GET", "/api/v1/visualizations")
-                v2 = await request("GET", "/api/v1/visualizations?contract_version=2")
-                assert v1["engine"] == v2["engine"] == "cordis"
-                assert v1["plugins"] and all(p["contract_version"] == 1 for p in v1["plugins"])
-                assert set(p["id"] for p in v1["plugins"]) <= set(p["id"] for p in v2["plugins"])
-                assert any(p["contract_version"] == 2 for p in v2["plugins"])
-                catalog = {p["id"]: p for p in v2["plugins"]}
+                unified = await request("GET", "/api/v1/visualizations")
+                assert unified["engine"] == "cordis"
+                assert len(unified["plugins"]) == 36 and all(p["contract_version"] == 2 for p in unified["plugins"])
+                assert all("data_kind" not in p and p["capabilities"]["operations"] for p in unified["plugins"])
+                catalog = {p["id"]: p for p in unified["plugins"]}
                 needed = {"viz-plotly", "viz-h5web", "viz-excel", "viz-rdkit", "viz-metpy", "viz-word", "viz-powerpoint", "viz-jsroot", "viz-nmrium", "viz-pdfjs", "netcdf-series"}
                 assert needed <= set(catalog) and all(catalog[p]["enabled"] for p in needed), "A required capability is disabled; no unrelated user preference will be changed"
                 original_fastqc = catalog["viz-fastqc"]["enabled"]
                 if not original_fastqc:
                     await set_fastqc(True)
-                checks.append({"catalog": "version_negotiation", "v1_plugins": len(v1["plugins"]), "v2_plugins": len(v2["plugins"])})
-                await expect("GET", "/api/v1/visualizations?contract_version=3", 422, "unsupported_contract_version")
+                checks.append({"catalog": "single_protocol", "plugins": len(unified["plugins"])})
+                obsolete_query = await request("GET", "/api/v1/visualizations?contract_version=1")
+                assert [(p["id"], p["contract_version"], p["capabilities"]) for p in obsolete_query["plugins"]] == [(p["id"], p["contract_version"], p["capabilities"]) for p in unified["plugins"]]
 
                 # Numeric 1 equals True in Python, but must never be an explicit
                 # user confirmation. Reject before file lookup or job writes.
@@ -160,7 +160,7 @@ async def main():
                 jobs_before_confirmation = await database.analysis_jobs.count_documents({})
                 assert await database.analysis_jobs.count_documents({"user_id": user_id, "session_id": confirmation_scope}) == 0
                 for value, label in [(1, "qc_integer_confirmation_rejected"), (1.0, "qc_float_confirmation_rejected")]:
-                    await expect("POST", file_path(confirmation_id, "/visualization-jobs"), 422, label,
+                    await expect("POST", file_path(confirmation_id, "/visualization/jobs"), 422, label,
                                  json={"plugin_id": "viz-fastqc", "kind": "report", "options": {"confirm": value}})
                     assert await database.analysis_jobs.count_documents({"user_id": user_id, "session_id": confirmation_scope}) == 0
                     assert await database.analysis_jobs.count_documents({}) == jobs_before_confirmation
@@ -177,9 +177,10 @@ async def main():
                 table_id = await upload("table.csv", csv, "text/csv")
                 table = await preview(table_id, "viz-plotly", "tabular", "table")
                 assert table["table"]["rows"] == [["0", "1.5"], ["1", "2.5"]]
-                legacy_csv = await request("GET", file_path(table_id, "/preview?mode=csv"))
+                legacy_csv = (await request("POST", file_path(table_id, "/visualization"), json={"plugin_id": "csv", "operation": "page"}))["payload"]
                 assert legacy_csv["headers"] == ["x", "y"] and legacy_csv["rows"] == [["0", "1.5"], ["1", "2.5"]]
-                legacy_text = await request("GET", file_path(table_id, "/preview?mode=text"))
+                text_id = await upload("text.txt", csv, "text/plain")
+                legacy_text = (await request("POST", file_path(text_id, "/visualization"), json={"plugin_id": "text", "operation": "page"}))["payload"]
                 assert legacy_text["text"] == csv.decode()
                 downloaded = await client.get(file_path(table_id, "/download"))
                 downloaded.raise_for_status()
@@ -191,10 +192,10 @@ async def main():
                 hdf = await preview(hdf_id, "viz-h5web", "hdf5", "heatmap", {"path": "/entry/signal", "indices": [1]})
                 assert hdf["array"]["values"] == list(range(12, 24))
                 nc_id = await upload("classic-compatible.nc", files["NETCDF4.nc"])
-                legacy_science = await request("POST", file_path(nc_id, "/visualization"), json={"plugin_id": "netcdf-series"})
-                science = ScientificVisualizationResult.model_validate(legacy_science)
-                assert science.y == [1.5, 2.5, 3.5]
-                checks.append({"legacy": "scientific_v1", "passed": True})
+                legacy_science = await request("POST", file_path(nc_id, "/visualization"), json={"plugin_id": "netcdf-series", "operation": "preview"})
+                science = VisualizationResult.model_validate(legacy_science)
+                assert science.kind == "series" and science.payload["y"] == [1.5, 2.5, 3.5]
+                checks.append({"existing_feature": "netcdf_series", "passed": True})
 
                 excel_id = await upload("book.xlsx", files["book.xlsx"])
                 excel = await preview(excel_id, "viz-excel", "excel", "table", {"sheet": "Measurements"})
@@ -210,7 +211,7 @@ async def main():
                 await preview(ppt_id, "viz-powerpoint", "office", "pdf")
                 pdf = base64.b64decode(word["data_base64"], validate=True)
                 pdf_id = await upload("converted.pdf", pdf, "application/pdf")
-                binary = await client.post(file_path(pdf_id, "/visualization-content"), json={"plugin_id": "viz-pdfjs"})
+                binary = await client.post(file_path(pdf_id, "/visualization"), json={"plugin_id": "viz-pdfjs", "operation": "bytes"})
                 binary.raise_for_status()
                 assert binary.content == pdf and binary.headers["x-content-type-options"] == "nosniff"
                 assert binary.headers["cache-control"] == "no-store" and re.fullmatch(r"[0-9a-f]{64}", binary.headers["x-preview-version"])
@@ -221,31 +222,34 @@ async def main():
                 nmr_id = await upload("spectrum.jdx", JCAMP)
                 await preview(nmr_id, "viz-nmrium", "jcamp", "series")
 
-                endpoint = file_path(table_id, "/visualization-v2")
-                await expect("POST", endpoint, 409, "stale_file_version", json={"plugin_id": "viz-plotly", "version": "0" * 64})
-                await expect("POST", endpoint, 422, "format_mismatch", json={"plugin_id": "viz-excel"})
-                await expect("POST", endpoint, 404, "missing_plugin", json={"plugin_id": prefix + "-missing"})
-                await expect("POST", file_path(prefix + "-missing", "/visualization-v2"), 404, "missing_file", json={"plugin_id": "viz-plotly"})
+                endpoint = file_path(table_id, "/visualization")
+                await expect("POST", endpoint, 409, "stale_file_version", json={"plugin_id": "viz-plotly", "operation": "preview", "version": "0" * 64})
+                await expect("POST", endpoint, 422, "format_mismatch", json={"plugin_id": "viz-excel", "operation": "preview"})
+                await expect("POST", endpoint, 404, "missing_plugin", json={"plugin_id": "missing-plugin", "operation": "preview"})
+                await expect("POST", file_path(prefix + "-missing", "/visualization"), 404, "missing_file", json={"plugin_id": "viz-plotly", "operation": "preview"})
+                await expect("POST", file_path(table_id, "/visualization-v2"), 404, "obsolete_v2_route_removed", json={"plugin_id": "viz-plotly"})
+                await expect("POST", file_path(table_id, "/visualization-content"), 404, "obsolete_content_route_removed", json={"plugin_id": "viz-plotly"})
+                await expect("GET", file_path(table_id, "/preview"), 404, "obsolete_page_route_removed")
 
                 fastq = b"".join(f"@read{i}\n".encode() + b"ACGT" * 25 + b"\n+\n" + b"I" * 100 + b"\n" for i in range(500))
                 fastq_id = await upload("quality.fastq", fastq)
                 other_fastq_id = await upload("other-quality.fastq", b"@one\nACGT\n+\nIIII\n")
-                job_base = file_path(fastq_id, "/visualization-jobs")
+                job_base = file_path(fastq_id, "/visualization/jobs")
                 body = {"plugin_id": "viz-fastqc", "kind": "report", "options": {"confirm": True}}
-                await expect("POST", file_path(fastq_id, "/visualization-v2"), 422, "qc_not_automatic_preview", json=body)
+                await expect("POST", file_path(fastq_id, "/visualization"), 422, "qc_not_automatic_preview", json={**body, "operation": "preview"})
                 await expect("POST", job_base, 422, "qc_requires_confirmation", json={"plugin_id": "viz-fastqc", "options": {}})
                 await expect("POST", job_base, 409, "qc_stale_version", json={**body, "version": "0" * 64})
                 created = await request("POST", job_base, json=body)
                 job_id = created["job_id"]
                 assert re.fullmatch(r"[0-9a-f]{32}", job_id)
                 assert created["tool_name"] == "visualization:viz-fastqc"
-                await expect("GET", file_path(other_fastq_id, "/visualization-jobs/" + job_id), 404, "qc_cross_file_owner_isolation")
+                await expect("GET", file_path(other_fastq_id, "/visualization/jobs/" + job_id), 404, "qc_cross_file_owner_isolation")
                 completed = await wait_job(fastq_id, job_id)
                 assert completed["status"] == "succeeded", "Explicit QC job did not succeed"
                 assert re.fullmatch(r"spill://artifact/[0-9a-f]{32}", completed["result_spill"]["locator"])
                 result = await request("GET", job_base + "/" + job_id + "/result")
-                validate_payload({k: v for k, v in result.items() if k not in {"version", "revision", "plugin_id"}}, "fastqc", "report", MAX_OUTPUT)
-                basic = next(section for section in result["sections"] if section["name"] == "Basic Statistics")
+                assert VisualizationResult.model_validate(result).kind == "report"
+                basic = next(section for section in result["payload"]["sections"] if section["name"] == "Basic Statistics")
                 assert ["Total Sequences", "500"] in basic["rows"]
                 assert result["metadata"]["engines"] == ["FastQC", "MultiQC"]
                 artifact_records = await database.spill_artifacts.find({"owner_user_id": user_id, "owner_session_id": scopes[fastq_id]}).to_list()
@@ -284,7 +288,7 @@ async def main():
                             records = await database.analysis_jobs.find({"user_id": user_id, "session_id": scope}).to_list()
                             for record in records:
                                 if record["status"] in ACTIVE:
-                                    response = await client.post(file_path(file_id, "/visualization-jobs/" + record["job_id"] + "/cancel"), headers={"X-Analysis-Job-Action": "cancel"})
+                                    response = await client.post(file_path(file_id, "/visualization/jobs/" + record["job_id"] + "/cancel"), headers={"X-Analysis-Job-Action": "cancel"})
                                     response.raise_for_status()
                                     await wait_job(file_id, record["job_id"], database_only=True)
                             assert not await database.analysis_jobs.count_documents({"user_id": user_id, "session_id": scope, "status": {"$in": list(ACTIVE)}})
@@ -298,7 +302,7 @@ async def main():
                 if restore_fastqc and original_fastqc is not None:
                     try:
                         await request("PATCH", "/api/v1/visualizations/viz-fastqc/state", json={"enabled": original_fastqc})
-                        catalog = await request("GET", "/api/v1/visualizations?contract_version=2")
+                        catalog = await request("GET", "/api/v1/visualizations")
                         preference_restored = next(p for p in catalog["plugins"] if p["id"] == "viz-fastqc")["enabled"] == original_fastqc
                         assert preference_restored
                     except Exception:

@@ -1,5 +1,5 @@
 {
-  "contract_version": 1,
+  "contract_version": 2,
   "id": "tiff",
   "version": "1.0.0",
   "name": "TIFF 栅格",
@@ -11,8 +11,7 @@
   "filenames": [],
   "view_kind": "image",
   "adapter": "tiff",
-  "data_kind": "file",
-  "reader": null,
+  "reader": "binary",
   "default_enabled": true,
   "priority": 50,
   "permissions": [
@@ -21,5 +20,12 @@
   "limits": {
     "max_input_bytes": 67108864,
     "max_output_bytes": 16777216
+  },
+  "capabilities": {
+    "operations": [
+      "bytes"
+    ],
+    "input_mode": "whole",
+    "shared": true
   }
 }

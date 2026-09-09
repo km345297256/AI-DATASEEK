@@ -29,7 +29,9 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
-import { getFileDownloadUrl, type FileInfo } from '../../api/file';
+import type { FileInfo } from '../../api/file';
+import { loadPluginBytes, loadPluginText } from '../../visualizations/runtime';
+import type { VisualizationPlugin } from '../../visualizations/contract';
 import { getSessionFiles, getSharedSessionFiles } from '../../api/agent';
 import { useFilePanel } from '../../composables/useFilePanel';
 import { useSessionFileList } from '../../composables/useSessionFileList';
@@ -42,6 +44,7 @@ import {
 
 const props = defineProps<{
   file: FileInfo;
+  plugin: VisualizationPlugin;
 }>();
 
 const { relatedFiles } = useFilePanel();
@@ -56,13 +59,9 @@ const loads = usePreviewLoad();
 const resolvedCount = computed(() => objectUrls.value.length);
 
 const createBlobUrl = async (file: FileInfo, load: PreviewLoad) => {
-  const url = await getFileDownloadUrl(file);
+  const bytes = await loadPluginBytes(props.file, props.plugin, load.signal, file);
   load.assertCurrent();
-  const response = await fetch(url, { signal: load.signal });
-  if (!response.ok) throw new Error(`HTTP ${response.status}`);
-  const blob = await response.blob();
-  load.assertCurrent();
-  const objectUrl = URL.createObjectURL(blob);
+  const objectUrl = URL.createObjectURL(new Blob([bytes], { type: file.content_type || 'application/octet-stream' }));
   load.onDispose(() => URL.revokeObjectURL(objectUrl));
   objectUrls.value.push(objectUrl);
   return objectUrl;
@@ -169,11 +168,7 @@ const loadHtml = async (file: FileInfo) => {
   objectUrls.value = [];
 
   try {
-    const url = await getFileDownloadUrl(file);
-    load.assertCurrent();
-    const response = await fetch(url, { signal: load.signal });
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    const html = await response.text();
+    const html = await loadPluginText(file, props.plugin, load.signal);
     load.assertCurrent();
     await ensureRelatedFiles(load);
     if (!load.isCurrent()) return;

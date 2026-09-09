@@ -19,10 +19,11 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
-import { getFileDownloadUrl } from '../../api/file';
+import { loadPluginBytes } from '../../visualizations/runtime';
+import type { VisualizationPlugin } from '../../visualizations/contract';
 import type { FileInfo } from '../../api/file';
 import { usePreviewLoad } from '../../composables/usePreviewLoad';
-import { readBoundedBinary, validateTiffDimensions } from '../../visualizations/boundedBinary';
+import { validateTiffDimensions } from '../../visualizations/boundedBinary';
 
 interface TiffImageDirectory {
   width: number;
@@ -47,6 +48,7 @@ declare global {
 
 const props = defineProps<{
   file: FileInfo;
+  plugin: VisualizationPlugin;
 }>();
 
 const { t } = useI18n();
@@ -98,11 +100,7 @@ const renderTiff = async (file: FileInfo) => {
 
   status.value = t('Loading TIFF image...');
   try {
-    const url = await getFileDownloadUrl(file);
-    load.assertCurrent();
-    const response = await fetch(url, { signal: load.signal });
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    const buffer = await readBoundedBinary(response, 64 * 1024 * 1024, load.signal);
+    const buffer = await loadPluginBytes(file, props.plugin, load.signal);
     if (!load.isCurrent()) return;
 
     const UTIF = await loadUTIF();

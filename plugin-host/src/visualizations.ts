@@ -6,55 +6,29 @@ import { Context, Service, type Fiber, type Plugin } from '@deepseek-ai/cordis'
 
 import { CatalogValidationError } from './errors.js'
 import { cloneJson, deepFreeze, sha256, stableStringify } from './json.js'
+import { VISUALIZATION_ADAPTERS, VISUALIZATION_CONTRACT_VERSION, type VisualizationAdapter,
+  type VisualizationReader, type VisualizationOperation, type VisualizationInputMode,
+  type VisualizationKind } from './visualization-adapters.generated.js'
+export { VISUALIZATION_ADAPTERS } from './visualization-adapters.generated.js'
 
-export const VISUALIZATION_ADAPTERS = {
-  image: ['file', null, 'image'],
-  tiff: ['file', null, 'image'],
-  shapefile: ['file', null, 'map'],
-  molecular: ['file', null, 'structure'],
-  obj: ['file', null, 'structure'],
-  html: ['file', null, 'document'],
-  markdown: ['file', null, 'document'],
-  text: ['file', null, 'text'],
-  csv: ['file', null, 'table'],
-  'scientific-map': ['scientific', 'netcdf', 'map'],
-  'scientific-series': ['scientific', ['netcdf', 'fits'], 'series'],
-  'scientific-image': ['scientific', 'fits', 'image'],
-  'scientific-quality': ['scientific', 'fastq', 'series'],
-  'v2-plotly': ['extended', 'tabular', 'series'],
-  'v2-h5web': ['extended', 'hdf5', 'image'],
-  'v2-vtk': ['extended', 'binary', 'structure'],
-  'v2-jsroot': ['extended', 'root', 'series'],
-  'v2-rdkit': ['extended', 'rdkit', 'image'],
-  'v2-molstar': ['extended', 'binary', 'structure'],
-  'v2-nmrium': ['extended', 'jcamp', 'series'],
-  'v2-openlayers': ['extended', 'binary', 'map'],
-  'v2-maplibre': ['extended', 'binary', 'map'],
-  'v2-cesium': ['extended', 'binary', 'map'],
-  'v2-aladin': ['extended', 'binary', 'map'],
-  'v2-metpy': ['extended', 'metpy', 'image'],
-  'v2-igv': ['extended', 'binary', 'series'],
-  'v2-viv': ['extended', 'binary', 'image'],
-  'v2-niivue': ['extended', 'binary', 'image'],
-  'v2-fastqc': ['extended', 'fastqc', 'table'],
-  'v2-pdfjs': ['extended', 'binary', 'document'],
-  'v2-word': ['extended', 'office', 'document'],
-  'v2-excel': ['extended', 'excel', 'table'],
-  'v2-powerpoint': ['extended', 'office', 'document'],
-} as const
+export interface VisualizationCapabilities {
+  operations: VisualizationOperation[]
+  input_mode: VisualizationInputMode
+  shared: boolean
+}
 
 export interface VisualizationDescriptor {
-  contract_version: 1 | 2
+  contract_version: 2
   id: string
   version: string
   name: string
   description: string
   extensions: string[]
   filenames: string[]
-  view_kind: 'image' | 'map' | 'series' | 'table' | 'text' | 'structure' | 'document'
-  adapter: keyof typeof VISUALIZATION_ADAPTERS
-  data_kind: 'file' | 'scientific' | 'extended'
-  reader: null | 'netcdf' | 'fits' | 'fastq' | 'binary' | 'tabular' | 'hdf5' | 'rdkit' | 'metpy' | 'fastqc' | 'office' | 'excel' | 'root' | 'jcamp'
+  view_kind: VisualizationKind
+  adapter: VisualizationAdapter
+  reader: VisualizationReader
+  capabilities: VisualizationCapabilities
   default_enabled: boolean
   priority: number
   permissions: ['file:read']
@@ -68,7 +42,7 @@ export interface VisualizationSnapshot {
 }
 
 const FIELDS = new Set(['contract_version', 'id', 'version', 'name', 'description',
-  'extensions', 'filenames', 'view_kind', 'adapter', 'data_kind', 'reader',
+  'extensions', 'filenames', 'view_kind', 'adapter', 'reader', 'capabilities',
   'default_enabled', 'priority', 'permissions', 'limits'])
 const DEFAULT_DIRECTORY = resolve(dirname(fileURLToPath(import.meta.url)), '../visualizations')
 const MAX_MANIFEST_BYTES = 16 * 1024
@@ -86,7 +60,7 @@ function reject(): never {
 export function validateVisualization(value: unknown): VisualizationDescriptor {
   if (!record(value) || Object.keys(value).length !== FIELDS.size
     || Object.keys(value).some(key => !FIELDS.has(key))) reject()
-  if (![1, 2].includes(value.contract_version as number) || typeof value.id !== 'string'
+  if (value.contract_version !== VISUALIZATION_CONTRACT_VERSION || typeof value.id !== 'string'
     || !/^[a-z][a-z0-9-]{0,63}$/.test(value.id)
     || typeof value.version !== 'string' || !/^[0-9A-Za-z][0-9A-Za-z.+_-]{0,63}$/.test(value.version)
     || typeof value.name !== 'string' || !value.name.trim() || value.name.length > 120
@@ -103,10 +77,16 @@ export function validateVisualization(value: unknown): VisualizationDescriptor {
   }
   if (!(value.extensions as unknown[]).length && !(value.filenames as unknown[]).length) reject()
   if (typeof value.adapter !== 'string' || !Object.hasOwn(VISUALIZATION_ADAPTERS, value.adapter)) reject()
-  if (value.contract_version !== (value.adapter.startsWith('v2-') ? 2 : 1)) reject()
   const spec = VISUALIZATION_ADAPTERS[value.adapter as keyof typeof VISUALIZATION_ADAPTERS]
-  if (value.data_kind !== spec[0] || value.view_kind !== spec[2]
-    || (Array.isArray(spec[1]) ? !spec[1].includes(value.reader as never) : value.reader !== spec[1])) reject()
+  if (value.view_kind !== spec.view_kind || !(spec.readers as readonly unknown[]).includes(value.reader)) reject()
+  if (!record(value.capabilities)
+    || Object.keys(value.capabilities).sort().join(',') !== 'input_mode,operations,shared'
+    || !Array.isArray(value.capabilities.operations)
+    || value.capabilities.operations.length !== spec.capabilities.operations.length
+    || new Set(value.capabilities.operations).size !== value.capabilities.operations.length
+    || value.capabilities.operations.some(operation => !(spec.capabilities.operations as readonly unknown[]).includes(operation))
+    || value.capabilities.input_mode !== spec.capabilities.input_mode
+    || value.capabilities.shared !== spec.capabilities.shared) reject()
   if (!Array.isArray(value.permissions) || value.permissions.length !== 1
     || value.permissions[0] !== 'file:read') reject()
   if (!record(value.limits) || Object.keys(value.limits).sort().join(',') !== 'max_input_bytes,max_output_bytes') reject()
@@ -163,7 +143,7 @@ export class VisualizationCatalogService extends Service {
   snapshot(): VisualizationSnapshot {
     const plugins = [...this.registrations.values()].map(item => cloneJson(item.plugin))
       .sort((a, b) => a.id < b.id ? -1 : a.id > b.id ? 1 : 0)
-    return deepFreeze({ engine: 'cordis', revision: sha256(stableStringify({ contract_version: 1, plugins })), plugins })
+    return deepFreeze({ engine: 'cordis', revision: sha256(stableStringify({ contract_version: VISUALIZATION_CONTRACT_VERSION, plugins })), plugins })
   }
 }
 

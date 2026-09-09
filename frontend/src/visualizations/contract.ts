@@ -1,9 +1,16 @@
-/** Public, versioned capability contract. No script, URL or component entry is executable. */
-export const ADAPTER_IDS = ['image', 'tiff', 'shapefile', 'molecular', 'obj', 'html', 'markdown', 'text', 'csv', 'scientific-map', 'scientific-series', 'scientific-image', 'scientific-quality', 'v2-plotly', 'v2-h5web', 'v2-vtk', 'v2-jsroot', 'v2-rdkit', 'v2-molstar', 'v2-nmrium', 'v2-openlayers', 'v2-maplibre', 'v2-cesium', 'v2-aladin', 'v2-metpy', 'v2-igv', 'v2-viv', 'v2-niivue', 'v2-fastqc', 'v2-pdfjs', 'v2-word', 'v2-excel', 'v2-powerpoint'] as const;
-export type VisualizationAdapter = typeof ADAPTER_IDS[number];
-export type VisualizationKind = 'image' | 'map' | 'series' | 'table' | 'text' | 'structure' | 'document';
+/** One data-only capability contract. Registry entries cannot introduce executable code or URLs. */
+import { VISUALIZATION_ADAPTERS, VISUALIZATION_CONTRACT_VERSION } from './adapters.generated.ts';
+import type { VisualizationAdapter, VisualizationKind, VisualizationReader, VisualizationOperation, VisualizationInputMode } from './adapters.generated.ts';
+export type { VisualizationAdapter, VisualizationKind, VisualizationReader, VisualizationOperation, VisualizationInputMode } from './adapters.generated.ts';
+export const ADAPTER_IDS = Object.keys(VISUALIZATION_ADAPTERS) as VisualizationAdapter[];
+
+export interface VisualizationCapabilities {
+  operations: VisualizationOperation[];
+  input_mode: VisualizationInputMode;
+  shared: boolean;
+}
 export interface VisualizationPlugin {
-  contract_version: 1 | 2;
+  contract_version: 2;
   id: string;
   version: string;
   name: string;
@@ -12,8 +19,8 @@ export interface VisualizationPlugin {
   filenames: string[];
   view_kind: VisualizationKind;
   adapter: VisualizationAdapter;
-  data_kind: 'file' | 'scientific' | 'extended';
-  reader: 'netcdf' | 'fits' | 'fastq' | 'binary' | 'tabular' | 'hdf5' | 'rdkit' | 'metpy' | 'fastqc' | 'office' | 'excel' | 'root' | 'jcamp' | null;
+  reader: VisualizationReader;
+  capabilities: VisualizationCapabilities;
   default_enabled: boolean;
   enabled: boolean;
   priority: number;
@@ -25,65 +32,60 @@ export interface VisualizationCatalog {
   revision: string;
   plugins: VisualizationPlugin[];
 }
-const kinds = new Set(['image', 'map', 'series', 'table', 'text', 'structure', 'document']);
-const adapterKinds: Record<VisualizationAdapter, VisualizationKind> = {
-  image: 'image', tiff: 'image', shapefile: 'map', molecular: 'structure', obj: 'structure',
-  html: 'document', markdown: 'document', text: 'text', csv: 'table',
-  'scientific-map': 'map', 'scientific-series': 'series', 'scientific-image': 'image', 'scientific-quality': 'series',
-  'v2-plotly': 'series', 'v2-h5web': 'image', 'v2-vtk': 'structure', 'v2-jsroot': 'series',
-  'v2-rdkit': 'image', 'v2-molstar': 'structure', 'v2-nmrium': 'series', 'v2-openlayers': 'map',
-  'v2-maplibre': 'map', 'v2-cesium': 'map', 'v2-aladin': 'map', 'v2-metpy': 'image',
-  'v2-igv': 'series', 'v2-viv': 'image', 'v2-niivue': 'image', 'v2-fastqc': 'table',
-  'v2-pdfjs': 'document', 'v2-word': 'document', 'v2-excel': 'table', 'v2-powerpoint': 'document',
-};
-const extendedReaders: Partial<Record<VisualizationAdapter, VisualizationPlugin['reader']>> = {
-  'v2-plotly': 'tabular', 'v2-h5web': 'hdf5', 'v2-vtk': 'binary', 'v2-jsroot': 'root',
-  'v2-rdkit': 'rdkit', 'v2-molstar': 'binary', 'v2-nmrium': 'jcamp', 'v2-openlayers': 'binary',
-  'v2-maplibre': 'binary', 'v2-cesium': 'binary', 'v2-aladin': 'binary', 'v2-metpy': 'metpy',
-  'v2-igv': 'binary', 'v2-viv': 'binary', 'v2-niivue': 'binary', 'v2-fastqc': 'fastqc',
-  'v2-pdfjs': 'binary', 'v2-word': 'office', 'v2-excel': 'excel', 'v2-powerpoint': 'office',
-};
 
-/** Reject the catalog as a whole on incompatible contracts: never revive a fallback renderer. */
+const descriptorFields = ['contract_version', 'id', 'version', 'name', 'description', 'extensions',
+  'filenames', 'view_kind', 'adapter', 'reader', 'capabilities', 'default_enabled', 'enabled',
+  'priority', 'permissions', 'limits'];
+function exactRecord(value: unknown, fields: readonly string[]): value is Record<string, unknown> {
+  return !!value && typeof value === 'object' && !Array.isArray(value)
+    && Object.keys(value).length === fields.length && Object.keys(value).every(field => fields.includes(field));
+}
+function validMatchers(value: unknown, pattern: RegExp): value is string[] {
+  return Array.isArray(value) && value.length <= 128 && new Set(value).size === value.length
+    && value.every(item => typeof item === 'string' && pattern.test(item));
+}
+
+/** Reject an incompatible catalog as a whole; never revive an unregistered fallback renderer. */
 export function parseVisualizationCatalog(value: unknown): VisualizationCatalog {
-  const catalog = value as VisualizationCatalog;
-  if (!catalog || catalog.engine !== 'cordis' || typeof catalog.revision !== 'string' || !Array.isArray(catalog.plugins) || catalog.plugins.length > 256) {
+  if (!exactRecord(value, ['engine', 'revision', 'plugins']) || value.engine !== 'cordis'
+      || typeof value.revision !== 'string' || !Array.isArray(value.plugins) || value.plugins.length > 256) {
     throw new Error('可视化插件目录格式不兼容，请更新服务后重试。');
   }
   const ids = new Set<string>();
-  for (const plugin of catalog.plugins) {
-    if (!plugin || ![1, 2].includes(plugin.contract_version) || typeof plugin.id !== 'string' || !/^[a-z][a-z0-9-]{0,63}$/.test(plugin.id) || ids.has(plugin.id)
-      || typeof plugin.name !== 'string' || typeof plugin.description !== 'string' || typeof plugin.version !== 'string'
-      || !(ADAPTER_IDS as readonly string[]).includes(plugin.adapter) || !kinds.has(plugin.view_kind)
-      || adapterKinds[plugin.adapter] !== plugin.view_kind
-      || !Array.isArray(plugin.extensions) || plugin.extensions.length > 128 || !plugin.extensions.every((item) => typeof item === 'string' && /^[a-z0-9][a-z0-9.-]{0,31}$/i.test(item))
-      || !Array.isArray(plugin.filenames) || !plugin.filenames.every((item) => typeof item === 'string' && item.length > 0 && !/[\\/]/.test(item))
-      || typeof plugin.enabled !== 'boolean' || typeof plugin.default_enabled !== 'boolean' || !Number.isSafeInteger(plugin.priority) || Math.abs(plugin.priority) > 1000
+  for (const raw of value.plugins) {
+    if (!exactRecord(raw, descriptorFields)) throw new Error('可视化插件协议包含缺失或未知字段。');
+    const plugin = raw as unknown as VisualizationPlugin;
+    if (plugin.contract_version !== VISUALIZATION_CONTRACT_VERSION || typeof plugin.id !== 'string'
+      || !/^[a-z][a-z0-9-]{0,63}$/.test(plugin.id) || ids.has(plugin.id)
+      || typeof plugin.name !== 'string' || !plugin.name.trim() || plugin.name.length > 120
+      || typeof plugin.description !== 'string' || plugin.description.length > 1000
+      || typeof plugin.version !== 'string' || !/^[0-9A-Za-z][0-9A-Za-z.+_-]{0,63}$/.test(plugin.version)
+      || typeof plugin.adapter !== 'string' || !Object.prototype.hasOwnProperty.call(VISUALIZATION_ADAPTERS, plugin.adapter)
+      || !validMatchers(plugin.extensions, /^[a-z0-9][a-z0-9.-]{0,31}$/)
+      || !validMatchers(plugin.filenames, /^[a-z0-9][a-z0-9._-]{0,127}$/)
+      || (!plugin.extensions.length && !plugin.filenames.length)
+      || typeof plugin.enabled !== 'boolean' || typeof plugin.default_enabled !== 'boolean'
+      || !Number.isSafeInteger(plugin.priority) || Math.abs(plugin.priority) > 1000
       || !Array.isArray(plugin.permissions) || plugin.permissions.length !== 1 || plugin.permissions[0] !== 'file:read'
-      || !plugin.limits || !Number.isSafeInteger(plugin.limits.max_input_bytes) || plugin.limits.max_input_bytes <= 0 || plugin.limits.max_input_bytes > 512 * 1024 * 1024
+      || !exactRecord(plugin.limits, ['max_input_bytes', 'max_output_bytes'])
+      || !Number.isSafeInteger(plugin.limits.max_input_bytes) || plugin.limits.max_input_bytes <= 0 || plugin.limits.max_input_bytes > 512 * 1024 * 1024
       || !Number.isSafeInteger(plugin.limits.max_output_bytes) || plugin.limits.max_output_bytes <= 0 || plugin.limits.max_output_bytes > 16 * 1024 * 1024) {
       throw new Error('可视化插件协议不兼容，已停止加载预览。');
     }
-    if (plugin.adapter.startsWith('v2-')) {
-      if (plugin.contract_version !== 2 || plugin.data_kind !== 'extended' || extendedReaders[plugin.adapter] !== plugin.reader) {
-        throw new Error('可视化插件 v2 读取协议不兼容。');
-      }
-      ids.add(plugin.id);
-      continue;
-    }
-    if (plugin.contract_version !== 1) throw new Error('旧版适配器不可使用新版协议。');
-    const scientific = plugin.adapter.startsWith('scientific-');
-    if (scientific !== (plugin.data_kind === 'scientific') || (!scientific && (plugin.data_kind !== 'file' || plugin.reader !== null))
-      || (scientific && !['netcdf', 'fits', 'fastq'].includes(plugin.reader ?? ''))
-      || (plugin.adapter === 'scientific-map' && plugin.reader !== 'netcdf')
-      || (plugin.adapter === 'scientific-image' && plugin.reader !== 'fits')
-      || (plugin.adapter === 'scientific-quality' && plugin.reader !== 'fastq')
-      || (plugin.adapter === 'scientific-series' && !['netcdf', 'fits'].includes(plugin.reader ?? ''))) {
-      throw new Error('可视化插件数据读取协议不兼容。');
+    const spec = VISUALIZATION_ADAPTERS[plugin.adapter];
+    if (plugin.view_kind !== spec.view_kind || !(spec.readers as readonly unknown[]).includes(plugin.reader)
+      || !exactRecord(plugin.capabilities, ['operations', 'input_mode', 'shared'])
+      || !Array.isArray(plugin.capabilities.operations)
+      || plugin.capabilities.operations.length !== spec.capabilities.operations.length
+      || new Set(plugin.capabilities.operations).size !== plugin.capabilities.operations.length
+      || plugin.capabilities.operations.some(operation => !(spec.capabilities.operations as readonly unknown[]).includes(operation))
+      || plugin.capabilities.input_mode !== spec.capabilities.input_mode
+      || plugin.capabilities.shared !== spec.capabilities.shared) {
+      throw new Error('可视化插件能力声明与批准的适配器规范不兼容。');
     }
     ids.add(plugin.id);
   }
-  return catalog;
+  return value as unknown as VisualizationCatalog;
 }
 
 export function matchingVisualizations(plugins: readonly VisualizationPlugin[], filename: string): VisualizationPlugin[] {

@@ -1,73 +1,54 @@
-"""Portable, data-only Visualization Contract v1; no executable entry points."""
+"""Unified, data-only visualization capability contract; no executable entry points."""
 from __future__ import annotations
 
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, StrictBool, StrictInt, field_validator, model_validator
 
-VisualizationAdapter = Literal[
-    "image", "tiff", "shapefile", "molecular", "obj", "html", "markdown", "text", "csv",
-    "scientific-map", "scientific-series", "scientific-image", "scientific-quality",
-    "v2-plotly", "v2-h5web", "v2-vtk", "v2-jsroot", "v2-rdkit", "v2-molstar", "v2-nmrium",
-    "v2-openlayers", "v2-maplibre", "v2-cesium", "v2-aladin", "v2-metpy", "v2-igv",
-    "v2-viv", "v2-niivue", "v2-fastqc", "v2-pdfjs", "v2-word", "v2-excel", "v2-powerpoint",
-]
-_ADAPTER_CONTRACTS = {
-    "image": ("file", (None,), "image"),
-    "tiff": ("file", (None,), "image"),
-    "shapefile": ("file", (None,), "map"),
-    "molecular": ("file", (None,), "structure"),
-    "obj": ("file", (None,), "structure"),
-    "html": ("file", (None,), "document"),
-    "markdown": ("file", (None,), "document"),
-    "text": ("file", (None,), "text"),
-    "csv": ("file", (None,), "table"),
-    "scientific-map": ("scientific", ("netcdf",), "map"),
-    "scientific-series": ("scientific", ("netcdf", "fits"), "series"),
-    "scientific-image": ("scientific", ("fits",), "image"),
-    "scientific-quality": ("scientific", ("fastq",), "series"),
-    "v2-plotly": ("extended", ("tabular",), "series"),
-    "v2-h5web": ("extended", ("hdf5",), "image"),
-    "v2-vtk": ("extended", ("binary",), "structure"),
-    "v2-jsroot": ("extended", ("root",), "series"),
-    "v2-rdkit": ("extended", ("rdkit",), "image"),
-    "v2-molstar": ("extended", ("binary",), "structure"),
-    "v2-nmrium": ("extended", ("jcamp",), "series"),
-    "v2-openlayers": ("extended", ("binary",), "map"),
-    "v2-maplibre": ("extended", ("binary",), "map"),
-    "v2-cesium": ("extended", ("binary",), "map"),
-    "v2-aladin": ("extended", ("binary",), "map"),
-    "v2-metpy": ("extended", ("metpy",), "image"),
-    "v2-igv": ("extended", ("binary",), "series"),
-    "v2-viv": ("extended", ("binary",), "image"),
-    "v2-niivue": ("extended", ("binary",), "image"),
-    "v2-fastqc": ("extended", ("fastqc",), "table"),
-    "v2-pdfjs": ("extended", ("binary",), "document"),
-    "v2-word": ("extended", ("office",), "document"),
-    "v2-excel": ("extended", ("excel",), "table"),
-    "v2-powerpoint": ("extended", ("office",), "document"),
-}
+from app.domain.models.visualization_adapters_generated import (
+    ADAPTER_CONTRACTS,
+    VISUALIZATION_CONTRACT_VERSION,
+    VisualizationAdapter,
+    VisualizationInputMode,
+    VisualizationKind,
+    VisualizationOperation,
+    VisualizationReader,
+)
+
+
+class VisualizationCapabilities(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True, strict=True)
+    operations: list[VisualizationOperation] = Field(min_length=1, max_length=5)
+    input_mode: VisualizationInputMode
+    shared: StrictBool
+
+    @field_validator("operations")
+    @classmethod
+    def unique_operations(cls, values):
+        if len(set(values)) != len(values):
+            raise ValueError("Duplicate visualization operations")
+        return values
 
 
 class VisualizationLimits(BaseModel):
-    model_config = ConfigDict(extra="forbid", frozen=True)
+    model_config = ConfigDict(extra="forbid", frozen=True, strict=True)
     max_input_bytes: StrictInt = Field(ge=1, le=512 * 1024 * 1024)
     max_output_bytes: StrictInt = Field(ge=1, le=16 * 1024 * 1024)
 
 
 class VisualizationPlugin(BaseModel):
-    model_config = ConfigDict(extra="forbid", frozen=True)
-    contract_version: Literal[1, 2]
+    model_config = ConfigDict(extra="forbid", frozen=True, strict=True)
+    contract_version: Literal[2]
     id: str = Field(pattern=r"^[a-z][a-z0-9-]{0,63}$")
     version: str = Field(pattern=r"^[0-9A-Za-z][0-9A-Za-z.+_-]{0,63}$")
     name: str = Field(min_length=1, max_length=120)
     description: str = Field(max_length=1000)
     extensions: list[str] = Field(max_length=128)
     filenames: list[str] = Field(max_length=128)
-    view_kind: Literal["image", "map", "series", "table", "text", "structure", "document"]
+    view_kind: VisualizationKind
     adapter: VisualizationAdapter
-    data_kind: Literal["file", "scientific", "extended"]
-    reader: Literal["netcdf", "fits", "fastq", "binary", "tabular", "hdf5", "rdkit", "metpy", "fastqc", "office", "excel", "root", "jcamp"] | None
+    reader: VisualizationReader
+    capabilities: VisualizationCapabilities
     default_enabled: StrictBool
     priority: StrictInt = Field(ge=-1000, le=1000)
     permissions: list[Literal["file:read"]] = Field(min_length=1, max_length=1)
@@ -76,15 +57,13 @@ class VisualizationPlugin(BaseModel):
     @field_validator("contract_version", mode="before")
     @classmethod
     def strict_contract_version(cls, value):
-        if type(value) is not int or value not in (1, 2):
+        if type(value) is not int or value != VISUALIZATION_CONTRACT_VERSION:
             raise ValueError("Unsupported visualization contract")
         return value
 
     @model_validator(mode="after")
     def validate_contract(self):
         import re
-        if self.contract_version != (2 if self.adapter.startswith("v2-") else 1):
-            raise ValueError("Visualization adapter requires the matching contract version")
         if not self.name.strip() or not (self.extensions or self.filenames):
             raise ValueError("Visualization name and file matchers are required")
         for items, pattern in (
@@ -93,9 +72,14 @@ class VisualizationPlugin(BaseModel):
         ):
             if len(set(items)) != len(items) or any(not re.fullmatch(pattern, item) for item in items):
                 raise ValueError("Invalid visualization file matcher")
-        data_kind, readers, view_kind = _ADAPTER_CONTRACTS[self.adapter]
-        if self.data_kind != data_kind or self.reader not in readers or self.view_kind != view_kind:
+        spec = ADAPTER_CONTRACTS[self.adapter]
+        if self.reader not in spec["readers"] or self.view_kind != spec["view_kind"]:
             raise ValueError("Visualization adapter and reader contract mismatch")
+        capabilities = spec["capabilities"]
+        if (set(self.capabilities.operations) != set(capabilities["operations"])
+                or self.capabilities.input_mode != capabilities["input_mode"]
+                or self.capabilities.shared != capabilities["shared"]):
+            raise ValueError("Visualization adapter and capabilities contract mismatch")
         return self
 
     def matches_filename(self, filename: str) -> bool:
@@ -105,7 +89,7 @@ class VisualizationPlugin(BaseModel):
 
 
 class VisualizationSnapshot(BaseModel):
-    model_config = ConfigDict(extra="forbid", frozen=True)
+    model_config = ConfigDict(extra="forbid", frozen=True, strict=True)
     engine: Literal["cordis"]
     revision: str = Field(pattern=r"^[0-9a-f]{64}$")
     plugins: list[VisualizationPlugin] = Field(min_length=1, max_length=256)
@@ -123,12 +107,12 @@ class VisualizationPluginState(VisualizationPlugin):
 
 
 class VisualizationCatalog(BaseModel):
-    model_config = ConfigDict(extra="forbid", frozen=True)
+    model_config = ConfigDict(extra="forbid", frozen=True, strict=True)
     engine: Literal["cordis"] = "cordis"
     revision: str
     plugins: list[VisualizationPluginState]
 
 
 class VisualizationStateRequest(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", strict=True)
     enabled: StrictBool

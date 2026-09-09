@@ -1,10 +1,17 @@
-# Cordis scientific domain adapters (v2)
+# Cordis scientific domain adapters (unified protocol)
 
 These trusted, lazy Vue adapters receive only `{ file, plugin }`. Each invocation
-uses the v2 owner- and plugin-gated `loadPluginBytes()` endpoint; no renderer
+uses `loadPluginBytes()` through the unified owner- and plugin-gated `bytes`
+operation at `/files/{id}/visualization`; no renderer
 receives a host path, arbitrary user URL, credential, or JavaScript entrypoint.
 The descriptor's input limit is additionally bounded by the host runtime to
-64 MiB. They do not add Agent tools, sessions, model calls, jobs, or SSE events.
+64 MiB for these domain plugins. They do not add Agent tools, sessions, model
+calls, jobs, or SSE events. All 34 visualizations use the same public descriptor
+and capability contract (currently strict version 2), independent of worker
+implementation details. The approved map lives in
+`contracts/visualization-adapters.json`; changes require regenerating its three
+build copies and passing `node scripts/sync-visualization-contract.mjs --check`.
+Input budgets, raw decoding checks and existing plugin IDs remain unchanged.
 
 | Component | Actual upstream engine | Implemented file subset and display |
 | --- | --- | --- |

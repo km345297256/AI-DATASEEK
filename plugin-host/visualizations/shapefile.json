@@ -1,5 +1,5 @@
 {
-  "contract_version": 1,
+  "contract_version": 2,
   "id": "shapefile",
   "version": "1.0.0",
   "name": "Shapefile 地图",
@@ -14,8 +14,7 @@
   "filenames": [],
   "view_kind": "map",
   "adapter": "shapefile",
-  "data_kind": "file",
-  "reader": null,
+  "reader": "shapefile",
   "default_enabled": true,
   "priority": 50,
   "permissions": [
@@ -24,5 +23,12 @@
   "limits": {
     "max_input_bytes": 268435456,
     "max_output_bytes": 16777216
+  },
+  "capabilities": {
+    "operations": [
+      "bytes"
+    ],
+    "input_mode": "whole",
+    "shared": true
   }
 }

@@ -19,7 +19,7 @@ import uuid
 
 import httpx
 
-from app.application.services.scientific_visualization import ScientificVisualizationResult
+from app.application.services.unified_visualization import VisualizationResult
 from app.core.config import get_settings
 from app.infrastructure.storage.mongodb import get_mongodb
 
@@ -81,17 +81,18 @@ async def main():
                 return file_id
 
             async def preview(file_id, plugin, reader, kind):
-                value = await request("POST", f"/api/v1/files/{quote(file_id, safe='')}/visualization", json={"plugin_id": plugin})
-                result = ScientificVisualizationResult.model_validate(value)
-                assert result.reader == reader and result.kind == kind and result.plugin_id == plugin
+                value = await request("POST", f"/api/v1/files/{quote(file_id, safe='')}/visualization", json={"plugin_id": plugin, "operation": "preview"})
+                result = VisualizationResult.model_validate(value)
+                assert result.payload["view_kind"] == kind and result.plugin_id == plugin
+                assert result.kind == ("series" if kind in {"series", "quality"} else "raster")
                 assert re.fullmatch(r"[0-9a-f]{64}", result.version)
                 assert re.fullmatch(r"[0-9a-f]{64}", result.revision)
-                checks.append({"reader": reader, "view": kind, "points": len(result.x),
-                               "pixels": len(result.values), "sampled": result.sampled})
-                return value
+                checks.append({"reader": reader, "view": kind, "points": len(result.payload["x"]),
+                               "pixels": len(result.payload["values"]), "sampled": result.sampled})
+                return {**result.payload, "metadata": result.metadata}
 
             async def expect_status(path, body, status, name):
-                response = await client.post(path, json=body)
+                response = await client.post(path, json={"operation": "preview", **body})
                 assert response.status_code == status, f"{name}: expected HTTP {status}, received {response.status_code}"
                 negative_checks[name] = status
 

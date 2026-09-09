@@ -1,0 +1,32 @@
+{
+  "contract_version": 2,
+  "id": "viz-word",
+  "version": "2.1.0",
+  "name": "Word 文档预览",
+  "description": "隔离 LibreOffice Writer 转换后由 PDF.js 逐页显示；拒绝宏、嵌入对象和外链。",
+  "extensions": [
+    "docx",
+    "doc",
+    "odt"
+  ],
+  "filenames": [],
+  "view_kind": "document",
+  "adapter": "word",
+  "reader": "office",
+  "default_enabled": true,
+  "priority": 10,
+  "permissions": [
+    "file:read"
+  ],
+  "limits": {
+    "max_input_bytes": 67108864,
+    "max_output_bytes": 8388608
+  },
+  "capabilities": {
+    "operations": [
+      "preview"
+    ],
+    "input_mode": "whole",
+    "shared": false
+  }
+}

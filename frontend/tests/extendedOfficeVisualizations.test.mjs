@@ -14,7 +14,8 @@ function mount(name, dependencies) {
     { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
   const module = { exports: {} }, mounted = [];
   const modules = { vue: { ...vue, onMounted: callback => mounted.push(callback) },
-    '../../composables/usePreviewLoad': { usePreviewLoad }, '../boundedBinary': { readBoundedBinary }, ...dependencies };
+    '../../composables/usePreviewLoad': { usePreviewLoad }, '../boundedBinary': { readBoundedBinary },
+    '../runtime': { visualizationJobsPath: file => `/files/${file.file_id}/visualization/jobs`, readVisualizationResult: async response => (await response.json()).data }, ...dependencies };
   new Function('require', 'module', 'exports', code)(id => { assert.ok(id in modules, id); return modules[id]; }, module, module.exports);
   const scope = vue.effectScope();
   const state = scope.run(() => module.exports.default.setup({ file: { file_id: 'synthetic-file' }, plugin: { id: 'viz-fastqc' } }, { expose() {} }));

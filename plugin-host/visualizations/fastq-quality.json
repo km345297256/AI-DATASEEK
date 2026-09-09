@@ -1,5 +1,5 @@
 {
-  "contract_version": 1,
+  "contract_version": 2,
   "id": "fastq-quality",
   "version": "1.0.0",
   "name": "FASTQ 质量分析",
@@ -11,7 +11,6 @@
   "filenames": [],
   "view_kind": "series",
   "adapter": "scientific-quality",
-  "data_kind": "scientific",
   "reader": "fastq",
   "default_enabled": true,
   "priority": 50,
@@ -21,5 +20,12 @@
   "limits": {
     "max_input_bytes": 2097152,
     "max_output_bytes": 524288
+  },
+  "capabilities": {
+    "operations": [
+      "preview"
+    ],
+    "input_mode": "prefix",
+    "shared": false
   }
 }

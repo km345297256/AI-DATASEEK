@@ -1,0 +1,17 @@
+{
+  "contract_version": 2,
+  "id": "viz-docx",
+  "version": "1.0.0",
+  "name": "DOCX 清晰阅读",
+  "description": "docx-preview 本地 HTML 排版，文字可选择、清晰缩放；隔离只读，不支持宏、嵌入对象和外链内容。复杂分页请切换 Word 预览。",
+  "extensions": ["docx"],
+  "filenames": [],
+  "view_kind": "document",
+  "adapter": "docx",
+  "reader": "binary",
+  "capabilities": { "operations": ["bytes"], "input_mode": "whole", "shared": false },
+  "default_enabled": true,
+  "priority": 9,
+  "permissions": ["file:read"],
+  "limits": { "max_input_bytes": 16777216, "max_output_bytes": 16777216 }
+}

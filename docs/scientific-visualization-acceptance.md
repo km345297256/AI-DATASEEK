@@ -1,5 +1,7 @@
 # 科学与办公可视化插件验收记录
 
+> 这是统一协议之前的集成验收记录；当前统一改造结果见[统一协议改造与验收](visualization-unification-acceptance.md)。下列旧协议和验收数字仅表示当时的验证结果。
+
 日期：2026-09-09。范围为[21 组集成说明](./scientific-visualization-integration.md)所列的已实现子集，不代表上游 SDK 的全部能力。
 
 ## 分层验证

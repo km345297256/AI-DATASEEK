@@ -1,5 +1,5 @@
 {
-  "contract_version": 1,
+  "contract_version": 2,
   "id": "image",
   "version": "1.0.0",
   "name": "图片",
@@ -20,8 +20,7 @@
   "filenames": [],
   "view_kind": "image",
   "adapter": "image",
-  "data_kind": "file",
-  "reader": null,
+  "reader": "binary",
   "default_enabled": true,
   "priority": 50,
   "permissions": [
@@ -30,5 +29,12 @@
   "limits": {
     "max_input_bytes": 268435456,
     "max_output_bytes": 16777216
+  },
+  "capabilities": {
+    "operations": [
+      "bytes"
+    ],
+    "input_mode": "whole",
+    "shared": true
   }
 }

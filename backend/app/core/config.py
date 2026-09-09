@@ -108,6 +108,13 @@ class Settings(BaseSettings):
     large_upload_part_size: int = 16 * 1024 * 1024
     large_upload_session_expire_hours: int = 24
 
+    # Optional local-only Office viewer. Secrets are independent of model/API
+    # keys and injected by run.sh from a mode-600 local generated secret file.
+    onlyoffice_enabled: bool = False
+    onlyoffice_public_origin: str = "http://office.localhost:7000"
+    onlyoffice_jwt_secret: str = ""
+    onlyoffice_gateway_secret: str = ""
+
     # Oversized text tool results are durably spilled before they reach model
     # context, SSE, Redis, or Mongo session events. Existing file storage owns
     # the bytes; a private Mongo record maps the opaque locator to that object.

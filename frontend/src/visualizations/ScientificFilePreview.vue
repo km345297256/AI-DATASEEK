@@ -102,7 +102,7 @@ const load = async (resetVersion = false) => {
   const selectedIndices = Object.fromEntries(activeDimensions.map((dimension) => [dimension.name, indices.value[dimension.name] ?? 0]));
   data.value = null;
   try {
-    const result = await getScientificVisualization(props.file.file_id, {
+    const result = await getScientificVisualization(props.file, props.plugin, {
       plugin_id: props.plugin.id,
       ...(props.plugin.reader === 'netcdf' && variable.value ? { variable: variable.value } : {}),
       ...(props.plugin.view_kind === 'series' && xDimension.value ? { x_dimension: xDimension.value } : {}),

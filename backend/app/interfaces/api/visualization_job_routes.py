@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, Header, HTTPException
 from app.application.services import visualization_jobs as service
-from app.application.services.extended_visualization import ExtendedPreviewRequest
+from app.application.services.unified_visualization import VisualizationJobRequest
 from app.application.services.file_preview import PreviewVersionChanged
 from app.application.services.scientific_visualization import ScientificPreviewRejected
 from app.application.services.visualization_catalog import VisualizationDisabledError, VisualizationNotFoundError
@@ -27,23 +27,25 @@ async def safe(operation):
         raise HTTPException(503, "质控任务暂不可用。") from None
 
 
-@router.post("/{file_id}/visualization-jobs")
-async def create_job(file_id: str, data: ExtendedPreviewRequest, user=Depends(get_current_user),
+@router.post("/{file_id}/visualization/jobs")
+async def create_job(file_id: str, data: VisualizationJobRequest, user=Depends(get_current_user),
                      files=Depends(get_file_service), catalog=Depends(get_visualization_catalog),
                      jobs=Depends(get_analysis_job_service), artifacts=Depends(get_spill_artifact_store)):
     return await safe(service.start_job(files, catalog, get_settings().sandbox_image, jobs, artifacts, file_id, user.id, data))
 
 
-@router.get("/{file_id}/visualization-jobs")
+@router.get("/{file_id}/visualization/jobs")
 async def list_jobs(file_id: str, user=Depends(get_current_user), files=Depends(get_file_service),
                     catalog=Depends(get_visualization_catalog), jobs=Depends(get_analysis_job_service)):
     async def operation():
         await service.authorize(files, catalog, file_id, user.id)
-        return [job.public_view() for job in await jobs.list_for_owner(user.id, service.scope_for_file(file_id), limit=20)]
+        records = await jobs.list_for_owner(user.id, service.scope_for_file(file_id), limit=20)
+        await service.authorize(files, catalog, file_id, user.id)
+        return [job.public_view() for job in records]
     return await safe(operation())
 
 
-@router.get("/{file_id}/visualization-jobs/{job_id}")
+@router.get("/{file_id}/visualization/jobs/{job_id}")
 async def get_job(file_id: str, job_id: str, user=Depends(get_current_user), files=Depends(get_file_service),
                    catalog=Depends(get_visualization_catalog), jobs=Depends(get_analysis_job_service)):
     async def operation():
@@ -51,7 +53,7 @@ async def get_job(file_id: str, job_id: str, user=Depends(get_current_user), fil
     return await safe(operation())
 
 
-@router.post("/{file_id}/visualization-jobs/{job_id}/cancel")
+@router.post("/{file_id}/visualization/jobs/{job_id}/cancel")
 async def cancel_job(file_id: str, job_id: str, user=Depends(get_current_user), jobs=Depends(get_analysis_job_service),
                       action: str | None = Header(default=None, alias="X-Analysis-Job-Action")):
     if action != "cancel":
@@ -66,7 +68,7 @@ async def cancel_job(file_id: str, job_id: str, user=Depends(get_current_user), 
     return await safe(operation())
 
 
-@router.get("/{file_id}/visualization-jobs/{job_id}/result")
+@router.get("/{file_id}/visualization/jobs/{job_id}/result")
 async def get_result(file_id: str, job_id: str, user=Depends(get_current_user), files=Depends(get_file_service),
                       catalog=Depends(get_visualization_catalog), jobs=Depends(get_analysis_job_service),
                       artifacts=Depends(get_spill_artifact_store)):

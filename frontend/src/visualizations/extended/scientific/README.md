@@ -1,9 +1,11 @@
-# Trusted scientific adapters (visualization contract v2)
+# Trusted scientific adapters (unified visualization contract)
 
 These Vue components are build-time trusted implementations, not scripts chosen
 by a manifest. Every component receives `{ file: FileInfo, plugin:
-VisualizationPlugin }` and uses the shared `extended/runtime.ts` authorization,
-version and bounded-byte boundary. All resources belong to `usePreviewLoad` and
+VisualizationPlugin }` and uses the unified `visualizations/runtime.ts`
+authorization, operation, version and bounded-byte boundary. The local
+`extended/runtime.ts` helper only adapts unified typed payloads to SDK-facing
+data; it does not define another public protocol or endpoint. All resources belong to `usePreviewLoad` and
 are released when another file/view is selected or the plugin is stopped.
 
 Plotly and JSROOT load their package-owned, version-checked browser distributions
@@ -30,12 +32,21 @@ the default Node heap build to complete without increasing its heap allowance.
 
 | Adapter | Real upstream API | Supported first integration |
 | --- | --- | --- |
-| `v2-plotly` | Plotly `react` / `purge` | CSV/TSV bounded windows; NPY/NPZ/MAT numeric variables and slices; curves, scatter, histogram, array heatmap |
-| `v2-h5web` | H5Web `LineVis` / `HeatmapVis`, React root | Controlled HDF5/NeXus numeric tree, leading-dimension slice selection; no remote H5Grove/HSDS service |
-| `v2-vtk` | vtk.js readers, mapper, actor, GenericRenderWindow | VTP/VTI **uncompressed ASCII numeric XML**, STL, OBJ without external materials; VTI axial slice, not full-volume rendering |
-| `v2-jsroot` | JSROOT `createHistogram`, `createTGraph`, `draw`, `cleanup` | Server-extracted TH1/TH2/TGraph numeric values; preserve real bin edges; no file-provided ROOT object reaches `draw` |
-| `v2-molstar` | Mol* core `PluginContext`, rawData, parseTrajectory | Small PDB/mmCIF atom structures; no upstream download actions or property-fetch behaviors |
-| `v2-nmrium` | NMRium React component | Processed one-dimensional JCAMP-DX numeric spectra with explicit ppm and nucleus; no FID processing or external imports |
+| `plotly` | Plotly `react` / `purge` | CSV/TSV bounded windows; NPY/NPZ/MAT numeric variables and slices; curves, scatter, histogram, array heatmap |
+| `h5web` | H5Web `LineVis` / `HeatmapVis`, React root | Controlled HDF5/NeXus numeric tree, leading-dimension slice selection; no remote H5Grove/HSDS service |
+| `vtk` | vtk.js readers, mapper, actor, GenericRenderWindow | VTP/VTI **uncompressed ASCII numeric XML**, STL, OBJ without external materials; VTI axial slice, not full-volume rendering |
+| `jsroot` | JSROOT `createHistogram`, `createTGraph`, `draw`, `cleanup` | Server-extracted TH1/TH2/TGraph numeric values; preserve real bin edges; no file-provided ROOT object reaches `draw` |
+| `molstar` | Mol* core `PluginContext`, rawData, parseTrajectory | Small PDB/mmCIF atom structures; no upstream download actions or property-fetch behaviors |
+| `nmrium` | NMRium React component | Processed one-dimensional JCAMP-DX numeric spectra with explicit ppm and nucleus; no FID processing or external imports |
+
+All 34 plugin registrations use strict public contract version 2; these adapters
+do not form a separate extended protocol. Approved reader/view/capability
+combinations come from `contracts/visualization-adapters.json` and its generated
+build copies. New adapters must update that source, run
+`node scripts/sync-visualization-contract.mjs` and `--check`, implement the
+trusted renderer/reader, and add bounded-input, cancellation and SDK tests.
+Use `preview` for structured readers and `bytes` for bounded local decoding;
+private worker formats are normalized by the host to one typed result envelope.
 
 ## Reading and limits
 

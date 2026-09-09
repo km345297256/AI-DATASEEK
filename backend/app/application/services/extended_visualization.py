@@ -150,7 +150,8 @@ async def extended_visualization(file_service, catalog, image: str | None, file_
                                  worker=run_extended_visualization_worker):
     plugin = await catalog.require_enabled(user_id, request.plugin_id)
     revision = (await catalog.list_for_user(user_id)).revision
-    if plugin.contract_version != 2 or plugin.data_kind != "extended" or binary != (plugin.reader == "binary"):
+    operation = "bytes" if binary else "job" if allow_job else "preview"
+    if operation not in plugin.capabilities.operations or binary != (plugin.reader == "binary"):
         raise ScientificPreviewRejected("此插件不支持该读取接口。")
     reader = plugin.reader
     if reader == "fastqc" and not allow_job:
@@ -226,8 +227,9 @@ async def extended_visualization(file_service, catalog, image: str | None, file_
             raise PreviewVersionChanged()
         # File providers may await I/O. Fence a disable occurring during that
         # final storage check before handing any bytes back to the browser.
+        final_revision = (await catalog.list_for_user(user_id)).revision
         final_plugin = await catalog.require_enabled(user_id, request.plugin_id)
-        if final_plugin != plugin:
+        if final_plugin != plugin or final_revision != revision:
             raise PreviewVersionChanged()
         if binary:
             return data, version

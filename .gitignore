@@ -67,6 +67,7 @@ coverage.xml
 logs/
 
 # Local development settings
+.local/
 .env.local
 .env.development.local
 .env.test.local

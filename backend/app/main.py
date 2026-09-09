@@ -17,6 +17,7 @@ from app.interfaces.api.routes import router
 from app.infrastructure.logging import setup_logging
 from app.interfaces.errors.exception_handlers import register_exception_handlers
 from app.interfaces.middleware.sso_auth import SSOAuthorizationMiddleware
+from app.interfaces.middleware.office_origin_guard import OfficeOriginGuard
 from app.infrastructure.models.documents import (
     AgentDocument,
     AgentProfileDocument,
@@ -308,6 +309,7 @@ app.add_middleware(
 # for deployments that explicitly select an authenticated provider.
 if settings.auth_provider != "none":
     app.add_middleware(SSOAuthorizationMiddleware)
+app.add_middleware(OfficeOriginGuard)
 
 # Register exception handlers
 register_exception_handlers(app)

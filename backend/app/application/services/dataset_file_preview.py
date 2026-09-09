@@ -256,6 +256,37 @@ class DatasetFilePreviewService:
         except (FileNotFoundError, VisualizationDisabledError):
             return None
 
+    async def authorize_visualization_resource(self, source_id, resource_id, user_id, plugin_id):
+        """Authorize a declared sidecar using private reference identities.
+
+        Public logical paths alone are not identities: separate datasets can
+        contain identically named files. This hook never exposes those private
+        identities or reads source bytes.
+        """
+        try:
+            source = await self._row(source_id)
+            resource = await self._row(resource_id)
+            if not user_id or any(row["owner_id"] != user_id for row in (source, resource)):
+                return False
+            if any(source[key] != resource[key] for key in ("dataset_id", "anchor")):
+                return False
+            source_path = strict_relative_path(source["path"])
+            resource_path = strict_relative_path(resource["path"])
+            if (source["path"] != source["anchor"] or source_path.suffix.lower() != ".shp"
+                    or resource_path.suffix.lower() not in _SIDECARS
+                    or source_path.with_suffix("") != resource_path.with_suffix("")):
+                return False
+            plugin = await self.catalog.require_enabled(user_id, plugin_id)
+            if plugin.adapter != "shapefile":
+                return False
+            # Validate current dataset inventory, location, allowlist and
+            # enabled capability, not merely the existence of a saved row.
+            for row in (source, resource):
+                await self._read(row, user_id, offset=0, length=0)
+            return await self.catalog.require_enabled(user_id, plugin_id) == plugin
+        except (FileNotFoundError, NotFoundError, VisualizationDisabledError, ValueError):
+            return False
+
     async def download_file_range(self, file_id, user_id, *, offset, length):
         return await self._read(await self._row(file_id), user_id, offset=offset, length=length)
 

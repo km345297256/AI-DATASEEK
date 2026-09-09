@@ -1,5 +1,5 @@
 {
-  "contract_version": 1,
+  "contract_version": 2,
   "id": "csv",
   "version": "1.0.0",
   "name": "表格",
@@ -11,8 +11,7 @@
   "filenames": [],
   "view_kind": "table",
   "adapter": "csv",
-  "data_kind": "file",
-  "reader": null,
+  "reader": "csv",
   "default_enabled": true,
   "priority": 50,
   "permissions": [
@@ -21,5 +20,12 @@
   "limits": {
     "max_input_bytes": 131072,
     "max_output_bytes": 16777216
+  },
+  "capabilities": {
+    "operations": [
+      "page"
+    ],
+    "input_mode": "page",
+    "shared": true
   }
 }

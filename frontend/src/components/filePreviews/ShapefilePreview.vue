@@ -161,7 +161,9 @@
 
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
-import { getFileDownloadUrl, type FileInfo } from '../../api/file';
+import type { FileInfo } from '../../api/file';
+import { loadPluginBytes } from '../../visualizations/runtime';
+import type { VisualizationPlugin } from '../../visualizations/contract';
 import { usePreviewLoad, type PreviewLoad } from '../../composables/usePreviewLoad';
 import { useFilePanel } from '../../composables/useFilePanel';
 
@@ -184,6 +186,7 @@ interface DbfField {
 
 const props = defineProps<{
   file: FileInfo;
+  plugin: VisualizationPlugin;
 }>();
 
 const { relatedFiles } = useFilePanel();
@@ -460,11 +463,7 @@ const calculateBounds = (items: Geometry[]): [number, number, number, number] | 
 };
 
 const fetchBuffer = async (file: FileInfo, load: PreviewLoad) => {
-  const url = await getFileDownloadUrl(file);
-  load.assertCurrent();
-  const response = await fetch(url, { signal: load.signal });
-  if (!response.ok) throw new Error(`HTTP ${response.status}`);
-  return response.arrayBuffer();
+  return loadPluginBytes(activeFile.value, props.plugin, load.signal, file.file_id === activeFile.value.file_id ? undefined : file);
 };
 
 const loadShapefile = async () => {

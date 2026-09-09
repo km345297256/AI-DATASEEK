@@ -8,8 +8,9 @@
 </template>
 
 <script setup lang="ts">
-import { nextTick, onBeforeUnmount, ref, watch } from 'vue';
-import { getFileDownloadUrl } from '../../api/file';
+import { nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { loadPluginBytes } from '../../visualizations/runtime';
+import type { VisualizationPlugin } from '../../visualizations/contract';
 import type { FileInfo } from '../../api/file';
 import { usePreviewLoad } from '../../composables/usePreviewLoad';
 
@@ -22,7 +23,7 @@ declare global {
         element: HTMLElement,
         parameters?: Record<string, unknown>,
       ) => {
-        LoadModelFromUrlList: (urls: string[]) => void;
+        LoadModelFromFileList: (files: File[]) => void;
         Resize: () => void;
         Destroy: () => void;
       };
@@ -32,6 +33,7 @@ declare global {
 
 const props = defineProps<{
   file: FileInfo;
+  plugin: VisualizationPlugin;
 }>();
 
 const viewerContainer = ref<HTMLElement | null>(null);
@@ -86,7 +88,9 @@ const renderObj = async (file: FileInfo) => {
     await nextTick();
     if (!load.isCurrent() || !viewerContainer.value || !window.OV?.EmbeddedViewer) return;
 
-    const url = await getFileDownloadUrl(file);
+    const bytes = await loadPluginBytes(file, props.plugin, load.signal);
+    load.assertCurrent();
+    const source = new File([bytes], file.filename, { type: file.content_type || 'text/plain' });
     if (!load.isCurrent() || !viewerContainer.value) return;
 
     viewer = new window.OV.EmbeddedViewer(viewerContainer.value, {
@@ -99,7 +103,7 @@ const renderObj = async (file: FileInfo) => {
         if (load.isCurrent()) status.value = 'Failed to load OBJ model';
       },
     });
-    viewer.LoadModelFromUrlList([url]);
+    viewer.LoadModelFromFileList([source]);
 
     resizeObserver = new ResizeObserver(() => viewer?.Resize());
     resizeObserver.observe(viewerContainer.value);
@@ -110,7 +114,8 @@ const renderObj = async (file: FileInfo) => {
   }
 };
 
-watch(() => props.file, renderObj, { immediate: true });
+watch(() => props.file, renderObj);
+onMounted(() => { void renderObj(props.file); });
 
 onBeforeUnmount(() => {
   loads.dispose();

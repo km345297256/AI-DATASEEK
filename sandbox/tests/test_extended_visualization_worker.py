@@ -351,6 +351,193 @@ def docx_fixture():
     })
 
 
+def office_quality_image():
+    """A sharp, compressible RGB pattern, placed at 1,200 DPI in both fixtures."""
+    image = optional("PIL.Image")
+    y, x = np.indices((800, 1200))
+    pixels = np.stack((x % 256, y % 256, ((x // 3 + y // 3) % 2) * 255), axis=-1).astype("uint8")
+    bitmap = image.fromarray(pixels)
+    output = io.BytesIO()
+    bitmap.save(output, format="PNG")
+    return output.getvalue(), bitmap.tobytes()
+
+
+def office_quality_fixture(fmt):
+    bitmap, pixels = office_quality_image()
+    output = io.BytesIO()
+    if fmt == "docx":
+        docx = optional("docx")
+        document = docx.Document()
+        paragraph = document.add_paragraph()
+        run = paragraph.add_run("科学数据高清预览 DataSeek 123")
+        run.font.name = "Noto Sans CJK SC"
+        run.font.size = docx.shared.Pt(8)
+        run._element.get_or_add_rPr().rFonts.set(docx.oxml.ns.qn("w:eastAsia"), "Noto Sans CJK SC")
+        borders = docx.oxml.OxmlElement("w:pBdr")
+        border = docx.oxml.OxmlElement("w:bottom")
+        for name, value in {"val": "single", "sz": "2", "color": "000000"}.items():
+            border.set(docx.oxml.ns.qn("w:" + name), value)
+        borders.append(border)
+        paragraph._element.get_or_add_pPr().append(borders)
+        document.add_picture(io.BytesIO(bitmap), width=docx.shared.Inches(1))
+        document.save(output)
+    else:
+        pptx = optional("pptx")
+        deck = pptx.Presentation()
+        slide = deck.slides.add_slide(deck.slide_layouts[6])
+        box = slide.shapes.add_textbox(pptx.util.Inches(1), pptx.util.Inches(1), pptx.util.Inches(7), pptx.util.Inches(1))
+        run = box.text_frame.paragraphs[0].add_run()
+        run.text = "科学数据高清预览 DataSeek 123"
+        run.font.name = "Noto Sans CJK SC"
+        run.font.size = pptx.util.Pt(8)
+        east_asian = pptx.oxml.xmlchemy.OxmlElement("a:ea")
+        east_asian.set("typeface", "Noto Sans CJK SC")
+        run._r.get_or_add_rPr().append(east_asian)
+        line = slide.shapes.add_connector(pptx.enum.shapes.MSO_CONNECTOR.STRAIGHT,
+                                         pptx.util.Inches(1), pptx.util.Inches(2),
+                                         pptx.util.Inches(6), pptx.util.Inches(2))
+        line.line.width = pptx.util.Pt(0.25)
+        slide.shapes.add_picture(io.BytesIO(bitmap), pptx.util.Inches(1), pptx.util.Inches(3), width=pptx.util.Inches(1))
+        deck.save(output)
+    return output.getvalue(), pixels
+
+
+@pytest.mark.parametrize("fmt", ["docx", "pptx"])
+def test_office_quality_preserves_chinese_fonts_vectors_and_image_pixels(fmt):
+    executable("soffice")
+    pypdf = optional("pypdf")
+    data, pixels = office_quality_fixture(fmt)
+    result = request(data, reader="office", kind="pdf", format=fmt)
+    assert result["ok"] is True, result
+    reader = pypdf.PdfReader(io.BytesIO(base64.b64decode(result["data"]["data_base64"])))
+    assert len(reader.pages) == 1
+    page = reader.pages[0]
+    assert "科学数据高清预览" in page.extract_text()
+    assert "DataSeek 123" in page.extract_text()
+    fonts = [font.get_object() for font in page["/Resources"]["/Font"].values()]
+    assert any("NotoSansCJK" in font["/BaseFont"] for font in fonts)
+    for font in fonts:
+        for descendant in font.get("/DescendantFonts", [font]):
+            descriptor = descendant.get_object()["/FontDescriptor"]
+            assert any(key in descriptor for key in ("/FontFile", "/FontFile2", "/FontFile3"))
+    operations = page.get_contents().operations
+    assert any(operator == b"w" and 0 < float(args[0]) <= 0.3 for args, operator in operations)
+    assert any(operator in (b"S", b"s") for _, operator in operations)
+    # Impress may add a small line-shadow image and enumerate the same XObject
+    # through multiple form resources. The source bitmap must still be intact.
+    embedded = [image.image.convert("RGB") for image in page.images if image.image.size == (1200, 800)]
+    assert embedded, "Do not downsample the 1,200 DPI source image"
+    assert all(image.tobytes() == pixels for image in embedded), "Do not introduce lossy JPEG recompression"
+
+
+def test_office_real_output_is_limited_to_first_100_pages():
+    executable("soffice")
+    docx = optional("docx")
+    pypdf = optional("pypdf")
+    document = docx.Document()
+    for index in range(101):
+        if index:
+            document.add_page_break()
+        document.add_paragraph(f"DataSeek page {index + 1:03d}")
+    output = io.BytesIO()
+    document.save(output)
+    result = request(output.getvalue(), reader="office", kind="pdf", format="docx")
+    assert result["ok"] is True, result
+    pdf = pypdf.PdfReader(io.BytesIO(base64.b64decode(result["data"]["data_base64"])))
+    assert len(pdf.pages) == 100
+    assert "DataSeek page 100" in pdf.pages[-1].extract_text()
+    assert result["data"]["sampled"] is True
+
+
+@pytest.mark.parametrize("fmt,filter_name", [("docx", "writer_pdf_Export"), ("pptx", "impress_pdf_Export")])
+def test_office_quality_parameters_are_fixed_in_cli_and_private_profile(monkeypatch, tmp_path, fmt, filter_name):
+    pypdf = optional("pypdf")
+    calls = []
+
+    def convert(command, directory):
+        from xml.etree import ElementTree
+        calls.append(command)
+        options = command[command.index("--convert-to") + 1]
+        assert options.startswith("pdf:" + filter_name + ":")
+        options = json.loads(options.split(":", 2)[2])
+        assert options["PageRange"] == {"type": "string", "value": "1-100"}
+        root = ElementTree.fromstring((directory / "profile/user/registrymodifications.xcu").read_text())
+        namespace = "{http://openoffice.org/2001/registry}"
+        by_path = {item.attrib[namespace + "path"]: {
+            prop.attrib[namespace + "name"]: prop.find("value").text for prop in item
+        } for item in root}
+        profile_options = by_path["/org.openoffice.Office.Common/Filter/PDF/Export"]
+        for name, value in worker.OFFICE_PDF_SETTINGS.items():
+            assert options[name] == {"type": "boolean", "value": str(value).lower()}
+            assert profile_options[name] == str(value).lower()
+        security = by_path["/org.openoffice.Office.Common/Security/Scripting"]
+        assert security["MacroSecurityLevel"] == "3"
+        assert security["DisableMacrosExecution"] == security["DisableActiveContent"] == "true"
+        assert security["BlockUntrustedRefererLinks"] == "true"
+        assert by_path["/org.openoffice.Office.Writer/Content/Update"]["Link"] == "2"
+        assert by_path["/org.openoffice.Office.Calc/Content/Update"]["Link"] == "0"
+        assert (directory / ("input." + fmt)).stat().st_mode & 0o777 == 0o400
+        pdf = pypdf.PdfWriter()
+        pdf.add_blank_page(width=72, height=72)
+        pdf.write(directory / "output/input.pdf")
+
+    monkeypatch.setattr(shutil, "which", lambda _: "/usr/bin/soffice")
+    monkeypatch.setattr(worker, "_process", convert)
+    data = docx_fixture() if fmt == "docx" else zip_bytes({"ppt/presentation.xml": "<presentation/>"})
+    result = worker.office_preview(data, fmt, tmp_path)
+    assert len(calls) == 1
+    assert result["metadata"]["image_compression"] == "lossless"
+    assert result["metadata"]["image_downsampling"] is False
+    assert result["metadata"]["standard_font_embedding"] == "requested"
+
+
+def test_office_pdf_size_guard_precedes_parser(monkeypatch):
+    pypdf = optional("pypdf")
+    monkeypatch.setattr(worker, "MAX_MEDIA_BYTES", 16)
+    monkeypatch.setattr(pypdf, "PdfReader", lambda *_a, **_k: pytest.fail("Oversized PDF reached parser"))
+    with pytest.raises(worker.PreviewError, match="5 MiB.*未降低清晰度"):
+        worker._office_pdf_pages(b"%PDF-" + b"x" * 16)
+
+
+def test_office_pdf_page_tree_has_an_additional_parse_budget():
+    pypdf = optional("pypdf")
+    pdf = pypdf.PdfWriter()
+    pdf.add_blank_page(width=72, height=72)
+    pdf._root_object["/Pages"][pypdf.generic.NameObject("/Count")] = pypdf.generic.NumberObject(worker.MAX_OFFICE_PDF_PAGES + 1)
+    output = io.BytesIO()
+    pdf.write(output)
+    with pytest.raises(worker.PreviewError, match="页数超过安全解析预算"):
+        worker._office_pdf_pages(output.getvalue())
+
+
+def test_office_pdf_limit_preserves_image_pixels_and_vector_operations():
+    pypdf = optional("pypdf")
+    executable("soffice")
+    data, pixels = office_quality_fixture("docx")
+    result = request(data, reader="office", kind="pdf", format="docx")
+    assert result["ok"] is True, result
+    source = pypdf.PdfReader(io.BytesIO(base64.b64decode(result["data"]["data_base64"])))
+    original_operations = source.pages[0].get_contents().operations
+    writer = pypdf.PdfWriter()
+    for _ in range(101):
+        writer.add_page(source.pages[0])
+    output = io.BytesIO()
+    writer.write(output)
+    limited, pages, truncated = worker._office_pdf_pages(output.getvalue())
+    assert pages == 100 and truncated is True
+    final = pypdf.PdfReader(io.BytesIO(limited))
+    assert len(final.pages) == 100
+    assert final.pages[0].get_contents().operations == original_operations
+    assert final.pages[-1].images[0].image.convert("RGB").tobytes() == pixels
+
+
+@pytest.mark.parametrize("data", [b"%PDF-invalid", b"not a pdf"])
+def test_office_pdf_parse_failure_is_safe(data):
+    optional("pypdf")
+    with pytest.raises(worker.PreviewError, match="安全预算内解析"):
+        worker._office_pdf_pages(data)
+
+
 def test_office_real_docx_to_pdf():
     executable("soffice")
     result = request(docx_fixture(), reader="office", kind="pdf", format="docx")

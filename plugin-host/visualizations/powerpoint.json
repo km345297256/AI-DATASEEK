@@ -1,0 +1,32 @@
+{
+  "contract_version": 2,
+  "id": "viz-powerpoint",
+  "version": "2.1.0",
+  "name": "PowerPoint 演示预览",
+  "description": "隔离 LibreOffice Impress 转为静态 PDF；不播放动画、音视频或执行宏。",
+  "extensions": [
+    "pptx",
+    "ppt",
+    "odp"
+  ],
+  "filenames": [],
+  "view_kind": "document",
+  "adapter": "powerpoint",
+  "reader": "office",
+  "default_enabled": true,
+  "priority": 10,
+  "permissions": [
+    "file:read"
+  ],
+  "limits": {
+    "max_input_bytes": 67108864,
+    "max_output_bytes": 8388608
+  },
+  "capabilities": {
+    "operations": [
+      "preview"
+    ],
+    "input_mode": "whole",
+    "shared": false
+  }
+}

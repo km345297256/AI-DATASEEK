@@ -22,6 +22,11 @@ class DatasetPreviewFileStorage:
     async def download_file_range(self, file_id, user_id, *, offset, length):
         return await self._reader(file_id).download_file_range(file_id, user_id, offset=offset, length=length)
 
+    async def authorize_visualization_resource(self, source_id, resource_id, user_id, plugin_id):
+        if not all(file_id.startswith(PREFIX) for file_id in (source_id, resource_id)):
+            return False
+        return await self.previews.authorize_visualization_resource(source_id, resource_id, user_id, plugin_id)
+
     async def delete_file(self, file_id, user_id):
         if file_id.startswith(PREFIX):
             return False  # Never mutate a dataset source or its registration.

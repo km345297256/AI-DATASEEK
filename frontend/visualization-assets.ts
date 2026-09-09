@@ -3,7 +3,7 @@ import { cp, mkdir, stat } from 'node:fs/promises';
 import { createReadStream } from 'node:fs';
 import { resolve, sep } from 'node:path';
 import type { Plugin } from 'vite';
-import { nmrBrowserDirectory, prebuildNmrBrowser } from './visualization-prebuild';
+import { nmrBrowserDirectory, prebuildNmrBrowser, docxBrowserDirectory, prebuildDocxBrowser } from './visualization-prebuild';
 
 export function visualizationAssets(): Plugin {
   const roots: Record<string, string> = {
@@ -17,11 +17,12 @@ export function visualizationAssets(): Plugin {
     '/visualization-assets/jsroot/': resolve('node_modules/jsroot/build'),
     '/visualization-assets/plotly/': resolve('node_modules/plotly.js-cartesian-dist-min'),
     '/visualization-assets/nmrium/': nmrBrowserDirectory(),
+    '/visualization-assets/docx/': docxBrowserDirectory(),
   };
   let output = resolve('dist');
   return {
     name: 'dataseek-offline-visualization-assets',
-    async buildStart() { await prebuildNmrBrowser(); },
+    async buildStart() { await Promise.all([prebuildNmrBrowser(), prebuildDocxBrowser()]); },
     configResolved(config) { output = resolve(config.root, config.build.outDir); },
     configureServer(server) {
       server.middlewares.use(async (req, res, next) => {
@@ -58,7 +59,13 @@ export function visualizationAssets(): Plugin {
         } else if (prefix.includes('plotly')) {
           await cp(resolve(source, 'plotly-cartesian.min.js'), resolve(target, 'plotly-cartesian.min.js'));
           await cp(resolve(source, 'LICENSE'), resolve(target, 'LICENSE'));
-        } else await cp(source, target, { recursive: true });
+        } else {
+          await cp(source, target, { recursive: true });
+          if (prefix.includes('/docx/')) {
+            await cp(resolve('node_modules/docx-preview/LICENSE'), resolve(target, 'docx-preview-LICENSE'));
+            await cp(resolve('node_modules/jszip/LICENSE.markdown'), resolve(target, 'JSZip-LICENSE.markdown'));
+          }
+        }
       }
     },
   };

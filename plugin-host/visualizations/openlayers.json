@@ -1,0 +1,32 @@
+{
+  "contract_version": 2,
+  "id": "viz-openlayers",
+  "version": "2.0.0",
+  "name": "OpenLayers 地理图层",
+  "description": "GeoJSON 与明确 EPSG:4326/3857 的 GeoTIFF；离线地图，不加载在线底图。",
+  "extensions": [
+    "geojson",
+    "tif",
+    "tiff"
+  ],
+  "filenames": [],
+  "view_kind": "map",
+  "adapter": "openlayers",
+  "reader": "binary",
+  "default_enabled": true,
+  "priority": 10,
+  "permissions": [
+    "file:read"
+  ],
+  "limits": {
+    "max_input_bytes": 67108864,
+    "max_output_bytes": 8388608
+  },
+  "capabilities": {
+    "operations": [
+      "bytes"
+    ],
+    "input_mode": "whole",
+    "shared": false
+  }
+}

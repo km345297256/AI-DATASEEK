@@ -14,7 +14,8 @@ import { useRoute } from 'vue-router';
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';
 import type { FileInfo } from '../../api/file';
-import { getFileDownloadUrl } from '../../api/file';
+import { loadPluginBytes, loadPluginText } from '../../visualizations/runtime';
+import type { VisualizationPlugin } from '../../visualizations/contract';
 import { getSessionFiles, getSharedSessionFiles } from '../../api/agent';
 import { useFilePanel } from '../../composables/useFilePanel';
 import { useSessionFileList } from '../../composables/useSessionFileList';
@@ -29,6 +30,7 @@ const renderedContent = ref('');
 
 const props = defineProps<{
     file: FileInfo;
+    plugin: VisualizationPlugin;
 }>();
 const route = useRoute();
 const { relatedFiles } = useFilePanel();
@@ -86,7 +88,11 @@ const rewriteRelativeResources = async (html: string, file: FileInfo, load: Prev
         if (!relatedFile) return;
 
         const { suffix } = splitResourceUrl(value);
-        element.setAttribute(attribute, `${await getFileDownloadUrl(relatedFile)}${suffix}`);
+        const bytes = await loadPluginBytes(file, props.plugin, load.signal, relatedFile);
+        load.assertCurrent();
+        const url = URL.createObjectURL(new Blob([bytes], { type: relatedFile.content_type || 'application/octet-stream' }));
+        load.onDispose(() => URL.revokeObjectURL(url));
+        element.setAttribute(attribute, `${url}${suffix}`);
     }));
 
     return DOMPurify.sanitize(document.body.innerHTML);
@@ -97,11 +103,7 @@ const loadMarkdown = async (file: FileInfo) => {
     renderedContent.value = '';
 
     try {
-        const url = await getFileDownloadUrl(file);
-        load.assertCurrent();
-        const response = await fetch(url, { signal: load.signal });
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        const content = await response.text();
+        const content = await loadPluginText(file, props.plugin, load.signal);
         load.assertCurrent();
         await ensureRelatedFiles(load);
         if (!load.isCurrent()) return;

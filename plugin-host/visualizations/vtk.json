@@ -1,0 +1,33 @@
+{
+  "contract_version": 2,
+  "id": "viz-vtk",
+  "version": "2.0.0",
+  "name": "VTK 三维科学模型",
+  "description": "vtk.js 小型 VTP/VTI（未压缩 ASCII）、STL/OBJ；网格输入最多8 MiB，不支持 VTU 或 OpenFOAM。",
+  "extensions": [
+    "vtp",
+    "vti",
+    "stl",
+    "obj"
+  ],
+  "filenames": [],
+  "view_kind": "structure",
+  "adapter": "vtk",
+  "reader": "binary",
+  "default_enabled": true,
+  "priority": 10,
+  "permissions": [
+    "file:read"
+  ],
+  "limits": {
+    "max_input_bytes": 67108864,
+    "max_output_bytes": 8388608
+  },
+  "capabilities": {
+    "operations": [
+      "bytes"
+    ],
+    "input_mode": "whole",
+    "shared": false
+  }
+}

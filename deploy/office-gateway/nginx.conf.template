@@ -1,0 +1,101 @@
+worker_processes 1;
+pid /tmp/nginx.pid;
+error_log /dev/stderr warn;
+events { worker_connections 256; }
+http {
+    include /etc/nginx/mime.types;
+    access_log off;
+    server_tokens off;
+    client_body_temp_path /tmp/client-body;
+    proxy_temp_path /tmp/proxy;
+    fastcgi_temp_path /tmp/fastcgi;
+    uwsgi_temp_path /tmp/uwsgi;
+    scgi_temp_path /tmp/scgi;
+    client_max_body_size 128k;
+    resolver 127.0.0.11 valid=10s ipv6=off;
+    map $http_upgrade $office_connection { default upgrade; '' close; }
+    map $http_x_forwarded_proto $office_scheme { default $http_x_forwarded_proto; '' $scheme; }
+
+    # Browser-facing surface. This is NOT a general reverse proxy. In
+    # particular /api, /example, /hosting, /ConvertService and commands stay closed.
+    server {
+        listen 8080;
+        if ($request_uri ~* "(%2e|%2f|%5c|\.\.)") { return 404; }
+        location = /healthcheck {
+            limit_except GET { deny all; }
+            set $office http://onlyoffice:80;
+            proxy_pass $office/healthcheck;
+        }
+        location ~ "^/office-viewer/(frame|status)/([A-Za-z0-9_-]{43})$" {
+            limit_except GET { deny all; }
+            set $capability $1;
+            set $lease $2;
+            set $backend http://backend:8000;
+            proxy_pass $backend/api/v1/office-viewer/private/$capability/$lease;
+            proxy_set_header Host backend;
+            proxy_set_header X-Office-Gateway '${ONLYOFFICE_GATEWAY_SECRET}';
+            proxy_set_header Origin '';
+            proxy_set_header Referer '';
+            proxy_set_header Authorization '';
+            proxy_set_header Cookie '';
+            proxy_hide_header Access-Control-Allow-Origin;
+            add_header Cache-Control no-store always;
+        }
+        location ~ ^/office-viewer/(?:[0-9][A-Za-z0-9._-]*/)?(?:(?:web-apps|sdkjs|fonts|dictionaries|cache/files)/|themes\.json$) {
+            limit_except GET { deny all; }
+            set $office http://onlyoffice:80;
+            rewrite ^/office-viewer/(.*)$ /$1 break;
+            proxy_pass $office;
+            proxy_http_version 1.1;
+            proxy_buffering off;
+            proxy_set_header Host $http_host;
+            proxy_set_header X-Forwarded-Host $http_host/office-viewer;
+            proxy_set_header X-Forwarded-Proto $office_scheme;
+            proxy_set_header Cookie '';
+            proxy_hide_header Set-Cookie;
+            proxy_hide_header Access-Control-Allow-Origin;
+        }
+        location ~ ^/office-viewer/(?:[0-9][A-Za-z0-9._-]*/)?doc/[A-Za-z0-9_.=-]+/ {
+            limit_except GET POST { deny all; }
+            set $office http://onlyoffice:80;
+            rewrite ^/office-viewer/(.*)$ /$1 break;
+            proxy_pass $office;
+            proxy_http_version 1.1;
+            proxy_set_header Host $http_host;
+            proxy_set_header X-Forwarded-Host $http_host/office-viewer;
+            proxy_set_header X-Forwarded-Proto $office_scheme;
+            proxy_set_header Upgrade $http_upgrade;
+            proxy_set_header Connection $office_connection;
+            proxy_set_header Cookie '';
+            proxy_hide_header Set-Cookie;
+            proxy_hide_header Access-Control-Allow-Origin;
+            proxy_read_timeout 300s;
+            proxy_buffering off;
+        }
+        location / { return 404; }
+    }
+
+    # Native parser egress: only a short-lived opaque lease can fetch a source.
+    # ONLYOFFICE cannot supply a URL, backend path, owner, file ID or HTTP method.
+    server {
+        listen 8081;
+        location ~ "^/files/([A-Za-z0-9_-]{43})$" {
+            limit_except GET { deny all; }
+            set $lease $1;
+            set $backend http://backend:8000;
+            proxy_pass $backend/api/v1/office-viewer/private/files/$lease;
+            proxy_set_header Host backend;
+            proxy_set_header X-Office-Gateway '${ONLYOFFICE_GATEWAY_SECRET}';
+            proxy_set_header Origin '';
+            proxy_set_header Referer '';
+            proxy_set_header Authorization '';
+            proxy_set_header Cookie '';
+            proxy_set_header Range '';
+            proxy_hide_header Set-Cookie;
+            proxy_buffering off;
+            proxy_read_timeout 90s;
+            add_header Cache-Control no-store always;
+        }
+        location / { return 404; }
+    }
+}

@@ -58,10 +58,12 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import * as $3Dmol from '3dmol';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
-import { getFileDownloadUrl, prepareMolecularPreview, type FileInfo, type MolecularPreviewPreparation } from '../../api/file';
+import { type FileInfo, type MolecularPreviewPreparation } from '../../api/file';
+import { loadPluginText, preparePluginMolecule } from '../../visualizations/runtime';
+import type { VisualizationPlugin } from '../../visualizations/contract';
 import { usePreviewLoad } from '../../composables/usePreviewLoad';
 
-const props = defineProps<{ file: FileInfo }>();
+const props = defineProps<{ file: FileInfo; plugin: VisualizationPlugin }>();
 const container = ref<HTMLElement | null>(null);
 const threeContainer = ref<HTMLElement | null>(null);
 const status = ref('');
@@ -438,13 +440,9 @@ async function render(file: FileInfo) {
   if (!file?.file_id || !container.value) return;
   status.value = '正在加载结构...';
   try {
-    const metadata = await prepareMolecularPreview(file.file_id);
+    const metadata = await preparePluginMolecule(file, props.plugin, load.signal);
     load.assertCurrent();
-    const url = await getFileDownloadUrl(file);
-    load.assertCurrent();
-    const response = await fetch(url, { signal: load.signal });
-    if (!response.ok) throw new Error(`下载失败 (${response.status})`);
-    const text = await response.text();
+    const text = await loadPluginText(file, props.plugin, load.signal);
     if (!load.isCurrent() || !container.value) return;
     prepared.value = metadata;
     // FilePanel can mount this component before its flex parent has a size.

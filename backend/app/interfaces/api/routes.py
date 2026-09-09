@@ -4,6 +4,7 @@ from . import (
     credential_routes,
     tool_approval_routes,
     model_trace_routes,
+    onlyoffice_routes,
     admin_routes,
     agent_profile_routes,
     config_routes,
@@ -25,6 +26,7 @@ def create_api_router() -> APIRouter:
     api_router.include_router(credential_routes.router)
     api_router.include_router(tool_approval_routes.router)
     api_router.include_router(model_trace_routes.router)
+    api_router.include_router(onlyoffice_routes.router)
 
     # Include all sub-routers
     api_router.include_router(session_routes.router)

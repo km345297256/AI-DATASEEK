@@ -1,5 +1,5 @@
 {
-  "contract_version": 1,
+  "contract_version": 2,
   "id": "molecular",
   "version": "1.0.0",
   "name": "分子与晶体结构",
@@ -20,8 +20,7 @@
   ],
   "view_kind": "structure",
   "adapter": "molecular",
-  "data_kind": "file",
-  "reader": null,
+  "reader": "molecular",
   "default_enabled": true,
   "priority": 50,
   "permissions": [
@@ -30,5 +29,13 @@
   "limits": {
     "max_input_bytes": 268435456,
     "max_output_bytes": 16777216
+  },
+  "capabilities": {
+    "operations": [
+      "prepare",
+      "bytes"
+    ],
+    "input_mode": "whole",
+    "shared": true
   }
 }

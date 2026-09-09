@@ -31,15 +31,6 @@ export interface FilePreviewPage {
   bytes_read: number;
 }
 
-export async function getFilePreviewPage(
-  fileId: string,
-  options: { mode: 'text' | 'csv'; offset?: number; version?: string; delimiter?: ',' | '\t'; header_pending?: boolean; signal?: AbortSignal },
-): Promise<FilePreviewPage> {
-  const { signal, ...params } = options;
-  const response = await apiClient.get<ApiResponse<FilePreviewPage>>(`/files/${encodeURIComponent(fileId)}/preview`, { params, signal });
-  return response.data.data;
-}
-
 export interface ShapefilePreviewLayer {
   name: string;
   relative_path: string;
@@ -60,14 +51,6 @@ export interface MolecularPreviewPreparation {
   size_bytes?: number;
   periodic: boolean;
   supports_unit_cell: boolean;
-}
-
-export async function prepareMolecularPreview(fileId: string): Promise<MolecularPreviewPreparation> {
-  const response = await apiClient.post<ApiResponse<MolecularPreviewPreparation>>(
-    '/files/molecular-preview/prepare',
-    { file_id: fileId },
-  );
-  return response.data.data;
 }
 
 export interface LargeUploadInitResponse {

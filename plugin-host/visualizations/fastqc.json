@@ -1,0 +1,31 @@
+{
+  "contract_version": 2,
+  "id": "viz-fastqc",
+  "version": "2.0.0",
+  "name": "FastQC / MultiQC 测序质控",
+  "description": "明确启动后运行隔离 FastQC 与 MultiQC，保存受控质控结果；不会自动运行。",
+  "extensions": [
+    "fastq",
+    "fq"
+  ],
+  "filenames": [],
+  "view_kind": "table",
+  "adapter": "fastqc",
+  "reader": "fastqc",
+  "default_enabled": true,
+  "priority": 10,
+  "permissions": [
+    "file:read"
+  ],
+  "limits": {
+    "max_input_bytes": 67108864,
+    "max_output_bytes": 8388608
+  },
+  "capabilities": {
+    "operations": [
+      "job"
+    ],
+    "input_mode": "whole",
+    "shared": false
+  }
+}

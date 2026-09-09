@@ -1,38 +1,61 @@
-# Cordis 可视化插件协议 v1 / v2
+# Cordis 统一可视化插件协议
 
-> v1 字段和旧接口保持兼容。新增科学及办公能力使用显式协商的 v2 协议；完整矩阵、资源预算、作业/Artifact 接口和支持范围见 [21 组工具集成说明](scientific-visualization-integration.md)。下文 v1 示例仍是有效契约，不应将其读取预算或版本字段直接套用到 v2。
+当前公有协议版本为严格整数 **2**，所有 **36 个插件**使用同一描述结构、能力声明、调用入口与结果封装。版本用于契约兼容检查，不再区分基础插件、科学插件或办公插件；清单不再接受 `data_kind`，适配器键不再使用 `v2-` 前缀。本次不维护旧版可视化接口兼容分支。
+
+完整工具范围、上游许可和实际格式限制见[21 组工具集成说明](scientific-visualization-integration.md)。已有插件的稳定 ID、发布版本、默认开关、优先级、格式匹配、权限及资源预算保持不变，已保存的个人启停选择继续生效。
 
 ## 目标和边界
 
-可视化不再等价于“一种扩展名对应一个固定前端组件”。文件格式、读取器、视图和用户启停状态是四个独立维度：同一个 NetCDF 文件可以匹配地图和数值曲线两个插件，用户自行选择当前视图并启停自己的插件。
+文件格式、读取器、展示视图和启停状态是独立维度。同一个 NetCDF 可以由地图、曲线或 HDF5 型变量树插件展示；它们使用同一协议，只声明不同能力。不应通过新增一套协议表达新的学科或 SDK。
 
-这套机制沿用 Cordis，但与 Agent 工具目录隔离：可视化使用独立 Cordis Context、服务、fiber 和 revision；不会进入模型工具列表。可视化目录重载与个人启停不改变工具 catalog digest 或执行 bundle digest，也不改变 PlanActFlow、SSE 或 Docker 数据集只读边界。本次新增沙箱读取器源码本身会随正常镜像构建更新执行 bundle digest，旧分析沙箱仍遵循原有版本隔离规则。
+可视化继续使用独立 Cordis Context、服务、fiber 和 revision，不进入模型工具列表。目录重载和个人启停不改变 Agent 工具 catalog digest，不替换 AgentLoop、PlanActFlow、SSE 或 FastAPI。读取器源码随正常镜像构建更新；现有分析沙箱依旧遵循自己的执行版本隔离。
+
+公有契约统一不意味着必须重写所有解析器：NetCDF/FITS/FASTQ 读取器、扩展科学/Office 读取器、分页读取和浏览器解码可以保留各自私有实现与资源配置。宿主负责把已校验的私有结果转换成统一 `VisualizationResult`；旧 worker 内部版本字段不是另一套可对外选择的插件协议。
 
 ## 使用方式
 
-1. 打开 `/plugins?tab=renderers` 的“可视化插件”，按类型启动或停止。原有 14 个 v1 插件与新增 20 个 v2 插件分别注册、默认启用；本次选定的 21 组上游工具包括原已接入的 3Dmol。当前本机无登录部署使用共享系统身份，因此浏览器显示“本机共享配置”。后端偏好依然按身份独立存储，不接受客户端指定其他用户。
-2. 打开文件面板，在“可视化”下拉框选择已启用且匹配该文件的视图。NetCDF 地图和数值曲线互不覆盖；停用的插件不再匹配，没有硬编码组件回退。
-3. 科学视图可以选择变量、横轴维度、其他维度的固定索引或 FITS HDU，再点击“应用 / 重新读取”。地图还可勾选离线底图；曲线不会偷偷进行空间平均或时间聚合。
+1. 打开 `/plugins?tab=renderers`，按场景启停插件。当前本机无登录部署采用共享系统身份，界面标记“本机共享配置”；后端偏好仍按身份存储，不接受请求指定其他身份。
+2. 在文件面板的“可视化”下拉框中选择匹配文件的已启用视图。停用的插件不再匹配，也不回退到未注册的硬编码组件。
+3. 科学视图按能力提供变量、维度、切片、HDU 或单位选择；完整 QC 需要明确启动，不会因打开文件自动运行。
 
-同页起停立即更新；其他浏览器标签中的预览会在重新获得焦点、手动刷新或最多 15 秒目录轮询后更新。已完成的分析结果和原文件不会因关闭可视化插件而删除。
+同页起停立即更新；其他标签在获得焦点、手动刷新或最多 15 秒目录轮询后更新。关闭插件不会删除原文件或已经保存的分析结果。
 
-### 从数据集文件列表直接预览
+### 数据集列表直接预览
 
-数据集探查页左侧“数据文件”列表中，匹配到已启用 Cordis 可视化插件的文件会常显“小眼睛”按钮。悬停显示可用插件，点击后直接打开现有文件预览面板；同一个 NetCDF 文件仍可在面板内切换地图和数值曲线。不支持的文件、目录和全部匹配插件已停用的文件不显示预览按钮。
+数据集探查页的数据文件可通过“小眼睛”打开同一预览面板；同格式多个插件仍可切换。无匹配能力、目录或所有候选均停用时不提供预览按钮。准备期间重复点击不重复请求；切换、关闭或停用后的过期响应不得重新打开旧面板。
 
-按钮准备期间显示加载状态，重复点击不会重复请求；切换文件、离开页面、关闭面板或停用插件后，过期响应不会重新打开旧预览。插件目录不可用时暂停入口并提供重试。列表加载和按钮点击本身不会创建分析会话或调用模型；页面原有的推荐问题生成逻辑保持不变。
+`POST /api/v1/datasets/{dataset_id}/files/preview` 接受登记清单中的精确逻辑路径及启用的 `plugin_id`，返回公开 `FileInfo` 与已授权的同目录 Shapefile 配套文件。该入口只是创建或复用不透明预览引用，不读取模型、不创建分析会话、不复制源数据、不向普通文件列表添加记录；引用按身份隔离，7 天后过期，可再次准备刷新。
 
-新增 `POST /api/v1/datasets/{dataset_id}/files/preview`，只接受登记清单中的精确逻辑路径和启用的 `plugin_id`，返回公开 `FileInfo` 及同目录 Shapefile 配套文件。接口使用可复用、按用户隔离的不透明文件引用，不上传或复制源文件、不向普通文件列表添加记录；引用独立存储并在 7 天后过期，再次点击可刷新。每次实际读取重新核验数据集归属、登记清单、存储位置和当前插件状态，归档数据集或停用全部匹配插件后旧引用不能继续读取。关闭地图但保留曲线时，同一个文件引用仍可供曲线使用。
+实际读取重新核验数据集归属、登记文件、存储位置、插件状态和版本。本机路径必须满足 `DATASET_HOST_PATH_ALLOWLIST` 及 Docker-host 映射；拒绝路径穿越、符号链接和非普通文件。真实路径不返回浏览器、不进入 URL/localStorage/sessionStorage。读取受插件预算及数据集 helper 的 64 MiB 范围边界限制；分页或前缀读取不复制整个大文件。删除引用不删除源文件。
 
-本机目录读取复用当前 allowlist 和 Docker-host 路径映射，通过固定只读 helper 获取有界数据；受管数据卷使用同样的逐级无符号链接文件描述符读取。禁止路径穿越、符号链接、非普通文件及任意宿主路径输入。每次读取服从插件预算，且最多 64 MiB；文本/CSV 分页及 FASTQ 前缀采样不要求复制大文件。引用不含真实存储路径；删除引用 ID 不会删除源数据。现有上传文件、分析附件和数据产品仍走原存储实现。
+Shapefile ZIP/RAR 解压导入是现有的**显式文件导入工作流**，可能生成新文件，不属于只读可视化的 `prepare` 操作。普通 Shapefile 插件仅声明 `bytes`，依次读取已授权主文件和伴随文件。
 
-## 声明式契约
+## 一份批准规范、三个构建副本
 
-受审查的描述文件位于 `plugin-host/visualizations/*.json`，每个文件描述一个视图插件。所有字段必填，未知字段拒绝。描述文件最大 16 KiB，目录最多 256 个插件，插件 ID 唯一。不接受任意 `entry`、脚本、URL 或动态模块地址。
+唯一受版本控制的适配器规范是 `contracts/visualization-adapters.json`，它描述批准的 `adapter → readers / view_kind / capabilities` 组合。当前共有 35 个适配器键、36 个插件注册；NetCDF/FITS 曲线共用一个适配器。
+
+运行：
+
+```bash
+node scripts/sync-visualization-contract.mjs
+node scripts/sync-visualization-contract.mjs --check
+```
+
+生成三个独立构建上下文内的副本：
+
+- `plugin-host/src/visualization-adapters.generated.ts`
+- `backend/app/domain/models/visualization_adapters_generated.py`
+- `frontend/src/visualizations/adapters.generated.ts`
+
+这些副本必须纳入版本控制，不手工编辑。`--check` 发现源规范或任何副本漂移时失败，已经接入回归入口与 Cordis 测试；前端独立 Docker 构建不需要越过自己的上下文读取根规范。
+
+## 声明式描述符
+
+受审查的插件文件位于 `plugin-host/visualizations/*.json`。描述符、能力对象、预算对象严格拒绝额外或缺失字段；目录最多 256 个插件、单文件最多 16 KiB，ID 唯一。不接受脚本、动态组件路径、远程 URL、命令或凭据。
 
 ```json
 {
-  "contract_version": 1,
+  "contract_version": 2,
   "id": "netcdf-map",
   "version": "1.0.0",
   "name": "NetCDF 地图",
@@ -41,7 +64,6 @@
   "filenames": [],
   "view_kind": "map",
   "adapter": "scientific-map",
-  "data_kind": "scientific",
   "reader": "netcdf",
   "default_enabled": true,
   "priority": 50,
@@ -49,93 +71,157 @@
   "limits": {
     "max_input_bytes": 67108864,
     "max_output_bytes": 524288
+  },
+  "capabilities": {
+    "operations": ["preview"],
+    "input_mode": "whole",
+    "shared": false
   }
 }
 ```
 
-| 字段 | 约束与作用 |
+| 字段 | 当前规则 |
 | --- | --- |
-| `contract_version` | 严格整数 `1`，不接受自动类型转换 |
-| `id` / `version` | 插件稳定 ID / 发布版本；ID 为小写字母开头、字母数字与连字符，最长 64 字符 |
-| `extensions` / `filenames` | 小写精确后缀或完整文件名，契约可表达复合后缀，但必须由读取器真正支持；不接受通配符和路径 |
-| `view_kind` | `image`、`map`、`series`、`table`、`text`、`structure`、`document` |
-| `adapter` | 宿主审核过的前端适配器键；不是执行入口或 URL |
-| `data_kind` / `reader` | `file` + `null` 用现有授权文件读取；`scientific` + `netcdf` / `fits` / `fastq` 用隔离科学读取器 |
-| `default_enabled` | 新用户未设置偏好时的初始开关，不覆盖用户已保存的选择 |
-| `priority` | -1000～1000 的有界整数，辅助候选视图排序 |
-| `permissions` | v1 严格限定为 `["file:read"]`，不授予文件写入、凭据或任意网络权限 |
-| `limits` | 输入和有界输出预算；科学响应输出至多 512 KiB，NetCDF/FITS 输入最多 64 MiB，未压缩 FASTQ 只读有界 2 MiB 前缀样本 |
+| `contract_version` | 只能是整数 `2`，不接受字符串、布尔值或其他协议版本 |
+| `id` / `version` | 稳定插件 ID / 插件自身发布版本；发布版本不必与协议版本相同 |
+| `extensions` / `filenames` | 小写后缀或完整文件名，无通配符、路径、重复项；声明格式必须有真实读取实现 |
+| `view_kind` | `image / map / series / table / text / structure / document`，表示用户场景 |
+| `adapter` / `reader` | 批准的前端适配器键 / 非空读取器键；不是 URL 或可执行入口 |
+| `capabilities.operations` | 非空、无重复、符合批准组合的操作列表，见下表 |
+| `capabilities.input_mode` | `whole / page / prefix`，明确输入预算针对整文件、每页还是前缀 |
+| `capabilities.shared` | 是否允许该插件用于已有共享预览；不是文件访问授权或数据公开开关 |
+| `default_enabled` / `priority` | 未保存个人偏好时的初始值 / -1000～1000 的排序整数 |
+| `permissions` | 严格 `["file:read"]`，不授予写入、任意网络或凭据 |
+| `limits` | 严格正整数预算，受读取器及存储更严格硬限制；不能通过增大清单预算绕过它们 |
 
-`adapter`、`view_kind`、`data_kind` 和 `reader` 的合法组合在 Node 和 Python 两端校验，前端也校验后才挂载。声明不能绕过读取器的更严格硬限制。浏览器文件适配器仍有各自解码/显示约束，`max_output_bytes` 不意味着授权任意网络输出，也不把浏览器 DOM 作为科学数据载荷。
+Node、Python、前端都从同一个批准规范校验完整组合，不能仅改 `operations` 或 `shared` 扩权。
 
-输入预算按照适配器的读取单位解释：`text` 为每页 64 KiB、`csv` 为每页 128 KiB，保持大文件的原有分段预览，不以整个文件大小阻止打开；`fastq-quality` 为最多 2 MiB 的前缀样本，可用于更大未压缩文件。其他当前适配器需要完整的有界源文件，按文件总大小检查预算，TIFF 为 64 MiB，NetCDF/FITS 为 64 MiB。预算不是全量文件分析承诺。
+| 操作 | 含义 | 当前插件 |
+| --- | --- | --- |
+| `bytes` | 读取授权文件的有界原始字节，浏览器本地解码 | 普通图片/TIFF/OBJ/HTML/Markdown/Shapefile、分子结构及 vtk/Mol*/地图/医学影像/PDF 等 |
+| `page` | 文本/CSV 分页，不以整个源文件大小禁止预览 | `text`、`csv` |
+| `preview` | 宿主调用批准读取器，返回有界结构化结果 | NetCDF/FITS/FASTQ 采样、Plotly/H5Web/JSROOT/NMR/RDKit/MetPy/Word/Excel/PPT |
+| `prepare` | 返回只读分子结构元信息，不创建分析任务或写入数据 | `molecular`，随后用 `bytes` 读取 |
+| `job` | 显式长任务，复用 AnalysisJob 和私有 Artifact | `viz-fastqc`；未声明即时 `preview` |
 
-FASTQ v1 只注册 `.fastq` 和 `.fq`，只接受未压缩标准四行记录；`.fastq.gz` / `.fq.gz` 未注册，不会将压缩数据误送文本读取器。增加压缩格式需要单独实现有界解压及解压资源预算后再声明支持。
+共享预览保留原九类插件的 `shared:true`：image、tiff、shapefile、molecular、obj、html、markdown、text、csv。其余插件为 false。共享资源仍走现有签名授权或当前身份的文件/插件校验，不因能力声明跳过服务端检查。
 
-## 生命周期和持久化
+## 统一调用与结果
 
-1. 宿主完整验证候选目录，随后为每个插件创建真实 Cordis fiber；注册使用 `owner.effect()`，dispose 自动注销。
-2. `visualizations.snapshot` 读取当前独立可视化目录；首次调用按需初始化，不阻断原 Agent 工具目录启动。
-3. `visualizations.reload` 在独立 Context 中构建候选，成功后原子切换，失败保留上一有效目录；不调用 `plugins.reload`，不改变 Agent 工具版本。
-4. `GET /api/v1/visualizations` 返回标准 `APIResponse`，`data` 为 `{engine:"cordis", revision, plugins:[descriptor + enabled]}`。实际 API 前缀沿用主应用路由配置。
-5. `PATCH /api/v1/visualizations/{id}/state` 仅接受 `{ "enabled": false }` 或严格布尔值 `true`；返回更新的描述符和状态。用户身份来自认证依赖，不接受请求指定其他用户。
-6. 偏好存储在独立 Mongo `visualization_preferences` 集合，每用户一条 `_id` 文档；以单字段原子更新避免两个插件同时切换互相覆盖。不会修改全局描述文件或其他用户开关。
-7. 前端关闭插件时卸载当前视图并取消请求；后端科学可视化入口每次调用 `require_enabled()`，不依赖前端隐藏按钮实现权限检查。
+所有普通读取使用：
 
-目录 revision 表示插件契约代际，不含个人开关。个人开关即时持久化，前端修改后重新读取当前目录；当前文件的视图选择不改变其他用户。v1 暂无用户自定义执行代码上传接口或每扩展名默认视图持久化接口。
+```text
+POST /api/v1/files/{opaque_file_id}/visualization
+```
 
-个人开关不会销毁共享目录里的 Cordis fiber，否则一个用户停止地图就会影响其他用户。目录注册/重载/卸载由 Cordis 真正管理；个人停止则取消其前端预览实例，并阻止后端新的科学读取和迟到结果交付。这是“全局能力生命周期”和“个人使用状态”的明确分层，不以页面隐藏代替后端校验。
+```json
+{
+  "plugin_id": "netcdf-map",
+  "operation": "preview",
+  "kind": "map",
+  "options": {
+    "variable": "precipitation",
+    "indices": {"time": 0}
+  }
+}
+```
 
-Cordis 不健康、插件未知或已停用时拒绝读取，不提供静态内置列表降级。文件读取仍以授权的不透明 file ID 为入口，真实宿主机路径不进入目录响应、URL 或浏览器存储。
+公共请求字段为 `plugin_id`、`operation`、可选文件 `version`、可选 `kind` 和有界 `options`。`operation` 必须由当前插件声明；`job` 使用下述作业资源，不通过普通读取隐式启动。变量等参数放入 `options`，不再直接放在请求顶层。
 
-## 数据面与资源边界
+- `page` 仅接受 `offset`、`delimiter`、`header_pending`。
+- NetCDF/FITS/FASTQ 预览仅接受其明确支持的 `variable / x_dimension / indices / hdu` 等参数。
+- 扩展读取器分别校验列名、单位、内部变量路径及切片等参数。HDF5/ROOT 的 path 是文件内部节点，不是主机路径。
+- `bytes` 可为已授权伴随资源带上不透明 `resource_id`；服务端验证它与主文件的关系，不能读取任意同身份文件，也不能传递路径或第三方 URL。
+- `prepare` 当前不接受额外参数。
 
-新科学读取入口是 `POST /api/v1/files/{opaque_file_id}/visualization`。请求包含 `plugin_id`，可选 `variable`、`x_dimension`、`indices`、`hdu`、`version`；不接受路径、任意代码、远端数据 URL 或用户 ID。
+非字节响应仍由应用统一 `APIResponse` 包装，`data` 为：
 
-入口同时检查文件归属、私有 Spill 限制、插件已启用、文件匹配及文件版本，再以真实范围读取获取有界输入。获取文件期间与 Docker 读取期间都保留并发槽直到底层工作结束；浏览器取消不能通过提前释放槽绕过内存限制。默认每后端进程最多 2 个科学预览，无空闲槽等待最多 5 秒。
+```typescript
+interface VisualizationResult {
+  contract_version: 2;
+  plugin_id: string;
+  version: string;       // 文件版本，不是插件发布版本
+  revision: string;      // Cordis 目录代际，不含个人启停偏好
+  kind: 'page' | 'series' | 'raster' | 'table' | 'array'
+      | 'tree' | 'media' | 'report' | 'molecule' | 'resources';
+  payload: Record<string, unknown>;
+  metadata: Record<string, unknown>;
+  warnings: string[];
+  sampled: boolean;
+}
+```
 
-科学解析使用现有沙箱镜像的一次性容器：无网络、无端口、无宿主目录挂载、非 root、只读根文件系统、仅有界临时目录，512 MiB 内存、1 CPU、32 进程上限、30 秒读取期限。输入通过有界协议传递，stdout/stderr 在读取中限制总量；终止、超时和取消均进入强制回收。读取器不调用模型、不创建 Agent 回合、不执行用户脚本。Docker 不可用时不降级到 FastAPI 进程解析。
+公共封装一致，`payload` 的科学字段按批准读取器/结果类型验证，不把它解释成可执行对象。图像/PDF 使用 `media`；变量树使用 `tree`；表格、数组、采样曲线与报告有明确类型。`resources` 为协议可表达的结果类型，不代表已经实现通用多对象或瓦片服务。前端科学 SDK 内部适配函数仍可转换字段，但不会新增对外接口或客户端协议协商。
 
-返回 `contract_version:1` 的显示数据：明确的 `kind/reader`、变量和维度、横纵轴、数值/缺失值、切片及抽样信息、文件版本与插件目录版本；后端和前端分别校验。响应最大 512 KiB，并进一步服从插件声明的更小预算。插件停止、目录变更或文件变化后，迟到的结果不能交付。
+`bytes` 返回流而不做 Base64 JSON 包装，以免扩大内存占用。响应提供 `X-Preview-Version`、`X-Visualization-Revision`、`X-Visualization-Plugin`，以及 `no-store`、`nosniff`、attachment 和准确长度。统一协议允许明确的字节流和类型化 JSON 两种载荷，二者共享身份、插件、版本与预算边界。
 
-| 读取器 / 适配器 | 当前支持与限制 |
+### 目录与作业资源
+
+| 方法 / 路径（均以 `/api/v1` 开头） | 行为 |
 | --- | --- |
-| NetCDF 地图 | 根组数值变量；严格规则的一维经纬度，最多 128 × 128 索引抽样，显式固定其余维度；拒绝旋转、投影、不规则或有歧义网格。底图仅为离线地理轮廓。 |
-| NetCDF 曲线 | 指定变量和横轴，其他维度固定切片，最多 1,000 点；保留坐标单位/日历说明。CF 边界和辅助变量不优先自动选中，但仍可手动选择。 |
-| FITS | 非压缩图像 HDU；图像最多 128 × 128，曲线最多 1,000 点；正确应用 BSCALE/BZERO/BLANK。不假装具备 WCS 天球投影，不支持本轮未适配的表格/压缩 HDU。 |
-| FASTQ | 未压缩标准四行 `.fastq/.fq`；前 2 MiB 内至多 1,000 条完整记录、前 500 个位置；明确按 Phred+33 解释，不声称自动推断质量编码或全量 QC。 |
-| TIFF | 保留原图像预览；读取最多 64 MiB、解码最多 16M 像素及 128 MiB 估算数据。同步浏览器解码仅有界并丢弃过期结果，不宣称可抢占任意已开始的同步解码。 |
-| 文本 / CSV | 保留原分页读取；每页 64 / 128 KiB，不按源文件总大小禁用大文件分页预览。 |
+| GET `/visualizations` | 返回完整 36 个当前统一描述符及 enabled，不再协商两个目录 |
+| PATCH `/visualizations/{id}/state` | 仅接受严格布尔 `{"enabled":false}` 或 true |
+| POST `/files/{id}/visualization/jobs` | 显式启动声明 job 的任务；当前为 FastQC，options 需明确 confirm |
+| GET `/files/{id}/visualization/jobs` | 当前文件作用域作业列表 |
+| GET `/files/{id}/visualization/jobs/{job_id}` | 作业状态 |
+| POST `/files/{id}/visualization/jobs/{job_id}/cancel` | 取消，必须带 `X-Analysis-Job-Action: cancel` |
+| GET `/files/{id}/visualization/jobs/{job_id}/result` | 成功后返回同一 VisualizationResult 封装 |
 
-当前科学读取是文件/切片预览，不是任意多图层 GIS 工作台或大数据分布式计算。大于 64 MiB 的 NetCDF/FITS、嵌套组、曲线网格与其他格式可继续走领域分析工具；后续按新读取器协议扩展，不放宽全局边界。已有签名共享文件预览保留，新科学读取暂不在共享页面开放。
+作业状态沿用 AnalysisJob，结果保存到私有 Spill Artifact Store，文件哈希作用域不伪造 Agent 会话。结果读取核验 owner、文件作用域、实际字节数、分块位置、摘要、文件版本及目录 revision。退出 QC 视图会请求取消未完成作业；插件停用或文件消失后仍允许取消本人已经拥有的任务。
 
-## 已迁移的内置插件
+旧 `visualization-v2`、`visualization-content`、`visualization-jobs` 可视化入口已收敛到上述资源结构，不作为兼容 API 保留。原通用下载、数据集引用准备与 Shapefile 导入接口属于各自工作流，不代表存在另一版可视化协议。
 
-| ID | 场景 |
+## 预算与隔离
+
+预算解释由能力显式声明，不再通过版本或适配器前缀猜测：
+
+| 读取方式 | 当前预算和限制 |
 | --- | --- |
-| `image` | 常见图片 |
-| `tiff` | TIFF 栅格图像 |
-| `shapefile` | 关联 Shapefile 地图 |
-| `molecular` / `obj` | 分子晶体 / 三维网格结构 |
-| `html` / `markdown` | 文档 |
-| `text` / `csv` | 分页文本代码 / 表格 |
-| `netcdf-map` / `netcdf-series` | 同格式下的地理地图 / 数值切片曲线 |
-| `fits-image` / `fits-series` | 图像 HDU / 一维切片曲线 |
-| `fastq-quality` | 有界序列质量采样 |
+| `page` | 文本每页 64 KiB、CSV 每页 128 KiB；不限制整个源文件大小，缩小清单预算后读前拒绝越界请求 |
+| `prefix` | FASTQ 采样最多 2 MiB、1,000 条完整四行记录、前 500 个位置；仅未压缩 fastq/fq、Phred+33 |
+| 整文件科学预览 | NetCDF/FITS 最大 64 MiB；派生科学结果最多 512 KiB，并服从更小清单预算 |
+| 扩展科学/Office/QC | 一般最大 64 MiB 输入、8 MiB 派生结果；PNG/PDF worker 媒体最多 5 MiB，数组最多 16,384 值，表格窗口 200×100 |
+| 原有字节适配器 | 保留各自原预算，不统一扩大/缩小：例如 TIFF 64 MiB，部分原适配器清单 256 MiB；分子实际另受 50 MiB 限制 |
+| 浏览器 SDK | 继续执行各适配器更严格的解码限制，例如 vtk/Mol* 8 MiB 输入、栅格/体素/原子数限制，详见工具说明 |
 
-原 `/renderers` 配置记录不删除；它们不是新契约插件，未经适配的远程 API/组件配置不能直接变成可执行可视化。
+`max_output_bytes` 校验派生的统一 JSON 结果封装（payload、metadata、warnings 等），不把原始字节流误计为派生结果。外层应用 APIResponse 只有固定包装开销。QC 读取还校验其 Artifact 的真实大小与摘要，并对归一化结果执行当前插件和 8 MiB 硬限制。原始字节流按 `max_input_bytes` 限制。
 
-## 如何扩展
+字节存储读取按最多 8 MiB 分块，HTTP 输出每块最多 1 MiB；源文件大于 1 MiB 时提前使用临时磁盘缓冲，避免整文件驻留。较大的存储读取块减少数据集 helper/存储的反复启动和往返，但不改变整文件输入预算。每后端进程字节读取最多两个并发槽，槽保持到响应关闭；取消时等待仍在运行的底层范围读取结束再释放。存储提供方可能有内部缓冲，因此不把“两个槽 × 单块大小”宣称为整个服务的精确内存用量。输入取回和科学解析也各有原有并发限制，不宣称整个系统仅两个任务。存储不支持有界范围读取时拒绝，不降级成整文件无限制读取。
 
-- 复用已有合法读取器和适配器：新增受审查描述文件、稳定 ID、文件匹配与预算，并添加样例契约测试。
-- 增加新视图：新增受信任的懒加载前端适配器，落实挂载、更新、取消和 dispose；同步更新 Node/Python/前端适配器组合校验。
-- 增加新格式读取器：在 Docker 隔离环境中实现有界读取，保持 file ID 授权入口和只读输入，提供明确的输出 schema、无数据/不适用错误和取消语义，再注册对应读取器。
-- 为同格式新增不同场景：创建不同 ID，不覆盖已有格式映射。例如增加第三个 NetCDF 视图不会要求删除地图或曲线插件。
-- 分别验证“装载 / 无效契约拒绝 / 卸载清理 / 用户隔离 / 同格式多视图 / 原 Agent 工具目录不变”。不要把一个新 `adapter` 字符串直接解释为脚本模块路径。
+隔离容器保留两种私有资源配置，而不是两种公有协议：
 
-控制平面的 `visualizations.reload` 是宿主内部 RPC，不对普通用户暴露全局重载操作。新适配器代码或依赖变化仍需通过现有 `./run.sh` 构建/更新流程；它不是免审核远程代码热安装系统。
+- NetCDF/FITS/FASTQ：512 MiB 内存、1 CPU、32 PID、96 MiB 临时空间、30 秒期限。
+- 扩展科学/Office/QC：1 GiB 内存、1 CPU、96 PID、512 MiB 临时空间、50 秒外层期限；容器另有 55 秒独立硬时限与自动删除。
 
-## 验证记录（2026-09-09）
+两者均无网络、无端口、无数据集或宿主目录挂载、无凭据、非 root、只读根文件系统。取消/超时强制回收；Docker 不可用时不降级到 FastAPI 进程执行复杂解析。普通受限文本分页与原始字节交付不因此新增解析容器。
+
+此协议没有新增通用 tile/range/chunk 对外协议、大图零拷贝、目录型 Zarr、任意多对象科学资源集或分布式分析。后端内部有界 range 读取是安全的文件交付实现，不等于已实现浏览器按需大图瓦片服务。
+
+## 生命周期与兼容边界
+
+1. 宿主校验完整目录，为每个插件创建真实 Cordis fiber，`owner.effect()` 注册、dispose 注销。
+2. `visualizations.snapshot` 按需初始化独立目录；`visualizations.reload` 在独立 Context 构建候选，成功原子替换，失败保留上一有效目录。
+3. 每次操作核验文件归属、私有 Spill 限制、插件启用、匹配格式、声明操作及版本。交付前核对当前文件版本、完整描述符、目录 revision 和启停状态。
+4. 前端实例随文件、插件与目录代际改变而卸载，取消请求，清理 canvas/WebGL/worker/blob；已停用或过期的结果不能重新挂载。
+5. 个人开关存于 Mongo `visualization_preferences`，稳定 ID 不变所以不需重建偏好。不销毁全局共享 fiber，避免一个身份停用影响其他身份。
+6. Cordis 不健康、插件未知或停用时拒绝读取，不退回静态清单。目录重载是宿主内部 RPC，不向普通用户开放任意代码安装。
+7. 原 `/renderers` 配置记录不删除，但未经适配的远程 API/组件配置不是可执行插件。
+
+原 NetCDF 地图仍限定规则经纬网和显式切片，最多 128×128；曲线最多 1,000 点，不隐式平均聚合。原 FITS 保留 BSCALE/BZERO/BLANK 语义和图像 HDU 子集，不假装具备 Aladin 的 WCS 功能。统一描述与传输不能改变这些科学语义。
+
+## 如何新增插件
+
+1. 明确支持格式、视图、读取粒度、共享策略和真实资源预算。优先复用批准读取器/适配器；同格式不同场景使用不同稳定 ID。
+2. 新增适配器组合时，修改唯一规范 `contracts/visualization-adapters.json`，生成三端副本并运行 `--check`。不要分别修改三个批准映射，不新增 `v3-*` 或 data_kind 分类来逃避能力建模。
+3. 添加清单并落实可信适配器的懒加载、取消、过期结果保护与销毁。所有组件接收统一 `{file, plugin}`，使用共享 runtime，不直接下载任意 URL 或绕过插件开关。
+4. 新读取器必须接入现有授权 file ID 入口，实现 options 白名单、输入/输出预算、无适用数据错误、科学语义与类型结果；复杂解析放入隔离 worker，不执行文件自带脚本。新增 job 使用现有 AnalysisJob/Artifact，不发明另一套任务系统。
+5. 添加正常样例、无效契约、错类型/参数、超限、停用/版本变化、取消清理、共享限制及关联资源越权测试；验证原 Agent 工具目录不变、同格式多视图与已保存开关保留。
+6. 运行 `bash scripts/check-regressions.sh --containers`，并根据新 SDK 执行真实隔离读取及浏览器画面验收。编译通过或 mock 返回不等于真实图形已验证。
+7. 依赖/代码变化通过唯一 `./run.sh` 流程更新现有 Compose 服务。插件清单不是远程代码热安装系统，不另建开发栈或开放新端口。
+
+## 历史验收记录（统一协议改造前，2026-09-09）
+
+以下保留原迁移阶段的验收事实与数字，不能作为本次统一协议改造已经通过的证明。当前协议、入口及开发流程以上文为准；本次验收由独立报告记录。
 
 | 检查 | 结果 |
 | --- | --- |

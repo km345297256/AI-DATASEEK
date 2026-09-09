@@ -41,6 +41,10 @@ services:
       DATASET_MANAGED_VOLUME: ai-dataseek-dataset-data
       SKILLS_DIR: /app/skills
       USER_SKILLS_DIR: /data/skills/users
+      ONLYOFFICE_ENABLED: ${ONLYOFFICE_ENABLED:-false}
+      ONLYOFFICE_PUBLIC_ORIGIN: http://office.localhost:${FRONTEND_PORT:-7000}
+      ONLYOFFICE_JWT_SECRET: ${ONLYOFFICE_JWT_SECRET:-}
+      ONLYOFFICE_GATEWAY_SECRET: ${ONLYOFFICE_GATEWAY_SECRET:-}
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - dataset-data:/data/datasets
@@ -110,6 +114,57 @@ services:
     networks:
       - ai-dataseek-network
 
+  # Opt in with --profile office. No published ports or dataset/host mounts.
+  # This parser must never join the administrator-capable application network.
+  onlyoffice:
+    profiles: [office]
+    image: ${ONLYOFFICE_IMAGE:-onlyoffice/documentserver:9.3.1.2@sha256:290a0a1406a485acc8a6bc20418ac7158c5eec78b4844c218f8f975a9800ddbc}
+    environment:
+      JWT_ENABLED: "true"
+      JWT_SECRET: ${ONLYOFFICE_JWT_SECRET:-}
+      JWT_IN_BODY: "true"
+      ALLOW_PRIVATE_IP_ADDRESS: "true"
+      ALLOW_META_IP_ADDRESS: "false"
+      WOPI_ENABLED: "false"
+      METRICS_ENABLED: "false"
+      GENERATE_FONTS: "true"
+    # Docker service discovery still resolves the gateway; unknown DNS names
+    # cannot use the host's public resolver as an exfiltration route.
+    dns: [127.0.0.1]
+    mem_limit: 4g
+    memswap_limit: 4g
+    cpus: 2
+    pids_limit: 512
+    shm_size: 256m
+    # ONLYOFFICE's own converted-copy cache only, never a user dataset mount.
+    # A hard 512 MiB cap is included in the 4 GiB container memory ceiling.
+    tmpfs:
+      - /var/lib/onlyoffice/documentserver/App_Data/cache/files:rw,nosuid,nodev,noexec,size=512m,uid=105,gid=107,mode=0755
+    security_opt: [no-new-privileges:true]
+    restart: unless-stopped
+    networks: [onlyoffice-internal]
+
+  office-gateway:
+    profiles: [office]
+    image: ai-dataseek-office-gateway:${IMAGE_TAG:-latest}
+    build:
+      context: ./deploy/office-gateway
+    environment:
+      ONLYOFFICE_GATEWAY_SECRET: ${ONLYOFFICE_GATEWAY_SECRET:-}
+    read_only: true
+    user: "101:101"
+    tmpfs:
+      - /tmp:rw,nosuid,nodev,noexec,size=32m,uid=101,gid=101,mode=0700
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    dns: [127.0.0.1]
+    mem_limit: 128m
+    cpus: 0.5
+    pids_limit: 64
+    depends_on: [onlyoffice, backend]
+    restart: unless-stopped
+    networks: [ai-dataseek-network, onlyoffice-internal]
+
 volumes:
   mongodb-data:
     name: ai-dataseek-mongodb-data
@@ -124,3 +179,7 @@ networks:
   ai-dataseek-network:
     name: ai-dataseek-network
     driver: bridge
+  onlyoffice-internal:
+    name: ai-dataseek-onlyoffice-internal
+    driver: bridge
+    internal: true

@@ -30,10 +30,12 @@
 import MonacoEditor from '@/components/ui/MonacoEditor.vue';
 import type { FileInfo } from '../../api/file';
 import { useFilePreviewPages } from '../../composables/useFilePreviewPages';
+import type { VisualizationPlugin } from '../../visualizations/contract';
 
 const props = defineProps<{
-    file: FileInfo;
+  file: FileInfo;
+  plugin: VisualizationPlugin;
 }>();
 
-const { page, loading, error, pageIndex, loadPage } = useFilePreviewPages(() => props.file, 'text');
+const { page, loading, error, pageIndex, loadPage } = useFilePreviewPages(() => props.file, () => props.plugin);
 </script>

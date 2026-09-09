@@ -1,6 +1,7 @@
 .git
 .gitignore
 .cache
+.local/
 .env
 .env.*
 !.env.example

@@ -1,0 +1,30 @@
+{
+  "contract_version": 2,
+  "id": "viz-jsroot",
+  "version": "2.0.0",
+  "name": "JSROOT 直方图与曲线",
+  "description": "ROOT 文件中 TH1/TH2/TGraph 的受控预览；拒绝任意公式、宏及自定义绘图代码。",
+  "extensions": [
+    "root"
+  ],
+  "filenames": [],
+  "view_kind": "series",
+  "adapter": "jsroot",
+  "reader": "root",
+  "default_enabled": true,
+  "priority": 10,
+  "permissions": [
+    "file:read"
+  ],
+  "limits": {
+    "max_input_bytes": 67108864,
+    "max_output_bytes": 8388608
+  },
+  "capabilities": {
+    "operations": [
+      "preview"
+    ],
+    "input_mode": "whole",
+    "shared": false
+  }
+}

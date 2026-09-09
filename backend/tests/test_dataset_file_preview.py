@@ -147,7 +147,7 @@ async def test_reference_reads_keep_owner_scope_and_allow_other_enabled_view(env
     assert (await env.service.get_file_info(file_id, None)).user_id == "owner"
     assert await env.service.get_file_info(file_id, "foreign") is None
     await env.catalog.set_state("owner", "netcdf-series", False)
-    # v2 H5Web is another independently enabled NetCDF4/HDF5 view. A reusable
+    # H5Web is another independently enabled NetCDF4/HDF5 view. A reusable
     # file reference must stay available until every matching view is stopped.
     assert await env.service.get_file_info(file_id, "owner") is not None
     await env.catalog.set_state("owner", "viz-h5web", False)
@@ -355,6 +355,32 @@ async def test_storage_overlay_preserves_uploads_and_rejects_dataset_deletion(en
     assert base.delete_file.await_count == 1
     with pytest.raises(NotImplementedError):
         await storage.create_presigned_url("dataset-preview:" + "a"*64, "owner")
+
+
+@pytest.mark.asyncio
+async def test_visualization_sidecars_use_private_dataset_anchor_identity(env):
+    env.datasets.dataset.files = [DatasetFile(path=f"folder/roads.{suffix}") for suffix in ("shp", "dbf", "prj")]
+    prepared = await prepare(env, path="folder/roads.shp", plugin="shapefile")
+    source, resource = prepared.file.file_id, prepared.related_files[1].file_id
+    storage = DatasetPreviewFileStorage(SimpleNamespace(), env.service)
+    allowed = storage.authorize_visualization_resource
+    assert await allowed(source, resource, "owner", "shapefile")
+    assert all(read[3] == 0 for read in env.state["reads"])
+    assert not await allowed(source, resource, "foreign", "shapefile")
+    assert not await allowed(source, resource, "owner", "netcdf-map")
+    assert not await allowed(source, "minio:other", "owner", "shapefile")
+    assert not await allowed("minio:other", resource, "owner", "shapefile")
+    original = env.repository.rows[resource].copy()
+    for field, value in [("dataset_id", "different-dataset"), ("anchor", "other/roads.shp"),
+                         ("path", "other/roads.dbf"), ("path", "folder/secret.txt"), ("owner_id", "foreign")]:
+        env.repository.rows[resource] = {**original, field: value}
+        assert not await allowed(source, resource, "owner", "shapefile")
+    env.repository.rows[resource] = original
+    env.datasets.archived = True
+    assert not await allowed(source, resource, "owner", "shapefile")
+    env.datasets.archived = False
+    await env.catalog.set_state("owner", "shapefile", False)
+    assert not await allowed(source, resource, "owner", "shapefile")
 
 
 @pytest.mark.asyncio

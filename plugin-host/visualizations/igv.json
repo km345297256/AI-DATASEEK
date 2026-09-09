@@ -1,0 +1,31 @@
+{
+  "contract_version": 2,
+  "id": "viz-igv",
+  "version": "2.0.0",
+  "name": "IGV 基因组轨道",
+  "description": "BED/VCF 轨道；用户明确提供染色体长度，不自动下载参考基因组。不支持 BAM/CRAM。",
+  "extensions": [
+    "bed",
+    "vcf"
+  ],
+  "filenames": [],
+  "view_kind": "series",
+  "adapter": "igv",
+  "reader": "binary",
+  "default_enabled": true,
+  "priority": 10,
+  "permissions": [
+    "file:read"
+  ],
+  "limits": {
+    "max_input_bytes": 67108864,
+    "max_output_bytes": 8388608
+  },
+  "capabilities": {
+    "operations": [
+      "bytes"
+    ],
+    "input_mode": "whole",
+    "shared": false
+  }
+}

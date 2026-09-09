@@ -217,8 +217,13 @@ async def test_preview_http_contract_authorization_validation_and_private_paths(
     import httpx
     from fastapi import FastAPI
     from types import SimpleNamespace
+    from unittest.mock import AsyncMock
+    import json
+    from pathlib import Path
+    from app.application.services.visualization_catalog import VisualizationCatalogService
+    from app.domain.models.visualization import VisualizationSnapshot
     from app.interfaces.api.file_routes import router
-    from app.interfaces.dependencies import get_current_user, get_file_service
+    from app.interfaces.dependencies import get_current_user, get_file_service, get_visualization_catalog
     from app.interfaces.errors.exception_handlers import register_exception_handlers
 
     storage = RangeStorage(b"name,value\nworld,1\n", filename="/private/host/secret/data.csv")
@@ -228,24 +233,31 @@ async def test_preview_http_contract_authorization_validation_and_private_paths(
     register_exception_handlers(app)
     app.dependency_overrides[get_file_service] = lambda: FileService(storage)
     app.dependency_overrides[get_current_user] = lambda: SimpleNamespace(id="owner")
+    manifest = Path(__file__).resolve().parents[2] / "plugin-host/visualizations/csv.json"
+    snapshot = VisualizationSnapshot(engine="cordis", revision="a"*64, plugins=[json.loads(manifest.read_text())])
+    catalog = VisualizationCatalogService(SimpleNamespace(visualization_snapshot=AsyncMock(return_value=snapshot)),
+        SimpleNamespace(get_states=AsyncMock(return_value={})))
+    app.dependency_overrides[get_visualization_catalog] = lambda: catalog
     async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as client:
-        response = await client.get("/files/opaque-file/preview", params={"mode": "csv"})
+        body = {"plugin_id": "csv", "operation": "page", "options": {}}
+        response = await client.post("/files/opaque-file/visualization", json=body)
         assert response.status_code == 200
-        assert response.json()["data"]["rows"] == [["world", "1"]]
+        assert response.json()["data"]["kind"] == "page"
+        assert response.json()["data"]["payload"]["rows"] == [["world", "1"]]
         assert "/private/" not in response.text
-        changed = await client.get("/files/opaque-file/preview", params={"version": "wrong"})
+        changed = await client.post("/files/opaque-file/visualization", json={**body, "version": "0"*64})
         assert changed.status_code == 409
         for query in [{"offset": -1}, {"mode": "binary"}, {"delimiter": "evil"}]:
-            invalid = await client.get("/files/opaque-file/preview", params=query)
+            invalid = await client.post("/files/opaque-file/visualization", json={**body, "options": query})
             assert invalid.status_code == 422
         app.dependency_overrides[get_current_user] = lambda: SimpleNamespace(id="other")
-        foreign = await client.get("/files/opaque-file/preview")
-        missing = await client.get("/files/missing/preview")
+        foreign = await client.post("/files/opaque-file/visualization", json=body)
+        missing = await client.post("/files/missing/visualization", json=body)
         assert foreign.status_code == missing.status_code == 404
         assert foreign.json() == missing.json()
         app.dependency_overrides[get_current_user] = lambda: SimpleNamespace(id="owner")
         storage.info.metadata = {"source": "tool_output_spill"}
-        hidden = await client.get("/files/opaque-file/preview")
+        hidden = await client.post("/files/opaque-file/visualization", json=body)
         assert hidden.status_code == 404
         assert hidden.json() == missing.json()
     assert storage.full_downloads == 0

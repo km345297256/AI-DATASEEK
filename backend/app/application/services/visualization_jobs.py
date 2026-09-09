@@ -30,10 +30,12 @@ async def authorize(file_service, catalog, file_id, user_id):
     info = await file_service.get_file_info(file_id, user_id)
     if info is None or _is_private_spill(info):
         raise FileNotFoundError("File not found")
-    if plugin.reader != "fastqc" or not plugin.matches_filename(info.filename or ""):
+    if "job" not in plugin.capabilities.operations or plugin.reader != "fastqc" or not plugin.matches_filename(info.filename or ""):
         raise ScientificPreviewRejected("此文件不支持 FastQC 质控插件。")
     if type(info.size) is not int or not 0 < info.size <= min(MAX_INPUT, plugin.limits.max_input_bytes):
         raise ScientificPreviewRejected("文件超过单次质控插件上限。")
+    if await catalog.require_enabled(user_id, "viz-fastqc") != plugin:
+        raise PreviewVersionChanged()
     return info
 
 
@@ -110,6 +112,7 @@ async def require_job(file_service, catalog, jobs, file_id, user_id, job_id):
     record = await jobs.get_for_owner(user_id, scope_for_file(file_id), job_id)
     if record is None or record.tool_name != "visualization:viz-fastqc":
         raise FileNotFoundError("Job not found")
+    await authorize(file_service, catalog, file_id, user_id)
     return record
 
 
@@ -147,5 +150,9 @@ async def read_result(file_service, catalog, jobs, artifacts, file_id, user_id, 
     info = await authorize(file_service, catalog, file_id, user_id)
     if result.get("version") != preview_version(info) or result.get("revision") != (await catalog.list_for_user(user_id)).revision:
         raise PreviewVersionChanged()
-    await catalog.require_enabled(user_id, "viz-fastqc")
-    return result
+    plugin = await catalog.require_enabled(user_id, "viz-fastqc")
+    from app.application.services.unified_visualization import normalize_result
+    public = normalize_result(result)
+    if len(json.dumps(public.model_dump(), ensure_ascii=False, allow_nan=False).encode()) > min(MAX_OUTPUT, plugin.limits.max_output_bytes):
+        raise ScientificPreviewRejected("质控结果超过此插件的输出上限。")
+    return public

@@ -9,7 +9,7 @@ from __future__ import annotations
 import asyncio
 import json
 import os
-from urllib.parse import quote, urlsplit
+from urllib.parse import quote
 
 import httpx
 
@@ -62,23 +62,26 @@ async def main():
                 info = await api("GET", file_endpoint + "/info")
                 assert info["file_id"] == file_id
                 if mode == "csv":
-                    page = await api("GET", file_endpoint + "/preview", params={"mode": "csv"})
+                    page = (await api("POST", file_endpoint + "/visualization", json={"plugin_id": plugin_id, "operation": "page"}))["payload"]
                     assert page["rows"] and page["bytes_read"] <= 128 * 1024
                 elif mode in {"map", "image"}:
-                    result = await api("POST", file_endpoint + "/visualization", json={"plugin_id": plugin_id})
-                    assert result["kind"] == mode and result["values"]
+                    result = await api("POST", file_endpoint + "/visualization", json={"plugin_id": plugin_id, "operation": "preview"})
+                    assert result["kind"] == "raster" and result["payload"]["view_kind"] == mode and result["payload"]["values"]
                     if mode == "map":
                         assert "netcdf-series" in enabled
-                        curve = await api("POST", file_endpoint + "/visualization", json={"plugin_id": "netcdf-series"})
-                        assert curve["kind"] == "series" and len(curve["y"]) == 12
+                        curve = await api("POST", file_endpoint + "/visualization", json={"plugin_id": "netcdf-series", "operation": "preview"})
+                        assert curve["kind"] == "series" and len(curve["payload"]["y"]) == 12
                 elif mode == "sidecars":
                     names = {item["filename"].lower().rsplit(".", 1)[-1] for item in prepared["related_files"]}
                     assert {"shp", "shx", "dbf"} <= names
+                    for resource in prepared["related_files"]:
+                        response = await client.post(file_endpoint + "/visualization", json={
+                            "plugin_id": plugin_id, "operation": "bytes", "options": {"resource_id": resource["file_id"]}})
+                        response.raise_for_status()
+                        assert len(response.content) == resource["size"]
+                        assert response.headers["x-visualization-plugin"] == plugin_id
                 else:
-                    signed = await api("POST", file_endpoint + "/signed-url", json={"expire_minutes": 5})
-                    location = urlsplit(signed["signed_url"])
-                    assert not location.netloc and location.path.startswith("/api/v1/files/")
-                    response = await client.get(signed["signed_url"])
+                    response = await client.post(file_endpoint + "/visualization", json={"plugin_id": plugin_id, "operation": "bytes"})
                     response.raise_for_status()
                     assert len(response.content) == source["size"]
                     assert response.content[:4] in (b"II*\x00", b"MM\x00*")
@@ -110,10 +113,16 @@ async def main():
             prepared = await api("POST", f"/api/v1/datasets/{quote(host_dataset['dataset_id'], safe='')}/files/preview",
                                  json={"path": host_source["path"], "plugin_id": plugin_id})
             file_id = prepared["file"]["file_id"]
-            page = await api("GET", f"/api/v1/files/{quote(file_id, safe='')}/preview", params={"mode": "csv" if plugin_id == "csv" else "text"})
-            assert page["bytes_read"] > 0 and page["bytes_read"] <= 128 * 1024
-            assert page["total_bytes"] == prepared["file"]["size"]
-            checks.append({"plugin": plugin_id, "mode": "host-path-bounded-page"})
+            file_endpoint = f"/api/v1/files/{quote(file_id, safe='')}/visualization"
+            if plugin_id == "markdown":
+                response = await client.post(file_endpoint, json={"plugin_id": plugin_id, "operation": "bytes"})
+                response.raise_for_status()
+                assert len(response.content) == prepared["file"]["size"]
+            else:
+                page = (await api("POST", file_endpoint, json={"plugin_id": plugin_id, "operation": "page"}))["payload"]
+                assert page["bytes_read"] > 0 and page["bytes_read"] <= 128 * 1024
+                assert page["total_bytes"] == prepared["file"]["size"]
+            checks.append({"plugin": plugin_id, "mode": "host-path-bounded-read"})
 
             endpoint = "/api/v1/datasets/open-noaa-air-climatology/files/preview"
             for path in ("../outside.nc", "/etc/passwd", "unregistered.nc"):

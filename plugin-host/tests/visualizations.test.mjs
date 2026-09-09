@@ -1,8 +1,9 @@
 import assert from 'node:assert/strict'
-import { mkdtemp, writeFile, rm, readFile, symlink } from 'node:fs/promises'
+import { mkdtemp, writeFile, rm, readFile, symlink, mkdir } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 import test from 'node:test'
+import { execFileSync } from 'node:child_process'
 
 import { CatalogRuntime } from '../dist/catalog.js'
 import { dispatchRequest } from '../dist/protocol.js'
@@ -18,13 +19,15 @@ async function directory(t, manifest = fixture) {
   return path
 }
 
-test('14 legacy and 20 extended visualization contracts load as real Cordis registrations', async () => {
+test('all 36 visualization plugins use one capability contract as real Cordis registrations', async () => {
   const context = await buildVisualizationContext(productionDirectory)
   try {
     assert.equal(context.snapshot.engine, 'cordis')
-    assert.equal(context.pluginFibers.length, 34)
-    assert.equal(context.catalog.snapshot().plugins.length, 34)
-    assert.equal(context.snapshot.plugins.filter(item => item.contract_version === 1).length, 14)
+    assert.equal(context.pluginFibers.length, 36)
+    assert.equal(context.catalog.snapshot().plugins.length, 36)
+    assert.equal(context.snapshot.plugins.filter(item => item.contract_version === 2).length, 36)
+    assert.ok(context.snapshot.plugins.every(item => !item.adapter.startsWith('v2-') && !('data_kind' in item)))
+    assert.equal(context.snapshot.plugins.filter(item => item.capabilities.shared).length, 9)
     assert.match(context.snapshot.revision, /^[a-f0-9]{64}$/)
     assert.deepEqual(context.snapshot.plugins.filter(item => item.reader === 'netcdf').map(item => item.view_kind).sort(), ['map', 'series'])
   } finally { await context.context.fiber.dispose() }
@@ -66,7 +69,20 @@ test('visualization migration retains every former builtin file suffix and speci
 for (const [name, update] of [
   ['untrusted script entry', { entry: 'https://attacker.test/plugin.js' }],
   ['untrusted adapter', { adapter: 'https://attacker.test/plugin.js' }],
-  ['unknown protocol version', { contract_version: 2 }],
+  ['unsupported former protocol version', { contract_version: 1 }],
+  ['unknown protocol version', { contract_version: 3 }],
+  ['coerced protocol version', { contract_version: '2' }],
+  ['legacy data classification', { data_kind: 'scientific' }],
+  ['null reader', { reader: null }],
+  ['empty operations', { capabilities: { operations: [], input_mode: 'whole', shared: false } }],
+  ['unknown operation', { capabilities: { operations: ['eval'], input_mode: 'whole', shared: false } }],
+  ['duplicate operations', { capabilities: { operations: ['preview', 'preview'], input_mode: 'whole', shared: false } }],
+  ['unapproved operation', { capabilities: { operations: ['bytes'], input_mode: 'whole', shared: false } }],
+  ['unapproved prefix reading', { capabilities: { operations: ['preview'], input_mode: 'prefix', shared: false } }],
+  ['unapproved shared access', { capabilities: { operations: ['preview'], input_mode: 'whole', shared: true } }],
+  ['unknown capability field', { capabilities: { operations: ['preview'], input_mode: 'whole', shared: false, execute: true } }],
+  ['missing capability field', { capabilities: { operations: ['preview'], input_mode: 'whole' } }],
+  ['coerced capability boolean', { capabilities: { operations: ['preview'], input_mode: 'whole', shared: 0 } }],
   ['coerced boolean', { default_enabled: 'false' }],
   ['unsafe wildcard', { extensions: ['*'] }],
   ['duplicate extension', { extensions: ['nc', 'nc'] }],
@@ -80,6 +96,45 @@ for (const [name, update] of [
     assert.throws(() => validateVisualization({ ...structuredClone(fixture), ...update }))
   })
 }
+
+test('single approved adapter source and every independent build copy remain synchronized', () => {
+  execFileSync(process.execPath, [new URL('../../scripts/sync-visualization-contract.mjs', import.meta.url).pathname, '--check'])
+})
+
+test('generated contract verification catches drift and rejects malformed source without changing production files', async t => {
+  const root = await mkdtemp(join(tmpdir(), 'dataseek-viz-generated-'))
+  t.after(() => rm(root, { recursive: true, force: true }))
+  const paths = ['scripts/sync-visualization-contract.mjs', 'contracts/visualization-adapters.json',
+    'plugin-host/src/visualization-adapters.generated.ts', 'frontend/src/visualizations/adapters.generated.ts',
+    'backend/app/domain/models/visualization_adapters_generated.py']
+  for (const path of paths) {
+    await mkdir(dirname(join(root, path)), { recursive: true })
+    await writeFile(join(root, path), await readFile(new URL(`../../${path}`, import.meta.url)))
+  }
+  const check = () => execFileSync(process.execPath, [join(root, paths[0]), '--check'], { stdio: 'pipe' })
+  check()
+  for (const path of paths.slice(2)) {
+    const before = await readFile(join(root, path), 'utf8')
+    await writeFile(join(root, path), before + '\n// drift\n')
+    assert.throws(check, /generated files differ/)
+    await writeFile(join(root, path), before)
+  }
+  const source = JSON.parse(await readFile(join(root, paths[1]), 'utf8'))
+  source.adapters.image.capabilities.execute = 'untrusted'
+  await writeFile(join(root, paths[1]), JSON.stringify(source))
+  assert.throws(check, /Invalid visualization adapter specification/)
+})
+
+test('unified operations preserve bounded page/prefix readers and explicit full quality jobs', async () => {
+  const plugins = await loadVisualizationManifests(productionDirectory)
+  const byId = new Map(plugins.map(plugin => [plugin.id, plugin]))
+  assert.deepEqual(byId.get('text').capabilities, { operations: ['page'], input_mode: 'page', shared: true })
+  assert.deepEqual(byId.get('csv').capabilities, { operations: ['page'], input_mode: 'page', shared: true })
+  assert.deepEqual(byId.get('shapefile').capabilities.operations, ['bytes'])
+  assert.deepEqual(byId.get('molecular').capabilities.operations, ['prepare', 'bytes'])
+  assert.deepEqual(byId.get('fastq-quality').capabilities, { operations: ['preview'], input_mode: 'prefix', shared: false })
+  assert.deepEqual(byId.get('viz-fastqc').capabilities, { operations: ['job'], input_mode: 'whole', shared: false })
+})
 
 test('visualization reload commits atomically, keeps old catalog after rejection, and releases contexts', async t => {
   const path = await directory(t)

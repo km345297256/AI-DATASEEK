@@ -62,16 +62,19 @@ async def test_real_contract_and_bounded_owner_read(environment):
     assert environment[1].reads == [(0, 8)]
 
 @pytest.mark.asyncio
-async def test_old_frontend_negotiation_keeps_fourteen_v1_plugins(environment):
+async def test_catalog_has_one_protocol_without_version_negotiation(environment):
     app = FastAPI(); app.include_router(router)
     app.dependency_overrides[get_current_user] = lambda: SimpleNamespace(id="owner")
     app.dependency_overrides[get_visualization_catalog] = lambda: environment[0]
     with TestClient(app) as client:
-        legacy = client.get('/visualizations').json()['data']['plugins']
-        extended = client.get('/visualizations?contract_version=2').json()['data']['plugins']
-        assert len(legacy) == 14 and all(p['contract_version'] == 1 for p in legacy)
-        assert len(extended) == 34
-        assert client.get('/visualizations?contract_version=3').status_code == 422
+        plugins = client.get('/visualizations').json()['data']['plugins']
+        assert len(plugins) == 36 and all(p['contract_version'] == 2 for p in plugins)
+        states = {plugin['id']: plugin['enabled'] for plugin in plugins}
+        assert states['viz-docx'] is True
+        assert states['viz-onlyoffice'] is False
+        assert all('data_kind' not in p and 'capabilities' in p for p in plugins)
+        # Obsolete query strings cannot select another public protocol.
+        assert client.get('/visualizations?contract_version=1').json()['data']['plugins'] == plugins
 
 @pytest.mark.asyncio
 async def test_foreign_private_and_disabled_reject_before_read(environment):

@@ -1,10 +1,11 @@
 import { ref, watch } from 'vue';
 import type { FileInfo, FilePreviewPage } from '../api/file.ts';
-import { getFilePreviewPage } from '../api/file.ts';
+import { getPluginPage } from '../visualizations/runtime';
+import type { VisualizationPlugin } from '../visualizations/contract';
 import { usePreviewLoad } from './usePreviewLoad.ts';
 
 /** Hold only the current bounded page; previous pages retain offsets, not data. */
-export function useFilePreviewPages(file: () => FileInfo, mode: 'text' | 'csv') {
+export function useFilePreviewPages(file: () => FileInfo, plugin: () => VisualizationPlugin) {
   const loads = usePreviewLoad();
   const page = ref<FilePreviewPage>();
   const headers = ref<string[]>([]);
@@ -23,7 +24,7 @@ export function useFilePreviewPages(file: () => FileInfo, mode: 'text' | 'csv') 
     loading.value = true;
     error.value = '';
     try {
-      const result = await getFilePreviewPage(selectedFile.file_id, { mode, ...cursor, version, delimiter, signal: request.signal });
+      const result = await getPluginPage(selectedFile, plugin(), { ...cursor, version, delimiter }, request.signal);
       if (!request.isCurrent()) return;
       page.value = result;
       pageIndex.value = index;
@@ -34,7 +35,7 @@ export function useFilePreviewPages(file: () => FileInfo, mode: 'text' | 'csv') 
       if (result.next_offset !== null) offsets.push({ offset: result.next_offset, header_pending: result.header_pending });
     } catch (cause) {
       if (!request.isCurrent()) return;
-      const status = (cause as { response?: { status?: number } })?.response?.status;
+      const status = (cause as { status?: number })?.status;
       error.value = status === 409
         ? '文件已更新，请重新打开预览。'
         : '无法预览此页。请使用 UTF-8 文本或 CSV（单条记录不超过 128 KiB），也可以下载完整文件。';

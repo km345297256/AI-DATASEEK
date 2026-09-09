@@ -1,5 +1,5 @@
 {
-  "contract_version": 1,
+  "contract_version": 2,
   "id": "obj",
   "version": "1.0.0",
   "name": "OBJ 三维模型",
@@ -10,8 +10,7 @@
   "filenames": [],
   "view_kind": "structure",
   "adapter": "obj",
-  "data_kind": "file",
-  "reader": null,
+  "reader": "binary",
   "default_enabled": true,
   "priority": 50,
   "permissions": [
@@ -20,5 +19,12 @@
   "limits": {
     "max_input_bytes": 268435456,
     "max_output_bytes": 16777216
+  },
+  "capabilities": {
+    "operations": [
+      "bytes"
+    ],
+    "input_mode": "whole",
+    "shared": true
   }
 }

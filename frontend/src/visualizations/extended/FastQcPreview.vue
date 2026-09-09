@@ -18,14 +18,14 @@ import type { FileInfo } from '../../api/file';
 import type { VisualizationPlugin } from '../contract';
 import { apiClient, BASE_URL } from '../../api/client';
 import { usePreviewLoad } from '../../composables/usePreviewLoad';
-import { readBoundedBinary } from '../boundedBinary';
+import { readVisualizationResult, visualizationJobsPath } from '../runtime';
 const props = defineProps<{ file: FileInfo; plugin: VisualizationPlugin }>();
 interface Job { job_id: string; status: string }
 interface Section { name: string; status: string; columns: string[]; rows: string[][] }
 const job = ref<Job>(), busy = ref(false), error = ref(''), sections = ref<Section[]>([]), warnings = ref<string[]>([]), summary = ref<{ columns: string[]; rows: unknown[][] }>();
 const active = computed(() => !!job.value && ['queued', 'running', 'cancelling'].includes(job.value.status));
 const statusLabel = computed(() => ({ queued: '排队中', running: '运行中', cancelling: '正在取消', succeeded: '已完成', failed: '失败（请检查读取器依赖和 FASTQ 格式）', cancelled: '已取消', timed_out: '超时', interrupted: '服务中断' } as Record<string, string>)[job.value?.status ?? ''] ?? '尚未启动');
-const path = `/files/${encodeURIComponent(props.file.file_id)}/visualization-jobs`;
+const path = visualizationJobsPath(props.file, props.plugin);
 const loads = usePreviewLoad(); let timer: ReturnType<typeof setTimeout> | undefined;
 function schedule() { if (timer) clearTimeout(timer); if (active.value) timer = setTimeout(refresh, 1500); }
 async function refresh() {
@@ -36,10 +36,10 @@ async function refresh() {
     if (job.value?.status === 'succeeded') {
       const response = await fetch(`${BASE_URL}${path}/${job.value.job_id}/result`, { signal: load.signal, credentials: 'same-origin' });
       if (!response.ok) { await response.body?.cancel(); throw new Error('质控结果已过期、文件已变化或插件已停用。'); }
-      const bytes = await readBoundedBinary(response, 8 * 1024 * 1024 + 4096, load.signal); load.assertCurrent();
-      const data = JSON.parse(new TextDecoder().decode(bytes)).data;
-      if (data?.contract_version !== 2 || data.type !== 'fastqc' || !Array.isArray(data.sections) || data.sections.length > 32) throw new Error('质控结果协议无效。');
-      sections.value = data.sections; summary.value = data.table; warnings.value = data.warnings;
+      const result = await readVisualizationResult(response, props.plugin, load.signal); load.assertCurrent();
+      const data = result.payload;
+      if (result.kind !== 'report' || !Array.isArray(data.sections) || data.sections.length > 32) throw new Error('质控结果协议无效。');
+      sections.value = data.sections as Section[]; summary.value = data.table as { columns: string[]; rows: unknown[][] }; warnings.value = result.warnings;
     }
   } catch (e) { if (load.isCurrent()) error.value = e instanceof Error ? e.message : '质控任务暂不可用。'; }
   finally { if (load.isCurrent()) schedule(); }

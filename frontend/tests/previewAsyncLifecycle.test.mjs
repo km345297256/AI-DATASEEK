@@ -22,9 +22,18 @@ function mountPreview(t, name, options = {}) {
   const script = compileScript(parse(source).descriptor, { id: name });
   const compiled = ts.transpileModule(script.content, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
   const relatedFiles = options.relatedFiles || vue.ref([]);
+  const loadBytes = options.loadBytes || (async (value, _plugin, signal, resource) => {
+    const url = await (options.getUrl || (async value => value.file_id))(resource || value);
+    if (signal.aborted) throw new DOMException('Cancelled', 'AbortError');
+    const response = await fetch(url, { signal });
+    return response.arrayBuffer ? response.arrayBuffer() : (await response.blob()).arrayBuffer();
+  });
   const dependencies = {
     vue,
     '../../api/file': { getFileDownloadUrl: options.getUrl || (async (value) => value.file_id) },
+    '../../visualizations/runtime': { loadPluginBytes: loadBytes, loadPluginText: options.loadText || (async (value, _plugin, signal) => {
+      const response = await fetch(value.file_id, { signal }); return response.text();
+    }) },
     '../../api/agent': { getSessionFiles: options.getFiles || (async () => []), getSharedSessionFiles: options.getFiles || (async () => []) },
     '../../composables/usePreviewLoad': { usePreviewLoad },
     '../../visualizations/boundedBinary': { readBoundedBinary, validateTiffDimensions },
@@ -47,7 +56,7 @@ function mountPreview(t, name, options = {}) {
   new Function('require', 'module', 'exports', pagesScript)((id) => {
     if (id === 'vue') return vue;
     if (id === './usePreviewLoad.ts') return { usePreviewLoad };
-    if (id === '../api/file.ts') return { getFilePreviewPage: options.getPage || (async () => assert.fail('Unexpected preview request')) };
+    if (id === '../visualizations/runtime') return { getPluginPage: (file, _plugin, params, signal) => (options.getPage || (async () => assert.fail('Unexpected preview request')))(file.file_id, { ...params, signal }) };
     assert.fail(`Unexpected page dependency ${id}`);
   }, pagesModule, pagesModule.exports);
   dependencies['../../composables/useFilePreviewPages'] = pagesModule.exports;
@@ -56,7 +65,7 @@ function mountPreview(t, name, options = {}) {
     assert.ok(id in dependencies, `Unexpected setup dependency ${id}`);
     return dependencies[id];
   }, module, module.exports);
-  const props = vue.reactive({ file: file('a', options.extension) });
+  const props = vue.reactive({ file: file('a', options.extension), plugin: { id: 'test-plugin' } });
   const scope = vue.effectScope();
   const state = scope.run(() => module.exports.default.setup(props, { expose() {} }));
   t.after(() => scope.stop());
@@ -119,14 +128,15 @@ test('late signed URLs cannot start downloads after replacement or unmount', asy
   assert.equal(fetch.mock.callCount(), 0);
 });
 
-test('image preview clears old image immediately and ignores late signed URLs', async (t) => {
+test('image preview clears old image immediately and ignores late protected bytes', async (t) => {
   const first = deferred();
-  const preview = mountPreview(t, 'ImageFilePreview', { getUrl: (value) => value.file_id === 'a' ? first.promise : Promise.resolve('new-image') });
+  t.mock.method(URL, 'createObjectURL', () => 'blob:new-image');
+  const preview = mountPreview(t, 'ImageFilePreview', { loadBytes: (value) => value.file_id === 'a' ? first.promise : Promise.resolve(new ArrayBuffer(1)) });
   await preview.select('b');
   await flush();
-  first.resolve('old-image');
+  first.resolve(new ArrayBuffer(2));
   await flush();
-  assert.equal(preview.state.imageUrl.value, 'new-image');
+  assert.equal(preview.state.imageUrl.value, 'blob:new-image');
 });
 
 test('CSV replacement aborts old transfer and retains quoted multiline fields', async (t) => {
@@ -169,7 +179,7 @@ test('CSV page navigation keeps only one page, forwards revision and resets on f
 
 test('changed file revision is visible and does not merge old and new pages', async (t) => {
   const preview = mountPreview(t, 'CodeFilePreview', { getPage: async (_id, options) => {
-    if (options.offset) throw { response: { status: 409 } };
+    if (options.offset) throw { status: 409 };
     return { version: 'a', text: 'page one', headers: [], next_offset: 65536 };
   } });
   await flush();

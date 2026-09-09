@@ -8,11 +8,12 @@ import { parseVisualizationCatalog, matchingVisualizations, selectVisualization 
 import { coordinateEdges, finiteExtent, seriesSegments } from '../src/visualizations/plot.ts';
 import { readBoundedBinary, validateTiffDimensions } from '../src/visualizations/boundedBinary.ts';
 import { usePreviewLoad } from '../src/composables/usePreviewLoad.ts';
+import { VISUALIZATION_ADAPTERS } from '../src/visualizations/adapters.generated.ts';
 
-const descriptor = (overrides = {}) => ({ contract_version: 1, id: 'tiff', version: '1.0.0', name: 'TIFF', description: 'image', extensions: ['tif', 'tiff'], filenames: [], view_kind: 'image', adapter: 'tiff', data_kind: 'file', reader: null, default_enabled: true, enabled: true, priority: 20, permissions: ['file:read'], limits: { max_input_bytes: 64 * 1024 * 1024, max_output_bytes: 512 * 1024 }, ...overrides });
+const descriptor = (overrides = {}) => { const spec = VISUALIZATION_ADAPTERS[overrides.adapter || 'tiff'] || VISUALIZATION_ADAPTERS.tiff; return ({ contract_version: 2, id: 'tiff', version: '1.0.0', name: 'TIFF', description: 'image', extensions: ['tif', 'tiff'], filenames: [], view_kind: spec.view_kind, adapter: 'tiff', reader: spec.readers[0], capabilities: spec.capabilities, default_enabled: true, enabled: true, priority: 20, permissions: ['file:read'], limits: { max_input_bytes: 64 * 1024 * 1024, max_output_bytes: 512 * 1024 }, ...overrides }); };
 const catalogOf = (...plugins) => ({ engine: 'cordis', revision: 'rev1', plugins });
-const ncMap = () => descriptor({ id: 'netcdf-map', extensions: ['nc'], adapter: 'scientific-map', data_kind: 'scientific', reader: 'netcdf', view_kind: 'map' });
-const ncSeries = () => descriptor({ id: 'netcdf-series', extensions: ['nc'], adapter: 'scientific-series', data_kind: 'scientific', reader: 'netcdf', view_kind: 'series', priority: 10 });
+const ncMap = () => descriptor({ id: 'netcdf-map', extensions: ['nc'], adapter: 'scientific-map', reader: 'netcdf', view_kind: 'map' });
+const ncSeries = () => descriptor({ id: 'netcdf-series', extensions: ['nc'], adapter: 'scientific-series', reader: 'netcdf', view_kind: 'series', priority: 10 });
 const file = (id, extension = 'nc') => ({ file_id: id, filename: `${id}.${extension}`, upload_date: '', size: 200 });
 const deferred = () => { let resolve, reject; const promise = new Promise((yes, no) => { resolve = yes; reject = no; }); return { promise, resolve, reject }; };
 const flush = async () => { for (let index = 0; index < 20; index++) await Promise.resolve(); await vue.nextTick(); };
@@ -49,14 +50,14 @@ test('every checked-in Cordis manifest is accepted by the frontend contract with
     const plugin = JSON.parse(readFileSync(new URL(name, directory), 'utf8'));
     return { ...plugin, enabled: plugin.default_enabled };
   });
-  assert.equal(plugins.length, 34);
-  assert.equal(plugins.filter(plugin => plugin.contract_version === 1).length, 14);
-  assert.equal(plugins.filter(plugin => plugin.contract_version === 2).length, 20);
+  assert.equal(plugins.length, 36);
+  assert.equal(plugins.filter(plugin => plugin.contract_version === 2).length, 36);
+  assert.ok(plugins.every(plugin => !Object.hasOwn(plugin, 'data_kind') && !plugin.adapter.startsWith('v2-')));
   assert.deepEqual(parseVisualizationCatalog(catalogOf(...plugins)).plugins, plugins);
 });
 
 for (const [label, change] of [
-  ['unknown contract', { contract_version: 2 }], ['remote adapter', { adapter: 'https://evil.example/script.js' }],
+  ['unknown contract', { contract_version: 3 }], ['obsolete contract', { contract_version: 1 }], ['remote adapter', { adapter: 'https://evil.example/script.js' }],
   ['write permission', { permissions: ['file:write'] }], ['wrong reader kind', { data_kind: 'scientific' }],
   ['wrong view', { view_kind: 'map' }], ['unbounded bytes', { limits: { max_input_bytes: -1, max_output_bytes: 1 } }],
 ]) test(`catalog fails closed for ${label}`, () => assert.throws(() => parseVisualizationCatalog(catalogOf(descriptor(change)))));
@@ -124,7 +125,7 @@ function compileSfc(path, dependencies, inlineTemplate = false) {
 
 function mountScientific(t, getData, plugin = ncSeries()) {
   const component = compileSfc('../src/visualizations/ScientificFilePreview.vue', {
-    '../api/visualization': { getScientificVisualization: getData },
+    '../api/visualization': { getScientificVisualization: (file, _plugin, options, signal) => getData(file.file_id, options, signal) },
     '../composables/usePreviewLoad': { usePreviewLoad },
     './plot': { coordinateEdges, finiteExtent, seriesSegments, heatColor: () => '', tickLabel: String },
     './assets/world-outline.json': { default: { geometry: { coordinates: [] } } },
@@ -135,7 +136,7 @@ function mountScientific(t, getData, plugin = ncSeries()) {
   t.after(() => scope.stop());
   return { props, state, unmount: () => scope.stop() };
 }
-const seriesResponse = (overrides = {}) => ({ contract_version: 1, kind: 'series', plugin_id: 'netcdf-series', revision: 'r', version: 'v1', reader: 'netcdf', variables: [{ name: 'temperature', dimensions: [{ name: 'time', size: 5 }, { name: 'station', size: 3 }], shape: [5, 3], units: 'K' }], selected_variable: 'temperature', x_label: 'time', y_label: 'temperature [K]', x: [0, 1], y: [1, 2], width: 0, height: 0, values: [], extent: null, metadata: { x_dimension: 'time', indices: { station: 0 } }, warnings: [], sampled: false, ...overrides });
+const seriesResponse = (overrides = {}) => ({ kind: 'series', plugin_id: 'netcdf-series', revision: 'r', version: 'v1', reader: 'netcdf', variables: [{ name: 'temperature', dimensions: [{ name: 'time', size: 5 }, { name: 'station', size: 3 }], shape: [5, 3], units: 'K' }], selected_variable: 'temperature', x_label: 'time', y_label: 'temperature [K]', x: [0, 1], y: [1, 2], width: 0, height: 0, values: [], extent: null, metadata: { x_dimension: 'time', indices: { station: 0 } }, warnings: [], sampled: false, ...overrides });
 
 for (const outcome of ['success', 'error']) test(`scientific plugin ignores late ${outcome} from a replaced file`, async (t) => {
   const old = deferred(), calls = [];
@@ -166,7 +167,7 @@ test('scientific axis and slice controls exclude the x axis and pin the file ver
 
 test('FITS HDU selection never sends NetCDF variable options or stale slice indices', async (t) => {
   const calls = [];
-  const { state } = mountScientific(t, async (_id, options) => { calls.push(options); return seriesResponse({ plugin_id: 'fits-series', reader: 'fits', selected_variable: 'HDU 0', variables: [{ name: 'HDU 0', dimensions: [{ name: 'axis0', size: 3 }], shape: [3] }], metadata: { hdu: 0, hdus: [{ index: 0, shape: [3] }, { index: 1, shape: [5] }], x_dimension: 'axis0' } }); }, descriptor({ id: 'fits-series', adapter: 'scientific-series', view_kind: 'series', data_kind: 'scientific', reader: 'fits' }));
+  const { state } = mountScientific(t, async (_id, options) => { calls.push(options); return seriesResponse({ plugin_id: 'fits-series', reader: 'fits', selected_variable: 'HDU 0', variables: [{ name: 'HDU 0', dimensions: [{ name: 'axis0', size: 3 }], shape: [3] }], metadata: { hdu: 0, hdus: [{ index: 0, shape: [3] }, { index: 1, shape: [5] }], x_dimension: 'axis0' } }); }, descriptor({ id: 'fits-series', adapter: 'scientific-series', view_kind: 'series', reader: 'fits' }));
   await flush(); state.hdu.value = 1; state.changeHdu(); await state.load(false);
   assert.deepEqual(calls.at(-1), { plugin_id: 'fits-series', hdu: 1, version: 'v1' });
 });
@@ -243,9 +244,10 @@ test('file preview host is destroyed when hidden, and signed share scientific re
   assert.match(panel, /v-if="isShow && visible && fileInfo && fileType"/);
   assert.match(panel, /<VisualizationHost :key="fileInfo.file_id"/);
   const host = source('../src/visualizations/VisualizationHost.vue');
-  assert.match(host, /shared.value && plugin.data_kind !== 'file'/);
+  assert.match(host, /shared.value && !plugin.capabilities.shared/);
   assert.match(host, /props.file.size > plugin.limits.max_input_bytes/);
-  assert.match(host, /!\['text', 'csv'\].includes\(plugin.adapter\)/);
+  assert.match(host, /plugin.capabilities.input_mode === 'whole'/);
+  assert.doesNotMatch(host, /data_kind|startsWith\('v2-'/);
   assert.match(host, /catalog.value\?\.revision/);
   assert.doesNotMatch(host, /localStorage|sessionStorage|window\.open\(.*plugin|fileType.preview/);
 });

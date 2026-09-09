@@ -25,8 +25,9 @@ import { computed } from 'vue';
 import type { FileInfo } from '../../api/file';
 import { useFilePreviewPages } from '../../composables/useFilePreviewPages';
 
-const props = defineProps<{ file: FileInfo }>();
-const { page, headers, loading, error, pageIndex, loadPage } = useFilePreviewPages(() => props.file, 'csv');
+import type { VisualizationPlugin } from '../../visualizations/contract';
+const props = defineProps<{ file: FileInfo; plugin: VisualizationPlugin }>();
+const { page, headers, loading, error, pageIndex, loadPage } = useFilePreviewPages(() => props.file, () => props.plugin);
 const rows = computed(() => (page.value?.rows || []).map(row => row.concat(Array(Math.max(0, headers.value.length - row.length)).fill(''))));
 const status = computed(() => loading.value ? '正在加载 CSV...' : error.value);
 </script>

@@ -1,0 +1,30 @@
+{
+  "contract_version": 2,
+  "id": "viz-maplibre",
+  "version": "2.0.0",
+  "name": "MapLibre / deck.gl 地理要素",
+  "description": "离线 GeoJSON 点、线及面交互视图；不加载远程样式、瓦片或字形。",
+  "extensions": [
+    "geojson"
+  ],
+  "filenames": [],
+  "view_kind": "map",
+  "adapter": "maplibre",
+  "reader": "binary",
+  "default_enabled": true,
+  "priority": 10,
+  "permissions": [
+    "file:read"
+  ],
+  "limits": {
+    "max_input_bytes": 67108864,
+    "max_output_bytes": 8388608
+  },
+  "capabilities": {
+    "operations": [
+      "bytes"
+    ],
+    "input_mode": "whole",
+    "shared": false
+  }
+}

@@ -36,7 +36,7 @@ REVISION = "a" * 64
 
 
 def manifest(name="fastqc"):
-    path = Path(__file__).resolve().parents[2] / "plugin-host" / "visualizations" / f"v2-{name}.json"
+    path = Path(__file__).resolve().parents[2] / "plugin-host" / "visualizations" / f"{name}.json"
     return VisualizationPlugin.model_validate_json(path.read_text())
 
 
@@ -149,7 +149,8 @@ async def test_qc_success_is_durable_owner_scoped_without_agent_session(monkeypa
     assert runner.call_args.args[5].version == preview_version(files.info)
     assert not service._ACTIVE
     result = await service.read_result(files, catalog, jobs, artifacts, FILE, OWNER, view.job_id)
-    assert result["sections"][0]["rows"] == [["Total Sequences", "1"]]
+    assert result.kind == "report" and result.contract_version == 2
+    assert result.payload["sections"][0]["rows"] == [["Total Sequences", "1"]]
     assert "user_id" not in view.model_dump() and "session_id" not in view.model_dump()
 
 
@@ -332,6 +333,14 @@ async def test_qc_result_rejects_wrong_chunk_digest(monkeypatch):
         await service.read_result(files, catalog, jobs, artifacts, FILE, OWNER, view.job_id)
 
 
+@pytest.mark.asyncio
+async def test_qc_unified_result_obeys_current_plugin_output_budget(monkeypatch):
+    files, catalog, jobs, artifacts, view = await completed_job(monkeypatch)
+    catalog.plugin = catalog.plugin.model_copy(update={"limits": catalog.plugin.limits.model_copy(update={"max_output_bytes": 32})})
+    with pytest.raises(ScientificPreviewRejected):
+        await service.read_result(files, catalog, jobs, artifacts, FILE, OWNER, view.job_id)
+
+
 def test_backend_accepts_worker_root_heatmap_and_long_valid_internal_hdf_path():
     assert "heatmap" in preview._KINDS["root"], "TH2 UI and sandbox worker already support heatmap"
     path = "/" + "/".join(["a" * 100] * 3)
@@ -380,8 +389,8 @@ def test_cancel_route_preserves_owner_scope_after_plugin_disabled_or_file_delete
     app.dependency_overrides[get_current_user] = lambda: owner
     app.dependency_overrides[get_analysis_job_service] = lambda: jobs
     with TestClient(app) as client:
-        assert client.post(f"/files/{FILE}/visualization-jobs/abc/cancel").status_code == 400
-        response = client.post(f"/files/{FILE}/visualization-jobs/abc/cancel", headers={"X-Analysis-Job-Action": "cancel"})
+        assert client.post(f"/files/{FILE}/visualization/jobs/abc/cancel").status_code == 400
+        response = client.post(f"/files/{FILE}/visualization/jobs/abc/cancel", headers={"X-Analysis-Job-Action": "cancel"})
         assert response.status_code == 200
     jobs.get_for_owner.assert_awaited_once_with(OWNER, service.scope_for_file(FILE), "abc")
     jobs.request_cancel.assert_awaited_once_with(OWNER, service.scope_for_file(FILE), "abc")
@@ -393,7 +402,7 @@ def test_cancel_route_cannot_cancel_foreign_file_or_job():
     app.dependency_overrides[get_current_user] = lambda: SimpleNamespace(id="other")
     app.dependency_overrides[get_analysis_job_service] = lambda: jobs
     with TestClient(app) as client:
-        response = client.post(f"/files/{FILE}/visualization-jobs/abc/cancel", headers={"X-Analysis-Job-Action": "cancel"})
+        response = client.post(f"/files/{FILE}/visualization/jobs/abc/cancel", headers={"X-Analysis-Job-Action": "cancel"})
     assert response.status_code == 404 and not jobs.request_cancel.called
 
 

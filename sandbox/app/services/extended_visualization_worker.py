@@ -36,6 +36,17 @@ MAX_COLUMNS = 100
 MAX_NODES = 256
 MAX_DEPTH = 8
 SUBPROCESS_SECONDS = 40
+OFFICE_PAGE_LIMIT = 100
+# The generated PDF is already size-bounded before parsing; cap its page tree
+# as well. Older LibreOffice releases ignore CLI PageRange and may export more.
+MAX_OFFICE_PDF_PAGES = 1000
+OFFICE_PDF_SETTINGS = {
+    "UseLosslessCompression": True,
+    "ReduceImageResolution": False,
+    "EmbedStandardFonts": True,
+    "ExportBookmarks": False,
+    "ExportFormFields": False,
+}
 FORMATS = {
     "tabular": {"csv", "tsv", "npy", "npz", "mat"},
     "hdf5": {"h5", "hdf5", "nxs", "nx", "nc4", "nc"},
@@ -625,6 +636,39 @@ def _process(command, directory, timeout=SUBPROCESS_SECONDS):
         raise PreviewError("离线转换未成功完成；文件可能损坏、加密或使用不支持的功能。")
 
 
+def _office_pdf_pages(pdf):
+    """Bound the legacy converter's page range without rasterizing PDF content."""
+    if len(pdf) > MAX_MEDIA_BYTES:
+        raise PreviewError("高清办公 PDF 超过 5 MiB 预览预算；未降低清晰度，请拆分文档后重试。")
+    from pypdf import PdfReader, PdfWriter
+
+    try:
+        reader = PdfReader(io.BytesIO(pdf), strict=True)
+        count = reader.root_object["/Pages"]["/Count"]
+        if not isinstance(count, int) or isinstance(count, bool) or not 1 <= count <= MAX_OFFICE_PDF_PAGES:
+            raise PreviewError("办公 PDF 页数超过安全解析预算，请拆分文档后重试。")
+        pages = len(reader.pages)
+        if pages != count:
+            raise PreviewError("办公 PDF 页数结构无效。")
+        if pages <= OFFICE_PAGE_LIMIT:
+            return pdf, pages, False
+        output = io.BytesIO()
+        writer = PdfWriter()
+        # Copy page objects/embedded fonts/images verbatim. No rendering,
+        # downsampling or JPEG round-trip occurs, including on LibreOffice 7.3.
+        for page in reader.pages[:OFFICE_PAGE_LIMIT]:
+            writer.add_page(page)
+        writer.write(output)
+        data = output.getvalue()
+        if len(data) > MAX_MEDIA_BYTES:
+            raise PreviewError("高清办公 PDF 超过 5 MiB 预览预算；未降低清晰度，请拆分文档后重试。")
+        return data, OFFICE_PAGE_LIMIT, True
+    except PreviewError:
+        raise
+    except Exception:
+        raise PreviewError("办公转换 PDF 无法在安全预算内解析。") from None
+
+
 def office_preview(data, fmt, directory):
     executable = shutil.which("soffice")
     if not executable:
@@ -655,28 +699,43 @@ def office_preview(data, fmt, directory):
         '<prop oor:name="Chart" oor:op="fuse"><value>false</value></prop></item>'
         '<item oor:path="/org.openoffice.Office.Calc/Content/Update">'
         '<prop oor:name="Link" oor:op="fuse"><value>0</value></prop></item>'
+        # CLI JSON filter options only work on LibreOffice 7.4+. The installed
+        # 7.3 converter must also receive the same fixed settings in its private
+        # profile. These are source-controlled, never file/user-supplied values.
+        '<item oor:path="/org.openoffice.Office.Common/Filter/PDF/Export">'
+        + ''.join('<prop oor:name="' + key + '" oor:op="fuse"><value>'
+                  + str(value).lower() + '</value></prop>'
+                  for key, value in OFFICE_PDF_SETTINGS.items())
+        + '</item>'
         '</oor:items>', encoding="utf-8")
     output = directory / "output"
     output.mkdir(mode=0o700)
     filter_name = "impress_pdf_Export" if fmt in {"pptx", "ppt", "odp"} else "writer_pdf_Export"
     # Security is enforced by the private profile and relationship preflight,
     # in addition to the host's no-network/no-mount process isolation.
-    pdf_options = json.dumps({"PageRange": {"type": "string", "value": "1-100"},
-                              "ExportBookmarks": {"type": "boolean", "value": "false"},
-                              "ExportFormFields": {"type": "boolean", "value": "false"}}, separators=(",", ":"))
+    pdf_options = json.dumps({"PageRange": {"type": "string", "value": f"1-{OFFICE_PAGE_LIMIT}"},
+                              **{key: {"type": "boolean", "value": str(value).lower()}
+                                 for key, value in OFFICE_PDF_SETTINGS.items()}}, separators=(",", ":"))
     _process([executable, "-env:UserInstallation=" + profile.as_uri(), "--headless", "--nologo", "--nodefault",
               "--norestore", "--unaccept=all", "--convert-to", "pdf:" + filter_name + ":" + pdf_options,
               "--outdir", str(output), str(source)], directory)
     target = output / "input.pdf"
-    if not target.is_file() or target.is_symlink() or target.stat().st_size > MAX_MEDIA_BYTES:
-        raise PreviewError("办公转换未生成预算内的 PDF 文件。")
+    if not target.is_file() or target.is_symlink():
+        raise PreviewError("办公转换未生成有效 PDF 文件。")
+    if target.stat().st_size > MAX_MEDIA_BYTES:
+        raise PreviewError("高清办公 PDF 超过 5 MiB 预览预算；未降低清晰度，请拆分文档后重试。")
     pdf = target.read_bytes()
     if not pdf.startswith(b"%PDF-"):
         raise PreviewError("办公转换结果不是有效 PDF。")
+    pdf, pages, truncated = _office_pdf_pages(pdf)
     result = _base("office", "pdf")
-    result["metadata"] = {"converter": "LibreOffice", "source_format": fmt, "page_limit": 100,
-                          "macros": "disabled", "external_updates": "disabled", "editable": False}
-    result["warnings"].append("仅显示前 100 页静态版式；不播放动画、音视频，不执行宏，不更新外部链接。与 Microsoft Office 排版可能不同。")
+    result["metadata"] = {"converter": "LibreOffice", "source_format": fmt, "page_limit": OFFICE_PAGE_LIMIT,
+                          "page_count": pages, "image_compression": "lossless", "image_downsampling": False,
+                          "standard_font_embedding": "requested", "macros": "disabled", "external_updates": "disabled", "editable": False}
+    # A modern converter may already apply PageRange. At the exact limit the
+    # original count is unknown, so conservatively signal a bounded preview.
+    result["sampled"] = truncated or pages == OFFICE_PAGE_LIMIT
+    result["warnings"].append("最多显示前 100 页静态版式；图像无损导出且不降采样，不播放动画、音视频，不执行宏，不更新外部链接。缺失字体会使用本地替代字体，与 Microsoft Office 排版可能不同。")
     return _media(result, pdf, "application/pdf")
 
 

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException
 
 from app.application.services.visualization_catalog import VisualizationCatalogService, VisualizationNotFoundError
 from app.domain.external.plugin_runtime import PluginRuntimeError
@@ -12,15 +12,12 @@ router = APIRouter(prefix="/visualizations", tags=["visualizations"])
 
 @router.get("", response_model=APIResponse[VisualizationCatalog])
 async def list_visualizations(
-    contract_version: int = Query(default=1, ge=1, le=2),
     user: User = Depends(get_current_user),
     catalog: VisualizationCatalogService = Depends(get_visualization_catalog),
 ) -> APIResponse[VisualizationCatalog]:
     try:
         result = await catalog.list_for_user(user.id)
-        return APIResponse.success(result.model_copy(update={
-            "plugins": [plugin for plugin in result.plugins if plugin.contract_version <= contract_version],
-        }))
+        return APIResponse.success(result)
     except PluginRuntimeError:
         raise HTTPException(status_code=503, detail="Cordis visualization runtime is unavailable") from None
 

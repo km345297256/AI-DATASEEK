@@ -14,8 +14,7 @@
     <div v-else-if="!catalog && loading" role="status" class="p-8 text-center text-sm text-[var(--text-tertiary)]">正在加载 Cordis 可视化插件…</div>
     <div v-else-if="!selectedPlugin" class="p-8 text-center text-sm leading-6 text-[var(--text-tertiary)]">此格式没有已启用的可视化插件。<br />可在插件管理中启用对应能力，或下载原始文件。</div>
     <div v-else-if="blockedReason" role="alert" class="p-8 text-center text-sm leading-6 text-[var(--text-tertiary)]">{{ blockedReason }}</div>
-    <component v-else-if="adapter && selectedPlugin.data_kind !== 'file'" :is="adapter" :key="instanceKey" :file="file" :plugin="selectedPlugin" />
-    <component v-else-if="adapter" :is="adapter" :key="instanceKey" :file="file" />
+    <component v-else-if="adapter" :is="adapter" :key="instanceKey" :file="file" :plugin="selectedPlugin" />
   </div>
 </template>
 
@@ -41,10 +40,10 @@ const instanceKey = computed(() => `${props.file.file_id}:${catalog.value?.revis
 const blockedReason = computed(() => {
   const plugin = selectedPlugin.value;
   if (!plugin) return '';
-  if (shared.value && plugin.data_kind !== 'file') return '共享页面暂不开放科学数据读取接口。请在原会话中使用此插件，或下载原始文件。';
+  if (shared.value && !plugin.capabilities.shared) return '此插件不开放共享读取。请在原会话中使用此插件，或下载原始文件。';
   // Text/CSV read bounded pages; their descriptor budget is per page, not a
   // maximum source-file size. Preserve large-file pagination and downloads.
-  if (plugin.data_kind === 'file' && !['text', 'csv'].includes(plugin.adapter) && props.file.size != null && (!Number.isFinite(props.file.size) || props.file.size < 0 || props.file.size > plugin.limits.max_input_bytes)) {
+  if (plugin.capabilities.input_mode === 'whole' && props.file.size != null && (!Number.isFinite(props.file.size) || props.file.size < 0 || props.file.size > plugin.limits.max_input_bytes)) {
     return `文件超出该插件的安全预览上限（${Math.round(plugin.limits.max_input_bytes / 1024 / 1024)} MiB），请下载后分析。`;
   }
   return '';

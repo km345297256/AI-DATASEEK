@@ -88,19 +88,17 @@ export const scientificCases = [
     // The existing renderer does not start that worker. Compare repeated mounts
     // below; this explicit library baseline must never become a per-view leak.
     libraryBlobBaseline: 1,
-    descriptor: { contract_version: 1, data_kind: 'molecular', adapter: 'molecular' },
+    descriptor: { contract_version: 2, adapter: 'molecular' },
     async init(page) {
       await instrumentWebgl(page);
       await page.addInitScript(() => { globalThis.__molecularFallbacks = []; const original = console.warn; console.warn = (...args) => { if (String(args[0]).includes('3Dmol parser failed')) globalThis.__molecularFallbacks.push(String(args[0])); original.apply(console, args); }; });
     },
     async api(request) {
       const path = new URL(request.url()).pathname;
-      if (path === '/api/v1/files/molecular-preview/prepare' && request.method() === 'POST') {
-        assert.equal(request.postDataJSON().file_id, 'synthetic-molecular');
-        return { contentType: 'application/json', body: JSON.stringify({ code: 0, msg: 'ok', data: { source_name: 'synthetic.pdb', source_format: 'pdb', size_bytes: utf8(pdb).byteLength, content_type: 'chemical/x-pdb', periodic: false, supports_unit_cell: false } }) };
+      if (path === '/api/v1/files/synthetic-molecular/visualization' && request.method() === 'POST' && request.postDataJSON().operation === 'prepare') {
+        assert.equal(request.postDataJSON().plugin_id, 'test-molecular');
+        return { contentType: 'application/json', body: JSON.stringify({ code: 0, msg: 'ok', data: { contract_version: 2, plugin_id: 'test-molecular', version: '1'.repeat(64), revision: '2'.repeat(64), kind: 'molecule', payload: { source_name: 'synthetic.pdb', source_format: 'pdb', size_bytes: utf8(pdb).byteLength, content_type: 'chemical/x-pdb', periodic: false, supports_unit_cell: false }, metadata: {}, warnings: [], sampled: false } }) };
       }
-      if (path === '/api/v1/files/synthetic-molecular/signed-url' && request.method() === 'POST') return { contentType: 'application/json', body: JSON.stringify({ code: 0, msg: 'ok', data: { signed_url: '/api/v1/files/synthetic-molecular/synthetic-content', expires_at: '2099-01-01T00:00:00Z' } }) };
-      if (path === '/api/v1/files/synthetic-molecular/synthetic-content' && request.method() === 'GET') return { contentType: 'chemical/x-pdb', body: utf8(pdb) };
     },
     async ready(page) {
       await gpuReady(page);

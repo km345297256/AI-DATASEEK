@@ -3,6 +3,15 @@ import { resolve } from 'node:path';
 
 /** Fixed local source and output; no manifest can add a build entry point. */
 export const nmrBrowserDirectory = () => resolve('node_modules/.cache/dataseek-visualizations/nmrium');
+export const docxBrowserDirectory = () => resolve('node_modules/.cache/dataseek-visualizations/docx');
+export async function prebuildDocxBrowser() {
+  await build({
+    entryPoints: [resolve('src/visualizations/extended/docxBrowserEntry.ts')],
+    outfile: resolve(docxBrowserDirectory(), 'docx.js'),
+    bundle: true, format: 'iife', platform: 'browser', target: 'es2022',
+    minify: true, sourcemap: false, legalComments: 'linked',
+  });
+}
 export async function prebuildNmrBrowser() {
   await build({
     entryPoints: [resolve('src/visualizations/extended/scientific/nmriumBrowserEntry.ts')],

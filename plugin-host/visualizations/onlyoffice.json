@@ -1,0 +1,17 @@
+{
+  "contract_version": 2,
+  "id": "viz-onlyoffice",
+  "version": "1.0.0",
+  "name": "ONLYOFFICE 本机只读阅读",
+  "description": "通过独立本机来源和短期授权阅读 Word、Excel、PowerPoint 与 PDF；禁用编辑、打印、下载及原件回写。需要配置可选本机文档服务，未配置时提示未就绪。",
+  "extensions": ["docx", "xlsx", "pptx", "doc", "xls", "ppt", "odt", "ods", "odp", "rtf", "txt", "csv", "pdf"],
+  "filenames": [],
+  "view_kind": "document",
+  "adapter": "onlyoffice",
+  "reader": "office-viewer",
+  "capabilities": { "operations": ["prepare"], "input_mode": "whole", "shared": false },
+  "default_enabled": false,
+  "priority": 8,
+  "permissions": ["file:read"],
+  "limits": { "max_input_bytes": 67108864, "max_output_bytes": 524288 }
+}

@@ -9,6 +9,8 @@ if [[ "$mode" != "--local" && "$mode" != "--containers" ]]; then
   exit 2
 fi
 
+cd "$task_repo_root"
+node scripts/sync-visualization-contract.mjs --check
 cd "$task_repo_root/frontend"
 npm run type-check
 npm test

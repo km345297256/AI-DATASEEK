@@ -139,10 +139,10 @@ async def scientific_visualization(file_service: FileService, catalog, image: st
     plugin = await catalog.require_enabled(user_id, request.plugin_id)
     snapshot = await catalog.list_for_user(user_id)
     revision = snapshot.revision
-    if plugin.data_kind != "scientific" or plugin.reader not in {"netcdf", "fits", "fastq"}:
+    if "preview" not in plugin.capabilities.operations or plugin.reader not in {"netcdf", "fits", "fastq"}:
         raise ScientificPreviewRejected("此插件不使用科学数据读取接口。")
     info = await file_service.get_file_info(file_id, user_id)
-    if info is None:
+    if info is None or _is_private_spill(info):
         raise FileNotFoundError("File not found")
     filename = (info.filename or "").lower()
     if not plugin.matches_filename(filename):
@@ -231,6 +231,10 @@ async def scientific_visualization(file_service: FileService, catalog, image: st
                 raise ValueError("Worker returned a different reader or view")
         except (TypeError, ValueError) as error:
             raise VisualizationWorkerError("预览结果未通过插件协议校验。") from error
+        final_revision = (await catalog.list_for_user(user_id)).revision
+        final = await catalog.require_enabled(user_id, request.plugin_id)
+        if final != plugin or final_revision != revision:
+            raise PreviewVersionChanged("可视化插件已更新，请重新打开预览。")
         return checked.model_copy(update={"version": version, "plugin_id": plugin.id, "revision": revision})
     finally:
         cancel.set()

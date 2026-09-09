@@ -23,9 +23,10 @@ from app.interfaces.dependencies import get_current_user, get_visualization_cata
 
 def manifest():
     return {
-        "contract_version": 1, "id": "netcdf-map", "version": "1.0.0", "name": "NetCDF map",
+        "contract_version": 2, "id": "netcdf-map", "version": "1.0.0", "name": "NetCDF map",
         "description": "Geographic view", "extensions": ["nc"], "filenames": [],
-        "view_kind": "map", "adapter": "scientific-map", "data_kind": "scientific", "reader": "netcdf",
+        "view_kind": "map", "adapter": "scientific-map", "reader": "netcdf",
+        "capabilities": {"operations": ["preview"], "input_mode": "whole", "shared": False},
         "default_enabled": True, "priority": 50, "permissions": ["file:read"],
         "limits": {"max_input_bytes": 67108864, "max_output_bytes": 524288},
     }
@@ -85,7 +86,11 @@ async def test_visualization_unavailable_fails_closed_without_builtin_fallback(s
 
 @pytest.mark.parametrize("update", [
     {"entry": "https://bad.test/script.js"}, {"api_url": "http://127.0.0.1"},
-    {"contract_version": True}, {"contract_version": 2}, {"default_enabled": "false"},
+    {"contract_version": True}, {"contract_version": 1}, {"contract_version": 3}, {"default_enabled": "false"},
+    {"data_kind": "scientific"}, {"reader": None},
+    {"capabilities": {"operations": ["bytes"], "input_mode": "whole", "shared": False}},
+    {"capabilities": {"operations": ["preview"], "input_mode": "whole", "shared": True}},
+    {"capabilities": {"operations": ["preview"], "input_mode": "whole", "shared": False, "url": "https://bad.test"}},
     {"adapter": "remote-script"}, {"view_kind": "image"}, {"reader": "fastq"},
     {"permissions": ["file:write"]}, {"extensions": ["../private"]},
     {"extensions": ["nc", "nc"]}, {"priority": 1.5},
@@ -99,9 +104,10 @@ def test_visualization_protocol_rejects_unsafe_or_inconsistent_descriptors(updat
 def test_all_shipped_manifests_match_python_and_file_selection():
     directory = Path(__file__).resolve().parents[2] / "plugin-host" / "visualizations"
     plugins = [VisualizationPlugin.model_validate_json(path.read_text()) for path in directory.glob("*.json")]
-    assert len(plugins) == 34
-    assert sum(plugin.contract_version == 1 for plugin in plugins) == 14
-    assert sum(plugin.contract_version == 2 for plugin in plugins) == 20
+    assert len(plugins) == 36
+    assert all(plugin.contract_version == 2 for plugin in plugins)
+    assert all(plugin.capabilities.operations for plugin in plugins)
+    assert all(not plugin.adapter.startswith("v2-") for plugin in plugins)
     fastq = next(plugin for plugin in plugins if plugin.id == "fastq-quality")
     assert fastq.matches_filename("Reads.FASTQ")
     assert fastq.matches_filename("Reads.fq")
