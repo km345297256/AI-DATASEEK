@@ -45,6 +45,8 @@ def _safe_mount_filename(value: str) -> bool:
 
 
 class DockerSandbox(Sandbox):
+    supports_execution_receipts = True
+
     def __init__(
         self,
         ip: str = None,
@@ -519,6 +521,11 @@ class DockerSandbox(Sandbox):
             return False
 
     async def exec_command(self, session_id: str, exec_dir: str, command: str) -> ToolResult:
+        from app.domain.services.execution_evidence import consume_shell_receipt, register_shell_attempt
+        attempt = register_shell_attempt(self, session_id, exec_dir, command)
+        if attempt is not None:
+            result = await self.exec_command_tracked(session_id, exec_dir, command, attempt.operation_id)
+            return consume_shell_receipt(result, attempt)
         response = await self.client.post(
             f"{self.base_url}/api/v1/shell/exec",
             json={
@@ -527,37 +534,62 @@ class DockerSandbox(Sandbox):
                 "command": command
             }
         )
+        return consume_shell_receipt(self._tool_result_from_response(response, "shell_exec"), None)
+
+    async def exec_command_tracked(self, session_id: str, exec_dir: str, command: str,
+                                   operation_id: str) -> ToolResult:
+        response = await self.client.post(
+            f"{self.base_url}/api/v1/shell/exec",
+            json={"id": session_id, "exec_dir": exec_dir, "command": command, "operation_id": operation_id},
+        )
         return self._tool_result_from_response(response, "shell_exec")
+
+    async def shell_operation_status(self, session_id: str, operation_id: str) -> ToolResult:
+        response = await self.client.post(
+            f"{self.base_url}/api/v1/shell/operation-status",
+            json={"id": session_id, "operation_id": operation_id}, timeout=3.0,
+        )
+        return ToolResult(**response.json())
 
     async def exec_command_with_credentials(
         self, session_id: str, exec_dir: str, command: str, credentials: dict[str, str],
     ) -> ToolResult:
+        from app.domain.services.execution_evidence import consume_shell_receipt, register_shell_attempt
+        attempt = register_shell_attempt(self, session_id, exec_dir, command)
         response = await self.client.post(
             f"{self.base_url}/api/v1/shell/exec",
             json={"id": session_id, "exec_dir": exec_dir, "command": command,
-                  "credentials": credentials},
+                  "credentials": credentials, **({"operation_id": attempt.operation_id} if attempt else {})},
         )
-        return self._tool_result_from_response(response, "plugin_exec")
+        return consume_shell_receipt(self._tool_result_from_response(response, "plugin_exec"), attempt)
 
     async def view_shell(self, session_id: str, console: bool = False) -> ToolResult:
+        from app.domain.services.execution_evidence import bind_shell_observation
+        attempt = bind_shell_observation(self, session_id)
         response = await self.client.post(
             f"{self.base_url}/api/v1/shell/view",
             json={
                 "id": session_id,
-                "console": console
+                "console": console,
+                **({"operation_id": attempt.operation_id} if attempt else {}),
             }
         )
         return ToolResult(**response.json())
 
     async def wait_for_process(self, session_id: str, seconds: Optional[int] = None) -> ToolResult:
+        from app.domain.services.execution_evidence import bind_shell_observation, refresh_shell_attempt
+        attempt = bind_shell_observation(self, session_id)
         response = await self.client.post(
             f"{self.base_url}/api/v1/shell/wait",
             json={
                 "id": session_id,
-                "seconds": seconds
+                "seconds": seconds,
+                **({"operation_id": attempt.operation_id} if attempt else {}),
             }
         )
-        return self._tool_result_from_response(response, "shell_wait")
+        result = self._tool_result_from_response(response, "shell_wait")
+        await refresh_shell_attempt(attempt)
+        return result
 
     async def write_to_process(self, session_id: str, input_text: str, press_enter: bool = True) -> ToolResult:
         response = await self.client.post(
@@ -571,17 +603,21 @@ class DockerSandbox(Sandbox):
         return ToolResult(**response.json())
 
     async def kill_process(self, session_id: str) -> ToolResult:
+        from app.domain.services.execution_evidence import bind_shell_observation
+        attempt = bind_shell_observation(self, session_id)
         response = await self.client.post(
             f"{self.base_url}/api/v1/shell/kill",
-            json={"id": session_id},
+            json={"id": session_id, **({"operation_id": attempt.operation_id} if attempt else {})},
             timeout=4.0,
         )
         return ToolResult(**response.json())
 
     async def release_shell(self, session_id: str) -> ToolResult:
+        from app.domain.services.execution_evidence import bind_shell_observation
+        attempt = bind_shell_observation(self, session_id)
         response = await self.client.post(
             f"{self.base_url}/api/v1/shell/release",
-            json={"id": session_id},
+            json={"id": session_id, **({"operation_id": attempt.operation_id} if attempt else {})},
             timeout=4.5,
         )
         return ToolResult(**response.json())
@@ -746,6 +782,53 @@ class DockerSandbox(Sandbox):
             }
         )
         return ToolResult(**response.json())
+
+    async def file_fingerprints(self, paths: list[str]) -> ToolResult:
+        response = await self.client.post(
+            f"{self.base_url}/api/v1/file/fingerprints", json={"paths": paths},
+        )
+        response.raise_for_status()
+        return ToolResult(**response.json())
+
+    async def validate_artifacts(self, items: list[dict[str, str]]) -> ToolResult:
+        """Validate generated bytes without a model/tool round or existence fallback."""
+        try:
+            response = await self.client.post(
+                f"{self.base_url}/api/v1/file/validate-artifacts",
+                json={"items": items}, timeout=35.0,
+            )
+            response.raise_for_status()
+            result = ToolResult(**response.json())
+            if (not result.success or not isinstance(result.data, dict)
+                    or result.data.get("version") != 1 or not isinstance(result.data.get("files"), list)):
+                raise ValueError("unsupported_validation_response")
+            return result
+        except (httpx.HTTPError, ValueError, TypeError):
+            # Old sandbox images may return 404. Never infer validity from
+            # existence or retry an analysis when only verification is missing.
+            return ToolResult(success=False, message="Artifact validation unavailable", data={
+                "version": 1, "code": "validation_unavailable", "files": [],
+            })
+
+    async def analysis_fingerprints(self, paths: list[str]) -> ToolResult:
+        """Snapshot only the bounded registered-input/output roots, without tools."""
+        try:
+            response = await self.client.post(
+                f"{self.base_url}/api/v1/file/analysis-fingerprints",
+                json={"paths": paths}, timeout=35.0,
+            )
+            response.raise_for_status()
+            result = ToolResult(**response.json())
+            if (not result.success or not isinstance(result.data, dict)
+                    or result.data.get("version") != 1
+                    or not isinstance(result.data.get("files"), list)
+                    or not isinstance(result.data.get("errors"), list)):
+                raise ValueError("unsupported_snapshot_response")
+            return result
+        except (httpx.HTTPError, ValueError, TypeError):
+            return ToolResult(success=False, message="Analysis snapshot unavailable", data={
+                "version": 1, "code": "snapshot_unavailable", "files": [], "errors": [],
+            })
 
     async def file_upload(self, file_data: BinaryIO, path: str, filename: str = None) -> ToolResult:
         """Upload file to sandbox

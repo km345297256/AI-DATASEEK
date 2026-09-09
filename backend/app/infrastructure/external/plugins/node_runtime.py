@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any, Mapping
 
 from pydantic import ValidationError
+from app.domain.models.visualization import VisualizationSnapshot
 
 from app.domain.external.plugin_runtime import (
     PluginCatalogSnapshot,
@@ -257,6 +258,34 @@ class NodePluginRuntime:
         """Stop the child and release all tasks; safe to call more than once."""
         async with self._lifecycle_lock:
             await self._stop_locked(graceful=True)
+
+    async def visualization_snapshot(self) -> VisualizationSnapshot:
+        return await self._visualization_request("visualizations.snapshot")
+
+    async def visualization_reload(self) -> VisualizationSnapshot:
+        return await self._visualization_request("visualizations.reload")
+
+    async def _visualization_request(self, method: str) -> VisualizationSnapshot:
+        await self.start()
+        async with self._lifecycle_lock:
+            try:
+                payload = await self._request(method)
+                return VisualizationSnapshot.model_validate(payload)
+            except PluginRuntimeRPCError:
+                # Rejected visualization candidates leave both last valid
+                # catalogs intact. Do not alter the Agent-tool generation.
+                raise
+            except (ValidationError, ValueError, TypeError) as exc:
+                raise PluginRuntimeProtocolError("Cordis visualization catalog failed validation") from exc
+            except asyncio.CancelledError:
+                # No visualization cache is advertised by Python. The next
+                # request reads the host's committed generation directly.
+                raise
+            except Exception as exc:
+                error = self._runtime_error("Cordis visualization request failed", exc)
+                self._invalidate(error)
+                await self._stop_locked(graceful=False)
+                raise error from exc
 
     async def _bootstrap(self) -> PluginCatalogSnapshot:
         health = await self._request("host.health", require_healthy=False)

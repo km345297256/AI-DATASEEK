@@ -21,10 +21,16 @@ import { ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { getFileDownloadUrl } from '../../api/file';
 import type { FileInfo } from '../../api/file';
+import { usePreviewLoad } from '../../composables/usePreviewLoad';
+import { readBoundedBinary, validateTiffDimensions } from '../../visualizations/boundedBinary';
 
 interface TiffImageDirectory {
   width: number;
   height: number;
+  t256?: number[];
+  t257?: number[];
+  t258?: number[];
+  t277?: number[];
 }
 
 interface UTIFRuntime {
@@ -47,7 +53,7 @@ const { t } = useI18n();
 const canvasRef = ref<HTMLCanvasElement | null>(null);
 const status = ref('');
 const metadata = ref('');
-let loadVersion = 0;
+const loads = usePreviewLoad();
 let scriptPromise: Promise<UTIFRuntime> | null = null;
 
 const loadUTIF = () => {
@@ -79,7 +85,7 @@ const loadUTIF = () => {
 };
 
 const renderTiff = async (file: FileInfo) => {
-  const currentVersion = ++loadVersion;
+  const load = loads.begin();
   status.value = '';
   metadata.value = '';
 
@@ -93,26 +99,28 @@ const renderTiff = async (file: FileInfo) => {
   status.value = t('Loading TIFF image...');
   try {
     const url = await getFileDownloadUrl(file);
-    const response = await fetch(url);
+    load.assertCurrent();
+    const response = await fetch(url, { signal: load.signal });
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    const buffer = await response.arrayBuffer();
-    if (currentVersion !== loadVersion) return;
+    const buffer = await readBoundedBinary(response, 64 * 1024 * 1024, load.signal);
+    if (!load.isCurrent()) return;
 
     const UTIF = await loadUTIF();
-    if (currentVersion !== loadVersion) return;
+    if (!load.isCurrent()) return;
 
     const ifds = UTIF.decode(buffer);
     if (!ifds.length) throw new Error('No image frames found');
+    if (ifds.length > 128) throw new Error('TIFF 页数超过安全预览上限（128 页），请下载后分析。');
+    // UTIF sets width/height during decodeImage; inspect raw directory tags
+    // before it allocates decompression buffers or any RGBA conversion.
+    const { width, height } = validateTiffDimensions(ifds[0]);
     UTIF.decodeImage(buffer, ifds[0], ifds);
     const rgba = UTIF.toRGBA8(ifds[0]);
-
-    const width = ifds[0].width;
-    const height = ifds[0].height;
-    if (!width || !height) throw new Error('Invalid TIFF dimensions');
+    if (rgba.length !== width * height * 4) throw new Error('Invalid TIFF pixel buffer');
 
     const targetCanvas = canvasRef.value;
     const context = targetCanvas?.getContext('2d');
-    if (!targetCanvas || !context || currentVersion !== loadVersion) return;
+    if (!targetCanvas || !context || !load.isCurrent()) return;
 
     targetCanvas.width = width;
     targetCanvas.height = height;
@@ -120,8 +128,8 @@ const renderTiff = async (file: FileInfo) => {
     metadata.value = `${width} x ${height}${ifds.length > 1 ? ` · ${ifds.length} pages` : ''}`;
     status.value = '';
   } catch (error) {
-    console.error('Failed to render TIFF file:', error);
-    status.value = t('Failed to render TIFF image');
+    if (!load.isCurrent()) return;
+    status.value = error instanceof Error && /安全|浏览器/.test(error.message) ? error.message : t('Failed to render TIFF image');
   }
 };
 

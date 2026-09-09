@@ -292,6 +292,9 @@ async def test_trace_records_only_declared_keys_and_counts_hostile_unknown_keys(
     sink = _CaptureSink()
     pipeline = ToolExecutionPipeline([StructuredToolTraceInterceptor(sink)])
     traced_tool = _tool()
+    # This trace-only case deliberately declares an extensible argument map;
+    # ordinary record schemas reject unknown keys before admission.
+    traced_tool.definition["parameters"]["additionalProperties"] = True
     traced_tool.definition["parameters"]["properties"].update({
         "Authorization: Bearer key-in-key": {},
         "/Users/alice/private/key": {},

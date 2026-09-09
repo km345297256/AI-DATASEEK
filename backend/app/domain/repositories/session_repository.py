@@ -4,9 +4,25 @@ from app.domain.models.session import Session, SessionStatus, SessionSummary
 from app.domain.models.file import FileInfo
 from app.domain.models.event import BaseEvent, AgentEvent
 from app.domain.models.execution_environment import ExecutionEnvironmentSnapshot
+from app.domain.models.session_history import SessionHistoryPage
 
 class SessionRepository(Protocol):
     """Repository interface for Session aggregate"""
+
+    async def save_analysis_checkpoint(self, session_id: str, checkpoint: dict) -> None: ...
+    async def get_analysis_checkpoint(self, session_id: str, checkpoint_id: str) -> dict | None: ...
+    async def claim_analysis_checkpoint(self, session_id: str, checkpoint_id: str,
+                                        user_id: str, client_message_id: str,
+                                        *, expected_source_seq: int) -> dict | None: ...
+    async def is_analysis_checkpoint_current(self, session_id: str, checkpoint_id: str,
+                                             user_id: str, client_message_id: str,
+                                             *, source_seq: int, resume_event_seq: int) -> bool: ...
+    async def clear_analysis_checkpoint(self, session_id: str) -> None: ...
+
+    async def get_history_page(self, session_id: str, *, turns: int = 5,
+                               before_seq: int | None = None) -> SessionHistoryPage:
+        """Load recent whole turns; retain full oversized turns for correctness."""
+        ...
 
     async def save(self, session: Session) -> None:
         """Save or update a session"""

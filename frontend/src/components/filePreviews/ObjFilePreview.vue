@@ -11,6 +11,7 @@
 import { nextTick, onBeforeUnmount, ref, watch } from 'vue';
 import { getFileDownloadUrl } from '../../api/file';
 import type { FileInfo } from '../../api/file';
+import { usePreviewLoad } from '../../composables/usePreviewLoad';
 
 declare global {
   interface Window {
@@ -37,7 +38,7 @@ const viewerContainer = ref<HTMLElement | null>(null);
 const status = ref('');
 let viewer: InstanceType<NonNullable<typeof window.OV>['EmbeddedViewer']> | null = null;
 let resizeObserver: ResizeObserver | null = null;
-let loadVersion = 0;
+const loads = usePreviewLoad();
 let scriptPromise: Promise<void> | null = null;
 
 const loadOnline3DViewer = () => {
@@ -75,7 +76,7 @@ const destroyViewer = () => {
 };
 
 const renderObj = async (file: FileInfo) => {
-  const currentVersion = ++loadVersion;
+  const load = loads.begin();
   destroyViewer();
   if (!file?.file_id || !viewerContainer.value) return;
 
@@ -83,19 +84,19 @@ const renderObj = async (file: FileInfo) => {
   try {
     await loadOnline3DViewer();
     await nextTick();
-    if (currentVersion !== loadVersion || !viewerContainer.value || !window.OV?.EmbeddedViewer) return;
+    if (!load.isCurrent() || !viewerContainer.value || !window.OV?.EmbeddedViewer) return;
 
     const url = await getFileDownloadUrl(file);
-    if (currentVersion !== loadVersion || !viewerContainer.value) return;
+    if (!load.isCurrent() || !viewerContainer.value) return;
 
     viewer = new window.OV.EmbeddedViewer(viewerContainer.value, {
       backgroundColor: new window.OV.RGBAColor(255, 255, 255, 255),
       defaultColor: new window.OV.RGBColor(160, 160, 160),
       onModelLoaded: () => {
-        status.value = '';
+        if (load.isCurrent()) status.value = '';
       },
       onModelLoadFailed: () => {
-        status.value = 'Failed to load OBJ model';
+        if (load.isCurrent()) status.value = 'Failed to load OBJ model';
       },
     });
     viewer.LoadModelFromUrlList([url]);
@@ -103,6 +104,7 @@ const renderObj = async (file: FileInfo) => {
     resizeObserver = new ResizeObserver(() => viewer?.Resize());
     resizeObserver.observe(viewerContainer.value);
   } catch (error) {
+    if (!load.isCurrent()) return;
     console.error('Failed to render OBJ file:', error);
     status.value = 'Failed to initialize 3D viewer';
   }
@@ -111,7 +113,7 @@ const renderObj = async (file: FileInfo) => {
 watch(() => props.file, renderObj, { immediate: true });
 
 onBeforeUnmount(() => {
-  loadVersion++;
+  loads.dispose();
   destroyViewer();
 });
 </script>

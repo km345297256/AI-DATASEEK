@@ -30,7 +30,7 @@ from app.domain.models.tool_result import ToolResult
 from app.domain.models.session import SessionStatus
 from app.domain.models.file import FileInfo
 from app.domain.external.sandbox_runtime import SandboxNotFoundError
-from app.domain.models.plan import Step
+from app.domain.models.plan import Step, ExecutionStatus
 from app.domain.models.execution_node import ExecutionNodeAuthType, ExecutionNodeCapacity, ExecutionNodeHealth, ExecutionNodeStatus, ExecutionNodeType, SandboxAllocationStatus
 from app.domain.models.user import User, UserRole
 from app.infrastructure.external.sandbox import runtime as sandbox_runtime_module
@@ -861,7 +861,7 @@ async def test_flow_does_not_rescan_unchanged_artifacts_at_summary_and_done():
                 function_args={},
                 status=ToolStatus.CALLED,
             )
-            yield StepEvent(status=StepStatus.COMPLETED, step=Step())
+            yield StepEvent(status=StepStatus.COMPLETED, step=Step(success=True, status=ExecutionStatus.COMPLETED))
             self.status = AgentStatus.SUMMARIZING
             yield MessageEvent(message="summary")
             yield DoneEvent()
@@ -891,12 +891,8 @@ async def test_flow_does_not_rescan_unchanged_artifacts_at_summary_and_done():
     runner._handle_tool_event = noop
     runner._sync_discovered_artifacts_to_storage = record_discovery
 
-    message = SimpleNamespace(
-        message="make a chart",
-        attachment_file_infos=[],
-        mcp_servers=[],
-        mcp_access_all=False,
-    )
+    from app.domain.models.message import Message
+    message = Message(message="make a chart")
     events = [event async for event in runner._run_flow(message)]
 
     assert len(discovery_calls) == 1

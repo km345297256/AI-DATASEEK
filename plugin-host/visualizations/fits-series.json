@@ -1,0 +1,26 @@
+{
+  "contract_version": 1,
+  "id": "fits-series",
+  "version": "1.0.0",
+  "name": "FITS 数值曲线",
+  "description": "FITS 数据的一维切片数值曲线",
+  "extensions": [
+    "fits",
+    "fit",
+    "fts"
+  ],
+  "filenames": [],
+  "view_kind": "series",
+  "adapter": "scientific-series",
+  "data_kind": "scientific",
+  "reader": "fits",
+  "default_enabled": true,
+  "priority": 50,
+  "permissions": [
+    "file:read"
+  ],
+  "limits": {
+    "max_input_bytes": 67108864,
+    "max_output_bytes": 524288
+  }
+}

@@ -338,9 +338,13 @@
           </div>
 
           <div v-else class="dataset-chat-list flex min-w-0 max-w-full flex-col gap-2">
-            <template v-for="(message, index) in messages" :key="`${message.type}-${index}`">
+            <button v-if="hasMoreHistory" type="button" :disabled="isLoadingEarlierHistory" class="mx-auto rounded-lg px-4 py-2 text-sm text-[var(--text-secondary)] disabled:opacity-50" @click="loadEarlierHistory">
+              {{ isLoadingEarlierHistory ? '正在加载历史记录…' : '加载更早的对话' }}
+            </button>
+            <template v-for="(message, index) in messages" :key="messageKey(message)">
               <div
                 v-if="message.type !== 'step' || shouldShowStep(index)"
+                :data-message-key="messageKey(message)"
                 class="dataset-chat-message min-w-0 max-w-full"
               >
                 <ChatMessage
@@ -348,6 +352,8 @@
                   :session-id="sessionId || undefined"
                   :hide-header="isConsecutiveAssistant(messages, index)"
                   :show-assistant-actions="!isLoading && isLatestAssistantMessage(messages, index)"
+                  :allow-analysis-resume="canResumeAnalysis(index)"
+                  @resumeAnalysis="resumeAnalysis(index)"
                   :task-summary-expanded="isTaskSummaryExpanded(message)"
                   :show-product-button="!isLoading && isLatestAssistantMessage(messages, index)"
                   @toolClick="handleToolClick"
@@ -438,9 +444,10 @@
               <span>建议您使用NCView进行可视化分析</span>
               <ChevronRight class="size-4 shrink-0 text-[var(--icon-tertiary)]" />
             </button>
-            <div v-if="isLoading && !hasRunningStep" class="mt-3 flex items-center gap-2 text-sm text-[var(--text-tertiary)]">
+            <p v-if="connectionNotice" role="status" class="mt-3 text-sm text-[var(--text-tertiary)]">{{ connectionNotice }}</p>
+            <div v-else-if="isLoading && (analysisProgress || !hasRunningStep)" role="status" aria-live="polite" class="mt-3 flex items-center gap-2 text-sm text-[var(--text-tertiary)]">
               <LoaderCircle class="size-4 animate-spin" />
-              <span>{{ loadingStatus }}</span>
+              <span>{{ analysisProgress || loadingStatus }}</span>
             </div>
           </div>
         </div>
@@ -455,7 +462,7 @@
             :rows="1"
             :is-running="isLoading"
             :attachments="datasetChatAttachments"
-            :disabled="isLoading || !dataset"
+            :disabled="isLoading || isRestoringHistory || !dataset"
             :show-file-actions="false"
             :show-mcp-actions="false"
             :placeholder="DATASET_CHAT_PLACEHOLDER"
@@ -519,7 +526,13 @@ import VersionBadge from '@/components/VersionBadge.vue';
 import SettingsDialog from '@/components/settings/SettingsDialog.vue';
 import AgentSelector from '@/components/AgentSelector.vue';
 import ToolPanel from '@/components/ToolPanel.vue';
-import { createSession, getSession, chatWithSession, stopSession } from '@/api/agent';
+import { createSession, getSessionHistory, chatWithSession, stopSession, createClientMessageId } from '@/api/agent';
+import { continuationAttempt, resumableAnalysisOutcome } from '@/utils/analysisOutcome';
+import type { AnalysisContinuationAttempt } from '@/types/analysisOutcome';
+import { createMessageKey, isLegacyPlanProgressMessage, prependHistoricalMessages, projectHistoryMessages } from '@/utils/sessionHistory';
+import { isAnalysisProgressEvent, isAnalysisProgressMessage } from '@/utils/analysisProgress';
+import { useAnalysisProgress } from '@/composables/useAnalysisProgress';
+import type { SSECallbacks } from '@/api/client';
 import { API_CONFIG } from '@/api/client';
 import { deleteDatasetDataProduct, downloadDatasetDataProduct, generateDatasetSuggestedQuestions, getDataCenterDataset, listDatasetChatSessions, listDatasetDataProducts, updateDatasetDataProduct, type DataCenterDataset, type DataCenterDatasetFile, type DataProduct, type DataProductFile, type DatasetChatSession } from '@/api/dataset';
 import { createFileSignedUrl } from '@/api/file';
@@ -579,6 +592,7 @@ const datasetChatAttachments: FileInfo[] = [];
 const selectedSkills = ref<string[]>([]);
 const autoEnabledSkillNames = ref(new Set<string>());
 const messages = ref<Message[]>([]);
+const analysisContinuation = ref<AnalysisContinuationAttempt | null>(null);
 const sessionId = ref<string | null>(null);
 const sessionCreatedAt = ref<number | null>(null);
 const expandedTaskSummaries = ref(new Set<number>());
@@ -588,6 +602,14 @@ const eventCursor = createAgentEventCursor();
 const isLoading = ref(false);
 const taskStartedAtMs = ref<number>();
 const loadingStatus = ref('');
+const { analysisProgress, updateAnalysisProgress, beginAnalysisProgress, clearAnalysisProgress } = useAnalysisProgress();
+const connectionNotice = ref('');
+const hasMoreHistory = ref(false);
+const isLoadingEarlierHistory = ref(false);
+const isRestoringHistory = ref(false);
+const historyBeforeSeq = ref<number>();
+const timelineRevision = ref(0);
+const messageKey = createMessageKey();
 const mobileCatalogOpen = ref(false);
 const catalogCollapsed = ref(false);
 const desktopCatalogViewport = ref(false);
@@ -611,6 +633,9 @@ const lastNoMessageTool = ref<ToolContent>();
 const toolPanel = ref<InstanceType<typeof ToolPanel>>();
 const toolPanelRealTime = ref(true);
 let cancelChat: (() => void) | null = null;
+let conversationGeneration = 0;
+let viewDisposed = false;
+let historyRequest: AbortController | undefined;
 let timelineResizeObserver: ResizeObserver | null = null;
 let datasetSummaryResizeObserver: ResizeObserver | null = null;
 let desktopCatalogMediaQuery: MediaQueryList | null = null;
@@ -798,11 +823,11 @@ function handleTimelinePointerUp() {
   updateTimelineFollowState();
 }
 
-watch(messages, async () => {
+watch([() => messages.value.length, timelineRevision], async () => {
   if (!shouldFollowTimeline.value) return;
   await nextTick();
   scrollTimelineToBottom();
-}, { deep: true });
+});
 
 function updateDatasetSummaryOverflow() {
   const element = datasetSummaryRef.value;
@@ -923,6 +948,7 @@ function handleCatalogViewportChange(event: MediaQueryListEvent) {
 }
 
 function startUserTurn() {
+  beginAnalysisProgress();
   closeToolPanel();
   shouldFollowTimeline.value = true;
   failRunningSteps(messages.value, false);
@@ -961,6 +987,7 @@ function jumpToLatestTool() {
 }
 
 function handleMessage(data: MessageEventData) {
+  if (isAnalysisProgressMessage(data)) return;
   if (data.role === 'user') startUserTurn();
   if (
     data.role === 'assistant'
@@ -970,10 +997,6 @@ function handleMessage(data: MessageEventData) {
   if (data.attachments?.length) {
     messages.value.push({ type: 'attachments', content: { ...data } as AttachmentsContent });
   }
-}
-
-function isLegacyPlanProgressMessage(content: string) {
-  return /^(正在(?:联合)?分析指定|正在快速分析当前数据集|Analyzing the selected file|Jointly analyzing \d+ selected files|Analyzing the current dataset)/.test(content.trim());
 }
 
 function handleTool(data: ToolEventData) {
@@ -1003,6 +1026,8 @@ function handleStep(data: StepEventData) {
 
 function handleEvent(event: AgentSSEEvent) {
   if (!acceptAgentEvent(eventCursor, event)) return;
+  updateAnalysisProgress(event);
+  if (!isAnalysisProgressEvent(event)) timelineRevision.value += 1;
   if (event.event === 'message') handleMessage(event.data as MessageEventData);
   else if (event.event === 'tool') handleTool(event.data as ToolEventData);
   else if (event.event === 'step') handleStep(event.data as StepEventData);
@@ -1191,10 +1216,11 @@ function toggleTaskSummary(message: Message) {
   expandedTaskSummaries.value = next;
 }
 
-async function ensureSession() {
+async function ensureSession(generation: number) {
   if (sessionId.value) return sessionId.value;
   loadingStatus.value = '正在创建数据分析会话...';
   const session = await createSession(selectedProfileId.value);
+  if (generation !== conversationGeneration) return null;
   sessionId.value = session.session_id;
   sessionCreatedAt.value = session.created_at;
   localStorage.setItem(datasetStorageKey(), session.session_id);
@@ -1227,7 +1253,14 @@ async function loadAutoEnabledSkillNames() {
 async function submit() {
   const question = inputMessage.value.trim();
   const selected = dataset.value;
-  if (!question || !selected || isLoading.value) return;
+  if (!question || !selected || isLoading.value || isRestoringHistory.value || viewDisposed) return;
+  analysisContinuation.value = null;
+  const generation = ++conversationGeneration;
+  historyRequest?.abort();
+  isLoadingEarlierHistory.value = false;
+  cancelChat?.();
+  cancelChat = null;
+  connectionNotice.value = '';
   inputMessage.value = '';
   startUserTurn();
   messages.value.push({ type: 'user', content: { content: question, timestamp: Math.floor(Date.now() / 1000) } as MessageContent });
@@ -1235,9 +1268,10 @@ async function submit() {
   isLoading.value = true;
   loadingStatus.value = '正在关联数据集...';
   try {
-    const activeSessionId = await ensureSession();
+    const activeSessionId = await ensureSession(generation);
+    if (!activeSessionId || generation !== conversationGeneration) return;
     const capabilities = buildDatasetChatCapabilities(selected.dataset_id, selectedSkills.value);
-    cancelChat = await chatWithSession(
+    const cancel = await chatWithSession(
       activeSessionId,
       question,
       lastEventId.value,
@@ -1246,22 +1280,103 @@ async function submit() {
       capabilities.skills,
       capabilities.mcpServers,
       selectedProfileId.value,
-      {
-        onMessage: ({ event, data }) => handleEvent({ event: event as AgentSSEEvent['event'], data: data as AgentSSEEvent['data'] }),
-        onClose: () => { isLoading.value = false; taskStartedAtMs.value = undefined; loadingStatus.value = ''; cancelChat = null; },
-        onError: (error) => { console.error(error); isLoading.value = false; taskStartedAtMs.value = undefined; loadingStatus.value = ''; failRunningSteps(messages.value); },
-      },
+      conversationCallbacks(generation),
       capabilities.datasetIds,
     );
+    if (generation !== conversationGeneration) { cancel(); return; }
+    cancelChat = cancel;
     loadingStatus.value = 'DataSeek 正在读取数据集...';
   } catch (error: any) {
+    if (generation !== conversationGeneration) return;
     console.error(error);
     isLoading.value = false;
+    clearAnalysisProgress();
     taskStartedAtMs.value = undefined;
     loadingStatus.value = '';
     messages.value.push({ type: 'assistant', content: { content: `数据探查启动失败：${error?.message || '未知错误'}`, timestamp: Math.floor(Date.now() / 1000) } as MessageContent });
     showErrorToast(error?.message || '数据探查启动失败');
   }
+}
+
+function canResumeAnalysis(index: number) {
+  return Boolean(!viewDisposed && sessionId.value && !isLoading.value && !isRestoringHistory.value
+    && !cancelChat && resumableAnalysisOutcome(messages.value, index));
+}
+
+async function resumeAnalysis(index: number) {
+  if (!canResumeAnalysis(index) || !sessionId.value) return;
+  const outcome = resumableAnalysisOutcome(messages.value, index);
+  if (!outcome?.resume_from) return;
+  const activeSessionId = sessionId.value;
+  const attempt = continuationAttempt(
+    analysisContinuation.value, activeSessionId, outcome.resume_from, createClientMessageId,
+  );
+  analysisContinuation.value = attempt;
+  beginAnalysisProgress();
+  const generation = ++conversationGeneration;
+  historyRequest?.abort();
+  isLoadingEarlierHistory.value = false;
+  cancelChat?.();
+  cancelChat = null;
+  connectionNotice.value = '';
+  taskStartedAtMs.value = performance.now();
+  isLoading.value = true;
+  shouldFollowTimeline.value = true;
+  loadingStatus.value = '正在继续未完成部分…';
+  try {
+    // The server restores the original objective and capabilities from the checkpoint.
+    const cancel = await chatWithSession(
+      activeSessionId, '', lastEventId.value, lastEventSeq.value, [], [], [], null,
+      conversationCallbacks(generation), undefined, attempt.clientMessageId, attempt.resumeFrom,
+    );
+    if (viewDisposed || generation !== conversationGeneration) { cancel(); return; }
+    cancelChat = cancel;
+  } catch (error) {
+    if (viewDisposed || generation !== conversationGeneration) return;
+    isLoading.value = false;
+    clearAnalysisProgress();
+    taskStartedAtMs.value = undefined;
+    loadingStatus.value = '';
+    connectionNotice.value = '续作连接未能建立，可重试继续或刷新页面确认任务状态。';
+  }
+}
+
+function conversationCallbacks(generation: number): SSECallbacks<AgentSSEEvent['data']> {
+  const current = () => !viewDisposed && generation === conversationGeneration;
+  return {
+    onOpen: () => {
+      if (!current()) return;
+      connectionNotice.value = '';
+      loadingStatus.value = 'DataSeek 正在读取数据集...';
+    },
+    onRetry: ({ attempt, maxAttempts }) => {
+      if (!current()) return;
+      isLoading.value = true;
+      connectionNotice.value = `连接中断，正在恢复（${attempt}/${maxAttempts}）…`;
+    },
+    onMessage: ({ event, data }) => {
+      if (current()) handleEvent({ event: event as AgentSSEEvent['event'], data });
+    },
+    onClose: () => {
+      if (!current()) return;
+      isLoading.value = false;
+      clearAnalysisProgress();
+      taskStartedAtMs.value = undefined;
+      loadingStatus.value = '';
+      connectionNotice.value = '';
+      cancelChat = null;
+    },
+    onError: (error) => {
+      if (!current()) return;
+      isLoading.value = false;
+      clearAnalysisProgress();
+      taskStartedAtMs.value = undefined;
+      loadingStatus.value = '';
+      connectionNotice.value = error.message;
+      cancelChat = null;
+      // Only a server error event (or an explicit stop) can fail running steps.
+    },
+  };
 }
 
 function askSuggestion(question: string) {
@@ -1271,6 +1386,14 @@ function askSuggestion(question: string) {
 
 function clearConversationState() {
   hideFilePanel();
+  beginAnalysisProgress();
+  analysisContinuation.value = null;
+  conversationGeneration += 1;
+  historyRequest?.abort();
+  hasMoreHistory.value = false;
+  isLoadingEarlierHistory.value = false;
+  historyBeforeSeq.value = undefined;
+  isRestoringHistory.value = false;
   closeToolPanel();
   shouldFollowTimeline.value = true;
   lastEventId.value = undefined;
@@ -1284,16 +1407,25 @@ function clearConversationState() {
   isLoading.value = false;
   taskStartedAtMs.value = undefined;
   loadingStatus.value = '';
+  connectionNotice.value = '';
   completionAdvice.value = undefined;
 }
 
 async function loadConversation(targetSessionId: string) {
+  if (viewDisposed) return;
   cancelChat?.();
   cancelChat = null;
   clearConversationState();
+  const generation = conversationGeneration;
+  const request = new AbortController();
+  historyRequest = request;
+  isRestoringHistory.value = true;
   selectedSkills.value = [];
   try {
-    const session = await getSession(targetSessionId);
+    const session = await getSessionHistory(targetSessionId, undefined, request.signal);
+    if (generation !== conversationGeneration) return;
+    hasMoreHistory.value = session.has_more && session.next_before_seq != null;
+    historyBeforeSeq.value = session.next_before_seq ?? undefined;
     sessionId.value = session.session_id;
     sessionCreatedAt.value = session.created_at;
     localStorage.setItem(datasetStorageKey(), session.session_id);
@@ -1312,13 +1444,16 @@ async function loadConversation(targetSessionId: string) {
     selectedSkills.value = [...new Set(restoredSkills)];
     if (session.status === SessionStatus.RUNNING || session.status === SessionStatus.PENDING) {
       isLoading.value = true;
-      cancelChat = await chatWithSession(session.session_id, '', lastEventId.value, lastEventSeq.value, [], [], [], selectedProfileId.value, {
-        onMessage: ({ event, data }) => handleEvent({ event: event as AgentSSEEvent['event'], data: data as AgentSSEEvent['data'] }),
-        onClose: () => { isLoading.value = false; cancelChat = null; },
-        onError: () => { isLoading.value = false; failRunningSteps(messages.value); },
-      }, dataset.value ? [dataset.value.dataset_id] : []);
+      const cancel = await chatWithSession(session.session_id, '', lastEventId.value, lastEventSeq.value, [], [], [], selectedProfileId.value,
+        conversationCallbacks(generation), dataset.value ? [dataset.value.dataset_id] : []);
+      if (generation === conversationGeneration) cancelChat = cancel;
+      else cancel();
+    } else {
+      isLoading.value = false;
+      clearAnalysisProgress();
     }
   } catch (error) {
+    if (request.signal.aborted || generation !== conversationGeneration) return;
     console.error('Failed to restore dataset chat session', error);
     localStorage.removeItem(datasetStorageKey());
     sessionId.value = null;
@@ -1326,6 +1461,36 @@ async function loadConversation(targetSessionId: string) {
     selectedSkills.value = [];
     clearConversationState();
     throw error;
+  } finally {
+    if (generation === conversationGeneration) isRestoringHistory.value = false;
+  }
+}
+
+async function loadEarlierHistory() {
+  const activeSessionId = sessionId.value;
+  const beforeSeq = historyBeforeSeq.value;
+  if (!activeSessionId || !beforeSeq || isLoadingEarlierHistory.value || viewDisposed) return;
+  const generation = conversationGeneration;
+  const request = new AbortController();
+  historyRequest?.abort();
+  historyRequest = request;
+  isLoadingEarlierHistory.value = true;
+  shouldFollowTimeline.value = false;
+  try {
+    const page = await getSessionHistory(activeSessionId, beforeSeq, request.signal);
+    if (request.signal.aborted || generation !== conversationGeneration) return;
+    const viewport = timelineRef.value;
+    const oldHeight = viewport?.scrollHeight ?? 0;
+    const oldTop = viewport?.scrollTop ?? 0;
+    messages.value = prependHistoricalMessages(projectHistoryMessages(page.events, true), messages.value);
+    hasMoreHistory.value = page.has_more && page.next_before_seq != null && page.next_before_seq < beforeSeq;
+    historyBeforeSeq.value = hasMoreHistory.value ? page.next_before_seq! : undefined;
+    await nextTick();
+    if (viewport && generation === conversationGeneration) viewport.scrollTop = oldTop + viewport.scrollHeight - oldHeight;
+  } catch (error) {
+    if (!request.signal.aborted && generation === conversationGeneration) showErrorToast('历史记录加载失败，请重试。');
+  } finally {
+    if (generation === conversationGeneration) isLoadingEarlierHistory.value = false;
   }
 }
 
@@ -1355,11 +1520,23 @@ function newConversationFromHistory() {
 }
 
 async function stop() {
+  clearAnalysisProgress();
+  const generation = ++conversationGeneration;
+  historyRequest?.abort();
+  isLoadingEarlierHistory.value = false;
   cancelChat?.();
   cancelChat = null;
-  if (sessionId.value) await stopSession(sessionId.value).catch(() => undefined);
   isLoading.value = false;
   loadingStatus.value = '';
+  connectionNotice.value = '';
+  try {
+    if (sessionId.value) await stopSession(sessionId.value);
+  } catch {
+    if (generation === conversationGeneration) connectionNotice.value = '停止请求未能确认，请刷新页面检查任务状态。';
+    return;
+  }
+  if (generation !== conversationGeneration) return;
+  taskStartedAtMs.value = undefined;
   failRunningSteps(messages.value);
 }
 
@@ -1400,6 +1577,10 @@ onMounted(async () => {
 });
 
 onUnmounted(() => {
+  viewDisposed = true;
+  clearAnalysisProgress();
+  historyRequest?.abort();
+  conversationGeneration += 1;
   document.title = 'DataSeek';
   cancelChat?.();
   eventBus.off(EVENT_SKILL_PREFERENCES_UPDATED, handleSkillPreferencesUpdated);

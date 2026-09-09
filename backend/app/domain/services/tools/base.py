@@ -1,5 +1,5 @@
 from contextvars import ContextVar, Token
-from typing import List, Callable
+from typing import List, Callable, ClassVar
 import inspect
 import copy
 
@@ -9,7 +9,7 @@ from langchain.messages import ToolMessage
 from langchain.messages import ToolCall
 from langchain_core.tools.base import BaseToolkit as LangchainBaseToolkit, ArgsSchema
 from typing import Any, Optional
-from pydantic import BaseModel, create_model, ConfigDict, PrivateAttr
+from pydantic import BaseModel, ConfigDict, PrivateAttr
 
 from app.domain.services.tools.pipeline import (
     ToolCancellationCallback,
@@ -17,6 +17,7 @@ from app.domain.services.tools.pipeline import (
     ToolExecutionDisposer,
     ToolExecutionPipeline,
 )
+from app.domain.services.tools.tool_contract import result_failed
 
 
 _ACTIVE_TOOL_EXECUTION: ContextVar[
@@ -30,17 +31,35 @@ def _noop_disposer() -> None:
 
 
 def create_model_without_fields(model_class: type[BaseModel], exclude_fields: set[str]) -> type[BaseModel]:
-    fields = {}
-    for field_name, field_info in model_class.model_fields.items():
-        if field_name not in exclude_fields:
-            fields[field_name] = (field_info.annotation, field_info)
-    return create_model(model_class.__name__, **fields)
+    # Inherit validators/config instead of reconstructing only field metadata.
+    # ClassVar shadows the bound toolkit receiver without making it an input.
+    return type(model_class.__name__, (model_class,), {
+        "__annotations__": {name: ClassVar[Any] for name in exclude_fields},
+        "model_config": ConfigDict(**{**model_class.model_config, "extra": "forbid"}),
+    })
+
+
+def tool_execution_contract(**contract: Any):
+    """Attach a host-authored static contract to a declared core tool.
+
+    Apply above the LangChain tool decorator. Call arguments and tool results
+    never supply this metadata; the resolved wrapper freezes its own copy.
+    """
+    from app.domain.external.plugin_runtime import ToolExecutionDescriptor
+    descriptor = ToolExecutionDescriptor.model_validate(contract)
+
+    def decorate(tool: StructuredTool) -> StructuredTool:
+        tool.metadata = {**(tool.metadata or {}), "execution_contract": descriptor.model_dump(mode="json")}
+        return tool
+
+    return decorate
 
 class Tool(BaseTool):
     
     name: str = ""
     description: str = ""
     args_schema: ArgsSchema | None = None
+    execution_contract: dict[str, Any] | None = None
     toolkit: 'BaseToolkit' = None
 
     def __init__(self, tool: StructuredTool, **kwargs: Any):
@@ -48,15 +67,16 @@ class Tool(BaseTool):
         self.name = tool.name
         self.description = tool.description
         self.args_schema = create_model_without_fields(tool.args_schema, {'self'})
+        declaration = (tool.metadata or {}).get("execution_contract")
+        if declaration is not None:
+            from app.domain.external.plugin_runtime import ToolExecutionDescriptor
+            self.execution_contract = ToolExecutionDescriptor.model_validate(declaration).model_dump(mode="json")
         self._tool = tool
 
     def _run(self, **kwargs: Any) -> Any:
         return self._tool.func(self.toolkit, **kwargs)
 
     async def _arun(self, **kwargs: Any) -> Any:
-        if self.args_schema is not None:
-            allowed_args = set(self.args_schema.model_fields.keys())
-            kwargs = {key: value for key, value in kwargs.items() if key in allowed_args}
         return await self._tool.coroutine(self.toolkit, **kwargs)
 
     async def ainvoke(self, input: Any, config: Any = None, **kwargs: Any) -> ToolMessage:
@@ -75,6 +95,7 @@ class Tool(BaseTool):
                     name=self.name,
                     content=content,
                     artifact=raw_result,
+                    status="error" if result_failed(raw_result) else "success",
                 )
             finally:
                 self.toolkit._reset_tool_execution_context(token)

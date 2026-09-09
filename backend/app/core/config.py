@@ -34,12 +34,12 @@ class Settings(BaseSettings):
     model_provider: str = "openai"
     temperature: float = 0.7
     max_tokens: int = 2000
-    # Deployment-owned engineering limits, not account quotas or advertised
+    # Per-request engineering limits, not cumulative task quotas or advertised
     # provider capacities. Offline token estimates include tool definitions.
     model_context_capacity_tokens: int = Field(default=131_072, ge=4096, le=2_000_000)
     model_context_safety_tokens: int = Field(default=2048, ge=256, le=65_536)
-    model_task_token_budget: int = Field(default=1_000_000, ge=4096, le=100_000_000)
-    model_task_call_budget: int = Field(default=128, ge=1, le=1024)
+    # Analysis has no total tool/call/token/time quota. The removed MODEL_TASK_*
+    # and ANALYSIS_BUDGET_* environment values intentionally have no effect.
     model_trace_store_timeout_seconds: float = Field(default=3.0, ge=0.1, le=30)
     # Existing saved profiles retain their own defaults; sessions without a
     # profile use progressive Cordis schema disclosure. Trials are opt-in.
@@ -274,6 +274,9 @@ class Settings(BaseSettings):
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"
+        # Retired deployment keys (including task quotas) cannot reactivate
+        # removed behavior or prevent loading the current configuration.
+        extra = "ignore"
         
     def validate(self):
         """Validate configuration settings"""

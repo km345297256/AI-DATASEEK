@@ -1,0 +1,25 @@
+{
+  "contract_version": 1,
+  "id": "csv",
+  "version": "1.0.0",
+  "name": "表格",
+  "description": "CSV 和 TSV 分页表格预览",
+  "extensions": [
+    "csv",
+    "tsv"
+  ],
+  "filenames": [],
+  "view_kind": "table",
+  "adapter": "csv",
+  "data_kind": "file",
+  "reader": null,
+  "default_enabled": true,
+  "priority": 50,
+  "permissions": [
+    "file:read"
+  ],
+  "limits": {
+    "max_input_bytes": 131072,
+    "max_output_bytes": 16777216
+  }
+}

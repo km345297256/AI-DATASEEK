@@ -53,6 +53,10 @@ export async function dispatchRequest(
       return { result: runtime.snapshot(), shutdown: false }
     case 'plugins.reload':
       return { result: await runtime.reload(), shutdown: false }
+    case 'visualizations.snapshot':
+      return { result: await runtime.visualizations.snapshot(), shutdown: false }
+    case 'visualizations.reload':
+      return { result: await runtime.visualizations.reload(), shutdown: false }
     case 'shutdown':
       return { result: { status: 'shutting_down' }, shutdown: true }
     default:

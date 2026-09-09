@@ -61,6 +61,8 @@ export interface MessageEventData extends BaseEventData {
     role: "user" | "assistant";
     attachments?: FileInfo[];
     metadata?: {
+      analysis_outcome?: import('./analysisOutcome').AnalysisOutcome;
+      analysis_progress?: { stage?: string } | null;
       skills?: string[];
       mcp_servers?: string[];
       dataset_ids?: string[];

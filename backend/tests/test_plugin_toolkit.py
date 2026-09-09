@@ -99,7 +99,7 @@ def _runtime_snapshot() -> PluginCatalogSnapshot:
                 contract_version=2,
                 name="runtime_first",
                 description="First runtime tool",
-                parameters={"type": "object", "properties": {}},
+                parameters={"type": "object", "properties": {"value": {"type": "integer"}}},
                 output_schema=None,
                 execution=ToolExecutionDescriptor(timeout_seconds=120),
                 presentation=ToolPresentationDescriptor(),

@@ -256,8 +256,8 @@ def test_completed_plan_finalizes_running_steps_before_final_plan_event():
     flow._finalize_incomplete_steps()
 
     assert flow.plan.steps[0].status == ExecutionStatus.COMPLETED
-    assert flow.plan.steps[1].status == ExecutionStatus.COMPLETED
-    assert flow.plan.steps[1].success is True
+    assert flow.plan.steps[1].status == ExecutionStatus.FAILED
+    assert flow.plan.steps[1].success is False
 
 
 def test_completed_plan_finalizes_pending_steps_before_final_plan_event():
@@ -270,8 +270,8 @@ def test_completed_plan_finalizes_pending_steps_before_final_plan_event():
 
     flow._finalize_incomplete_steps()
 
-    assert flow.plan.steps[0].status == ExecutionStatus.COMPLETED
-    assert flow.plan.steps[0].success is True
+    assert flow.plan.steps[0].status == ExecutionStatus.FAILED
+    assert flow.plan.steps[0].success is False
 
 
 def test_agent_runner_does_not_interrupt_current_flow_when_new_input_arrives():
@@ -441,19 +441,21 @@ def test_docker_sandbox_file_upload_rewinds_stream(monkeypatch):
     assert captured["content"] == b"image-bytes"
 
 
-def test_tool_filters_unexpected_model_arguments():
+def test_tool_rejects_unexpected_model_arguments_without_execution():
     import asyncio
+    import pytest
+    from app.domain.services.tools.tool_contract import ToolContractError
 
     class FakeBrowser:
         async def view_page(self):
-            return {"ok": True}
+            pytest.fail("invalid arguments must not reach the browser")
 
     toolkit = BrowserToolkit(FakeBrowser())
     tool = toolkit.get_tool("browser_view")
 
-    result = asyncio.run(tool.ainvoke({"id": "call-1", "args": {"url": "http://127.0.0.1:8080/docs"}}))
-
-    assert result.artifact == {"ok": True}
+    with pytest.raises(ToolContractError) as error:
+        asyncio.run(tool.ainvoke({"id": "call-1", "args": {"url": "http://127.0.0.1:8080/docs"}}))
+    assert error.value.fields == [{"field": "url", "type": "unknown_field"}]
 
 
 def test_unsynced_message_attachment_is_not_dropped(monkeypatch):

@@ -1,0 +1,26 @@
+{
+  "contract_version": 1,
+  "id": "netcdf-series",
+  "version": "1.0.0",
+  "name": "NetCDF 数值曲线",
+  "description": "NetCDF 一维变量或多维切片的数值变化曲线",
+  "extensions": [
+    "nc",
+    "nc4",
+    "netcdf"
+  ],
+  "filenames": [],
+  "view_kind": "series",
+  "adapter": "scientific-series",
+  "data_kind": "scientific",
+  "reader": "netcdf",
+  "default_enabled": true,
+  "priority": 50,
+  "permissions": [
+    "file:read"
+  ],
+  "limits": {
+    "max_input_bytes": 67108864,
+    "max_output_bytes": 524288
+  }
+}

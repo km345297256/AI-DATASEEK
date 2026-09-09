@@ -72,6 +72,41 @@ async def test_model_request_reserves_before_send_settles_actual_and_does_not_le
 
 
 @pytest.mark.asyncio
+async def test_request_phase_timings_preserve_pre_send_audit_and_privacy(monkeypatch):
+    ticks = iter(range(100))
+    # Replace the module reference, not time.perf_counter globally: unrelated
+    # database/event-loop timing must not consume this deterministic clock.
+    monkeypatch.setattr(runtime, "time", SimpleNamespace(perf_counter=lambda: next(ticks) * 0.01))
+    store = TraceStore()
+    with runtime.model_execution_scope(user_id="u", session_id="s", task_id="timings", store=store):
+        async def send(messages, max_output):
+            admitted = store.history[-1]
+            assert admitted.status == "started"
+            assert admitted.timings.context_prepare_ms == pytest.approx(10)
+            assert admitted.timings.provider_call_ms is None
+            return AIMessage(content="private response")
+        await call(send)
+    record = next(iter(store.records.values()))
+    assert record.status == "succeeded"
+    assert all(value == pytest.approx(10) for value in record.timings.model_dump().values())
+    assert "private response" not in record.public_view().model_dump_json()
+    legacy = record.model_dump(exclude={"timings"})
+    assert ModelTraceRecord.model_validate(legacy).timings.provider_call_ms is None
+
+
+@pytest.mark.asyncio
+async def test_failed_provider_has_duration_without_claiming_usage_settled():
+    store = TraceStore()
+    with runtime.model_execution_scope(user_id="u", session_id="s", task_id="timing-failed", store=store):
+        with pytest.raises(RuntimeError):
+            await call(AsyncMock(side_effect=RuntimeError("private provider error")))
+    record = next(iter(store.records.values()))
+    assert record.timings.provider_call_ms is not None
+    assert record.timings.provider_call_ms >= 0
+    assert record.timings.usage_settlement_ms is None
+
+
+@pytest.mark.asyncio
 async def test_failed_attempts_keep_reservation_and_exhaustion_never_retries():
     store = TraceStore()
     failure = AsyncMock(side_effect=RuntimeError("PRIVATE provider detail"))
@@ -99,6 +134,23 @@ async def test_missing_usage_retains_reservation_and_tasks_are_isolated():
             return scope.ledger.charged_tokens
     assert len(set(await asyncio.gather(run("a"), run("b")))) == 1
     assert runtime.model_stop_reason() is None
+
+
+@pytest.mark.asyncio
+async def test_production_task_metering_has_no_cumulative_limit_and_trace_says_unlimited(monkeypatch):
+    monkeypatch.setenv("MODEL_TASK_TOKEN_BUDGET", "4096")
+    monkeypatch.setenv("MODEL_TASK_CALL_BUDGET", "1")
+    store = TraceStore()
+    with runtime.model_execution_scope(user_id="u", session_id="s", task_id="unlimited", store=store) as scope:
+        assert scope.ledger.token_limit is None and scope.ledger.call_limit is None
+        # Counters far beyond both retired defaults still admit physical calls.
+        scope.ledger.calls = 1000
+        scope.ledger.charged_tokens = 100_000_000
+        await call()
+        assert scope.ledger.calls == 1001 and scope.ledger.charged_tokens == 100_000_030
+    record = next(iter(store.records.values()))
+    assert record.task_token_limit is None and record.task_call_limit is None
+    assert record.public_view().model_dump()["task_token_limit"] is None
 
 
 @pytest.mark.asyncio

@@ -1,9 +1,22 @@
 from typing import List
-from pydantic import BaseModel
+from pydantic import BaseModel, PrivateAttr
 from app.domain.models.file import FileInfo
 from app.domain.models.dataset import MountedDataset
+from app.domain.models.analysis_outcome import DeliverableRequirement
 
 class Message(BaseModel):
+    # Request-local history; never part of Redis, SSE, URLs, or persisted input.
+    _session_events_snapshot: list | None = PrivateAttr(default=None)
+    _resume_checkpoint: dict | None = PrivateAttr(default=None)
+    _accepted_event_seq: int | None = PrivateAttr(default=None)
+    _budget_lineage_id: str | None = PrivateAttr(default=None)
+    _budget_origin_seq: int | None = PrivateAttr(default=None)
+    # Host-created validation feedback. Never accepted from the client or
+    # serialized into plan events, URLs, queued input, or browser storage.
+    _artifact_repair_context: dict | None = PrivateAttr(default=None)
+    resume_from: str | None = None
+    client_message_id: str | None = None
+    deliverables: List[DeliverableRequirement] = []
     message: str = ""
     attachments: List[str] = []
     attachment_file_ids: List[str] = []

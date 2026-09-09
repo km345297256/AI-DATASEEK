@@ -226,9 +226,12 @@ cannot contain runtime payloads, arbitrary HTML, scripts, or URLs.
 inside one backend process; it is not a distributed lock. Its timeout budget
 includes both lock wait and execution time.
 
-Later phases may expose MCP, Skills, and Renderers through the same catalog
-view, but their existing storage, installation, permission, and prompt
-semantics remain authoritative until an explicit migration is implemented.
+File visualization now has a separate Cordis capability catalog and lifecycle,
+described in [Visualization Contract v1](visualization-plugin-contract.md).
+Its user-level switches and same-format multi-view selection do not mutate the
+Agent tool generation. Legacy renderer configuration records remain nonexecuting
+until explicitly adapted. MCP and Skills keep their existing storage,
+installation, permission, and prompt semantics.
 
 ## Verification
 

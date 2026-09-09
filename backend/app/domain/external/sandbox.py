@@ -5,6 +5,17 @@ from app.domain.external.browser import Browser
 class Sandbox(Protocol):
     """Sandbox service gateway interface"""
 
+    supports_execution_receipts: bool = False
+
+    async def exec_command_tracked(self, session_id: str, exec_dir: str, command: str,
+                                   operation_id: str) -> ToolResult:
+        """Start one host-identified operation; never accept a model receipt."""
+        ...
+
+    async def shell_operation_status(self, session_id: str, operation_id: str) -> ToolResult:
+        """Read the original operation only, without restarting or killing it."""
+        ...
+
     async def ensure_sandbox(self) -> None:
         """Ensure sandbox is ready"""
         ...
@@ -229,6 +240,18 @@ class Sandbox(Protocol):
         """
         ...
     
+    async def file_fingerprints(self, paths: list[str]) -> ToolResult:
+        """Optional v1 output-content manifest; older sandboxes may lack it."""
+        ...
+
+    async def validate_artifacts(self, items: list[dict[str, str]]) -> ToolResult:
+        """Read-only output-content receipts; unavailable is never validation success."""
+        ...
+
+    async def analysis_fingerprints(self, paths: list[str]) -> ToolResult:
+        """Bounded source/output hashes; incomplete receipts forbid automatic resume."""
+        ...
+
     async def file_upload(
         self,
         file_data: BinaryIO,

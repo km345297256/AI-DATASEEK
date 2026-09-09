@@ -525,6 +525,7 @@ async def test_agent_initializes_tools_then_persists_snapshot_before_flow_output
     runner._front_controller_resolution = _resolution()
     runner._record_safety_audit = AsyncMock()
     runner._generated_files = []
+    runner._open_analysis_runtime = AsyncMock()  # Independently tested durable admission boundary.
 
     async def initialize_mcp(*_args, **_kwargs):
         order.append("mcp")

@@ -6,6 +6,10 @@ from app.domain.external.file import FileStorage
 from app.domain.models.file import FileInfo
 from app.application.services.token_service import TokenService
 from app.infrastructure.models.documents import FileUploadSessionDocument
+from app.application.services.file_preview import (
+    CSV_PAGE_BYTES, TEXT_PAGE_BYTES, FilePreviewPage, PreviewVersionChanged,
+    parse_preview_page, preview_version,
+)
 
 # Set up logger
 logger = logging.getLogger(__name__)
@@ -54,6 +58,32 @@ class FileService:
     def __init__(self, file_storage: Optional[FileStorage] = None, token_service: Optional[TokenService] = None):
         self._file_storage = file_storage
         self._token_service = token_service
+
+    async def preview_file(self, file_id: str, user_id: str, *, offset: int = 0, mode: str = "text", version: str | None = None, delimiter: str | None = None, header_pending: bool = False) -> FilePreviewPage:
+        if mode not in {"text", "csv"} or delimiter not in {None, ",", "\t"} or isinstance(offset, bool) or not isinstance(offset, int) or offset < 0:
+            raise ValueError("Invalid preview request")
+        info = await self.get_file_info(file_id, user_id)
+        if info is None:
+            raise FileNotFoundError("File not found")
+        if info.size is None or offset > info.size:
+            raise ValueError("Preview offset exceeds file size")
+        expected = preview_version(info)
+        if version is not None and version != expected:
+            raise PreviewVersionChanged("File changed; restart preview from the first page")
+        length = min(CSV_PAGE_BYTES if mode == "csv" else TEXT_PAGE_BYTES, info.size - offset)
+        # Never fall back to download_file: some providers materialize the full
+        # object before returning a stream. All supported stores have ranges.
+        read_range = getattr(self._file_storage, "download_file_range", None)
+        if not callable(read_range):
+            raise NotImplementedError("Storage does not support bounded previews")
+        data, ranged_info = await read_range(file_id, user_id, offset=offset, length=length)
+        if _is_private_spill(ranged_info):
+            raise FileNotFoundError("File not found")
+        if preview_version(ranged_info) != expected:
+            raise PreviewVersionChanged("File changed; restart preview from the first page")
+        if len(data) != length:
+            raise ValueError("Incomplete preview range")
+        return parse_preview_page(data, ranged_info, offset=offset, mode=mode, delimiter=delimiter, header_pending=header_pending)
 
     async def upload_file(self, file_data: BinaryIO, filename: str, user_id: str, content_type: Optional[str] = None, metadata: Optional[Dict[str, Any]] = None) -> FileInfo:
         """Upload file"""

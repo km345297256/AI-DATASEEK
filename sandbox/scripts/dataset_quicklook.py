@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+from contextlib import ExitStack
 from dataclasses import asdict, dataclass
 from datetime import date, datetime
 import hashlib
@@ -40,10 +41,10 @@ import xarray as xr
 
 try:  # Running from sandbox/scripts or from its installed image location.
     from recursive_unpack import Limits as UnpackLimits
-    from recursive_unpack import UnpackError, archive_kind, unpack_recursive
+    from recursive_unpack import UnpackError, archive_kind, unpack_recursive, zip_container_kind
 except ImportError:  # Importing as scripts.dataset_quicklook in tests.
     from scripts.recursive_unpack import Limits as UnpackLimits
-    from scripts.recursive_unpack import UnpackError, archive_kind, unpack_recursive
+    from scripts.recursive_unpack import UnpackError, archive_kind, unpack_recursive, zip_container_kind
 
 
 TABULAR_SUFFIXES = {".csv": "csv", ".tsv": "tsv"}
@@ -51,7 +52,6 @@ EXCEL_SUFFIXES = {".xlsx": "excel", ".xlsm": "excel", ".xls": "excel"}
 RASTER_SUFFIXES = {".tif": "geotiff", ".tiff": "geotiff"}
 NETCDF_SUFFIXES = {".nc": "netcdf", ".nc4": "netcdf", ".cdf": "netcdf"}
 SUPPORTED_SUFFIXES = {**TABULAR_SUFFIXES, **EXCEL_SUFFIXES, **RASTER_SUFFIXES, **NETCDF_SUFFIXES}
-ARCHIVE_SUFFIXES = {".zip", ".rar", ".7z"}
 NULL_TEXT = {"", "na", "n/a", "nan", "null", "none", "-"}
 TOOL_EVIDENCE_MAX_DATASETS = 4
 TOOL_EVIDENCE_MAX_COLUMNS = 8
@@ -446,17 +446,21 @@ def _read_excel(path: Path, limits: Limits) -> tuple[list[tuple[str, pd.DataFram
     suffix = path.suffix.lower()
     sheets: list[tuple[str, pd.DataFrame]] = []
     sheet_metadata: list[dict[str, Any]] = []
-    if suffix in {".xlsx", ".xlsm"}:
+    if zip_container_kind(path) == "excel" or suffix in {".xlsx", ".xlsm"}:
         import openpyxl
 
-        workbook = openpyxl.load_workbook(
-            path,
-            read_only=True,
-            data_only=True,
-            keep_links=False,
-        )
-        total_sheets = len(workbook.sheetnames)
-        try:
+        with ExitStack() as stack:
+            # A verified workbook may have a nonstandard extension. Passing a
+            # stream lets the format parser validate contents, not its name.
+            source_stream = stack.enter_context(path.open("rb"))
+            workbook = openpyxl.load_workbook(
+                source_stream,
+                read_only=True,
+                data_only=True,
+                keep_links=False,
+            )
+            stack.callback(workbook.close)
+            total_sheets = len(workbook.sheetnames)
             names = workbook.sheetnames[: limits.max_excel_sheets]
             for name in names:
                 worksheet = workbook[name]
@@ -483,8 +487,6 @@ def _read_excel(path: Path, limits: Limits) -> tuple[list[tuple[str, pd.DataFram
                             ),
                         }
                     )
-        finally:
-            workbook.close()
     else:
         excel_file = pd.ExcelFile(path, engine="xlrd")
         total_sheets = len(excel_file.sheet_names)
@@ -1189,10 +1191,10 @@ def _original_source_tree(source: Path, limits: Limits) -> dict[str, Any]:
             if path.is_symlink() or not path.is_file():
                 continue
             relative = path.relative_to(source).as_posix()
-            suffix = path.suffix.lower()
-            if suffix in ARCHIVE_SUFFIXES:
+            archive_format = archive_kind(path)
+            if archive_format is not None:
                 entry_type = "archive"
-                file_format = suffix.removeprefix(".")
+                file_format = archive_format
             else:
                 entry_type = "file"
                 file_format = _kind_for_path(path)
@@ -1272,6 +1274,11 @@ def _archive_organization(
 
 
 def _kind_for_path(path: Path) -> str | None:
+    container = zip_container_kind(path)
+    if container is not None:
+        return "excel" if container == "excel" else None
+    if archive_kind(path) is not None:
+        return None
     return SUPPORTED_SUFFIXES.get(path.suffix.lower())
 
 
@@ -1308,7 +1315,7 @@ def _discover(
                 if display_prefix
                 else relative_path
             )
-            if include_archives and path.suffix.lower() in ARCHIVE_SUFFIXES:
+            if include_archives and archive_kind(path) is not None:
                 state.archives_found += 1
                 archives.append(
                     Candidate(

@@ -2,19 +2,9 @@ import type { Component } from 'vue';
 import { useI18n } from 'vue-i18n';
 import FileIcon from '../components/icons/FileIcon.vue';
 import CodeFileIcon from '../components/icons/CodeFileIcon.vue';
-import UnknownFilePreview from '../components/filePreviews/UnknownFilePreview.vue';
-import MarkdownFilePreview from '../components/filePreviews/MarkdownFilePreview.vue';
-import CodeFilePreview from '../components/filePreviews/CodeFilePreview.vue';
-import ImageFilePreview from '../components/filePreviews/ImageFilePreview.vue';
-import TiffFilePreview from '../components/filePreviews/TiffFilePreview.vue';
-import ShapefilePreview from '../components/filePreviews/ShapefilePreview.vue';
-import HtmlFilePreview from '../components/filePreviews/HtmlFilePreview.vue';
-import CsvFilePreview from '../components/filePreviews/CsvFilePreview.vue';
-import { findRendererByFilename } from '@/renderers/registry';
 
 export interface FileType {
   icon: Component;
-  preview: Component;
 }
 
 const codeFileExtensions = [
@@ -54,66 +44,9 @@ const archiveFileExtensions = [
 ];
 
 export const getFileType = (filename: string): FileType => {
-  const renderer = findRendererByFilename(filename);
-  if (renderer) {
-    return {
-      icon: renderer.icon,
-      preview: renderer.preview,
-    };
-  }
-
-  const file_extension = filename.split('.').pop()?.toLowerCase();
-  
-  if (file_extension === 'md') {
-    return {
-      icon: FileIcon,
-      preview: MarkdownFilePreview,
-    };
-  }
-
-  if (file_extension === 'csv' || file_extension === 'tsv') {
-    return { icon: FileIcon, preview: CsvFilePreview };
-  }
-  
-  if (file_extension && codeFileExtensions.includes(file_extension)) {
-    return {
-      icon: CodeFileIcon,
-      preview: CodeFilePreview,
-    };
-  }
-
-  if (file_extension && htmlFileExtensions.includes(file_extension)) {
-    return {
-      icon: FileIcon,
-      preview: HtmlFilePreview,
-    };
-  }
-
-  if (file_extension && tiffFileExtensions.includes(file_extension)) {
-    return {
-      icon: FileIcon,
-      preview: TiffFilePreview,
-    };
-  }
-
-  if (file_extension && shapefileExtensions.includes(file_extension)) {
-    return {
-      icon: FileIcon,
-      preview: ShapefilePreview,
-    };
-  }
-
-  if (file_extension && imageFileExtensions.includes(file_extension)) {
-    return {
-      icon: FileIcon,
-      preview: ImageFilePreview,
-    };
-  }
-  
-  return {
-    icon: FileIcon,
-    preview: UnknownFilePreview,
-  };
+  // Icon classification cannot bypass a stopped/missing Cordis capability.
+  const extension = filename.split('.').pop()?.toLowerCase();
+  return { icon: extension && codeFileExtensions.includes(extension) ? CodeFileIcon : FileIcon };
 };
 
 /**

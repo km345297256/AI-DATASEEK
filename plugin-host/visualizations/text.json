@@ -1,0 +1,51 @@
+{
+  "contract_version": 1,
+  "id": "text",
+  "version": "1.0.0",
+  "name": "文本与代码",
+  "description": "有界分页的文本和代码预览",
+  "extensions": [
+    "txt",
+    "log",
+    "json",
+    "yaml",
+    "yml",
+    "xml",
+    "py",
+    "js",
+    "ts",
+    "css",
+    "sh",
+    "r",
+    "sql",
+    "toml",
+    "ini",
+    "cfg",
+    "conf",
+    "tex",
+    "rst",
+    "ipynb",
+    "jsx", "tsx", "vue", "java", "c", "cpp", "h", "hpp",
+    "go", "rust", "php", "ruby", "swift", "kotlin", "scala",
+    "haskell", "erlang", "elixir", "ocaml", "fsharp", "dart",
+    "julia", "lua", "perl", "bash", "scss", "sass", "less", "dockerfile"
+  ],
+  "filenames": [
+    "readme",
+    "license",
+    "dockerfile"
+  ],
+  "view_kind": "text",
+  "adapter": "text",
+  "data_kind": "file",
+  "reader": null,
+  "default_enabled": true,
+  "priority": 0,
+  "permissions": [
+    "file:read"
+  ],
+  "limits": {
+    "max_input_bytes": 65536,
+    "max_output_bytes": 16777216
+  }
+}

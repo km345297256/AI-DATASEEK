@@ -24,6 +24,11 @@ export interface GetSessionResponse {
     collaborators: SessionCollaboratorUser[];
 }
 
+export interface GetSessionHistoryResponse extends GetSessionResponse {
+    has_more: boolean;
+    next_before_seq: number | null;
+}
+
 export interface ListSessionItem {
     session_id: string;
     title: string | null;

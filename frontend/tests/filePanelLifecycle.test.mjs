@@ -253,7 +253,7 @@ test('same-page conversation reset closes previews before clearing the previous 
   assert.match(reset, /function clearConversationState\(\)\s*\{\s*hideFilePanel\(\)/);
   const load = page.slice(page.indexOf('async function loadConversation('), page.indexOf('async function restoreConversation('));
   assert.ok(load.indexOf('clearConversationState()') >= 0);
-  assert.ok(load.indexOf('clearConversationState()') < load.indexOf('await getSession('));
+  assert.ok(load.indexOf('clearConversationState()') < load.indexOf('await getSessionHistory('));
   const fresh = page.slice(page.indexOf('function newConversationFromHistory()'), page.indexOf('async function stop()'));
   assert.match(fresh, /clearConversationState\(\)/);
 });

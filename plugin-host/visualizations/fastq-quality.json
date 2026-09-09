@@ -1,0 +1,25 @@
+{
+  "contract_version": 1,
+  "id": "fastq-quality",
+  "version": "1.0.0",
+  "name": "FASTQ 质量分析",
+  "description": "未压缩四行 FASTQ 的有界序列长度与碱基质量采样",
+  "extensions": [
+    "fastq",
+    "fq"
+  ],
+  "filenames": [],
+  "view_kind": "series",
+  "adapter": "scientific-quality",
+  "data_kind": "scientific",
+  "reader": "fastq",
+  "default_enabled": true,
+  "priority": 50,
+  "permissions": [
+    "file:read"
+  ],
+  "limits": {
+    "max_input_bytes": 2097152,
+    "max_output_bytes": 524288
+  }
+}

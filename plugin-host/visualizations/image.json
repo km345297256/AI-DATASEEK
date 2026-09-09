@@ -1,0 +1,34 @@
+{
+  "contract_version": 1,
+  "id": "image",
+  "version": "1.0.0",
+  "name": "图片",
+  "description": "常见图片预览",
+  "extensions": [
+    "png",
+    "jpg",
+    "jpeg",
+    "gif",
+    "bmp",
+    "webp",
+    "svg",
+    "ico",
+    "avif",
+    "heic",
+    "heif"
+  ],
+  "filenames": [],
+  "view_kind": "image",
+  "adapter": "image",
+  "data_kind": "file",
+  "reader": null,
+  "default_enabled": true,
+  "priority": 50,
+  "permissions": [
+    "file:read"
+  ],
+  "limits": {
+    "max_input_bytes": 268435456,
+    "max_output_bytes": 16777216
+  }
+}

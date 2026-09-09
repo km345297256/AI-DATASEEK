@@ -9,6 +9,7 @@ import logging
 import asyncio
 import codecs
 import hashlib
+import json
 import re
 import signal
 import threading
@@ -18,7 +19,7 @@ from dataclasses import dataclass
 from typing import Dict, Any, Optional, List
 from app.models.shell import (
     ShellExecResult, ShellViewResult, ShellWaitResult,
-    ShellWriteResult, ShellKillResult, ShellTask, ConsoleRecord
+    ShellWriteResult, ShellKillResult, ShellTask, ConsoleRecord, ShellExecutionReceipt
 )
 from app.core.exceptions import AppException, ResourceNotFoundException, BadRequestException
 
@@ -56,6 +57,20 @@ class _PendingShellExec:
     """One in-flight exec generation which can be cancelled before publish."""
 
     cancelled: bool = False
+    operation_id: Optional[str] = None
+
+
+@dataclass
+class _ShellExecutionAttempt:
+    session_id: str
+    operation_id: str
+    command_digest: str
+    state: str = "starting"
+    creation_attempted: bool = False
+    process: Optional[asyncio.subprocess.Process] = None
+    process_identity: Optional[int] = None
+    process_group: Optional[Dict[str, Any]] = None
+    receipt: Optional[ShellExecutionReceipt] = None
 
 
 class ShellService:
@@ -67,6 +82,13 @@ class ShellService:
     PROCESS_GROUP_POLL_INTERVAL_SECONDS = 0.05
     MAX_PRE_CANCELLED_EXEC_SESSIONS = 4_096
     PRE_CANCELLED_EXEC_TTL_SECONDS = 30.0
+    MAX_PENDING_EXECUTION_OPERATIONS = 4_096
+    MAX_RECEIPT_PROCESS_SCAN_ENTRIES = 16_384
+    RECEIPT_PROCESS_SCAN_SECONDS = 0.1
+    # One nonce per server process, shared by all service instances. Restarted
+    # servers cannot attest to operations from the previous process.
+    SERVER_INSTANCE_ID = uuid.uuid4().hex
+    _execution_operations: Dict[str, _ShellExecutionAttempt] = {}
 
     # Store active shell sessions
     active_shells: Dict[str, Dict[str, Any]] = {}
@@ -84,6 +106,122 @@ class ShellService:
     _pre_cancelled_execs: OrderedDict[str, float] = OrderedDict()
     _monotonic = staticmethod(time.monotonic)
 
+    def _register_execution_operation(
+        self, session_id: str, operation_id: str, command: str, exec_dir: str,
+    ) -> _ShellExecutionAttempt:
+        if not isinstance(operation_id, str) or not re.fullmatch(r"[0-9a-f]{32}", operation_id):
+            raise BadRequestException("Invalid execution operation ID")
+        digest = hashlib.sha256(json.dumps(
+            {"command": command, "exec_dir": exec_dir},
+            ensure_ascii=False, sort_keys=True, separators=(",", ":"),
+        ).encode("utf-8")).hexdigest()
+        with self._session_state_lock:
+            if operation_id in self._execution_operations:
+                raise BadRequestException("Execution operation ID already used")
+            # Bound unresolved concurrent operations, not the lifetime amount
+            # of completed analysis. Keep terminal nonce/receipt identities so
+            # freeing an active slot can never authorize an old launch again.
+            if sum(item.receipt is None for item in self._execution_operations.values()) >= self.MAX_PENDING_EXECUTION_OPERATIONS:
+                raise BadRequestException("Pending execution operation capacity reached")
+            record = _ShellExecutionAttempt(session_id, operation_id, digest)
+            self._execution_operations[operation_id] = record
+            return record
+
+    def _receipt_group_is_quiescent(self, process_group: Optional[Dict[str, Any]]) -> bool:
+        """Prove the original group has no running members; never signal it.
+
+        The teardown helper's `retired` flag is intentionally not proof: it can
+        also indicate PID reuse or inability to validate an identity.
+        """
+        if os.name != "posix" or not process_group:
+            return False
+        pgid = process_group.get("process_group_id")
+        if type(pgid) is not int or pgid <= 1 or pgid == os.getpgrp():
+            return False
+        if process_group.get("session_id") != pgid or process_group.get("leader_pid") != pgid:
+            return False
+        try:
+            os.killpg(pgid, 0)
+        except ProcessLookupError:
+            return True
+        except OSError:
+            return False
+        # Signal-zero sees zombies too. On Linux we can prove an otherwise
+        # present group contains only inert zombies. A failed read of a still
+        # present /proc entry invalidates that proof; never treat it as empty.
+        if not os.path.isdir("/proc"):
+            return False
+        deadline = self._monotonic() + self.RECEIPT_PROCESS_SCAN_SECONDS
+        try:
+            with os.scandir("/proc") as entries:
+                for scanned, entry in enumerate(entries):
+                    if (scanned >= self.MAX_RECEIPT_PROCESS_SCAN_ENTRIES
+                        or self._monotonic() >= deadline):
+                        return False
+                    if not entry.name.isdigit():
+                        continue
+                    identity = self._read_linux_process_identity(int(entry.name))
+                    if identity is None:
+                        if os.path.exists(entry.path):
+                            return False
+                        continue
+                    if identity["process_group_id"] == pgid and identity["state"] not in {"Z", "X"}:
+                        return False
+        except OSError:
+            return False
+        return True
+
+    def _execution_receipt(self, record: _ShellExecutionAttempt) -> ShellExecutionReceipt:
+        with self._session_state_lock:
+            if record.receipt is not None:
+                return record.receipt.model_copy()
+            state = record.state
+            returncode = None
+            quiescent = state == "not_started"
+            if record.process is not None:
+                observed_returncode = record.process.returncode
+                if type(observed_returncode) is int:
+                    state = "exited"
+                    returncode = observed_returncode
+                    quiescent = self._receipt_group_is_quiescent(record.process_group)
+                elif observed_returncode is None:
+                    state = "running"
+                else:
+                    state = "unknown"
+            receipt = ShellExecutionReceipt(
+                operation_id=record.operation_id,
+                command_digest=record.command_digest,
+                server_instance_id=self.SERVER_INSTANCE_ID,
+                state=state,
+                returncode=returncode,
+                process_tree_quiescent=quiescent,
+            )
+            if quiescent:
+                record.receipt = receipt
+                record.process = None
+                record.process_group = None
+            return receipt.model_copy()
+
+    async def operation_status(self, session_id: str, operation_id: str) -> Optional[ShellExecutionReceipt]:
+        with self._session_state_lock:
+            record = self._execution_operations.get(operation_id)
+            if record is None or record.session_id != session_id:
+                return None
+            return self._execution_receipt(record)
+
+    def _require_current_operation(
+        self, session_id: str, operation_id: str,
+        process: Optional[asyncio.subprocess.Process] = None,
+    ) -> None:
+        with self._session_state_lock:
+            record = self._execution_operations.get(operation_id)
+            shell = self.active_shells.get(session_id)
+            if (record is None or record.session_id != session_id or not shell
+                or shell.get("operation_id") != operation_id
+                or record.process_identity != id(shell.get("process"))
+                or (process is not None and shell.get("process") is not process)):
+                raise BadRequestException("Execution operation no longer owns shell")
+
     def _prune_expired_pre_cancellations(self, now: float) -> None:
         """Discard expired tombstones; caller must hold _session_state_lock."""
         expired_session_ids = [
@@ -97,8 +235,9 @@ class ShellService:
     def _begin_exec(
         self,
         session_id: str,
+        operation_id: Optional[str] = None,
     ) -> tuple[_PendingShellExec, Optional[Dict[str, Any]]]:
-        operation = _PendingShellExec()
+        operation = _PendingShellExec(operation_id=operation_id)
         with self._session_state_lock:
             self._prune_expired_pre_cancellations(self._monotonic())
             if session_id in self._pre_cancelled_execs:
@@ -116,15 +255,29 @@ class ShellService:
     def _cancel_pending_exec(
         self,
         session_id: str,
+        operation_id: Optional[str] = None,
     ) -> tuple[bool, Optional[Dict[str, Any]]]:
         """Cancel the current generation and atomically snapshot its shell."""
         with self._session_state_lock:
             now = self._monotonic()
             self._prune_expired_pre_cancellations(now)
             operation = self._pending_execs.get(session_id)
+            shell = self.active_shells.get(session_id)
+            if operation_id is not None:
+                record = self._execution_operations.get(operation_id)
+                if record is None or record.session_id != session_id:
+                    raise BadRequestException("Execution operation no longer owns shell")
+                if operation is not None:
+                    if operation.operation_id != operation_id:
+                        raise BadRequestException("Execution operation no longer owns shell")
+                    # Cancelling a replacement before publish must not target
+                    # the prior shell merely because its ID is still visible.
+                    if shell is not None and shell.get("operation_id") != operation_id:
+                        shell = None
+                else:
+                    self._require_current_operation(session_id, operation_id)
             if operation is not None:
                 operation.cancelled = True
-            shell = self.active_shells.get(session_id)
             if operation is None and shell is None:
                 # A cancellation HTTP request may overtake the corresponding
                 # exec request before its handler registers a pending marker.
@@ -730,7 +883,7 @@ class ShellService:
                 type(e).__name__,
             )
 
-    async def exec_command(self, session_id: str, exec_dir: Optional[str], command: str, *, credentials: Optional[Dict[str, str]] = None) -> ShellExecResult:
+    async def exec_command(self, session_id: str, exec_dir: Optional[str], command: str, *, credentials: Optional[Dict[str, str]] = None, operation_id: Optional[str] = None) -> ShellExecResult:
         """
         Asynchronously execute a command in the specified shell session
         """
@@ -743,8 +896,13 @@ class ShellService:
         )
         if not exec_dir:
             exec_dir = os.path.expanduser("~")
+        exec_dir = os.path.abspath(os.path.normpath(exec_dir))
+        receipt_record = (self._register_execution_operation(session_id, operation_id, command, exec_dir)
+                          if operation_id is not None else None)
         # Ensure directory exists
         if not os.path.exists(exec_dir):
+            if receipt_record is not None:
+                receipt_record.state = "not_started"
             logger.error(
                 "Execution directory does not exist path=%s",
                 _opaque_log_identifier(exec_dir, namespace="path"),
@@ -756,7 +914,7 @@ class ShellService:
             # Create PS1 format
             ps1 = self._format_ps1(exec_dir)
 
-            operation, previous_shell = self._begin_exec(session_id)
+            operation, previous_shell = self._begin_exec(session_id, operation_id)
 
             if previous_shell is None:
                 logger.debug("Creating new shell session=%s", session_ref)
@@ -785,8 +943,14 @@ class ShellService:
             if not self._exec_can_continue(session_id, operation):
                 raise RuntimeError("Shell session was cancelled before process creation")
 
+            if receipt_record is not None:
+                receipt_record.creation_attempted = True
             process = (await self._create_process(command, exec_dir, credentials=credentials)
                        if credentials else await self._create_process(command, exec_dir))
+            if receipt_record is not None:
+                receipt_record.process = process
+                receipt_record.process_identity = id(process)
+                receipt_record.process_group = getattr(process, "_dataseek_process_group", None)
             console_record = ConsoleRecord(ps1=ps1, command=command, output="")
             console_history = (
                 list(previous_shell.get("console", []))
@@ -804,6 +968,7 @@ class ShellService:
                 "exec_dir": exec_dir,
                 "output": "",
                 "console": console_history,
+                "operation_id": operation_id,
             }
 
             if not self._publish_exec_shell(
@@ -835,13 +1000,16 @@ class ShellService:
                 wait_result = await self.wait_for_process(
                     session_id,
                     seconds=self.EXEC_COMPLETION_GRACE_SECONDS,
+                    **({"operation_id": operation_id} if operation_id is not None else {}),
                 )
                 if wait_result.status == "completed":
                     if not self._exec_owns_shell(session_id, operation, shell):
                         raise RuntimeError("Shell session changed while command was running")
                     # Process has completed, get the output
                     logger.debug(f"Process completed with code: {wait_result.returncode}")
-                    view_result = await self.view_shell(session_id)
+                    view_result = await self.view_shell(
+                        session_id, **({"operation_id": operation_id} if operation_id is not None else {}),
+                    )
                     
                     return ShellExecResult(
                         session_id=session_id,
@@ -849,6 +1017,7 @@ class ShellService:
                         status="completed",
                         returncode=wait_result.returncode,
                         output=view_result.output,
+                        execution_receipt=self._execution_receipt(receipt_record) if receipt_record else None,
                     )
             except Exception as e:
                 # Other exceptions, ignore and continue
@@ -868,6 +1037,7 @@ class ShellService:
                 session_id=session_id,
                 command=command,
                 status="running",
+                execution_receipt=self._execution_receipt(receipt_record) if receipt_record else None,
             )
         except Exception as e:
             logger.error("Command execution failed error_type=%s", type(e).__name__)
@@ -876,15 +1046,19 @@ class ShellService:
                 data={"command_bytes": command_bytes},
             ) from e
         finally:
+            if receipt_record is not None and receipt_record.process is None and receipt_record.receipt is None:
+                receipt_record.state = "unknown" if receipt_record.creation_attempted else "not_started"
             if operation is not None:
                 self._finish_exec(session_id, operation)
 
-    async def view_shell(self, session_id: str, console: bool = False) -> ShellViewResult:
+    async def view_shell(self, session_id: str, console: bool = False, *, operation_id: Optional[str] = None) -> ShellViewResult:
         """
         Asynchronously view the content of the specified shell session
         """
         session_ref = _opaque_log_identifier(session_id, namespace="session")
         logger.debug("Viewing shell content session=%s", session_ref)
+        if operation_id is not None:
+            self._require_current_operation(session_id, operation_id)
         if session_id not in self.active_shells:
             logger.error("Shell session not found session=%s", session_ref)
             raise ResourceNotFoundException("Shell session does not exist")
@@ -930,7 +1104,7 @@ class ShellService:
         
         return clean_console
 
-    async def wait_for_process(self, session_id: str, seconds: Optional[int] = None) -> ShellWaitResult:
+    async def wait_for_process(self, session_id: str, seconds: Optional[int] = None, *, operation_id: Optional[str] = None) -> ShellWaitResult:
         """
         Asynchronously wait for the process in the specified shell session to return
         """
@@ -940,6 +1114,8 @@ class ShellService:
             session_ref,
             seconds,
         )
+        if operation_id is not None:
+            self._require_current_operation(session_id, operation_id)
         if session_id not in self.active_shells:
             logger.error("Shell session not found session=%s", session_ref)
             raise ResourceNotFoundException("Shell session does not exist")
@@ -957,6 +1133,8 @@ class ShellService:
                 await asyncio.wait_for(process.wait(), timeout=seconds)
 
             await self._wait_for_output_reader(session_id, process)
+            if operation_id is not None:
+                self._require_current_operation(session_id, operation_id, process)
             
             logger.info(f"Process completed with return code: {process.returncode}")
             return ShellWaitResult(
@@ -966,6 +1144,8 @@ class ShellService:
         except asyncio.TimeoutError:
             if process.returncode is not None:
                 await self._wait_for_output_reader(session_id, process)
+                if operation_id is not None:
+                    self._require_current_operation(session_id, operation_id, process)
                 return ShellWaitResult(
                     status="completed",
                     returncode=process.returncode,
@@ -975,6 +1155,8 @@ class ShellService:
                 session_ref,
                 seconds,
             )
+            if operation_id is not None:
+                self._require_current_operation(session_id, operation_id, process)
             return ShellWaitResult(status="running", returncode=None)
         except Exception as e:
             logger.error("Failed to wait for process error_type=%s", type(e).__name__)
@@ -1029,13 +1211,13 @@ class ShellService:
             logger.error("Failed to write input error_type=%s", type(e).__name__)
             raise AppException(message="Failed to write input") from e
 
-    async def kill_process(self, session_id: str) -> ShellKillResult:
+    async def kill_process(self, session_id: str, *, operation_id: Optional[str] = None) -> ShellKillResult:
         """
         Asynchronously terminate the process in the specified shell session
         """
         session_ref = _opaque_log_identifier(session_id, namespace="session")
         logger.info("Killing process session=%s", session_ref)
-        pending_cancelled, shell = self._cancel_pending_exec(session_id)
+        pending_cancelled, shell = self._cancel_pending_exec(session_id, operation_id)
         if shell is None and pending_cancelled:
             # The exec generation will either observe this before spawning or
             # immediately terminate the process returned by its blocked spawn.
@@ -1075,10 +1257,10 @@ class ShellService:
             logger.error("Failed to kill process error_type=%s", type(e).__name__)
             raise AppException(message="Failed to terminate process") from e
 
-    async def release_shell(self, session_id: str) -> ShellKillResult:
+    async def release_shell(self, session_id: str, *, operation_id: Optional[str] = None) -> ShellKillResult:
         """Idempotently terminate and discard a private shell channel."""
         session_ref = _opaque_log_identifier(session_id, namespace="session")
-        _, shell = self._cancel_pending_exec(session_id)
+        _, shell = self._cancel_pending_exec(session_id, operation_id)
         if shell is None:
             return ShellKillResult(status="released", returncode=0)
 

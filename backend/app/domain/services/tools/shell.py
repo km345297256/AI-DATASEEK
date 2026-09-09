@@ -732,15 +732,24 @@ class ShellToolkit(BaseToolkit):
                 timeout_seconds=timeout_seconds,
             )
 
-        view_result = await self.sandbox.view_shell(id)
-        view_data = self._result_data(view_result)
         returncode = wait_data.get("returncode")
+        try:
+            view_result = await self.sandbox.view_shell(id)
+        except Exception:
+            # Process completion and output transport are different facts.
+            # The private execution ledger retains independent terminal proof;
+            # fetching a lost output must never re-execute the command.
+            view_result = ToolResult(success=False, message="Command output is unavailable")
+        view_data = self._result_data(view_result)
         succeeded = returncode == 0 and view_result.success
+        output_unavailable = not view_result.success
         result = ToolResult(
             success=succeeded,
             message=(
                 "Command completed successfully"
                 if succeeded
+                else "Command completed, but its output could not be retrieved"
+                if returncode == 0 and output_unavailable
                 else f"Command failed with return code: {returncode}"
             ),
             data={
@@ -749,6 +758,8 @@ class ShellToolkit(BaseToolkit):
                 "status": "completed",
                 "returncode": returncode,
                 "output": view_data.get("output", ""),
+                **({"error_code": "shell_output_unavailable", "output_available": False}
+                   if output_unavailable else {}),
             },
         )
         dispose_cancellation()

@@ -3,6 +3,8 @@ import { apiClient, API_CONFIG, ApiResponse, createSSEConnection, SSECallbacks }
 import { AgentSSEEvent } from '../types/event';
 import { CreateSessionResponse, GetSessionResponse, ShellViewResponse, FileViewResponse, ListSessionResponse, SignedUrlResponse, ShareSessionResponse, SharedSessionResponse, SessionCollaboratorsResponse, SessionCollaboratorUser, UserSearchResponse } from '../types/response';
 import type { FileInfo } from './file';
+import { createAgentStreamRecovery } from '../utils/agentStreamRecovery';
+import type { GetSessionHistoryResponse } from '../types/response';
 
 
 
@@ -24,6 +26,18 @@ export async function createSession(
 
 export async function getSession(sessionId: string): Promise<GetSessionResponse> {
   const response = await apiClient.get<ApiResponse<GetSessionResponse>>(`/sessions/${sessionId}`);
+  return response.data.data;
+}
+
+export async function getSessionHistory(
+  sessionId: string,
+  beforeSeq?: number,
+  signal?: AbortSignal,
+): Promise<GetSessionHistoryResponse> {
+  const response = await apiClient.get<ApiResponse<GetSessionHistoryResponse>>(
+    `/sessions/${encodeURIComponent(sessionId)}/history`,
+    { params: { turns: 5, before_seq: beforeSeq }, signal },
+  );
   return response.data.data;
 }
 
@@ -117,33 +131,48 @@ export const chatWithSession = async (
   callbacks?: SSECallbacks<AgentSSEEvent['data']>,
   datasetIds?: string[],
   clientMessageId?: string,
+  resumeFrom?: string,
 ): Promise<() => void> => {
-  const effectiveClientMessageId = message
+  const effectiveClientMessageId = message || resumeFrom
     ? clientMessageId || createClientMessageId()
     : undefined;
+  const recovery = createAgentStreamRecovery({
+    message,
+    timestamp: Math.floor(Date.now() / 1000),
+    event_id: eventId,
+    event_seq: eventSeq,
+    // A continuation is an explicit command, not a rewritten user request.
+    // Its original objective, inputs and capabilities are restored by the server.
+    ...(resumeFrom ? { resume_from: resumeFrom } : {
+      agent_profile_id: agentProfileId,
+      attachments,
+      skills,
+      mcp_servers: mcpServers,
+      dataset_ids: datasetIds,
+    }),
+    client_message_id: effectiveClientMessageId,
+  });
 
   return createSSEConnection<AgentSSEEvent['data']>(
     `/sessions/${sessionId}/chat`,
     {
       method: 'POST',
-      body: { 
-        message, 
-        timestamp: Math.floor(Date.now() / 1000), 
-        event_id: eventId,
-        event_seq: eventSeq,
-        agent_profile_id: agentProfileId,
-        attachments,
-        skills,
-        mcp_servers: mcpServers,
-        dataset_ids: datasetIds,
-        client_message_id: effectiveClientMessageId,
-      }
+      retryOnError: true,
+      getBody: recovery.getBody,
+      isComplete: recovery.isComplete,
     },
-    callbacks
+    {
+      ...callbacks,
+      onMessage: ({ event, data }) => {
+        if (recovery.accept({ event: event as AgentSSEEvent['event'], data })) {
+          callbacks?.onMessage?.({ event, data });
+        }
+      },
+    },
   );
 };
 
-function createClientMessageId(): string {
+export function createClientMessageId(): string {
   if (typeof globalThis.crypto?.randomUUID === 'function') {
     return globalThis.crypto.randomUUID();
   }

@@ -13,6 +13,7 @@ from . import (
     plugin_runtime_routes,
     domain_preset_routes,
     renderer_routes,
+    visualization_routes,
     session_routes,
     skill_routes,
 )
@@ -35,6 +36,7 @@ def create_api_router() -> APIRouter:
     api_router.include_router(domain_preset_routes.router)
     api_router.include_router(agent_profile_routes.router)
     api_router.include_router(renderer_routes.router)
+    api_router.include_router(visualization_routes.router)
     api_router.include_router(admin_routes.router)
     api_router.include_router(dataset_routes.router)
 

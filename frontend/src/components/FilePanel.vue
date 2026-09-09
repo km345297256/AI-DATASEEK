@@ -34,7 +34,7 @@
       <span class="absolute left-1/2 top-1/2 h-12 w-1 -translate-x-1/2 -translate-y-1/2 rounded-full bg-[var(--background-menu-white)] shadow-sm ring-1 ring-[var(--border-main)]" />
     </div>
     <div class="h-full" :style="{ 'width': isShow ? '100%' : '0px' }">
-      <div v-if="isShow && fileInfo && fileType" class="bg-[var(--background-gray-main)] overflow-hidden shadow-[0px_0px_8px_0px_rgba(0,0,0,0.02)] ltr:border-l rtl:border-r border-black/8 dark:border-[var(--border-light)] flex flex-col h-full w-full">
+      <div v-if="isShow && visible && fileInfo && fileType" class="bg-[var(--background-gray-main)] overflow-hidden shadow-[0px_0px_8px_0px_rgba(0,0,0,0.02)] ltr:border-l rtl:border-r border-black/8 dark:border-[var(--border-light)] flex flex-col h-full w-full">
         <div
           class="px-4 pt-2 pb-4 gap-4 flex items-center justify-between flex-shrink-0 border-b border-[var(--border-main)] flex-col-reverse md:flex-row md:py-4">
           <div class="flex justify-between self-stretch flex-1 truncate">
@@ -92,7 +92,7 @@
             </div>
           </div>
         </div>
-        <component :is="fileType.preview" :file="fileInfo" />
+        <VisualizationHost :key="fileInfo.file_id" :file="fileInfo" />
       </div>
     </div>
   </div>
@@ -107,6 +107,7 @@ import { getFileType } from '../utils/fileType'
 import { useResizeObserver } from '../composables/useResizeObserver'
 import { eventBus } from '../utils/eventBus'
 import { EVENT_SHOW_TOOL_PANEL } from '../constants/event'
+import VisualizationHost from '../visualizations/VisualizationHost.vue'
 
 const props = withDefaults(defineProps<{
   resizable?: boolean
@@ -173,7 +174,7 @@ const hasNextFile = computed(() => relatedIndex.value >= 0 && relatedIndex.value
 
 const navigateFile = (offset: -1 | 1) => {
   const nextFile = relatedFiles.value[relatedIndex.value + offset]
-  if (nextFile) fileInfo.value = nextFile
+  if (nextFile) showFilePanel(nextFile, relatedFiles.value)
 }
 
 const setPanelWidth = (width: number) => {

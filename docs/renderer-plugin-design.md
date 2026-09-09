@@ -1,5 +1,11 @@
 # Renderer Plugin Design
 
+> Historical design, superseded by [Cordis Visualization Contract v1](visualization-plugin-contract.md).
+> File previews now resolve enabled, validated Cordis capabilities and support
+> multiple views per format. The hard-coded fallback and executable interpretation
+> of legacy API/component records described below are no longer active. Existing
+> legacy records remain available for inspection and management only.
+
 ## Goal
 
 Renderer plugins extend file previews without changing the conversation flow. When an agent produces a file, the frontend resolves a renderer by file extension and uses it to preview the file in the right-side file panel.

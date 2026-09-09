@@ -1,7 +1,8 @@
-from fastapi import APIRouter, Depends, UploadFile, File, Form, Request, HTTPException
+from fastapi import APIRouter, Depends, UploadFile, File, Form, Request, HTTPException, Query
 from fastapi.responses import StreamingResponse
 from starlette.background import BackgroundTask
 import json
+import asyncio
 import logging
 import io
 import shutil
@@ -12,8 +13,18 @@ from pathlib import Path, PurePosixPath
 from pydantic import BaseModel
 
 from app.application.services.file_service import FileService
+from app.application.services.file_preview import FilePreviewPage, PreviewVersionChanged
+from app.application.services.scientific_visualization import (
+    ScientificVisualizationRequest, ScientificVisualizationResult, ScientificPreviewRejected,
+    VisualizationWorkerError, scientific_visualization,
+)
+from app.application.services.visualization_catalog import VisualizationDisabledError, VisualizationNotFoundError
+from app.domain.external.plugin_runtime import PluginRuntimeError
+from app.core.config import get_settings
+from typing import Literal
 from app.application.errors.exceptions import NotFoundError
 from app.interfaces.dependencies import get_file_service, get_current_user, get_optional_current_user, verify_signature
+from app.interfaces.dependencies import get_visualization_catalog
 from app.domain.models.user import User
 from app.interfaces.schemas.base import APIResponse
 from app.interfaces.schemas.file import (
@@ -443,6 +454,78 @@ async def get_file_info(
         raise NotFoundError("File not found")
     
     return APIResponse.success(await FileInfoResponse.from_file_info(file_info))
+
+
+@router.get("/{file_id}/preview", response_model=APIResponse[FilePreviewPage])
+async def preview_file(
+    file_id: str,
+    offset: int = Query(default=0, ge=0),
+    mode: Literal["text", "csv"] = "text",
+    version: str | None = Query(default=None, max_length=64),
+    delimiter: Literal[",", "\t"] | None = None,
+    header_pending: bool = False,
+    file_service: FileService = Depends(get_file_service),
+    current_user: User = Depends(get_current_user),
+) -> APIResponse[FilePreviewPage]:
+    """Read one bounded page using the same ownership checks as file info."""
+    try:
+        page = await file_service.preview_file(file_id, current_user.id, offset=offset, mode=mode, version=version, delimiter=delimiter, header_pending=header_pending)
+    except (FileNotFoundError, PermissionError):
+        raise NotFoundError("File not found")
+    except PreviewVersionChanged:
+        raise HTTPException(status_code=409, detail="File changed; reopen the preview")
+    except NotImplementedError:
+        raise HTTPException(status_code=501, detail="Bounded preview is unavailable for this storage; download the file instead")
+    except ValueError as error:
+        # Do not expose storage exception details, IDs, or host paths.
+        logger.info("File preview rejected error_type=%s", type(error).__name__)
+        raise HTTPException(status_code=422, detail="This page cannot be previewed. Use UTF-8 text/CSV with records under 128 KiB, or download the file.")
+    return APIResponse.success(page)
+
+
+@router.post("/{file_id}/visualization", response_model=APIResponse[ScientificVisualizationResult])
+async def visualize_file(
+    file_id: str,
+    request_data: ScientificVisualizationRequest,
+    request: Request,
+    file_service: FileService = Depends(get_file_service),
+    current_user: User = Depends(get_current_user),
+    catalog=Depends(get_visualization_catalog),
+) -> APIResponse[ScientificVisualizationResult]:
+    """Data-only scientific preview. File and plugin grants are both required."""
+    work = asyncio.create_task(scientific_visualization(
+        file_service, catalog, get_settings().sandbox_image, file_id, current_user.id, request_data,
+    ))
+    try:
+        # Starlette does not automatically cancel ordinary POST handlers on
+        # browser abort. Explicitly fence this independent, non-Agent reader.
+        while not work.done():
+            await asyncio.wait({work}, timeout=0.25)
+            if not work.done() and await request.is_disconnected():
+                raise asyncio.CancelledError()
+        return APIResponse.success(await work)
+    except VisualizationDisabledError:
+        raise HTTPException(status_code=403, detail="此可视化插件已停用，请先在插件页面启用。")
+    except (VisualizationNotFoundError, FileNotFoundError, PermissionError):
+        raise HTTPException(status_code=404, detail="文件或可视化插件不存在。")
+    except PreviewVersionChanged:
+        raise HTTPException(status_code=409, detail="文件或插件版本已变化，请重新打开预览。")
+    except ScientificPreviewRejected as error:
+        raise HTTPException(status_code=422, detail=str(error))
+    except NotImplementedError:
+        raise HTTPException(status_code=501, detail="当前存储不支持有界预览。")
+    except (PluginRuntimeError, VisualizationWorkerError):
+        raise HTTPException(status_code=503, detail="Cordis 或隔离预览暂不可用，请确认服务及沙箱镜像已更新。")
+    except Exception as error:
+        logger.warning("Scientific preview unavailable error_type=%s", type(error).__name__)
+        raise HTTPException(status_code=503, detail="科学预览暂不可用，请稍后重试。")
+    finally:
+        if not work.done():
+            work.cancel()
+            try:
+                await work
+            except asyncio.CancelledError:
+                pass
 
 
 @router.post("/{file_id}/signed-url", response_model=APIResponse[SignedUrlResponse])

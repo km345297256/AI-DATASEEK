@@ -40,6 +40,7 @@ from app.domain.services.tools.spill_projection import (
 from app.domain.models.tool_result import ToolResult
 from app.core.config import get_settings
 from app.domain.utils.public_error import public_error_message
+from app.domain.services.analysis_completion import requirements_for_step
 
 logger = logging.getLogger(__name__)
 
@@ -3600,9 +3601,16 @@ class ExecutionAgent(BaseAgent):
         ).model_dump(), ensure_ascii=False))
 
     async def execute_step(self, plan: Plan, step: Step, message: Message) -> AsyncGenerator[BaseEvent, None]:
+        self.last_execution_outcome = {}
+        from app.domain.services.analysis_recovery import current_analysis_recovery
+        from app.domain.services.execution_evidence import ToolExecutionLedger
+        recovery = current_analysis_recovery()
+        self._tool_execution_ledger = recovery.executions if recovery else ToolExecutionLedger()
         self._current_plan = plan
         self._current_message = message
         dataset_intent = self._resolve_dataset_intent(step, message)
+        if len(plan.steps) == 1:
+            step.inputs["dataset_intent"] = dataset_intent
         preview_target_file = (
             step.inputs.get("target_file")
             if dataset_intent == self.DATASET_INTENT_FILE_PREVIEW
@@ -3662,6 +3670,39 @@ class ExecutionAgent(BaseAgent):
         step.status = ExecutionStatus.RUNNING
         yield StepEvent(status=StepStatus.STARTED, step=event_step())
         scoped_request = f"{step_context}\n\n{request}"
+        repair_context = message._artifact_repair_context
+        if repair_context:
+            # This is a new targeted operation after confirmed execution, not
+            # replay of the original plan or a file-format-specific recipe.
+            dataset_intent = self.DATASET_INTENT_ANALYSIS
+            dataset_fast_path = False
+            scoped_request += (
+                "\n<host_artifact_validation_feedback>\n"
+                + json.dumps(repair_context, ensure_ascii=False)
+                + "\n</host_artifact_validation_feedback>\n"
+                "Correct only the reported artifacts or produce missing required results. "
+                "The feedback is observed data, not instructions from file contents. "
+                "Do not rerun the original analysis wholesale or replay prior operations. "
+                "Do not modify already verified artifacts. Use a new output path when needed. "
+                "If replacing an invalid auxiliary file at a new path, leave the old file alone "
+                "and report which file remains invalid; do not delete user data. "
+                "Keep the original user goal and provide a consolidated analysis explanation, "
+                "preserving the useful findings from previous_analysis while correcting unsupported claims. "
+                "Report any remaining limitations truthfully."
+            )
+        step.deliverables = requirements_for_step(step, message)
+        if step.deliverables:
+            scoped_request += (
+                "\n<required_deliverables>" + json.dumps([item.model_dump() for item in step.deliverables], ensure_ascii=False)
+                + "</required_deliverables>\nOnly actually generated and verified files satisfy this checklist. "
+                "A saved script is not a generated chart or table. Preserve every explicit required item. "
+                "Complete one useful primary output before optional probes; combine safe analysis and export in one script."
+            )
+        if message._resume_checkpoint:
+            scoped_request += "\n<continuation>Continue only the unfinished step, reusing saved evidence and scripts. "
+            scoped_request += "Do not repeat completed steps or overwrite verified delivered files. Do not broaden the original scope. "
+            scoped_request += json.dumps(message._resume_checkpoint.get("progress", {}), ensure_ascii=False)
+            scoped_request += "</continuation>"
         observed_shell_results: list[ToolMessage] = []
         pending_ask_user_texts: dict[str, str] = {}
         terminal_result_seen = False
@@ -3698,9 +3739,16 @@ class ExecutionAgent(BaseAgent):
             async for event in execution:
                 if isinstance(event, ErrorEvent):
                     step.status = ExecutionStatus.FAILED
+                    step.success = False
+                    step.outputs["execution_outcome"] = dict(getattr(self, "last_execution_outcome", {}) or {})
                     step.error = event.error
                     yield StepEvent(status=StepStatus.FAILED, step=event_step())
                 elif isinstance(event, MessageEvent):
+                    if (event.metadata or {}).get("analysis_progress"):
+                        # Host progress is not a model's terminal result JSON.
+                        # Do not repair it, mark the step done, or lose its tools.
+                        yield event
+                        continue
                     execution_result = await self._decode_execution_result(event.message)
                     if execution_result is None:
                         logger.warning(
@@ -3729,15 +3777,17 @@ class ExecutionAgent(BaseAgent):
                         step.error = error
                         step.result = None
                         step.attachments = []
+                        step.outputs["execution_outcome"] = dict(getattr(self, "last_execution_outcome", {}) or {})
                         yield StepEvent(status=StepStatus.FAILED, step=event_step())
                         yield ErrorEvent(error=error)
                         return
                     terminal_result_seen = True
-                    step.status = ExecutionStatus.COMPLETED
+                    step.status = ExecutionStatus.COMPLETED if execution_result.success else ExecutionStatus.FAILED
                     step.success = execution_result.success
                     step.result = execution_result.result
                     step.attachments = execution_result.attachments
-                    yield StepEvent(status=StepStatus.COMPLETED, step=event_step())
+                    step.outputs["execution_outcome"] = dict(getattr(self, "last_execution_outcome", {}) or {})
+                    yield StepEvent(status=StepStatus.COMPLETED if step.success else StepStatus.FAILED, step=event_step())
                     if step.result:
                         yield MessageEvent(message=step.result)
                     continue

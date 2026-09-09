@@ -30,6 +30,7 @@ RUN --mount=type=cache,target=/root/.npm,sharing=locked \
         --prefer-offline --no-audit --registry="${NPM_REGISTRY}"
 COPY plugin-host/tsconfig.json /opt/ai-dataseek/plugin-host/tsconfig.json
 COPY plugin-host/src /opt/ai-dataseek/plugin-host/src
+COPY plugin-host/visualizations /opt/ai-dataseek/plugin-host/visualizations
 RUN npm run build --prefix /opt/ai-dataseek/plugin-host && \
     npm prune --prefix /opt/ai-dataseek/plugin-host --omit=dev --no-audit
 

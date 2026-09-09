@@ -573,6 +573,13 @@ class SessionDocument(BaseDocument[Session], id_field="session_id", domain_model
     is_shared: Optional[bool] = False
     collaborator_user_ids: List[str] = Field(default_factory=list)
     client_message_ids: List[str] = Field(default_factory=list)
+    # Storage-only: excluded from Session/API projection and stale aggregate saves.
+    analysis_checkpoint: Optional[Dict] = None
+    # Continuation fences are storage-only and never follow stale Session saves.
+    # The write-ahead fence may exceed the durable marker after a failed input
+    # commit; that conservatively disables old checkpoints until input recovery.
+    latest_user_input_fence_seq: int = Field(default=0, strict=True, ge=0, le=MAX_EVENT_SEQUENCE)
+    latest_user_event_seq: int = Field(default=0, strict=True, ge=0, le=MAX_EVENT_SEQUENCE)
     # Monotonic per-session allocator for the versioned event envelope.  It is
     # deliberately stored on the session so Mongo can increment it atomically.
     event_seq: int = Field(
@@ -648,6 +655,10 @@ class SessionEventDocument(Document):
     )
     version: Literal[1] = 1
     event: Dict[str, Any]
+    # Private delivery bookkeeping is outside ``event`` and never serialized
+    # by the history/SSE projections. Legacy events omit it entirely.
+    input_admission: Optional[Dict[str, Any]] = None
+    input_active_session: Optional[str] = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
     class Settings:
@@ -671,6 +682,19 @@ class SessionEventDocument(Document):
                 [("event.metadata.dataset_ids", ASCENDING), ("event.role", ASCENDING), ("session_id", ASCENDING)],
                 name="dataset_chat_history_lookup",
             ),
+            IndexModel(
+                [("session_id", ASCENDING), ("event.type", ASCENDING), ("event.role", ASCENDING), ("seq", ASCENDING)],
+                name="session_history_turn_lookup",
+            ),
+            IndexModel([("input_active_session", ASCENDING)], unique=True,
+                       partialFilterExpression={"input_active_session": {"$type": "string"}},
+                       name="session_input_active_unique"),
+            IndexModel([("input_admission.state", ASCENDING), ("input_admission.retry_after", ASCENDING)],
+                       name="session_input_pending"),
+            IndexModel([("input_admission.state", ASCENDING), ("input_admission.lease_expires_at", ASCENDING)],
+                       name="session_input_expired"),
+            IndexModel([("session_id", ASCENDING), ("event.id", ASCENDING)],
+                       name="session_event_transport_alias"),
         ]
 
 

@@ -1,4 +1,5 @@
 import io
+import hashlib
 from types import SimpleNamespace
 
 import pytest
@@ -95,13 +96,66 @@ async def _noop(*args, **kwargs):
     return None
 
 
+@pytest.mark.asyncio
+@pytest.mark.parametrize("mode", ["unchanged", "same-size-overwrite", "legacy-endpoint", "partial-manifest", "unsafe-file"])
+async def test_discovery_transfers_only_changed_known_artifacts(mode):
+    path = "/home/ubuntu/output/existing.csv"
+    original = b"old-data"
+    body = b"new-data" if mode == "same-size-overwrite" else original
+    old_fingerprint = (len(original), hashlib.sha256(original).hexdigest())
+    downloads = []
+    manifests = []
+
+    async def read_manifest(paths):
+        manifests.append(paths)
+        if mode == "legacy-endpoint":
+            raise RuntimeError("old sandbox endpoint")
+        return SimpleNamespace(success=True, data={
+            "version": 1,
+            "files": [] if mode in {"partial-manifest", "unsafe-file"} else [{
+                "path": path, "size": len(body), "sha256": hashlib.sha256(body).hexdigest(),
+            }],
+            "errors": [{"path": path, "code": "unavailable_or_changed"}] if mode == "unsafe-file" else [],
+        })
+
+    async def download(file_path):
+        downloads.append(file_path)
+        return io.BytesIO(body)
+
+    async def find(*args):
+        return SimpleNamespace(success=True, data={"files": [path]})
+
+    runner = AgentTaskRunner.__new__(AgentTaskRunner)
+    runner._sandbox = SimpleNamespace(file_fingerprints=read_manifest, file_download=download, file_find=find)
+    runner._agent_id = "manifest-test"
+    runner._session_id = "manifest-session"
+    runner._protected_dataset_paths = set()
+    runner._protected_dataset_roots = set()
+    runner._artifact_fingerprints = {path: old_fingerprint}
+    runner._artifact_baseline_paths = {path}
+    runner._generated_files = []
+    synced = []
+
+    async def sync(file_path, *, file_data, fingerprint):
+        synced.append((file_data.read(), fingerprint))
+        runner._remember_artifact_fingerprint(file_path, fingerprint)
+        return FileInfo(file_id="changed-file", filename="existing.csv", file_path=file_path)
+
+    runner._sync_file_to_storage = sync
+    result = await runner._sync_discovered_artifacts_to_storage()
+    assert manifests == [[path]]
+    assert len(downloads) == (0 if mode in {"unchanged", "unsafe-file"} else 1)
+    assert len(result) == len(synced) == (1 if mode == "same-size-overwrite" else 0)
+    if result:
+        assert synced[0][0] == body
+        # The next analysis step does not download this now-unchanged output.
+        assert await runner._sync_discovered_artifacts_to_storage() == []
+        assert len(downloads) == 1
+
+
 def _message(text: str = "生成一张图"):
-    return SimpleNamespace(
-        message=text,
-        attachment_file_infos=[],
-        mcp_servers=[],
-        mcp_access_all=False,
-    )
+    from app.domain.models.message import Message
+    return Message(message=text)
 
 
 def test_dataset_unpack_working_root_is_excluded_from_artifact_delivery():
@@ -140,6 +194,8 @@ async def test_completed_step_delivers_artifact_once_before_duplicate_messages()
         file_id="chart-file",
         filename="chart.png",
         file_path=artifact_path,
+        size=10,
+        metadata={"artifact_sha256": "a" * 64},
     )
     step = Step(
         description="绘制图表",
@@ -201,6 +257,15 @@ async def test_completed_step_delivers_artifact_once_before_duplicate_messages()
     runner._sync_step_attachments_to_storage = _sync_step
     runner._sync_discovered_artifacts_to_storage = _discover
 
+    async def validate(items):
+        return SimpleNamespace(success=True, data={"version": 1, "files": [
+            {"path": item["path"], "kind": "image", "valid": True, "size": 10, "sha256": "a" * 64}
+            for item in items]})
+    runner._sandbox = SimpleNamespace(validate_artifacts=validate)
+    async def empty_artifacts():
+        return []
+    runner._list_sandbox_artifacts = empty_artifacts
+
     events = [event async for event in runner._run_flow(_message())]
 
     assert [type(event) for event in events] == [
@@ -212,7 +277,9 @@ async def test_completed_step_delivers_artifact_once_before_duplicate_messages()
     delivery = events[2]
     assert delivery.message == "图表已生成。"
     assert delivery.attachments == [artifact]
-    assert delivery.metadata == {"artifact_delivery": True, "step_id": step.id}
+    assert delivery.metadata["artifact_delivery"] is True
+    assert delivery.metadata["step_id"] == step.id
+    assert delivery.metadata["analysis_outcome"]["status"] == "succeeded"
     assert discovery_skip_paths == [{artifact_path}]
     assert events[-1].advice is not None
 
@@ -280,6 +347,8 @@ async def test_late_discovered_artifact_is_emitted_before_done():
         file_id="late-file",
         filename="late.csv",
         file_path="/home/ubuntu/output/late.csv",
+        size=10,
+        metadata={"artifact_sha256": "a" * 64},
     )
 
     class _Flow:
@@ -302,6 +371,12 @@ async def test_late_discovered_artifact_is_emitted_before_done():
 
     runner._sync_discovered_artifacts_to_storage = _discover
 
+    async def validate(items):
+        return SimpleNamespace(success=True, data={"version": 1, "files": [
+            {"path": item["path"], "kind": "table", "valid": True, "size": 10, "sha256": "a" * 64}
+            for item in items]})
+
+    runner._sandbox = SimpleNamespace(validate_artifacts=validate)
     events = [event async for event in runner._run_flow(_message())]
 
     assert [type(event) for event in events] == [MessageEvent, DoneEvent]
@@ -315,6 +390,8 @@ async def test_partial_artifact_is_emitted_before_terminal_error():
         file_id="partial-file",
         filename="partial.csv",
         file_path="/home/ubuntu/output/partial.csv",
+        size=10,
+        metadata={"artifact_sha256": "a" * 64},
     )
     failed_step = Step(
         description="生成可视化",
@@ -353,6 +430,13 @@ async def test_partial_artifact_is_emitted_before_terminal_error():
 
     runner._sync_step_attachments_to_storage = _sync_step
 
+    async def validate(items):
+        return SimpleNamespace(success=True, data={"version": 1, "files": [
+            {"path": item["path"], "kind": "table", "valid": True, "size": 10, "sha256": "a" * 64}
+            for item in items]})
+
+    runner._sandbox = SimpleNamespace(validate_artifacts=validate)
+
     discovery_calls = 0
 
     async def _discover(*, skip_paths=None):
@@ -372,10 +456,8 @@ async def test_partial_artifact_is_emitted_before_terminal_error():
         DoneEvent,
     ]
     assert events[2].attachments == [artifact]
-    assert events[2].metadata == {
-        "artifact_delivery": True,
-        "partial": True,
-    }
+    assert events[2].metadata["artifact_delivery"] is True
+    assert events[2].metadata["analysis_outcome"]["status"] == "partial"
     assert discovery_calls == 1
 
 
@@ -477,7 +559,20 @@ async def test_successful_compiled_analysis_reconciles_undeclared_artifacts():
 
     runner._sync_step_attachments_to_storage = _sync_step
     discovery_calls = 0
-    artifact = FileInfo(filename="plot.png", file_path="/home/ubuntu/output/analysis-x/plot.png")
+    artifact = FileInfo(file_id="uploaded-plot", filename="plot.png",
+                        file_path="/home/ubuntu/output/analysis-x/plot.png", size=37,
+                        metadata={ARTIFACT_HASH_METADATA_KEY: "a" * 64})
+    validation_calls = []
+
+    async def validate(items):
+        validation_calls.append(items)
+        return SimpleNamespace(success=True, data={"version": 1, "files": [{
+            "path": artifact.file_path, "kind": "image", "expected_kind": "image",
+            "valid": True, "reason": "validated", "size": artifact.size,
+            "sha256": artifact.metadata[ARTIFACT_HASH_METADATA_KEY],
+        }]})
+
+    runner._sandbox = SimpleNamespace(validate_artifacts=validate)
 
     async def _discover(*, skip_paths=None):
         nonlocal discovery_calls
@@ -490,6 +585,8 @@ async def test_successful_compiled_analysis_reconciles_undeclared_artifacts():
 
     assert any(isinstance(event, MessageEvent) and event.attachments == [artifact] for event in events)
     assert discovery_calls == 1
+    assert validation_calls == [[{"path": artifact.file_path, "kind": "image"}]]
+    assert completed_step.outcome.status == "succeeded"
 
 
 def test_compiled_analysis_manifest_is_not_a_syncable_artifact():

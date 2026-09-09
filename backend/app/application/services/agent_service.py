@@ -9,6 +9,7 @@ from app.interfaces.schemas.file import FileViewResponse
 from app.domain.models.agent import Agent
 from app.domain.services.agent_domain_service import AgentDomainService
 from app.domain.models.event import AgentEvent
+from app.domain.models.session_history import SessionHistoryPage
 from app.domain.external.sandbox import Sandbox
 from app.domain.external.sandbox_runtime import SandboxRuntime
 from app.domain.external.search import SearchEngine
@@ -44,6 +45,7 @@ class AgentService:
         analysis_job_service=None,
         tool_approval_service=None,
         credential_service=None,
+        input_repository=None,
     ):
         logger.info("Initializing AgentService")
         self._agent_repository = agent_repository
@@ -68,6 +70,7 @@ class AgentService:
             analysis_job_service=analysis_job_service,
             tool_approval_service=tool_approval_service,
             credential_service=credential_service,
+            input_repository=input_repository,
         )
         self._search_engine = search_engine
         self._sandbox_cls = sandbox_cls
@@ -120,6 +123,7 @@ class AgentService:
         mcp_access_all: bool = False,
         llm_overrides: Optional[dict] = None,
         client_message_id: Optional[str] = None,
+        resume_from: Optional[str] = None,
     ) -> AsyncGenerator[AgentEvent, None]:
         logger.info(
             "Starting chat session=%s message_chars=%d",
@@ -141,6 +145,7 @@ class AgentService:
             mcp_access_all=mcp_access_all,
             llm_overrides=llm_overrides,
             client_message_id=client_message_id,
+            resume_from=resume_from,
         ):
             logger.debug(
                 "Received agent event type=%s id=%s",
@@ -170,6 +175,13 @@ class AgentService:
                 raise RuntimeError("Session not found")
         return await self._session_repository.get_events(session_id)
     
+    async def get_session_history(self, session_id: str, user_id: str, *, turns: int = 5,
+                                  before_seq: int | None = None) -> SessionHistoryPage:
+        session = await self.get_session(session_id, user_id)
+        if session is None:
+            raise RuntimeError("Session not found")
+        return await self._session_repository.get_history_page(session_id, turns=turns, before_seq=before_seq)
+
     async def get_all_sessions(self, user_id: str) -> List[SessionSummary]:
         """Get all sessions for a specific user (lightweight summaries)"""
         logger.info(f"Getting all sessions for user {user_id}")
@@ -234,6 +246,9 @@ class AgentService:
         # Clean up all Agents and their associated sandboxes
         await self._agent_domain_service.shutdown()
         logger.info("All agents closed successfully")
+
+    def start_input_recovery(self) -> None:
+        self._agent_domain_service.start_input_recovery()
 
     async def _restore_session_sandbox(self, session: Session) -> Sandbox:
         if not session.sandbox_id:

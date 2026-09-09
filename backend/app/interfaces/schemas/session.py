@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 from typing import Optional, List
 from app.interfaces.schemas.event import AgentSSEEvent
 from app.domain.models.session import SessionStatus
@@ -26,6 +26,7 @@ class ChatRequest(BaseModel):
     timestamp: Optional[int] = None
     message: Optional[str] = None
     client_message_id: Optional[str] = Field(default=None, min_length=1, max_length=128)
+    resume_from: Optional[str] = Field(default=None, pattern=r"^[0-9a-f]{32}$")
     agent_profile_id: Optional[str] = None
     attachments: Optional[List[dict]] = None
     skills: Optional[List[str]] = None
@@ -38,6 +39,16 @@ class ChatRequest(BaseModel):
         ge=0,
         le=MAX_EVENT_SEQUENCE,
     )
+
+    @model_validator(mode="after")
+    def validate_continuation(self):
+        if self.resume_from is not None:
+            if not self.client_message_id or not self.client_message_id.strip():
+                raise ValueError("A continuation requires a new client_message_id")
+            if ((self.message or "").strip() or self.agent_profile_id or self.attachments
+                    or self.skills or self.mcp_servers or self.dataset_ids):
+                raise ValueError("A continuation cannot change the original task or execution scope")
+        return self
 
 
 class ShellViewRequest(BaseModel):
@@ -62,6 +73,11 @@ class GetSessionResponse(BaseModel):
     is_shared: bool = False
     is_owner: bool = False
     collaborators: List["SessionCollaboratorUser"] = []
+
+
+class GetSessionHistoryResponse(GetSessionResponse):
+    has_more: bool = False
+    next_before_seq: Optional[int] = Field(default=None, ge=1, le=MAX_EVENT_SEQUENCE)
 
 
 class ListSessionItem(BaseModel):

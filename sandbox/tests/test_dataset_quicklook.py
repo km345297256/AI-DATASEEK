@@ -21,6 +21,63 @@ def _artifact_paths(output: Path, manifest: dict) -> list[Path]:
     return [output / item["path"] for item in manifest["artifacts"]]
 
 
+def _workbook_bytes() -> bytes:
+    openpyxl = pytest.importorskip("openpyxl")
+    workbook = openpyxl.Workbook()
+    workbook.active.append(["year", "rainfall"])
+    workbook.active.append([2020, 10])
+    workbook.active.append([2021, 12])
+    stream = io.BytesIO()
+    workbook.save(stream)
+    workbook.close()
+    return stream.getvalue()
+
+
+@pytest.mark.parametrize("filename", ["table.xlsx", "table.xlsm", "workbook.zip", "workbook.bin"])
+def test_single_excel_container_is_analyzed_as_workbook_not_archive(tmp_path, filename):
+    source = tmp_path / filename
+    source.write_bytes(_workbook_bytes())
+    manifest = generate_quicklook(source, tmp_path / "output", Limits(max_plots=1))
+    assert manifest["summary"]["files_analyzed"] == 1
+    assert manifest["datasets"][0]["format"] == "excel"
+    assert manifest["datasets"][0]["sheets"][0]["table"]["rows_sampled"] == 2
+    assert manifest["source"]["type"] == "file"
+    assert manifest["file_organization"]["root"]["type"] == "file"
+
+
+@pytest.mark.parametrize("in_directory", [False, True])
+def test_nested_archive_excel_remains_a_workbook_in_quicklook(tmp_path, in_directory):
+    inner = io.BytesIO()
+    with zipfile.ZipFile(inner, "w") as archive:
+        archive.writestr("table.xlsx", _workbook_bytes())
+    directory = tmp_path / "dataset"
+    directory.mkdir()
+    outer = directory / "tables.zip"
+    with zipfile.ZipFile(outer, "w") as archive:
+        archive.writestr("nested.zip", inner.getvalue())
+    source = directory if in_directory else outer
+    manifest = generate_quicklook(source, tmp_path / "output", Limits(max_plots=1))
+    assert manifest["summary"]["files_analyzed"] == 1
+    assert manifest["datasets"][0]["format"] == "excel"
+    assert manifest["datasets"][0]["path"].endswith("table.xlsx")
+    assert len(manifest["file_organization"]["archive_layers"]) == 2
+    assert not any("xl/worksheets" in item["path"] for item in manifest["file_organization"]["extracted_tree"]["entries"])
+
+
+def test_directory_recognizes_renamed_workbook_and_real_archive_by_contents(tmp_path):
+    source = tmp_path / "dataset"
+    source.mkdir()
+    (source / "workbook.zip").write_bytes(_workbook_bytes())
+    with zipfile.ZipFile(source / "archive.xlsx", "w") as archive:
+        archive.writestr("values.csv", "x,y\n1,2\n2,3\n")
+    manifest = generate_quicklook(source, tmp_path / "output", Limits(max_plots=1))
+    assert {item["format"] for item in manifest["datasets"]} == {"excel", "csv"}
+    entries = {item["path"]: item for item in manifest["file_organization"]["original_tree"]["entries"]}
+    assert entries["workbook.zip"]["type"] == "file"
+    assert entries["workbook.zip"]["format"] == "excel"
+    assert entries["archive.xlsx"]["type"] == "archive"
+
+
 def test_csv_quicklook_is_bounded_and_writes_complete_artifact_manifest(tmp_path):
     source = tmp_path / "碳收支.csv"
     rows = ["年份,区域,碳排放,碳吸收"]

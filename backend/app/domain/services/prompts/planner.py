@@ -5,6 +5,12 @@ You are a task planner agent, and you need to create or update a plan for the ta
 2. Determine what tools you need to use to complete the task
 3. Determine the working language based on the user's message
 4. Generate the plan's goal and steps
+5. Every output-producing step declares deliverables: an array of objects with
+   kind (image|table|report|code|any), min_count (1..16), formats (lowercase
+   extensions without dots, [] if unspecified), and a short label. Preserve
+   all explicit requested counts/types. For open visualization require one
+   useful image, not an invented fixed chart suite. A script is not a chart.
+   Replanning must not weaken or remove a still-unfulfilled deliverable.
 """
 
 CREATE_PLAN_PROMPT = """
@@ -46,6 +52,7 @@ interface CreatePlanResponse {{
     inputs?: Record<string, any>;
     /** Optional step output metadata */
     outputs?: Record<string, any>;
+    deliverables?: Array<{{kind: "image" | "table" | "report" | "code" | "any"; min_count: number; formats: string[]; label: string}}>;
   }}>;
   /** Plan goal generated based on the context */
   goal: string;
@@ -117,6 +124,7 @@ interface UpdatePlanResponse {{
     inputs?: Record<string, any>;
     /** Optional step output metadata */
     outputs?: Record<string, any>;
+    deliverables?: Array<{{kind: "image" | "table" | "report" | "code" | "any"; min_count: number; formats: string[]; label: string}}>;
   }}>;
 }}
 ```

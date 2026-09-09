@@ -12,6 +12,7 @@ import {
   type ValidatedPlugin,
 } from './types.js'
 import type { ValidatedManifestSet } from './manifest.js'
+import { VisualizationRuntime } from './visualizations.js'
 
 declare module '@deepseek-ai/cordis' {
   interface Context {
@@ -186,6 +187,7 @@ export async function buildCatalogContext(
 export type HostLogger = (message: string, error?: unknown) => void
 
 export class CatalogRuntime {
+  readonly visualizations: VisualizationRuntime
   private current: CatalogContext | undefined
   private operation: Promise<void> = Promise.resolve()
   private stopped = false
@@ -194,7 +196,10 @@ export class CatalogRuntime {
     readonly toolsDirectory: string,
     private readonly log: HostLogger = () => undefined,
     readonly executionContractDirectory?: string,
-  ) {}
+    visualizationsDirectory?: string,
+  ) {
+    this.visualizations = new VisualizationRuntime(visualizationsDirectory)
+  }
 
   async start(): Promise<CatalogSnapshot> {
     return this.reload()
@@ -252,5 +257,6 @@ export class CatalogRuntime {
     const current = this.current
     this.current = undefined
     if (current) await current.context.fiber.dispose()
+    await this.visualizations.shutdown()
   }
 }

@@ -59,6 +59,7 @@ import * as $3Dmol from '3dmol';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { getFileDownloadUrl, prepareMolecularPreview, type FileInfo, type MolecularPreviewPreparation } from '../../api/file';
+import { usePreviewLoad } from '../../composables/usePreviewLoad';
 
 const props = defineProps<{ file: FileInfo }>();
 const container = ref<HTMLElement | null>(null);
@@ -78,7 +79,7 @@ const structure2dBonds = ref<Array<{ key: string; x1: number; y1: number; x2: nu
 let viewer: $3Dmol.GLViewer | null = null;
 let model: $3Dmol.GLModel | null = null;
 let resizeObserver: ResizeObserver | null = null;
-let loadVersion = 0;
+const loads = usePreviewLoad();
 let selected: $3Dmol.AtomSpec[] = [];
 let threeRenderer: THREE.WebGLRenderer | null = null;
 let threeScene: THREE.Scene | null = null;
@@ -421,7 +422,7 @@ function resolveFormula(text: string, atoms: $3Dmol.AtomSpec[]) {
 }
 
 async function render(file: FileInfo) {
-  const version = ++loadVersion;
+  const load = loads.begin();
   resizeObserver?.disconnect();
   viewer?.clear();
   viewer = null;
@@ -438,15 +439,18 @@ async function render(file: FileInfo) {
   status.value = '正在加载结构...';
   try {
     const metadata = await prepareMolecularPreview(file.file_id);
+    load.assertCurrent();
     const url = await getFileDownloadUrl(file);
-    const response = await fetch(url);
+    load.assertCurrent();
+    const response = await fetch(url, { signal: load.signal });
     if (!response.ok) throw new Error(`下载失败 (${response.status})`);
     const text = await response.text();
-    if (version !== loadVersion || !container.value) return;
+    if (!load.isCurrent() || !container.value) return;
     prepared.value = metadata;
     // FilePanel can mount this component before its flex parent has a size.
     // Wait for layout, then force 3Dmol to measure the real canvas dimensions.
     await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
+    if (!load.isCurrent() || !container.value) return;
     const format = parserFormat(metadata.source_format);
     let atoms: $3Dmol.AtomSpec[] = [];
     try {
@@ -489,6 +493,7 @@ async function render(file: FileInfo) {
     if (threeContainer.value) resizeObserver.observe(threeContainer.value);
     if (!threeRenderer) throw new Error('浏览器未能创建三维渲染画布');
   } catch (error) {
+    if (!load.isCurrent()) return;
     console.error('Failed to render molecular structure:', error);
     status.value = error instanceof Error ? error.message : '结构预览失败';
   }
@@ -515,5 +520,5 @@ onMounted(() => render(props.file));
 watch(() => props.file, (file) => render(file));
 watch([styleMode, showHydrogen], applyStyle);
 watch(showUnitCell, redrawUnitCell);
-onBeforeUnmount(() => { loadVersion++; resizeObserver?.disconnect(); viewer?.clear(); clearThree(); });
+onBeforeUnmount(() => { loads.dispose(); resizeObserver?.disconnect(); viewer?.clear(); clearThree(); });
 </script>

@@ -574,9 +574,16 @@ async def test_runner_assigns_sequence_before_redis_payload():
         async def add_event(self, session_id, event):
             assert session_id == "session-1"
             assert event.seq == 31
-            assert event.id == "1700000000000-4"
+            assert event.id == producer_ids[0]
             assert event.bind_producer_event_id() == producer_ids[0]
             order.append("persist")
+
+        async def record_event_transport_alias(self, session_id, event):
+            assert session_id == "session-1"
+            assert event.seq == 31
+            assert event.id == "1700000000000-4"
+            assert event.bind_producer_event_id() == producer_ids[0]
+            order.append("alias")
 
     class Queue:
         async def put(self, payload):
@@ -595,7 +602,7 @@ async def test_runner_assigns_sequence_before_redis_payload():
 
     await runner._publish(task, DoneEvent())
 
-    assert order == ["reserve", "redis", "persist"]
+    assert order == ["reserve", "persist", "redis", "alias"]
 
 
 def test_private_producer_identity_is_absent_from_recordings():

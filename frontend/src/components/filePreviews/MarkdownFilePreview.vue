@@ -18,6 +18,7 @@ import { getFileDownloadUrl } from '../../api/file';
 import { getSessionFiles, getSharedSessionFiles } from '../../api/agent';
 import { useFilePanel } from '../../composables/useFilePanel';
 import { useSessionFileList } from '../../composables/useSessionFileList';
+import { usePreviewLoad, type PreviewLoad } from '../../composables/usePreviewLoad';
 import {
     findRelatedFile,
     isRelativeResourceUrl,
@@ -32,7 +33,7 @@ const props = defineProps<{
 const route = useRoute();
 const { relatedFiles } = useFilePanel();
 const { shared } = useSessionFileList();
-let loadVersion = 0;
+const loads = usePreviewLoad();
 
 // Configure marked options
 marked.setOptions({
@@ -40,7 +41,8 @@ marked.setOptions({
     gfm: true,
 });
 
-const ensureRelatedFiles = async (force = false) => {
+const ensureRelatedFiles = async (load: PreviewLoad, force = false) => {
+    load.assertCurrent();
     if (!force && relatedFiles.value.length > 1) return;
     const sessionId = route.params.sessionId as string;
     if (!sessionId) return;
@@ -48,16 +50,17 @@ const ensureRelatedFiles = async (force = false) => {
         const sessionFiles = shared.value || route.path.startsWith('/share/')
             ? await getSharedSessionFiles(sessionId)
             : await getSessionFiles(sessionId);
+        load.assertCurrent();
         const filesById = new Map(
             [...relatedFiles.value, ...sessionFiles].map((file) => [file.file_id, file]),
         );
         relatedFiles.value = Array.from(filesById.values());
     } catch (error) {
-        console.warn('Failed to load related Markdown files:', error);
+        if (load.isCurrent()) console.warn('Failed to load related Markdown files:', error);
     }
 };
 
-const rewriteRelativeResources = async (html: string) => {
+const rewriteRelativeResources = async (html: string, file: FileInfo, load: PreviewLoad) => {
     const document = new DOMParser().parseFromString(html, 'text/html');
     const elements = Array.from(document.body.querySelectorAll<HTMLElement>('[src], [href]'));
     const relativeElements = elements.filter((element) => {
@@ -68,17 +71,18 @@ const rewriteRelativeResources = async (html: string) => {
     const hasMissingFile = relativeElements.some((element) => {
         const attribute = element.hasAttribute('src') ? 'src' : 'href';
         return !findRelatedFile(
-            props.file,
+            file,
             relatedFiles.value,
             element.getAttribute(attribute) || '',
         );
     });
-    if (hasMissingFile) await ensureRelatedFiles(true);
+    if (hasMissingFile) await ensureRelatedFiles(load, true);
+    load.assertCurrent();
 
     await Promise.all(relativeElements.map(async (element) => {
         const attribute = element.hasAttribute('src') ? 'src' : 'href';
         const value = element.getAttribute(attribute) || '';
-        const relatedFile = findRelatedFile(props.file, relatedFiles.value, value);
+        const relatedFile = findRelatedFile(file, relatedFiles.value, value);
         if (!relatedFile) return;
 
         const { suffix } = splitResourceUrl(value);
@@ -88,23 +92,26 @@ const rewriteRelativeResources = async (html: string) => {
     return DOMPurify.sanitize(document.body.innerHTML);
 };
 
-const loadMarkdown = async () => {
-    const currentVersion = ++loadVersion;
+const loadMarkdown = async (file: FileInfo) => {
+    const load = loads.begin();
     renderedContent.value = '';
 
     try {
-        const url = await getFileDownloadUrl(props.file);
-        const response = await fetch(url);
+        const url = await getFileDownloadUrl(file);
+        load.assertCurrent();
+        const response = await fetch(url, { signal: load.signal });
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
         const content = await response.text();
-        await ensureRelatedFiles();
-        if (currentVersion !== loadVersion) return;
+        load.assertCurrent();
+        await ensureRelatedFiles(load);
+        if (!load.isCurrent()) return;
 
         const html = DOMPurify.sanitize(marked.parse(content) as string);
-        const rewritten = await rewriteRelativeResources(html);
-        if (currentVersion !== loadVersion) return;
+        const rewritten = await rewriteRelativeResources(html, file, load);
+        if (!load.isCurrent()) return;
         renderedContent.value = rewritten;
     } catch (error) {
+        if (!load.isCurrent()) return;
         console.error('Failed to render markdown:', error);
         renderedContent.value = '<pre class="text-sm text-red-500">Failed to render markdown content</pre>';
     }

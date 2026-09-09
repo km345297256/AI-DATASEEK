@@ -35,11 +35,15 @@ class LightweightTaskRunner(TaskRunner):
         session_repository: SessionRepository,
         file_storage: FileStorage,
         llm_overrides: dict[str, Any] | None = None,
+        input_delivery=None,
     ):
         self._session_id = session_id
         self._user_id = user_id
         self._resolution = resolution
         self._session_repository = session_repository
+        self._input_delivery = input_delivery
+        self._accepted_input_key: str | None = None
+        self._accepted_input_finished = False
         self._file_storage = file_storage
         self._llm_overrides = dict(llm_overrides or {})
         self._execution_snapshot: ExecutionEnvironmentSnapshot | None = None
@@ -106,6 +110,13 @@ class LightweightTaskRunner(TaskRunner):
         return "legacy-untracked-task"
 
     async def _publish(self, task: Task, event: AgentEvent) -> None:
+        delivery = getattr(self, "_input_delivery", None)
+        identity = getattr(self, "_accepted_input_key", None)
+        if delivery is not None and identity is not None:
+            if getattr(self, "_accepted_input_finished", False):
+                from app.domain.services.input_delivery import InputLeaseLost
+                raise InputLeaseLost()
+            await delivery.prepare_event(self._session_id, identity, event)
         event.bind_producer_event_id()
         reserve_sequence = getattr(
             self._session_repository,
@@ -114,9 +125,19 @@ class LightweightTaskRunner(TaskRunner):
         )
         if callable(reserve_sequence):
             await reserve_sequence(self._session_id, event)
-        event_id = await task.output_stream.put(event.model_dump_json())
-        event.id = event_id
         await self._session_repository.add_event(self._session_id, event)
+        try:
+            event_id = await task.output_stream.put(event.model_dump_json())
+            event.id = event_id
+            record_alias = getattr(self._session_repository, "record_event_transport_alias", None)
+            if callable(record_alias):
+                await record_alias(self._session_id, event)
+        except Exception as error:
+            logger.warning("Durable event live publication unavailable error_type=%s", type(error).__name__)
+        if delivery is not None and identity is not None:
+            await delivery.complete(self._session_id, identity, event)
+            if isinstance(event, (DoneEvent, ErrorEvent)):
+                self._accepted_input_finished = True
 
     async def run(self, task: Task) -> None:
         try:
@@ -131,6 +152,10 @@ class LightweightTaskRunner(TaskRunner):
             user_event = TypeAdapter(AgentEvent).validate_json(event_str)
             if not isinstance(user_event, MessageEvent):
                 raise RuntimeError("Lightweight task requires a user message")
+            delivery = getattr(self, "_input_delivery", None)
+            if delivery is not None and await delivery.start(self._session_id, user_event, task):
+                from app.domain.models.input_admission import input_key
+                self._accepted_input_key = input_key(user_event)
             await self._record_execution_snapshot(
                 self._execution_task_id(task),
                 trigger_event_seq=user_event.seq,

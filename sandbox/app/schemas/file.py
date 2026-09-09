@@ -1,8 +1,8 @@
 """
 File operation request models
 """
-from pydantic import BaseModel, Field
-from typing import Optional
+from pydantic import BaseModel, ConfigDict, Field
+from typing import Annotated, Literal, Optional
 
 
 class FileReadRequest(BaseModel):
@@ -42,3 +42,23 @@ class FileFindRequest(BaseModel):
     """File find request"""
     path: str = Field(..., description="Directory path to search")
     glob: str = Field(..., description="Filename pattern (glob syntax)")
+
+
+class ArtifactFingerprintsRequest(BaseModel):
+    paths: list[str] = Field(min_length=1, max_length=256)
+
+
+class ArtifactValidationItem(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+    path: str = Field(min_length=1, max_length=4096)
+    kind: Literal["image", "table", "report", "code"]
+
+
+class ArtifactValidationRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+    items: list[ArtifactValidationItem] = Field(min_length=1, max_length=32)
+
+
+class AnalysisFingerprintsRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+    paths: list[Annotated[str, Field(min_length=1, max_length=4096)]] = Field(min_length=1, max_length=64)

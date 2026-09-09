@@ -18,6 +18,8 @@ export interface BaseContent {
 export interface MessageContent extends BaseContent {
   content: string;
   metadata?: {
+    analysis_outcome?: NonNullable<MessageEventData['metadata']>['analysis_outcome'];
+    analysis_progress?: NonNullable<MessageEventData['metadata']>['analysis_progress'];
     skills?: string[];
     mcp_servers?: string[];
     dataset_ids?: string[];

@@ -19,7 +19,7 @@ from app.application.errors.exceptions import BadRequestError, NotFoundError, Un
 from app.interfaces.dependencies import get_agent_service, get_current_user, get_optional_current_user, get_token_service, verify_signature_websocket, get_agent_profile_service, get_jupyter_service
 from app.interfaces.schemas.base import APIResponse
 from app.interfaces.schemas.session import (
-    ChatRequest, ShellViewRequest, CreateSessionResponse, GetSessionResponse,
+    ChatRequest, ShellViewRequest, CreateSessionResponse, GetSessionResponse, GetSessionHistoryResponse,
     ListSessionItem, ListSessionResponse, ShellViewResponse,
     ShareSessionResponse, SharedSessionResponse, CreateSessionRequest,
     UpdateSessionTitleRequest, TaskFeedbackRequest, TaskFeedbackResponse,
@@ -30,6 +30,7 @@ from app.interfaces.schemas.file import FileInfoResponse, FileViewRequest, FileV
 from app.interfaces.schemas.resource import AccessTokenRequest, SignedUrlResponse
 from app.interfaces.schemas.event import EventMapper
 from app.domain.models.file import FileInfo
+from app.domain.models.event import MAX_EVENT_SEQUENCE, MessageEvent
 from app.domain.models.user import User
 from app.domain.repositories.user_repository import UserRepository
 from app.core.config import get_settings
@@ -181,6 +182,26 @@ async def get_session(
         is_owner=True,
         collaborators=[],
     ))
+
+@router.get("/{session_id}/history", response_model=APIResponse[GetSessionHistoryResponse])
+async def get_session_history(
+    session_id: str,
+    turns: int = Query(default=5, ge=1, le=20),
+    before_seq: Optional[int] = Query(default=None, ge=1, le=MAX_EVENT_SEQUENCE),
+    current_user: User = Depends(get_current_user),
+    agent_service: AgentService = Depends(get_agent_service),
+) -> APIResponse[GetSessionHistoryResponse]:
+    session = await agent_service.get_session(session_id, current_user.id)
+    if session is None:
+        raise NotFoundError("Session not found")
+    page = await agent_service.get_session_history(session_id, current_user.id, turns=turns, before_seq=before_seq)
+    return APIResponse.success(GetSessionHistoryResponse(
+        session_id=session.id, created_at=int(session.created_at.timestamp()),
+        title=session.title, title_manually_set=session.title_manually_set, status=session.status,
+        events=await EventMapper.events_to_sse_events(page.events), is_shared=session.is_shared,
+        is_owner=True, collaborators=[], has_more=page.has_more, next_before_seq=page.next_before_seq,
+    ))
+
 
 @router.delete("/{session_id}", response_model=APIResponse[None])
 async def delete_session(
@@ -494,18 +515,16 @@ async def chat(
     for dataset_id in dict.fromkeys(request.dataset_ids or []):
         await dataset_service.get_dataset(dataset_id, user_id=current_user.id)
 
-    llm_overrides = await _agent_profile_overrides(
-        profile_service,
-        request.agent_profile_id,
-        current_user,
+    llm_overrides = None if request.resume_from else await _agent_profile_overrides(
+        profile_service, request.agent_profile_id, current_user,
     )
     stored_user = await user_repository.get_user_by_id(current_user.id)
     user = stored_user or current_user
-    effective_skills = await _installed_skill_names(user, merge_skill_names(
+    effective_skills = [] if request.resume_from else await _installed_skill_names(user, merge_skill_names(
         user.auto_enabled_skills or [],
         request.skills or [],
     ))
-    effective_mcp_servers = await _installed_mcp_names(user, request.mcp_servers or [])
+    effective_mcp_servers = [] if request.resume_from else await _installed_mcp_names(user, request.mcp_servers or [])
 
     async def event_generator() -> AsyncGenerator[ServerSentEvent, None]:
         async for event in agent_service.chat(
@@ -525,6 +544,7 @@ async def chat(
             mcp_access_all=user.role == "admin",
             llm_overrides=llm_overrides,
             client_message_id=request.client_message_id,
+            resume_from=request.resume_from,
         ):
             logger.debug(
                 "Received chat event type=%s id=%s",
@@ -910,10 +930,20 @@ async def get_shared_session(
     if not session:
         raise NotFoundError("Shared session not found")
     events = await agent_service.get_session_events(session_id)
+    shared_events = []
+    for event in events:
+        if isinstance(event, MessageEvent) and event.metadata:
+            event = event.model_copy(deep=True)
+            event.metadata.pop("resume_from", None)
+            outcome = event.metadata.get("analysis_outcome")
+            if isinstance(outcome, dict):
+                outcome.pop("resume_from", None)
+                outcome["can_resume"] = False
+        shared_events.append(event)
     return APIResponse.success(SharedSessionResponse(
         session_id=session.id,
         title=session.title,
         status=session.status,
-        events=await EventMapper.events_to_sse_events(events),
+        events=await EventMapper.events_to_sse_events(shared_events),
         is_shared=session.is_shared
     ))

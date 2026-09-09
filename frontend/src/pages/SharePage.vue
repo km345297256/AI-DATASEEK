@@ -47,7 +47,7 @@
           </div>
 
           <!-- Loading indicator -->
-          <LoadingIndicator v-if="isLoading" :text="$t('Thinking')" />
+          <LoadingIndicator v-if="isLoading" role="status" aria-live="polite" :text="analysisProgress || $t('Thinking')" />
         </div>
 
         <div class="sticky bottom-0 max-w-[800px] mx-auto w-full pb-3 flex flex-col gap-2 px-3 pt-2.5 sm:pt-0">
@@ -141,6 +141,8 @@ import {
   isLatestAssistantMessage,
 } from '../utils/chatTimeline';
 import { isPlaceholderAssistantMessage } from '../utils/datasetResultPresentation';
+import { isAnalysisProgressMessage } from '../utils/analysisProgress';
+import { useAnalysisProgress } from '../composables/useAnalysisProgress';
 import {
   acceptAgentEvent,
   createAgentEventCursor,
@@ -152,6 +154,7 @@ const { t } = useI18n()
 const { showSessionFileList } = useSessionFileList()
 const { hideFilePanel } = useFilePanel()
 const isAdminReplay = computed(() => Boolean(router.currentRoute.value.meta.adminReplay));
+const { analysisProgress, updateAnalysisProgress, beginAnalysisProgress, clearAnalysisProgress } = useAnalysisProgress();
 
 // Create initial state factory
 const createInitialState = () => ({
@@ -206,6 +209,8 @@ const toolPanel = ref<InstanceType<typeof ToolPanel>>()
 const simpleBarRef = ref<InstanceType<typeof SimpleBar>>();
 let countdownTimer: number | null = null;
 const eventCursor = createAgentEventCursor();
+let replayGeneration = 0;
+let viewDisposed = false;
 
 // Watch message changes and automatically scroll to bottom
 watch(messages, async () => {
@@ -236,6 +241,8 @@ const failActiveSteps = (currentTurnOnly = true) => {
 };
 
 const startUserTurn = () => {
+  beginAnalysisProgress();
+  isLoading.value = true;
   toolPanel.value?.hideToolPanel();
   realTime.value = false;
   failActiveSteps(false);
@@ -246,6 +253,7 @@ const startUserTurn = () => {
 
 // Handle message event
 const handleMessageEvent = (messageData: MessageEventData) => {
+  if (isAnalysisProgressMessage(messageData)) return;
   if (messageData.role === 'user') {
     startUserTurn();
   }
@@ -326,7 +334,6 @@ const handleStepEvent = (stepData: StepEventData) => {
       existingStep.description = stepData.description;
       existingStep.ended_at = stepData.timestamp;
     }
-    isLoading.value = false;
   }
 }
 
@@ -385,6 +392,7 @@ const isTerminalStepStatus = (status: StepEventData['status']) => {
 // Main event handler function
 const handleEvent = (event: AgentSSEEvent) => {
   if (!acceptAgentEvent(eventCursor, event)) return;
+  updateAnalysisProgress(event);
   if (event.event === 'message') {
     handleMessageEvent(event.data as MessageEventData);
   } else if (event.event === 'tool') {
@@ -392,11 +400,11 @@ const handleEvent = (event: AgentSSEEvent) => {
   } else if (event.event === 'step') {
     handleStepEvent(event.data as StepEventData);
   } else if (event.event === 'done') {
-    //isLoading.value = false;
+    isLoading.value = false;
     insertTaskExecutionSummary(messages.value, event.data.timestamp);
     completionAdvice.value = (event.data as any)?.advice;
   } else if (event.event === 'wait') {
-    // TODO: handle wait event
+    isLoading.value = false;
   } else if (event.event === 'error') {
     handleErrorEvent(event.data as ErrorEventData);
   } else if (event.event === 'title') {
@@ -410,6 +418,8 @@ const handleEvent = (event: AgentSSEEvent) => {
 
 // Reset all refs to their initial values
 const resetState = () => {
+  replayGeneration += 1;
+  beginAnalysisProgress();
   resetAgentEventCursor(eventCursor);
   // Reset reactive state to initial values
   Object.assign(state, createInitialState());
@@ -428,16 +438,27 @@ const replay = async () => {
   toolPanel.value?.hideToolPanel();
   resetState();
   sessionId.value = String(router.currentRoute.value.params.sessionId) as string;
-  const session = await loadReplaySession(sessionId.value);
+  const generation = replayGeneration;
+  const session = await loadReplaySession(sessionId.value).catch(() => {
+    if (!viewDisposed && generation === replayGeneration) {
+      clearAnalysisProgress();
+      isLoading.value = false;
+      showErrorToast('回放加载失败，请稍后重试。');
+    }
+    return null;
+  });
+  if (!session || viewDisposed || generation !== replayGeneration) return;
   realTime.value = true;
   isLoading.value = true;
   for (const event of session.events) {
     if (!jumpToEnd.value) {
       await new Promise(resolve => setTimeout(resolve, 300));
     }
+    if (viewDisposed || generation !== replayGeneration) return;
     handleEvent(event);
   }
   isLoading.value = false;
+  clearAnalysisProgress();
   replayCompleted.value = true;
 }
 
@@ -446,13 +467,24 @@ const restoreSession = async () => {
     showErrorToast(t('Session not found'));
     return;
   }
-  const session = await loadReplaySession(sessionId.value);
+  const generation = replayGeneration;
+  const session = await loadReplaySession(sessionId.value).catch(() => {
+    if (!viewDisposed && generation === replayGeneration) {
+      clearAnalysisProgress();
+      isLoading.value = false;
+      showErrorToast('回放加载失败，请稍后重试。');
+    }
+    return null;
+  });
+  if (!session || viewDisposed || generation !== replayGeneration) return;
   realTime.value = false;
   follow.value = false; // Prevent auto-scrolling during restoration
   for (const event of session.events) {
     handleEvent(event);
   }
   realTime.value = true;
+  clearAnalysisProgress();
+  isLoading.value = false;
 }
 
 // Start countdown timer
@@ -481,7 +513,7 @@ const startReplay = () => {
 }
 
 // Initialize active conversation
-onMounted(() => {
+const initializeReplay = () => {
   hideFilePanel();
   const routeParams = router.currentRoute.value.params;
   if (routeParams.sessionId) {
@@ -493,10 +525,27 @@ onMounted(() => {
     showReplayOverlay.value = true;
     startCountdown();
   }
+};
+
+onMounted(initializeReplay);
+
+watch(() => router.currentRoute.value.fullPath, () => {
+  if (viewDisposed) return;
+  if (countdownTimer) {
+    clearInterval(countdownTimer);
+    countdownTimer = null;
+  }
+  toolPanel.value?.hideToolPanel();
+  resetState();
+  initializeReplay();
 });
 
 // Clean up timer on unmount
 onUnmounted(() => {
+  viewDisposed = true;
+  replayGeneration += 1;
+  clearAnalysisProgress();
+  isLoading.value = false;
   if (countdownTimer) {
     clearInterval(countdownTimer);
     countdownTimer = null;

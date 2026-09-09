@@ -2,7 +2,36 @@
 Shell business model definitions
 """
 from typing import Literal, Optional, List
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field, StrictBool, StrictInt, field_validator, model_validator
+
+
+class ShellExecutionReceipt(BaseModel):
+    """Server-observed execution identity; never inferred from command output."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    version: Literal[1] = 1
+    operation_id: str = Field(pattern=r"^[0-9a-f]{32}$", strict=True)
+    command_digest: str = Field(pattern=r"^[0-9a-f]{64}$", strict=True)
+    server_instance_id: str = Field(pattern=r"^[0-9a-f]{32}$", strict=True)
+    state: Literal["starting", "running", "exited", "not_started", "unknown"]
+    returncode: Optional[StrictInt] = None
+    process_tree_quiescent: StrictBool = False
+
+    @field_validator("version", mode="before")
+    @classmethod
+    def strict_version(cls, value):
+        if type(value) is not int or value != 1:
+            raise ValueError("Invalid receipt version")
+        return value
+
+    @model_validator(mode="after")
+    def consistent_execution_state(self):
+        if (self.state == "exited") != (self.returncode is not None):
+            raise ValueError("Return code requires a confirmed exited process")
+        if self.process_tree_quiescent and self.state not in {"exited", "not_started"}:
+            raise ValueError("Active or unknown execution is not quiescent")
+        return self
 
 
 class ConsoleRecord(BaseModel):
@@ -28,6 +57,7 @@ class ShellExecResult(BaseModel):
     status: str = Field(..., description="Command execution status")
     returncode: Optional[int] = Field(None, description="Process return code, only has value when status is completed")
     output: Optional[str] = Field(None, description="Command execution output, only has value when status is completed")
+    execution_receipt: Optional[ShellExecutionReceipt] = None
 
 
 class ShellViewResult(BaseModel):

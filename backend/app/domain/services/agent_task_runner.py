@@ -1,10 +1,12 @@
 from typing import Any, Optional, AsyncGenerator, List
+from contextlib import aclosing
 import asyncio
 import hashlib
 import json
 import logging
 import os
 import io
+import re
 from pathlib import PurePosixPath
 import debugpy
 from pydantic import TypeAdapter
@@ -44,7 +46,7 @@ from app.domain.models.session import SessionStatus
 from app.domain.models.file import FileInfo
 from app.domain.models.execution_environment import ExecutionEnvironmentSnapshot
 from app.domain.services.execution_environment import create_agent_execution_snapshot
-from app.domain.services.model_runtime import ModelBudgetStopped, model_execution_scope, model_stop_reason
+from app.domain.services.model_runtime import ModelBudgetStopped, model_execution_scope, model_stop_reason, analysis_budget_scope
 from app.infrastructure.repositories.mongo_model_trace_repository import get_model_trace_repository
 from app.domain.services.tools.mcp import MCPToolkit
 from app.domain.services.tools.interceptors import (
@@ -187,6 +189,9 @@ class AgentTaskRunner(TaskRunner):
         analysis_job_service=None,
         tool_approval_service=None,
         credential_service=None,
+        input_delivery=None,
+        session_events_snapshot: list | None = None,
+        effective_dataset_ids: list[str] | None = None,
     ):
         self._session_id = session_id
         self._agent_id = agent_id
@@ -196,6 +201,10 @@ class AgentTaskRunner(TaskRunner):
         self._search_engine = search_engine
         self._repository = agent_repository
         self._session_repository = session_repository
+        self._input_delivery = input_delivery
+        self._accepted_input_key: str | None = None
+        self._accepted_input_finished = False
+        self._session_events_snapshot = session_events_snapshot
         self._file_storage = file_storage
         self._mcp_repository = mcp_repository
         self._plugin_runtime = plugin_runtime
@@ -242,7 +251,7 @@ class AgentTaskRunner(TaskRunner):
         self._artifact_baseline_paths: set[str] = set()
         self._artifact_fingerprints: dict[str, ArtifactFingerprint] = {}
         self._dataset_service = DataCenterDatasetService()
-        self._mounted_dataset_ids: set[str] = set()
+        self._mounted_dataset_ids: set[str] = set(effective_dataset_ids or [])
         self._active_datasets: list[Any] = []
         self._reported_analysis_tool_usage: set[tuple[str, str, str]] = set()
         # Only files materialized from the data-center catalog are protected from
@@ -341,6 +350,13 @@ class AgentTaskRunner(TaskRunner):
                     event = event.model_copy(update={"analysis_job": views[event.tool_call_id]})
         event = self._durable_event_projection(event)
         event = self._bound_event_payload(event)
+        input_delivery = getattr(self, "_input_delivery", None)
+        input_identity = getattr(self, "_accepted_input_key", None)
+        if input_delivery is not None and input_identity is not None:
+            if getattr(self, "_accepted_input_finished", False):
+                from app.domain.services.input_delivery import InputLeaseLost
+                raise InputLeaseLost()
+            await input_delivery.prepare_event(self._session_id, input_identity, event)
         event.bind_producer_event_id()
         reserve_sequence = getattr(
             self._session_repository,
@@ -351,9 +367,21 @@ class AgentTaskRunner(TaskRunner):
             # The sequence must be inside the Redis payload; assigning it after
             # XADD would make live events and persisted history disagree.
             await reserve_sequence(self._session_id, event)
-        event_id = await task.output_stream.put(event.model_dump_json())
-        event.id = event_id
         await self._session_repository.add_event(self._session_id, event)
+        try:
+            event_id = await task.output_stream.put(event.model_dump_json())
+            event.id = event_id
+            record_alias = getattr(self._session_repository, "record_event_transport_alias", None)
+            if callable(record_alias):
+                await record_alias(self._session_id, event)
+        except Exception as error:
+            # A committed event is already recoverable via seq. A transport
+            # outage must not cause the Agent to repeat its successful tool.
+            logger.warning("Durable event live publication unavailable error_type=%s", type(error).__name__)
+        if input_delivery is not None and input_identity is not None:
+            await input_delivery.complete(self._session_id, input_identity, event)
+            if isinstance(event, (DoneEvent, ErrorEvent, WaitEvent)):
+                self._accepted_input_finished = True
 
     async def _publish_tool_approval(self, task: Task, view, context) -> None:
         call_id = str(context.tool_call_id)
@@ -516,6 +544,7 @@ class AgentTaskRunner(TaskRunner):
             )
             return
         event = TypeAdapter(AgentEvent).validate_json(event_str)
+        event.bind_producer_event_id()
         event.id = event_id
         return event
 
@@ -674,6 +703,12 @@ class AgentTaskRunner(TaskRunner):
         try:
             if not file_path:
                 return None
+            # A local repair must never replace/delete a previously verified
+            # uploaded object. Validation later observes the current sandbox
+            # bytes independently and detects changed or missing working copies.
+            for pinned in getattr(self, "_analysis_verified_files", {}).values():
+                if file_path in pinned:
+                    return pinned[file_path]
             if file_data is None:
                 file_data, fingerprint = await self._read_artifact_with_fingerprint(file_path)
             elif fingerprint is None:
@@ -938,6 +973,35 @@ class AgentTaskRunner(TaskRunner):
                     continue
             self._artifact_fingerprints[file_path] = fingerprint
 
+    async def _sandbox_artifact_fingerprints(
+        self, paths: list[str],
+    ) -> tuple[dict[str, ArtifactFingerprint], set[str]]:
+        """Hash known outputs near the data; old sandbox versions fall back."""
+        reader = getattr(self._sandbox, "file_fingerprints", None)
+        if not callable(reader) or not paths:
+            return {}, set()
+        fingerprints: dict[str, ArtifactFingerprint] = {}
+        unavailable: set[str] = set()
+        for offset in range(0, len(paths), 256):
+            batch = paths[offset:offset + 256]
+            try:
+                result = await reader(batch)
+                data = result.data if result.success else None
+                if not isinstance(data, dict) or data.get("version") != 1:
+                    continue
+                for item in data.get("files", []):
+                    if not isinstance(item, dict) or item.get("path") not in batch:
+                        continue
+                    size, digest = item.get("size"), item.get("sha256")
+                    if type(size) is int and size >= 0 and isinstance(digest, str) and re.fullmatch(r"[0-9a-f]{64}", digest):
+                        fingerprints[item["path"]] = (size, digest)
+                for item in data.get("errors", []):
+                    if isinstance(item, dict) and item.get("path") in batch:
+                        unavailable.add(item["path"])
+            except Exception as exc:
+                logger.debug("Artifact manifest fallback error_type=%s", type(exc).__name__)
+        return fingerprints, unavailable
+
     async def _sync_discovered_artifacts_to_storage(
         self,
         *,
@@ -954,10 +1018,15 @@ class AgentTaskRunner(TaskRunner):
 
         attachments: List[FileInfo] = []
         skipped = skip_paths or set()
+        remote_fingerprints, unavailable = await self._sandbox_artifact_fingerprints([
+            path for path in current_paths if path in fingerprints and path not in skipped
+        ])
         for file_path in current_paths:
             if len(attachments) >= MAX_AUTO_SYNC_ARTIFACTS:
                 break
-            if file_path in skipped:
+            if file_path in skipped or file_path in unavailable:
+                continue
+            if file_path in remote_fingerprints and remote_fingerprints[file_path] == fingerprints.get(file_path):
                 continue
             try:
                 file_data, fingerprint = await self._read_artifact_with_fingerprint(file_path)
@@ -978,7 +1047,10 @@ class AgentTaskRunner(TaskRunner):
                 # available: observe it once without publishing pre-task output.
                 fingerprints[file_path] = fingerprint
                 continue
-
+            pending_paths = getattr(self, "_pending_artifact_paths", None)
+            if pending_paths is None:
+                pending_paths = self._pending_artifact_paths = set()
+            pending_paths.add(file_path)
             file_info = await self._sync_file_to_storage(
                 file_path,
                 file_data=file_data,
@@ -989,6 +1061,56 @@ class AgentTaskRunner(TaskRunner):
                 self._remember_generated_file(file_info)
         return attachments
     
+    async def _validate_staged_artifact_files(self, files: List[FileInfo]) -> List[FileInfo]:
+        """Check staged uploads without declaring completion or scheduling repair.
+
+        A durable object alone is not a usable result. Every attachment leaving
+        a non-step boundary needs a content receipt bound to its uploaded bytes.
+        Unavailable/malformed batches are withheld, without suppressing the
+        surrounding question, error, completion event, or cancellation.
+        """
+        from app.domain.services.analysis_completion import artifact_kind, verified_deliveries
+
+        candidates = []
+        paths = set()
+        for info in files:
+            path = info.file_path
+            if (not isinstance(path, str) or not path.startswith("/home/ubuntu/output/")
+                    or str(PurePosixPath(path)) != path or ".." in PurePosixPath(path).parts
+                    or "\\" in path or any(ord(char) < 32 for char in path)
+                    or not artifact_kind(path)):
+                continue
+            candidates.append(info)
+            paths.add(path)
+        if not candidates:
+            return []
+        validate = getattr(getattr(self, "_sandbox", None), "validate_artifacts", None)
+        if not callable(validate):
+            return []
+        items = [{"path": path, "kind": artifact_kind(path)} for path in sorted(paths)]
+        records = []
+        for offset in range(0, len(items), 32):
+            batch = items[offset:offset + 32]
+            try:
+                async with asyncio.timeout(35):
+                    result = await validate(batch)
+                data = getattr(result, "data", None)
+                batch_ok = (getattr(result, "success", None) is True and isinstance(data, dict)
+                            and type(data.get("version")) is int and data["version"] == 1)
+                batch_records = data.get("files") if batch_ok else None
+                batch_ok = (batch_ok and isinstance(batch_records, list)
+                            and len(batch_records) == len(batch)
+                            and all(isinstance(item, dict) and isinstance(item.get("path"), str)
+                                    for item in batch_records)
+                            and {item["path"] for item in batch_records} == {item["path"] for item in batch})
+                if batch_ok:
+                    records.extend(batch_records)
+            except Exception as exc:
+                # CancelledError intentionally propagates. No model/tool retry
+                # is appropriate merely because verification is unavailable.
+                logger.warning("Staged artifact validation unavailable error_type=%s", type(exc).__name__)
+        return verified_deliveries(records, candidates)
+
     async def _sync_file_to_sandbox(self, file_id: str) -> Optional[FileInfo]:
         """Download file from storage to sandbox"""
         try:
@@ -1033,7 +1155,7 @@ class AgentTaskRunner(TaskRunner):
     async def _sync_step_attachments_to_storage(self, event: StepEvent) -> List[FileInfo]:
         """Sync files explicitly reported by a completed step."""
         try:
-            if event.status == StepStatus.COMPLETED and event.step.attachments:
+            if event.status in {StepStatus.COMPLETED, StepStatus.FAILED} and event.step.attachments:
                 return await self._sync_explicit_paths_to_storage(event.step.attachments)
         except Exception as e:
             logger.error(
@@ -1458,6 +1580,12 @@ class AgentTaskRunner(TaskRunner):
                 message = ""
                 metadata = {}
                 if isinstance(event, MessageEvent):
+                    self._accepted_input_key = None
+                    self._accepted_input_finished = False
+                    delivery = getattr(self, "_input_delivery", None)
+                    if delivery is not None and await delivery.start(self._session_id, event, task):
+                        from app.domain.models.input_admission import input_key
+                        self._accepted_input_key = input_key(event)
                     message = event.message or ""
                     metadata = event.metadata or {}
                     await self._sync_message_attachments_to_sandbox(event)
@@ -1505,8 +1633,13 @@ class AgentTaskRunner(TaskRunner):
                     len([attachment for attachment in (event.attachments or []) if attachment.file_id]),
                     len(sandbox_attachment_paths),
                 )
+                decision = getattr(getattr(self, "_front_controller_resolution", None), "decision", None)
+                execution_decision = getattr(decision, "execution", None)
                 message_obj = Message(
                     message=message,
+                    resume_from=metadata.get("resume_from"),
+                    client_message_id=metadata.get("client_message_id"),
+                    deliverables=list(getattr(execution_decision, "deliverables", []) or []),
                     attachments=sandbox_attachment_paths,
                     attachment_file_ids=[
                         attachment.file_id
@@ -1524,11 +1657,15 @@ class AgentTaskRunner(TaskRunner):
                     ),
                     mcp_access_all=bool(metadata.get("mcp_access_all", False)),
                 )
+                message_obj._session_events_snapshot = getattr(self, "_session_events_snapshot", None)
+                message_obj._accepted_event_seq = event.seq
+                self._session_events_snapshot = None
 
                 # Generated attachments belong to one user turn.  Keeping files
                 # from an earlier turn here makes later summaries re-deliver
                 # stale artifacts even when nothing changed.
                 self._generated_files = []
+                self._pending_artifact_paths = set()
                 execution_task_id = self._execution_task_id(task)
                 flow_events = (
                     self._run_flow(
@@ -1539,27 +1676,34 @@ class AgentTaskRunner(TaskRunner):
                     if execution_task_id is not None
                     else self._run_flow(message_obj)
                 )
-                async for event in flow_events:
-                    await self._put_and_add_event(task, event)
-                    if isinstance(event, TitleEvent):
-                        await self._session_repository.update_title(self._session_id, event.title)
-                    elif isinstance(event, MessageEvent):
-                        await self._session_repository.update_latest_message(self._session_id, event.message, event.timestamp)
-                        await self._session_repository.increment_unread_message_count(self._session_id)
-                    elif isinstance(event, WaitEvent):
-                        await self._session_repository.update_status(self._session_id, SessionStatus.WAITING)
-                        return
+                async with aclosing(flow_events):
+                    async for event in flow_events:
+                        await self._put_and_add_event(task, event)
+                        if isinstance(event, TitleEvent):
+                            await self._session_repository.update_title(self._session_id, event.title)
+                        elif isinstance(event, MessageEvent):
+                            await self._session_repository.update_latest_message(self._session_id, event.message, event.timestamp)
+                            await self._session_repository.increment_unread_message_count(self._session_id)
+                        elif isinstance(event, WaitEvent):
+                            await self._session_repository.update_status(self._session_id, SessionStatus.WAITING)
+                            return
 
             await self._session_repository.update_status(self._session_id, SessionStatus.COMPLETED)
         except asyncio.CancelledError as error:
+            from app.domain.services.input_delivery import InputLeaseLost
+            if isinstance(error, InputLeaseLost):
+                # The new owner/reaper publishes the durable interrupted state.
+                # This expired attempt must not fabricate another terminal.
+                return
             logger.info(
                 "Agent task cancelled agent=%s",
                 opaque_log_identifier(self._agent_id, namespace="agent"),
             )
             if isinstance(error, ModelBudgetStopped) or model_stop_reason():
                 await self._put_and_add_event(task, MessageEvent(
-                    message=("本轮执行已在模型运行边界停止：上下文或本轮 Token/调用预算不足，或运行记录暂时无法保存。"
-                             "已有分析结果会保留。请缩小问题范围或检查模型运行记录后继续。"),
+                    message=("本次分析已达到执行时间上限，已有结果保持不变。"
+                             if getattr(error, "code", None) == "analysis_budget_deadline_exceeded" or model_stop_reason() == "analysis_budget_deadline_exceeded"
+                             else "本轮执行已达到模型运行边界，或运行记录暂时无法保存。已有分析结果会保留，请检查模型运行记录后继续。"),
                 ))
             elif isinstance(error, ToolAuthorizationStopped):
                 await self._put_and_add_event(task, MessageEvent(
@@ -1638,12 +1782,432 @@ class AgentTaskRunner(TaskRunner):
                 await self._mcp_tool.cleanup()
                 raise
     
-    async def _run_flow(
+    async def _review_artifact_repair(self, step, message, records, checked_files, requirements,
+                                      outcome, execution, *, validation_available, source_seq):
+        """Keep repair evidence host-private; only queue a new local operation.
+
+        The plan consumes this queue after its current executor has drained.
+        No recursive generator execution or replay of an unknown operation.
+        """
+        from app.domain.services.analysis_artifact_repair import ArtifactRepairTracker
+        from app.domain.services.analysis_completion import blocking_receipt_paths, UNAVAILABLE_REASONS
+        trackers = getattr(self, "_analysis_delivery_trackers", None)
+        if trackers is None:
+            trackers = self._analysis_delivery_trackers = {}
+            self._analysis_verified_files = {}
+        if not hasattr(self._flow, "_artifact_repair_requests"):
+            self._flow._artifact_repair_requests = {}
+        tracker = trackers.get(step.id)
+        handler = getattr(self._flow, "enabled_subagents", {}).get(step.agent)
+        supported = (getattr(self._flow, "supports_artifact_repair", False) is True
+                     and getattr(handler, "handler_type", None) == "execution"
+                     and (step.inputs or {}).get("dataset_intent") != "file_preview"
+                     and not self._is_delivery_only_continuation(message._resume_checkpoint))
+        delivery_blocked = any(issue.blocking and issue.reason_code == "delivery_failed" for issue in outcome.issues)
+        # Extra failed outputs alone never extend an otherwise fulfilled task.
+        if supported and (tracker is not None or outcome.missing):
+            if tracker is None:
+                tracker = trackers[step.id] = ArtifactRepairTracker(
+                    original_goal=message.message, step_id=step.id, requirements=requirements)
+            blocking_paths = blocking_receipt_paths(requirements, records, checked_files,
+                                                    validation_available=validation_available)
+            protected_paths = self._analysis_verified_files.get(step.id, {})
+            relevant = [item for item in records if item.get("valid") is True
+                        or item.get("path") in blocking_paths or item.get("path") in protected_paths]
+            relevant_available = validation_available or not any(
+                item.get("reason") in UNAVAILABLE_REASONS for item in relevant)
+            decision = tracker.review(relevant, outcome.missing, execution,
+                                      validation_available=relevant_available)
+        else:
+            decision = None
+        repair_reason = decision.reason if decision else "no_repair_needed"
+        if delivery_blocked and repair_reason == "local_artifact_repair_allowed":
+            repair_reason = "delivery_failed"
+        protected_changed = repair_reason == "protected_artifact_changed"
+        pins = self._analysis_verified_files.setdefault(step.id, {})
+        if protected_changed:
+            outcome.status = "partial" if pins or checked_files else "failed"
+            outcome.reason_code = "execution_failed"
+        if not protected_changed:
+            for item in checked_files:
+                pins.setdefault(item.file_path, item)
+
+        # Production diagnostics survive a restart, separately from chat/SSE.
+        # An audit failure prevents a new autonomous repair, not an honest
+        # successful delivery of already checked bytes.
+        audit_ok = True
+        audit = getattr(self, "_delivery_audit_store", None)
+        if audit is not None or source_seq is not None:
+            if audit is None:
+                from app.domain.services.analysis_delivery_audit import AnalysisDeliveryAuditStore
+                audit = self._delivery_audit_store = AnalysisDeliveryAuditStore()
+            try:
+                async with asyncio.timeout(3):
+                    await audit.record(user_id=self._user_id, session_id=self._session_id,
+                        input_seq=source_seq, step_id=step.id, records=records, requirements=requirements,
+                        outcome=outcome, repair_reason=repair_reason)
+            except Exception as error:
+                audit_ok = False
+                logger.warning("Analysis delivery audit unavailable error_type=%s", type(error).__name__)
+        # Failed transport is not missing computation. Do not ask the model to
+        # regenerate verified bytes while storage is still unavailable.
+        allowed = bool(decision and decision.allowed and audit_ok and not delivery_blocked)
+        if allowed:
+            feedback = dict(decision.feedback)
+            feedback["previous_analysis"] = (step.result or "")[:32000]
+            self._flow._artifact_repair_requests[step.id] = feedback
+        logger.info("analysis_artifact_repair allowed=%s reason=%s files=%d missing=%d",
+                    allowed, repair_reason, len(records), len(outcome.missing))
+        return allowed, protected_changed
+
+    async def _finalize_analysis_step(self, event, message, files, *, source_seq=None):
+        from app.domain.models.plan import ExecutionStatus
+        from app.domain.models.event import StepStatus
+        from app.domain.services.analysis_completion import (
+            artifact_kind, assess_delivery, outcome_message, requirements_for_step, verified_deliveries,
+        )
+        from app.domain.services.analysis_checkpoint import save_checkpoint
+        public_step = event.step
+        current_plan = getattr(self._flow, "plan", None)
+        matches = [item for item in getattr(current_plan, "steps", []) if item.id == public_step.id]
+        step = matches[0] if len(matches) == 1 else public_step
+        step.outputs["model_execution_success"] = bool(step.success)
+        requirements = requirements_for_step(step, message)
+        step.deliverables = requirements
+        execution = step.outputs.get("execution_outcome", {})
+        unconfirmed = bool(execution.get("has_unconfirmed_tool_execution") or execution.get("side_effect_state") == "unknown")
+        candidates = set(step.attachments or []) | {item.file_path for item in files if item.file_path}
+        candidates.update(getattr(self, "_pending_artifact_paths", set()))
+        pinned = getattr(self, "_analysis_verified_files", {}).get(step.id, {})
+        candidates.update(pinned)
+        if not requirements and not candidates and step.success and not unconfirmed:
+            return files
+        if requirements:
+            candidates.update(path for path in await self._list_sandbox_artifacts()
+                              if path not in getattr(self, "_artifact_baseline_paths", set()))
+        if message._resume_checkpoint:
+            candidates.update(message._resume_checkpoint.get("progress", {}).get("verified_files", []))
+        def expected_kind(path):
+            # A structured JSON table is a table only when the requested
+            # contract explicitly says so. Extension defaults serve other cases.
+            suffix = PurePosixPath(path).suffix.lower().lstrip(".")
+            declared = {item.kind for item in requirements if item.kind != "any" and suffix in item.formats}
+            return next(iter(declared)) if len(declared) == 1 else artifact_kind(path)
+
+        items = [{"path": path, "kind": expected_kind(path)} for path in sorted(candidates)
+                 if expected_kind(path) and path.startswith("/home/ubuntu/output/")
+                 and str(PurePosixPath(path)) == path and ".." not in PurePosixPath(path).parts
+                 and "\\" not in path and not any(ord(char) < 32 for char in path)]
+        records, available = [], True
+        if items:
+            validate = getattr(self._sandbox, "validate_artifacts", None)
+            # A failed batch must not hide evidence from other batches.
+            for offset in range(0, len(items), 32):
+                batch = items[offset:offset + 32]
+                try:
+                    result = await validate(batch) if callable(validate) else None
+                    batch_ok = bool(result and result.success and isinstance(result.data, dict)
+                                    and type(result.data.get("version")) is int
+                                    and result.data.get("version") == 1)
+                    batch_records = result.data.get("files", []) if batch_ok else []
+                    batch_ok = (batch_ok and isinstance(batch_records, list) and len(batch_records) == len(batch)
+                                and all(isinstance(item, dict) for item in batch_records)
+                                and {item.get("path") for item in batch_records} == {item["path"] for item in batch})
+                except Exception:
+                    batch_ok = False
+                if batch_ok:
+                    records.extend(batch_records)
+                else:
+                    available = False
+                    records.extend({**item, "expected_kind": item["kind"], "valid": False,
+                                    "reason": "validation_unavailable"} for item in batch)
+        valid = {item["path"]: item for item in records if item.get("valid") is True}
+        def uploaded_matches(item):
+            return (isinstance(item.file_id, str) and bool(item.file_id.strip()) and item.file_path in valid
+                    and item.size == valid[item.file_path].get("size")
+                    and (item.metadata or {}).get("artifact_sha256") == valid[item.file_path].get("sha256"))
+        checked_files = [item for item in files if uploaded_matches(item)]
+        uploaded_paths = {item.file_path for item in checked_files}
+        for path in valid.keys() - uploaded_paths - pinned.keys():
+            # Retry delivery, not analysis. A fresh upload must match the exact
+            # validated bytes, otherwise it remains unverified and cannot count.
+            info = await self._sync_file_to_storage(path)
+            if info is not None and uploaded_matches(info):
+                checked_files.append(info)
+        checked_files = verified_deliveries(records, checked_files, validation_available=available)
+        final_code = execution.get("code", "")
+        stop_code = ("tool_execution_unknown" if unconfirmed else
+                     final_code if final_code not in {"", "running", "completed"} else
+                     execution.get("last_tool_error_code") or final_code)
+        outcome = assess_delivery(requirements, records, checked_files,
+                                  execution_success=bool(step.success and not unconfirmed), stop_code=stop_code,
+                                  validation_available=available)
+        repair_pending, protected_changed = await self._review_artifact_repair(
+            step, message, records, checked_files, requirements, outcome, execution,
+            validation_available=available, source_seq=source_seq)
+        if protected_changed:
+            # Previously uploaded bytes are immutable. Do not substitute a
+            # changed working copy or claim the repair preserved its evidence.
+            checked_files = list(pinned.values()) + [item for item in checked_files if item.file_path not in pinned]
+            outcome.status = "partial" if checked_files else "failed"
+            outcome.reason_code = "execution_failed"
+        if not repair_pending:
+            # Immutable, already checked uploads remain usable even when the
+            # latest validation service or tool receipt is unavailable.
+            preserved = getattr(self, "_analysis_verified_files", {}).get(step.id, {})
+            checked_files = list(preserved.values()) + [item for item in checked_files if item.file_path not in preserved]
+        step.outcome = outcome
+        step.success = outcome.status == "succeeded"
+        step.status = ExecutionStatus.COMPLETED if step.success else ExecutionStatus.FAILED
+        event.status = StepStatus.COMPLETED if step.success else StepStatus.FAILED
+        if not step.success:
+            # An uncertain side-effecting call must not be offered as an
+            # automatically replayable script. Only explicit safe checkpoints.
+            safe = not execution.get("has_unconfirmed_tool_execution", False)
+            safe = safe and execution.get("side_effect_state") != "unknown"
+            proof = execution.get("execution_evidence", {})
+            if proof:
+                # A confirmed exit is not permission to replay an arbitrary
+                # shell/plugin step. Only upload-only continuation can bypass
+                # computation without a genuine replay-safety guarantee.
+                safe = safe and (proof.get("replay_safe") is True or
+                    (outcome.reason_code == "delivery_failed" and step.outputs.get("model_execution_success") is True))
+            from app.domain.services.model_runtime import current_analysis_budget
+            budget = current_analysis_budget()
+            if safe and budget is not None:
+                try:
+                    snapshot = await budget.snapshot()
+                    from datetime import UTC, datetime
+                    deadline = snapshot.deadline_at
+                    if deadline is not None:
+                        deadline = deadline.replace(tzinfo=UTC) if deadline.tzinfo is None else deadline
+                    # Production requests are metered, not quota-limited. A
+                    # missing ceiling must not disable a safe checkpoint.
+                    safe = (deadline is None or datetime.now(UTC) < deadline) and (
+                        outcome.reason_code == "delivery_failed" or all(
+                            limit is None or used < limit for used, limit in (
+                                (snapshot.tool_batches_used, snapshot.hard_limit),
+                                (snapshot.model_calls, snapshot.model_call_limit),
+                                (snapshot.charged_tokens, snapshot.model_token_limit),
+                            )
+                        )
+                    )
+                except Exception:
+                    safe = False
+            if safe and not repair_pending and not protected_changed and message.datasets and source_seq is not None:
+                try:
+                    token = await save_checkpoint(
+                        self._session_repository, self._sandbox, self._session_id, self._user_id,
+                        message, getattr(self._flow, "plan", None),
+                        source_fingerprints=getattr(self, "_analysis_source_fingerprints", None),
+                        records=records, delivered=checked_files, reason_code=outcome.reason_code,
+                        source_seq=source_seq)
+                    if token:
+                        outcome.can_resume, outcome.resume_from = True, token
+                except Exception as error:
+                    logger.warning("Analysis checkpoint unavailable error_type=%s", type(error).__name__)
+            if not step.result:
+                step.result = outcome_message(outcome, delivered_files=checked_files)
+            elif not repair_pending and not step.result.startswith("分析说明（完成状态以成果检查结果为准）："):
+                # Preserve evidence/explanation, but distinguish model-authored
+                # prose from the authoritative verified completion state.
+                step.result = "分析说明（完成状态以成果检查结果为准）：\n\n" + step.result
+            step.error = outcome.reason_code
+        logger.info("analysis_outcome status=%s reason=%s missing=%d delivered=%d resumable=%s",
+                    outcome.status, outcome.reason_code, len(outcome.missing), len(checked_files), outcome.can_resume)
+        if public_step is not step:
+            # Public StepEvents can be redacted copies. Reflect execution state
+            # in both places without writing redacted source inputs into the plan.
+            for field in ("status", "success", "result", "error", "outcome", "deliverables", "outputs"):
+                setattr(public_step, field, getattr(step, field))
+        return checked_files
+
+    @staticmethod
+    def _is_delivery_only_continuation(checkpoint) -> bool:
+        """Only replay upload/validation when execution already finished.
+
+        A successful upload must never turn an unfinished computation into a
+        successful analysis. Untouched later plan steps therefore disqualify
+        this path, as does any uncertain tool side effect.
+        """
+        if not checkpoint or checkpoint.get("reason_code") != "delivery_failed":
+            return False
+        steps = checkpoint.get("plan", {}).get("steps", [])
+        return bool(steps) and all(
+            step.get("success") or (
+                step.get("outputs", {}).get("model_execution_success") is True
+                and not step.get("outputs", {}).get("execution_outcome", {}).get("has_unconfirmed_tool_execution")
+            ) for step in steps)
+
+    async def _resume_delivery_only(self, checkpoint):
+        from app.domain.models.plan import Plan, ExecutionStatus
+        from app.domain.models.event import PlanEvent, PlanStatus
+        self._flow.plan = Plan.model_validate(checkpoint["plan"])
+        self._flow.status = AgentStatus.EXECUTING
+        for step in self._flow.plan.steps:
+            if step.success:
+                continue
+            step.outcome = None
+            step.status = ExecutionStatus.RUNNING
+            yield StepEvent(status=StepStatus.STARTED, step=step)
+            step.attachments = list(checkpoint.get("progress", {}).get("verified_files", []))
+            step.success = True
+            step.status = ExecutionStatus.COMPLETED
+            step.result = "已完成已有成果的验证与交付。"
+            yield StepEvent(status=StepStatus.COMPLETED, step=step)
+            yield PlanEvent(status=PlanStatus.UPDATED, plan=self._flow.plan)
+            if not step.success:
+                break
+        self._flow.plan.status = (ExecutionStatus.COMPLETED if all(step.success for step in self._flow.plan.steps)
+                                  else ExecutionStatus.FAILED)
+        yield PlanEvent(status=PlanStatus.COMPLETED, plan=self._flow.plan)
+        self._flow.status = AgentStatus.IDLE
+        yield DoneEvent()
+
+    async def _run_flow(self, message: Message, *, task_id: str | None = None,
+                        trigger_event_seq: int | None = None) -> AsyncGenerator[BaseEvent, None]:
+        from contextlib import ExitStack, aclosing
+        # The stack lives outside the generator producing events so model,
+        # validation, upload and checkpoint work share the same request identity
+        # and accounting, without a cumulative execution quota.
+        with ExitStack() as runtime_stack:
+            async with aclosing(self._run_authorized_flow(message, task_id=task_id,
+                    trigger_event_seq=trigger_event_seq, runtime_stack=runtime_stack)) as events:
+                async for event in events:
+                    yield event
+
+    async def _open_analysis_runtime(self, message, trigger_event_seq, runtime_stack):
+        from app.domain.services.analysis_budget import AnalysisBudgetService, BudgetUnavailableError
+        from app.domain.services.analysis_checkpoint import configuration_digest
+        from app.domain.services.analysis_recovery import AnalysisRecoveryContext, analysis_recovery_scope
+        from app.domain.services.execution_identity import private_identity_hmac
+        # Isolated legacy runners have no durable input. Production admission
+        # always supplies its server-assigned event sequence.
+        if type(trigger_event_seq) is not int or trigger_event_seq < 1:
+            return
+        session = await self._session_repository.find_by_id_and_user_id(self._session_id, self._user_id)
+        checkpoint = message._resume_checkpoint or {}
+        lineage_id = checkpoint.get("budget_lineage_id")
+        if checkpoint and not lineage_id and not self._is_delivery_only_continuation(checkpoint):
+            raise BudgetUnavailableError("legacy_checkpoint_budget_missing")
+        if checkpoint and not lineage_id:
+            return  # Legacy upload-only recovery cannot run analysis tools.
+        scope_digest = private_identity_hmac({"purpose": "analysis-budget-scope/v1",
+            "goal": message.message, "configuration": configuration_digest(session),
+            "sandbox_id": self._sandbox.id, "datasets": [item.dataset_id for item in message.datasets],
+            "targets": message.controller_target_files, "sources": self._analysis_source_fingerprints,
+            "attachments": message.attachment_file_ids, "skills": message.skills,
+            "mcp_servers": message.mcp_servers, "mcp_access_all": message.mcp_access_all})
+
+        delivery = getattr(self, "_input_delivery", None)
+        identity = getattr(self, "_accepted_input_key", None)
+
+        async def require_live():
+            if getattr(self, "_accepted_input_key", None) != identity:
+                from app.domain.services.input_delivery import InputLeaseLost
+                raise InputLeaseLost()
+            if delivery is not None and identity is not None:
+                await delivery._require_live(self._session_id, identity)
+
+        service = getattr(self, "_analysis_budget_service", None) or AnalysisBudgetService()
+        handle = await service.open(user_id=self._user_id, session_id=self._session_id,
+            origin_input_id=str(checkpoint.get("budget_origin_seq", trigger_event_seq)), scope_digest=scope_digest,
+            lineage_id=lineage_id, require_live=require_live)
+        recovery = AnalysisRecoveryContext(review=lambda *args, **kwargs: self._review_analysis_budget(
+            message, recovery, handle, *args, **kwargs))
+        from app.domain.services.analysis_checkpoint import source_paths
+        recovery.progress.read_scope_paths = frozenset(source_paths(message) + list(message.attachments))
+        # These lists are private host-authored identities protected by the
+        # checkpoint HMAC, never supplied by the continuation request.
+        recovery.progress.evidence.update(checkpoint.get("budget_read_evidence", []))
+        recovery.artifact_evidence.update(checkpoint.get("budget_artifact_evidence", []))
+        message._budget_lineage_id = handle.lineage_id
+        message._budget_origin_seq = checkpoint.get("budget_origin_seq", trigger_event_seq)
+        runtime_stack.enter_context(analysis_budget_scope(handle))
+        runtime_stack.enter_context(analysis_recovery_scope(recovery))
+
+    async def _review_analysis_budget(self, message, recovery, handle, next_calls, *, review_needed):
+        from app.domain.services.analysis_budget import BudgetEvidence
+        from app.domain.services.analysis_checkpoint import fingerprints, source_paths
+        from app.domain.services.analysis_completion import artifact_kind
+        from app.domain.services.execution_identity import private_identity_hmac
+        from app.domain.services.tools.tool_contract import validate_tool_arguments
+        sources_stable = not (message.datasets or message.attachments or message.attachment_file_ids)
+        required_work = True
+        bounded = isinstance(next_calls, list) and 0 < len(next_calls) <= 4
+        if bounded:
+            executor = getattr(self._flow, "executor", None)
+            for call in next_calls:
+                try:
+                    tool = executor.get_tool(call.get("name")) if executor else None
+                    if tool is None or executor._blocked_runtime_install_reason(call) or recovery.progress.before_call(call, record=False):
+                        bounded = False
+                        break
+                    validate_tool_arguments(tool, call)
+                except Exception:
+                    bounded = False
+                    break
+        if review_needed:
+            # Each extension rechecks sources and real output bytes, under one
+            # bounded deadline. Scripts are deliberately not delivery progress.
+            try:
+                async with asyncio.timeout(10):
+                    if message.datasets:
+                        current_sources = await fingerprints(self._sandbox, source_paths(message))
+                        sources_stable = bool(current_sources and current_sources == self._analysis_source_fingerprints)
+                    if message.attachments or message.attachment_file_ids:
+                        # The current fingerprint protocol covers mounted
+                        # datasets/output, not arbitrary attachment paths.
+                        sources_stable = False
+                    candidates = [path for path in await self._list_sandbox_artifacts()
+                                  if path not in getattr(self, "_artifact_baseline_paths", set())
+                                  and artifact_kind(path) not in {None, "code"}][:32]
+                    valid = []
+                    if candidates:
+                        result = await self._sandbox.validate_artifacts([
+                            {"path": path, "kind": artifact_kind(path)} for path in candidates])
+                        if not result.success or not isinstance(result.data, dict) or result.data.get("version") != 1:
+                            raise ValueError("artifact_review_unavailable")
+                        records = result.data.get("files", [])
+                        if len(records) != len(candidates) or {item["path"] for item in records} != set(candidates):
+                            raise ValueError("artifact_review_incomplete")
+                        valid = [item for item in records if item.get("valid") is True
+                                 and type(item.get("size")) is int and item["size"] > 0
+                                 and isinstance(item.get("sha256"), str) and re.fullmatch(r"[0-9a-f]{64}", item["sha256"])]
+                        for item in valid:
+                            if len(recovery.artifact_evidence) < 128:
+                                recovery.artifact_evidence.add(private_identity_hmac({"purpose": "analysis-verified-artifact/v1",
+                                    "path": item["path"], "sha256": item["sha256"], "kind": item["kind"]}))
+                    running_steps = [step for step in getattr(getattr(self._flow, "plan", None), "steps", [])
+                                     if getattr(step.status, "value", step.status) == "running"]
+                    requirements = (list(running_steps[0].deliverables) if len(running_steps) == 1
+                                    else list(message.deliverables))
+                    if requirements:
+                        from app.domain.services.analysis_completion import assess_delivery
+                        # Provisional records are used only for the required-
+                        # output comparison; they are never uploaded/persisted.
+                        inspected = [FileInfo(file_id=f"review-{index}", file_path=item["path"],
+                            filename=PurePosixPath(item["path"]).name, size=item["size"],
+                            metadata={"artifact_sha256": item["sha256"]}) for index, item in enumerate(valid)]
+                        required_work = bool(assess_delivery(requirements, valid, inspected,
+                            execution_success=True, stop_code="completed", validation_available=True).missing)
+            except Exception:
+                sources_stable = False
+                bounded = False
+        progress = sorted(recovery.progress.evidence | recovery.artifact_evidence)
+        return BudgetEvidence(scope_digest=handle.scope_digest, confirmed_progress_units=len(progress),
+            progress_digest=private_identity_hmac({"purpose": "analysis-grant-progress/v1", "evidence": progress}),
+            has_unknown_execution=recovery.executions.summary()["pending_execution"],
+            no_progress_loop=recovery.progress.stalled,
+            next_action_bounded=bool(bounded and sources_stable and required_work), estimated_next_batches=1)
+
+    async def _run_authorized_flow(
         self,
         message: Message,
         *,
         task_id: str | None = None,
         trigger_event_seq: int | None = None,
+        runtime_stack=None,
     ) -> AsyncGenerator[BaseEvent, None]:
         """Process a single message through the agent's flow and yield events"""
         if not message.message:
@@ -1736,6 +2300,10 @@ class AgentTaskRunner(TaskRunner):
             yield DoneEvent()
             return
 
+        from app.domain.services.analysis_checkpoint import fingerprints, prepare_continuation, source_paths
+        checkpoint = (await prepare_continuation(
+            self._session_repository, self._sandbox, self._session_id, self._user_id, message)
+            if message.resume_from else None)
         try:
             await self._initialize_mcp_tool(
                 message.mcp_servers,
@@ -1773,6 +2341,23 @@ class AgentTaskRunner(TaskRunner):
             )
 
         artifact_discovery_dirty = bool(getattr(self, "_generated_files", []))
+        self._analysis_source_fingerprints = await fingerprints(self._sandbox, source_paths(message)) if message.datasets else None
+        try:
+            await self._open_analysis_runtime(message, trigger_event_seq, runtime_stack)
+        except Exception as error:
+            from app.domain.services.analysis_budget import BudgetUnavailableError
+            if not isinstance(error, BudgetUnavailableError):
+                raise
+            logger.warning("Analysis runtime admission unavailable error_type=%s", type(error).__name__)
+            yield MessageEvent(message="本次执行暂未启动：无法确认任务运行记录。已有结果保持不变，请检查任务运行记录后再继续。")
+            yield DoneEvent()
+            return
+        if checkpoint:
+            self._generated_files = [FileInfo.model_validate(item) for item in checkpoint.get("delivered", [])]
+        self._analysis_delivery_trackers = {}
+        self._analysis_verified_files = {}
+        self._flow._artifact_repair_requests = {}
+        last_analysis_outcome = None
         artifact_discovery_ran = False
         delivered_file_keys: set[str] = set()
         completed_step_count = 0
@@ -1784,7 +2369,15 @@ class AgentTaskRunner(TaskRunner):
             MessageEvent(role="user", message=message.message)
         ]
 
-        async for event in self._flow.run(message):
+        flow_events = (self._resume_delivery_only(checkpoint)
+                       if self._is_delivery_only_continuation(checkpoint) else self._flow.run(message))
+        async for event in flow_events:
+            delivery = getattr(self, "_input_delivery", None)
+            identity = getattr(self, "_accepted_input_key", None)
+            if delivery is not None and identity is not None:
+                # Check before processing step attachments or delayed tool
+                # results, not only after artifact uploads have already run.
+                await delivery._require_live(self._session_id, identity)
             pre_events: List[BaseEvent] = []
             post_events: List[BaseEvent] = []
             suppress_event = False
@@ -1821,7 +2414,7 @@ class AgentTaskRunner(TaskRunner):
                     "required",
                     "capability",
                 }
-                if event.status == StepStatus.COMPLETED and (
+                if event.status in {StepStatus.COMPLETED, StepStatus.FAILED} and (
                     artifact_discovery_dirty
                     or (force_artifact_discovery and not artifact_discovery_ran)
                 ):
@@ -1844,14 +2437,28 @@ class AgentTaskRunner(TaskRunner):
                 else:
                     discovered_files = []
 
-                if event.status == StepStatus.COMPLETED:
+                if event.status in {StepStatus.COMPLETED, StepStatus.FAILED}:
+                    terminal_files = self._unique_files(explicit_files + discovered_files + self._generated_files)
+                    terminal_files = await self._finalize_analysis_step(
+                        event, message, terminal_files, source_seq=trigger_event_seq)
+                    # Once a contract has been checked, later summary/Done
+                    # branches may only reuse the validated delivered files.
+                    if event.step.outcome:
+                        self._generated_files = terminal_files
+                    if event.step.id in self._flow._artifact_repair_requests:
+                        skip_next_step_result = (event.step.result or "").strip() or None
+                        yield MessageEvent(message="", metadata={"analysis_progress": {"stage": "completing_results"}})
+                        # The matching terminal/prose pair is internal until
+                        # required outputs are repaired or further work stalls.
+                        continue
                     completed_step_count += 1
+                    last_analysis_outcome = event.step.outcome
                     new_files = [
                         file_info
-                        for file_info in self._unique_files(explicit_files + discovered_files)
+                        for file_info in terminal_files
                         if self._file_delivery_key(file_info) not in delivered_file_keys
                     ]
-                    if new_files:
+                    if new_files or last_analysis_outcome:
                         result_message = (event.step.result or "").strip()
                         delivery_message = result_message or f"已生成 {len(new_files)} 个结果文件。"
                         delivery_event = MessageEvent(
@@ -1861,6 +2468,7 @@ class AgentTaskRunner(TaskRunner):
                             metadata={
                                 "artifact_delivery": True,
                                 "step_id": event.step.id,
+                                **({"analysis_outcome": last_analysis_outcome.model_dump(exclude_none=True)} if last_analysis_outcome else {}),
                             },
                         )
                         delivered_file_keys.update(
@@ -1875,9 +2483,19 @@ class AgentTaskRunner(TaskRunner):
                             # following attachment-free duplicate.
                             skip_next_step_result = result_message
             elif isinstance(event, MessageEvent):
+                if (event.metadata or {}).get("analysis_progress"):
+                    # Progress is a transient running message, not a terminal
+                    # summary and not a request to discover or attach files.
+                    event.attachments = []
+                    event.metadata.pop("analysis_outcome", None)
+                    yield event
+                    turn_events.append(event)
+                    continue
                 is_summary = self._should_attach_generated_files_to_message()
                 summary_discovered_files: List[FileInfo] = []
                 normalized_message = (event.message or "").strip()
+                if is_summary and last_analysis_outcome and last_analysis_outcome.status != "succeeded":
+                    event.metadata = {**(event.metadata or {}), "analysis_outcome": last_analysis_outcome.model_dump(exclude_none=True)}
                 if (
                     skip_next_step_result is not None
                     and not is_summary
@@ -1894,14 +2512,21 @@ class AgentTaskRunner(TaskRunner):
                     artifact_discovery_dirty = False
                     artifact_discovery_ran = True
                 if not suppress_event:
-                    await self._sync_message_attachments_to_storage(event)
-                    event.attachments = [
+                    if last_analysis_outcome is not None:
+                        # The step boundary is authoritative. A later model
+                        # summary cannot introduce an unvalidated attachment.
+                        requested_paths = {item.file_path for item in event.attachments or []}
+                        event.attachments = [item for item in self._generated_files if item.file_path in requested_paths]
+                    else:
+                        await self._sync_message_attachments_to_storage(event)
+                    staged_files = [
                         file_info
                         for file_info in self._unique_files(
                             list(event.attachments or []) + summary_discovered_files
                         )
                         if self._file_delivery_key(file_info) not in delivered_file_keys
                     ]
+                    event.attachments = await self._validate_staged_artifact_files(staged_files)
                     if event.attachments:
                         delivered_file_keys.update(
                             self._file_delivery_key(file_info)
@@ -1918,6 +2543,11 @@ class AgentTaskRunner(TaskRunner):
                     ):
                         suppress_event = True
             elif isinstance(event, ErrorEvent):
+                if self._flow._artifact_repair_requests:
+                    # execute_step has already yielded its terminal StepEvent;
+                    # confirmed, repairable file failure is not a terminal SSE
+                    # error while a private repair is scheduled.
+                    continue
                 # The live SSE consumer treats ErrorEvent as terminal.  Publish
                 # any durable partial outputs first; otherwise they are uploaded
                 # later at Done time and exist in history, but the connected user
@@ -1931,6 +2561,7 @@ class AgentTaskRunner(TaskRunner):
                         for file_info in partial_files
                         if self._file_delivery_key(file_info) not in delivered_file_keys
                     ]
+                    partial_files = await self._validate_staged_artifact_files(partial_files)
                     if partial_files:
                         delivered_file_keys.update(
                             self._file_delivery_key(file_info)
@@ -1940,8 +2571,7 @@ class AgentTaskRunner(TaskRunner):
                             MessageEvent(
                                 role="assistant",
                                 message=(
-                                    f"任务未能完整完成，但已保留 {len(partial_files)} "
-                                    "个阶段性结果文件。"
+                                    f"任务未能完整完成。已保存的阶段性文件：{len(partial_files)} 个。"
                                 ),
                                 attachments=partial_files,
                                 metadata={
@@ -1960,6 +2590,7 @@ class AgentTaskRunner(TaskRunner):
                         for file_info in late_files
                         if self._file_delivery_key(file_info) not in delivered_file_keys
                     ]
+                    late_files = await self._validate_staged_artifact_files(late_files)
                     if late_files:
                         delivered_file_keys.update(
                             self._file_delivery_key(file_info) for file_info in late_files
@@ -1967,7 +2598,7 @@ class AgentTaskRunner(TaskRunner):
                         pre_events.append(
                             MessageEvent(
                                 role="assistant",
-                                message=f"已生成 {len(late_files)} 个结果文件。",
+                                message=f"已保存的阶段性文件：{len(late_files)} 个。",
                                 attachments=late_files,
                                 metadata={"artifact_delivery": True},
                             )
@@ -1982,6 +2613,7 @@ class AgentTaskRunner(TaskRunner):
                         for file_info in late_files
                         if self._file_delivery_key(file_info) not in delivered_file_keys
                     ]
+                    late_files = await self._validate_staged_artifact_files(late_files)
                     if late_files:
                         delivered_file_keys.update(
                             self._file_delivery_key(file_info) for file_info in late_files
@@ -1989,7 +2621,7 @@ class AgentTaskRunner(TaskRunner):
                         pre_events.append(
                             MessageEvent(
                                 role="assistant",
-                                message=f"已生成 {len(late_files)} 个结果文件。",
+                                message=f"已保存的阶段性文件：{len(late_files)} 个。",
                                 attachments=late_files,
                                 metadata={"artifact_delivery": True},
                             )

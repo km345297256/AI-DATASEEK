@@ -13,10 +13,12 @@ import re
 import resource
 import shutil
 import stat
+import struct
 import subprocess
 import sys
 import tempfile
 from typing import BinaryIO, Iterable
+from xml.etree import ElementTree
 import zipfile
 
 import rarfile
@@ -24,6 +26,10 @@ import rarfile
 
 CHUNK_SIZE = 1024 * 1024
 ARCHIVE_SUFFIXES = (".zip", ".rar", ".7z")
+# Identification reads only bounded metadata, never extracts a ZIP container.
+ZIP_DIRECTORY_MAX_BYTES = 4 * 1024 * 1024
+ZIP_DIRECTORY_MAX_ENTRIES = 10_000
+ZIP_METADATA_MAX_BYTES = 256 * 1024
 
 
 class UnpackError(RuntimeError):
@@ -86,8 +92,153 @@ class Member:
     is_directory: bool = False
 
 
+def _check_zip_directory_budget(stream: BinaryIO) -> None:
+    """Bound zipfile's eager central-directory allocation, including ZIP64."""
+    size = stream.seek(0, os.SEEK_END)
+    stream.seek(max(0, size - 65_557))
+    tail = stream.read(65_557)
+    end = tail.rfind(b"PK\x05\x06")
+    if end < 0 or end + 22 > len(tail):
+        raise zipfile.BadZipFile("ZIP directory is missing")
+    _, disk, directory_disk, disk_entries, entries, directory_bytes, _, comment = (
+        struct.unpack_from("<4s4H2LH", tail, end)
+    )
+    if end + 22 + comment != len(tail):
+        raise zipfile.BadZipFile("invalid ZIP end record")
+    if disk or directory_disk or disk_entries != entries:
+        raise UnpackError("multi-disk ZIP files are not supported")
+    end_offset = size - len(tail) + end
+    locator = b""
+    if end_offset >= 20:
+        stream.seek(end_offset - 20)
+        locator = stream.read(20)
+    if locator.startswith(b"PK\x06\x07"):
+        signature, zip64_disk, offset, disks = struct.unpack("<4sLQL", locator)
+        # Match the ZIP64 record position consumed by Python's zipfile, not an
+        # untrusted locator offset that could point at a different small record.
+        record_offset = end_offset - 20 - 56
+        if zip64_disk or disks != 1 or offset != record_offset or record_offset < 0:
+            raise zipfile.BadZipFile("invalid ZIP64 locator")
+        stream.seek(record_offset)
+        record = stream.read(56)
+        values = struct.unpack("<4sQ2H2L4Q", record)
+        if values[0] != b"PK\x06\x06" or values[1] != 44 or values[4] or values[5]:
+            raise zipfile.BadZipFile("invalid ZIP64 directory")
+        if values[6] != values[7]:
+            raise UnpackError("multi-disk ZIP files are not supported")
+        entries, directory_bytes = values[7], values[8]
+    elif entries == 0xFFFF or directory_bytes == 0xFFFFFFFF:
+        raise zipfile.BadZipFile("ZIP64 locator is missing")
+    if entries > ZIP_DIRECTORY_MAX_ENTRIES or directory_bytes > ZIP_DIRECTORY_MAX_BYTES:
+        raise UnpackError("ZIP identification metadata exceeds safe limits")
+    stream.seek(0)
+
+
+def _zip_metadata(archive: zipfile.ZipFile, name: str, maximum: int = ZIP_METADATA_MAX_BYTES) -> bytes:
+    info = archive.getinfo(name)
+    if info.file_size > maximum:
+        raise UnpackError("ZIP format metadata exceeds safe limits")
+    with archive.open(info) as stream:
+        value = stream.read(maximum + 1)
+    if len(value) > maximum:
+        raise UnpackError("ZIP format metadata exceeds safe limits")
+    return value
+
+
+def zip_container_kind(path: Path) -> str | None:
+    """Identify file formats implemented as ZIP packages by their structure.
+
+    Filename extensions are deliberately not consulted: a workbook renamed to
+    .zip is still a workbook, and an ordinary archive named .xlsx stays an
+    archive. Unrecognized ZIPs remain eligible for normal safe extraction.
+    """
+    try:
+        with path.open("rb") as stream:
+            if stream.read(4) not in (b"PK\x03\x04", b"PK\x05\x06", b"PK\x07\x08"):
+                return None
+            _check_zip_directory_budget(stream)
+            with zipfile.ZipFile(stream) as archive:
+                names: set[str] = set()
+                for info in archive.infolist():
+                    try:
+                        safe_relative_path(info.filename)
+                    except UnpackError:
+                        raise UnpackError("unsafe member path in ZIP package") from None
+                    if info.filename in names:
+                        raise UnpackError("duplicate ZIP package member")
+                    if stat.S_ISLNK((info.external_attr >> 16) & 0xFFFF):
+                        raise UnpackError("symbolic links are not allowed in ZIP packages")
+                    if info.flag_bits & 0x1:
+                        raise UnpackError("encrypted ZIP packages are not supported")
+                    names.add(info.filename)
+                if {"[Content_Types].xml", "_rels/.rels"} <= names:
+                    content = _zip_metadata(archive, "[Content_Types].xml")
+                    # Removing NUL separators covers UTF-16/32 declarations
+                    # too, before handing any XML to the standard parser.
+                    markup = content.replace(b"\x00", b"").upper()
+                    if b"<!DOCTYPE" in markup or b"<!ENTITY" in markup:
+                        raise UnpackError("XML entity declarations are not allowed in ZIP metadata")
+                    root = ElementTree.fromstring(content)
+                    namespace = "{http://schemas.openxmlformats.org/package/2006/content-types}"
+                    if root.tag == namespace + "Types":
+                        for item in root.findall(namespace + "Override"):
+                            part = item.get("PartName", "").removeprefix("/")
+                            mime = item.get("ContentType", "")
+                            if part not in names:
+                                continue
+                            if part == "xl/workbook.xml" and mime in {
+                                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml",
+                                "application/vnd.openxmlformats-officedocument.spreadsheetml.template.main+xml",
+                                "application/vnd.ms-excel.sheet.macroEnabled.main+xml",
+                                "application/vnd.ms-excel.template.macroEnabled.main+xml",
+                            }:
+                                return "excel"
+                            if part == "xl/workbook.bin" and mime == "application/vnd.ms-excel.sheet.binary.macroEnabled.main":
+                                return "excel-binary"
+                            if part == "word/document.xml" and mime in {
+                                "application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml",
+                                "application/vnd.openxmlformats-officedocument.wordprocessingml.template.main+xml",
+                                "application/vnd.ms-word.document.macroEnabled.main+xml",
+                            }:
+                                return "word"
+                            if part == "ppt/presentation.xml" and mime in {
+                                "application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml",
+                                "application/vnd.openxmlformats-officedocument.presentationml.slideshow.main+xml",
+                                "application/vnd.ms-powerpoint.presentation.macroEnabled.main+xml",
+                            }:
+                                return "presentation"
+                if "mimetype" in names:
+                    mime = _zip_metadata(archive, "mimetype", 256).strip()
+                    if mime.startswith(b"application/vnd.oasis.opendocument.") and {
+                        "META-INF/manifest.xml", "content.xml"
+                    } <= names:
+                        return "opendocument"
+                    if mime == b"application/epub+zip" and "META-INF/container.xml" in names:
+                        return "epub"
+                files = [name for name in names if not name.endswith("/")]
+                if files and all(name.endswith(".npy") for name in files):
+                    for name in files:
+                        with archive.open(name) as member:
+                            if member.read(6) != b"\x93NUMPY":
+                                break
+                    else:
+                        return "numpy"
+                if "META-INF/MANIFEST.MF" in names and any(name.endswith(".class") for name in files):
+                    if _zip_metadata(archive, "META-INF/MANIFEST.MF").startswith(b"Manifest-Version:"):
+                        return "java"
+    except zipfile.BadZipFile:
+        # Never fall through to an extractor that would load an unbounded or
+        # inconsistent directory after identification rejected its structure.
+        raise UnpackError("ZIP package metadata is invalid") from None
+    except (OSError, ValueError, ElementTree.ParseError):
+        # Unknown package types remain ordinary archives; resource-limit and
+        # unsafe-member errors deliberately propagate.
+        return None
+    return None
+
+
 def archive_kind(path: Path) -> str | None:
-    """Detect supported archives by signature instead of trusting extensions."""
+    """Detect distributable archives, excluding recognized ZIP-based formats."""
     try:
         with path.open("rb") as stream:
             signature = stream.read(8)
@@ -95,7 +246,7 @@ def archive_kind(path: Path) -> str | None:
         return None
 
     if signature.startswith((b"PK\x03\x04", b"PK\x05\x06", b"PK\x07\x08")):
-        return "zip"
+        return None if zip_container_kind(path) is not None else "zip"
     if signature.startswith((b"Rar!\x1a\x07\x00", b"Rar!\x1a\x07\x01\x00")):
         return "rar"
     if signature.startswith(b"7z\xbc\xaf\x27\x1c"):

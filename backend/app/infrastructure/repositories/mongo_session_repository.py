@@ -12,6 +12,7 @@ from app.domain.models.file import FileInfo
 from app.domain.repositories.session_repository import SessionRepository
 from app.domain.models.event import BaseEvent, AgentEvent, MAX_EVENT_SEQUENCE
 from app.domain.models.execution_environment import ExecutionEnvironmentSnapshot
+from app.domain.models.session_history import SessionHistoryPage, page_legacy_history
 from app.infrastructure.models.documents import (
     ExecutionEnvironmentSnapshotDocument,
     SessionDocument,
@@ -40,6 +41,75 @@ SESSION_LIST_PROJECTION = {
 
 class MongoSessionRepository(SessionRepository):
     """MongoDB implementation of SessionRepository"""
+
+    async def save_analysis_checkpoint(self, session_id: str, checkpoint: dict) -> None:
+        source_seq = checkpoint.get("source_seq")
+        if type(source_seq) is not int or not 0 < source_seq <= MAX_EVENT_SEQUENCE:
+            raise ValueError("Checkpoint requires a durable source sequence")
+        result = await SessionDocument.get_pymongo_collection().update_one(
+            {"session_id": session_id, "user_id": checkpoint.get("owner_id"),
+             "latest_user_event_seq": source_seq, "latest_user_input_fence_seq": source_seq},
+            {"$set": {"analysis_checkpoint": checkpoint}})
+        if not result.matched_count:
+            raise ValueError("Checkpoint source is no longer the current accepted input")
+
+    async def get_analysis_checkpoint(self, session_id: str, checkpoint_id: str) -> dict | None:
+        document = await SessionDocument.get_pymongo_collection().find_one(
+            {"session_id": session_id, "analysis_checkpoint.id": checkpoint_id,
+             "analysis_checkpoint.expires_at": {"$gt": datetime.now(UTC)}},
+            {"analysis_checkpoint": 1})
+        return document.get("analysis_checkpoint") if document else None
+
+    async def claim_analysis_checkpoint(self, session_id: str, checkpoint_id: str,
+                                        user_id: str, client_message_id: str,
+                                        *, expected_source_seq: int) -> dict | None:
+        if type(expected_source_seq) is not int or not 0 < expected_source_seq <= MAX_EVENT_SEQUENCE:
+            return None
+        document = await SessionDocument.get_pymongo_collection().find_one_and_update(
+            {"session_id": session_id, "user_id": user_id,
+             "latest_user_event_seq": expected_source_seq,
+             "latest_user_input_fence_seq": expected_source_seq,
+             "analysis_checkpoint.id": checkpoint_id,
+             "analysis_checkpoint.owner_id": user_id,
+             "analysis_checkpoint.source_seq": expected_source_seq,
+             "analysis_checkpoint.expires_at": {"$gt": datetime.now(UTC)},
+             "analysis_checkpoint.claimed_by": {"$in": [None, client_message_id]}},
+            {"$set": {"analysis_checkpoint.claimed_by": client_message_id}},
+            return_document=ReturnDocument.AFTER)
+        return document.get("analysis_checkpoint") if document else None
+
+    async def is_analysis_checkpoint_current(self, session_id: str, checkpoint_id: str,
+                                             user_id: str, client_message_id: str,
+                                             *, source_seq: int, resume_event_seq: int) -> bool:
+        """Recheck the claim against the current durable input immediately before use.
+
+        Both markers share the session document with the claim. Any newer input
+        starts fencing before its event commit, so no cross-collection gap can
+        make a stale continuation look current. Runtime input-delivery guards
+        still own cancellation if a new input arrives after this read.
+        """
+        if (type(source_seq) is not int or type(resume_event_seq) is not int
+                or not 0 < source_seq < resume_event_seq <= MAX_EVENT_SEQUENCE):
+            return False
+        document = await SessionDocument.get_pymongo_collection().find_one(
+            {"session_id": session_id, "user_id": user_id,
+             "latest_user_event_seq": resume_event_seq,
+             "latest_user_input_fence_seq": resume_event_seq,
+             "analysis_checkpoint.id": checkpoint_id,
+             "analysis_checkpoint.owner_id": user_id,
+             "analysis_checkpoint.source_seq": source_seq,
+             "analysis_checkpoint.claimed_by": client_message_id,
+             "analysis_checkpoint.expires_at": {"$gt": datetime.now(UTC)}},
+            {"_id": 1})
+        return document is not None
+
+    async def clear_analysis_checkpoint(self, session_id: str) -> None:
+        # Admission cleanup must not erase a newer checkpoint saved by a fast
+        # worker between the accepted event and this cleanup call.
+        await SessionDocument.get_pymongo_collection().update_one(
+            {"session_id": session_id, "$expr": {
+                "$lt": ["$analysis_checkpoint.source_seq", "$latest_user_input_fence_seq"]}},
+            {"$unset": {"analysis_checkpoint": ""}})
     
     async def save(self, session: Session) -> None:
         """Save or update a session"""
@@ -531,12 +601,28 @@ class MongoSessionRepository(SessionRepository):
 
     async def add_event(self, session_id: str, event: BaseEvent) -> None:
         """Idempotently materialize the event selected by its reservation."""
+        await self._add_event(session_id, event)
+
+    async def add_input_event(self, session_id: str, event: BaseEvent, admission) -> None:
+        """Commit acceptance and the immutable user event in one Mongo write."""
+        from app.domain.models.event import MessageEvent
+        from app.domain.models.input_admission import InputAdmission
+        if not isinstance(event, MessageEvent) or event.role != "user":
+            raise ValueError("Only a user message can be accepted for delivery")
+        if not isinstance(admission, InputAdmission) or admission.state != "pending":
+            raise ValueError("New input admission must be pending")
+        await self._add_event(session_id, event, admission=admission)
+
+    async def _add_event(self, session_id: str, event: BaseEvent, *, admission=None) -> None:
         producer_event_id = event.bind_producer_event_id()
         producer_event_key = self._producer_event_key(producer_event_id)
         payload_digest = self._event_payload_digest(event)
         await self.reserve_event_sequence(session_id, event)
         if event.seq is None:  # Narrow the type after the repository contract.
             raise RuntimeError("Event reservation did not assign a sequence")
+        # Fence before the event write, not after it: otherwise another process
+        # could claim an old checkpoint in the cross-collection commit gap.
+        await self._mark_user_event_progress(session_id, event, durable=False)
 
         event_key = f"{session_id}:{event.id}"
         legacy_producer_key = f"{session_id}:{producer_event_id}"
@@ -558,6 +644,7 @@ class MongoSessionRepository(SessionRepository):
                 expected_seq=event.seq,
                 payload_digest=payload_digest,
             )
+            await self._mark_user_event_progress(session_id, event, durable=True)
             return
 
         document = {
@@ -570,6 +657,8 @@ class MongoSessionRepository(SessionRepository):
             "event": event.model_dump(),
             "created_at": datetime.now(UTC),
         }
+        if admission is not None:
+            document["input_admission"] = admission.model_dump(mode="python")
         for attempt in range(SESSION_EVENT_WRITE_ATTEMPTS):
             try:
                 persisted = await collection.find_one_and_update(
@@ -589,6 +678,7 @@ class MongoSessionRepository(SessionRepository):
                     expected_seq=event.seq,
                     payload_digest=payload_digest,
                 )
+                await self._mark_user_event_progress(session_id, event, durable=True)
                 return
             except DuplicateKeyError:
                 # The producer, legacy event-key, or sequence unique index may
@@ -613,6 +703,7 @@ class MongoSessionRepository(SessionRepository):
                     expected_seq=event.seq,
                     payload_digest=payload_digest,
                 )
+                await self._mark_user_event_progress(session_id, event, durable=True)
                 return
             except ConnectionFailure:
                 if attempt == SESSION_EVENT_WRITE_ATTEMPTS - 1:
@@ -626,6 +717,42 @@ class MongoSessionRepository(SessionRepository):
                     SESSION_EVENT_WRITE_ATTEMPTS,
                 )
                 await asyncio.sleep(delay)
+
+    async def _mark_user_event_progress(self, session_id: str, event: BaseEvent, *, durable: bool) -> None:
+        from app.domain.models.event import MessageEvent
+        if not isinstance(event, MessageEvent) or event.role != "user":
+            return
+        if type(event.seq) is not int or not 0 < event.seq <= MAX_EVENT_SEQUENCE:
+            raise ValueError("User input fence requires a reserved sequence")
+        field = "latest_user_event_seq" if durable else "latest_user_input_fence_seq"
+        result = await SessionDocument.get_pymongo_collection().update_one(
+            {"session_id": session_id}, {"$max": {field: event.seq}})
+        if not result.matched_count:
+            raise ValueError("Session not found while fencing user input")
+
+    async def record_event_transport_alias(self, session_id: str, event: BaseEvent) -> None:
+        """Update only the non-semantic Redis cursor after durable publication.
+
+        Event IDs are explicitly excluded from the immutable payload digest;
+        producer identity and seq remain unchanged throughout this update.
+        """
+        await SessionEventDocument.get_pymongo_collection().update_one(
+            {"session_id": session_id,
+             "producer_event_key": self._producer_event_key(event.bind_producer_event_id())},
+            {"$set": {"event.id": event.id}})
+
+    async def resolve_event_sequence(self, session_id: str, event_id: str) -> int | None:
+        """Bridge event-id-only clients onto durable replay, including a crash
+        between Mongo commit and Redis cursor/alias publication.
+        """
+        if not isinstance(event_id, str) or not event_id or len(event_id) > 128:
+            return None
+        document = await SessionEventDocument.get_pymongo_collection().find_one(
+            {"session_id": session_id, "$or": [
+                {"event.id": event_id}, {"event_key": f"{session_id}:{event_id}"},
+                {"producer_event_key": self._producer_event_key(event_id)},
+            ]}, {"seq": 1, "event.seq": 1})
+        return self._stored_event_sequence(document)
 
     async def claim_client_message_id(self, session_id: str, client_message_id: str) -> bool:
         """Atomically reserve a message ID within a session."""
@@ -751,6 +878,56 @@ class MongoSessionRepository(SessionRepository):
             event.seq = stored_seq
             events.append(event)
         return events
+
+    async def get_history_page(
+        self, session_id: str, *, turns: int = 5, before_seq: int | None = None,
+    ) -> SessionHistoryPage:
+        """Indexed whole-turn window, with the original legacy seq projection.
+
+        This deliberately limits *turns*, not individual events: splitting a
+        tool call/result or a plan lifecycle would change replay semantics. An
+        unusually large single turn still loads fully; callers must not claim
+        a hard byte/event cap for this endpoint.
+        """
+        if type(turns) is not int or not 1 <= turns <= 20:
+            raise ValueError("turns must be between 1 and 20")
+        if before_seq is not None and (type(before_seq) is not int or not 1 <= before_seq <= MAX_EVENT_SEQUENCE):
+            raise ValueError("invalid history cursor")
+        collection = SessionEventDocument.get_pymongo_collection()
+        legacy = await collection.find_one({"session_id": session_id, "$or": [
+            {"seq": {"$not": {"$type": ["int", "long"]}}},
+            {"seq": {"$lte": 0}}, {"seq": {"$gt": MAX_EVENT_SEQUENCE}},
+        ]}, {"_id": 1})
+        if legacy is not None:
+            return page_legacy_history(await self.get_events(session_id), turns=turns, before_seq=before_seq)
+
+        upper_query: dict = {"session_id": session_id}
+        if before_seq is not None:
+            upper_query["seq"] = {"$lt": before_seq}
+        # Freeze the upper watermark so events appended while this page is
+        # being assembled are handled by the normal SSE continuation exactly.
+        latest = await collection.find_one(upper_query, {"seq": 1}, sort=[("seq", -1)])
+        if latest is None:
+            return SessionHistoryPage([], False, None)
+        watermark = latest["seq"]
+        boundaries = await collection.find({
+            "session_id": session_id, "seq": {"$lte": watermark},
+            "event.type": "message", "event.role": "user",
+        }, {"seq": 1}).sort("seq", -1).limit(turns + 1).to_list(length=turns + 1)
+        has_more = len(boundaries) > turns
+        start = boundaries[turns - 1]["seq"] if has_more else 1
+        documents = await collection.find({
+            "session_id": session_id, "seq": {"$gte": start, "$lte": watermark},
+        }, {"seq": 1, "event": 1}).sort("seq", 1).to_list(length=None)
+        adapter = TypeAdapter(AgentEvent)
+        events = []
+        for document in documents:
+            event = adapter.validate_python(document["event"])
+            if event.seq is not None and event.seq != document["seq"]:
+                raise RuntimeError("Persisted event sequence envelope is inconsistent")
+            event.seq = document["seq"]
+            events.append(event)
+        return SessionHistoryPage(events, has_more, start if has_more else None)
 
     async def add_execution_snapshot(
         self,

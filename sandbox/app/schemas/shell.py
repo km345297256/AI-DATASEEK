@@ -7,6 +7,7 @@ class ShellExecRequest(BaseModel):
     id: Optional[str] = Field(None, description="Unique identifier of the target shell session, if not provided, one will be automatically created")
     exec_dir: Optional[str] = Field(None, description="Working directory for command execution (must use absolute path)")
     command: str = Field(..., description="Shell command to execute")
+    operation_id: Optional[str] = Field(None, pattern=r"^[0-9a-f]{32}$", strict=True)
     credentials: dict[str, SecretStr] = Field(default_factory=dict, exclude=True, repr=False)
 
     @field_validator("credentials")
@@ -21,16 +22,24 @@ class ShellExecRequest(BaseModel):
         return values
 
 
+class ShellOperationStatusRequest(BaseModel):
+    """Read-only lookup of one original execution, not the current shell."""
+    id: str = Field(min_length=1, strict=True)
+    operation_id: str = Field(pattern=r"^[0-9a-f]{32}$", strict=True)
+
+
 class ShellViewRequest(BaseModel):
     """Shell session content view request model"""
     id: str = Field(..., description="Unique identifier of the target shell session")
     console: Optional[bool] = Field(False, description="Whether to return console records")
+    operation_id: Optional[str] = Field(None, pattern=r"^[0-9a-f]{32}$", strict=True)
 
 
 class ShellWaitRequest(BaseModel):
     """Shell process wait request model"""
     id: str = Field(..., description="Unique identifier of the target shell session")
     seconds: Optional[int] = Field(None, description="Wait time (seconds)")
+    operation_id: Optional[str] = Field(None, pattern=r"^[0-9a-f]{32}$", strict=True)
 
 
 class ShellWriteToProcessRequest(BaseModel):
@@ -43,3 +52,4 @@ class ShellWriteToProcessRequest(BaseModel):
 class ShellKillProcessRequest(BaseModel):
     """Request model for terminating a running process"""
     id: str = Field(..., description="Unique identifier of the target shell session")
+    operation_id: Optional[str] = Field(None, pattern=r"^[0-9a-f]{32}$", strict=True)

@@ -99,12 +99,6 @@ class _Exchange:
     tool_indices: tuple[int, ...]
 
 
-@dataclass(slots=True)
-class _IndexedMessage:
-    original_index: int | None
-    message: AnyMessage
-
-
 def _ceil_div3(byte_count: int) -> int:
     return (byte_count + 2) // 3
 
@@ -501,16 +495,18 @@ def prepare_context(
 
     schemas = tuple(tool_schemas)
     source_messages = tuple(messages)
-    working = [
-        _IndexedMessage(index, _copy_message(message))
-        for index, message in enumerate(source_messages)
+    copied_messages = [_copy_message(message) for message in source_messages]
+    # The versioned estimator is additive. Keep request-local contributions,
+    # not a global content cache: mutable provider messages, credentials and
+    # catalog revisions must never reuse stale estimates across requests.
+    tool_tokens = estimate_tool_tokens(schemas)
+    message_tokens = [
+        _estimate_message(message, image_tokens=image_tokens)
+        for message in copied_messages
     ]
-    copied_messages = [item.message for item in working]
-    input_tokens_before, tool_tokens = estimate_context_tokens(
-        copied_messages,
-        tool_schemas=schemas,
-        response_format=response_format,
-        image_tokens=image_tokens,
+    input_tokens_before = (
+        3 + sum(message_tokens) + tool_tokens
+        + _estimate_response_format(response_format)
     )
     current_tokens = input_tokens_before
     records: list[CompactionRecord] = []
@@ -534,17 +530,8 @@ def prepare_context(
     for original_index in compressible_indices:
         if current_tokens <= input_limit:
             break
-        entry = next(
-            (
-                item
-                for item in working
-                if item.original_index == original_index
-            ),
-            None,
-        )
-        if entry is None:
-            continue
-        content = getattr(entry.message, "content", None)
+        original_message = copied_messages[original_index]
+        content = getattr(original_message, "content", None)
         if not isinstance(content, str) or _utf8_tokens(content) <= max_tool_text_tokens:
             continue
         compacted, digest = _compact_tool_text(
@@ -552,21 +539,18 @@ def prepare_context(
             max_tokens=max_tool_text_tokens,
         )
         before = current_tokens
-        entry.message = entry.message.model_copy(
+        candidate_message = original_message.model_copy(
             update={"content": compacted},
             deep=True,
         )
-        current_tokens, _ = estimate_context_tokens(
-            [item.message for item in working],
-            tool_schemas=schemas,
-            response_format=response_format,
-            image_tokens=image_tokens,
-        )
+        candidate_tokens = _estimate_message(candidate_message, image_tokens=image_tokens)
+        current_tokens += candidate_tokens - message_tokens[original_index]
         if current_tokens >= before:
             # A pathological marker/reference set must not make context larger.
-            entry.message = _copy_message(source_messages[original_index])
             current_tokens = before
             continue
+        copied_messages[original_index] = candidate_message
+        message_tokens[original_index] = candidate_tokens
         _append_record(records, CompactionRecord(
             kind="tool_text_compacted",
             start_message_index=original_index,
@@ -582,43 +566,33 @@ def prepare_context(
     # earlier exchanges after the latest user request. Always retain the newest
     # complete exchange as evidence and never touch pending/unpaired calls.
     latest_exchange = exchanges[-1] if exchanges else None
+    omitted_indices: set[int] = set()
+    omission_markers: dict[int, AnyMessage] = {}
     for exchange in exchanges:
         if current_tokens <= input_limit:
             break
         if exchange is latest_exchange:
             continue
-        positions = [
-            position
-            for position, item in enumerate(working)
-            if item.original_index is not None
-            and exchange.start <= item.original_index < exchange.end
-        ]
-        if len(positions) != exchange.end - exchange.start:
-            continue
-        unit_messages = [working[position].message for position in positions]
+        # _complete_exchanges returns disjoint ranges in source order. Retain
+        # those indices until final assembly so omissions need no repeated
+        # whole-history scan, copy or token/schema re-estimation.
+        unit_messages = copied_messages[exchange.start:exchange.end]
         digest = _private_digest({
             "purpose": "context-budget/completed-exchange/v1",
             "messages": [
                 _message_private_payload(message) for message in unit_messages
             ],
         })
-        marker = _IndexedMessage(None, _omission_marker(exchange, digest))
-        first_position = positions[0]
-        candidate = (
-            working[:first_position]
-            + [marker]
-            + working[positions[-1] + 1 :]
-        )
-        candidate_tokens, _ = estimate_context_tokens(
-            [item.message for item in candidate],
-            tool_schemas=schemas,
-            response_format=response_format,
-            image_tokens=image_tokens,
+        marker = _omission_marker(exchange, digest)
+        candidate_tokens = (
+            current_tokens - sum(message_tokens[exchange.start:exchange.end])
+            + _estimate_message(marker, image_tokens=image_tokens)
         )
         if candidate_tokens >= current_tokens:
             continue
         before = current_tokens
-        working = candidate
+        omitted_indices.update(range(exchange.start, exchange.end))
+        omission_markers[exchange.start] = marker
         current_tokens = candidate_tokens
         _append_record(records, CompactionRecord(
             kind="completed_exchange_omitted",
@@ -635,7 +609,11 @@ def prepare_context(
         raise ContextBudgetExceeded(ContextBudgetFailure.FIXED_CONTEXT_TOO_LARGE)
 
     return PreparedContext(
-        messages=[item.message for item in working],
+        messages=[
+            omission_markers[index] if index in omission_markers else message
+            for index, message in enumerate(copied_messages)
+            if index not in omitted_indices or index in omission_markers
+        ],
         input_tokens_before=input_tokens_before,
         input_tokens_after=current_tokens,
         tool_tokens=tool_tokens,

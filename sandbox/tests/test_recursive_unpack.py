@@ -5,13 +5,22 @@ import os
 from pathlib import Path
 import shutil
 import stat
+import struct
 import subprocess
 import sys
 import zipfile
 
 import pytest
 
-from scripts.recursive_unpack import Limits, UnpackError, unpack_recursive
+from scripts.recursive_unpack import (
+    Limits,
+    UnpackError,
+    ZIP_DIRECTORY_MAX_BYTES,
+    ZIP_METADATA_MAX_BYTES,
+    archive_kind,
+    unpack_recursive,
+    zip_container_kind,
+)
 
 
 # ISC-licensed fixture from markokr/rarfile test/files/rar3-subdirs.rar.
@@ -38,6 +47,137 @@ def _zip_bytes(files: dict[str, bytes]) -> bytes:
         for name, content in files.items():
             archive.writestr(name, content)
     return output.getvalue()
+
+
+def _office_bytes(part: str, mime: str) -> bytes:
+    return _zip_bytes({
+        "[Content_Types].xml": (
+            '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'
+            f'<Override PartName="/{part}" ContentType="{mime}"/>'
+            '</Types>'
+        ).encode(),
+        "_rels/.rels": b"<Relationships/>",
+        part: b"<document/>",
+    })
+
+
+@pytest.mark.parametrize("filename,part,mime,kind", [
+    ("renamed.zip", "xl/workbook.xml", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml", "excel"),
+    ("report.bin", "xl/workbook.xml", "application/vnd.ms-excel.sheet.macroEnabled.main+xml", "excel"),
+    ("notes.xlsx", "word/document.xml", "application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml", "word"),
+    ("slides.pptx", "ppt/presentation.xml", "application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml", "presentation"),
+])
+def test_office_containers_are_identified_by_package_type_not_filename(tmp_path, filename, part, mime, kind):
+    source = tmp_path / filename
+    source.write_bytes(_office_bytes(part, mime))
+    assert zip_container_kind(source) == kind
+    assert archive_kind(source) is None
+    with pytest.raises(UnpackError, match="not a supported"):
+        unpack_recursive(source, tmp_path / "unpacked", Limits())
+    assert not (tmp_path / "unpacked").exists()
+
+
+@pytest.mark.parametrize("members,kind", [
+    ({"mimetype": b"application/vnd.oasis.opendocument.spreadsheet", "content.xml": b"<document/>", "META-INF/manifest.xml": b"<manifest/>"}, "opendocument"),
+    ({"mimetype": b"application/epub+zip", "META-INF/container.xml": b"<container/>"}, "epub"),
+    ({"one.npy": b"\x93NUMPY\x01\x00", "two.npy": b"\x93NUMPY\x01\x00"}, "numpy"),
+    ({"META-INF/MANIFEST.MF": b"Manifest-Version: 1.0\n", "Main.class": b"\xca\xfe\xba\xbe"}, "java"),
+])
+def test_other_zip_based_formats_are_not_recursively_unpacked(tmp_path, members, kind):
+    source = tmp_path / "container.zip"
+    source.write_bytes(_zip_bytes(members))
+    assert zip_container_kind(source) == kind
+    assert archive_kind(source) is None
+
+
+def test_ordinary_zip_with_workbook_extension_still_recurses(tmp_path):
+    nested = _zip_bytes({"values.csv": b"x,y\n1,2\n"})
+    source = tmp_path / "misnamed.xlsx"
+    source.write_bytes(_zip_bytes({"also-misnamed.xlsx": nested}))
+    assert zip_container_kind(source) is None
+    assert archive_kind(source) == "zip"
+    manifest = unpack_recursive(source, tmp_path / "unpacked", Limits())
+    assert manifest["summary"]["archive_count"] == 2
+    assert manifest["files"][0]["path"].endswith("/values.csv")
+
+
+def test_nested_office_files_remain_intact_and_count_against_existing_limits(tmp_path):
+    workbook = _office_bytes("xl/workbook.xml", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml")
+    nested = _zip_bytes({"table.xlsx": workbook})
+    source = tmp_path / "dataset.zip"
+    source.write_bytes(_zip_bytes({"nested.zip": nested, "renamed.zip": workbook}))
+    output = tmp_path / "unpacked"
+    manifest = unpack_recursive(source, output, Limits())
+    assert manifest["summary"]["archive_count"] == 2
+    assert {item["path"] for item in manifest["files"]} == {"nested_contents/table.xlsx", "renamed.zip"}
+    assert (output / "nested_contents/table.xlsx").read_bytes() == workbook
+    assert (output / "renamed.zip").read_bytes() == workbook
+    with pytest.raises(UnpackError, match="single file exceeds"):
+        unpack_recursive(source, tmp_path / "limited", Limits(max_single_file_bytes=len(workbook) - 1))
+    assert not (tmp_path / "limited").exists()
+
+
+def test_zip_identification_bounds_directory_before_loading_it(tmp_path):
+    source = tmp_path / "oversized.zip"
+    data = bytearray(_zip_bytes({"values.csv": b"x\n1\n"}))
+    end = data.rfind(b"PK\x05\x06")
+    struct.pack_into("<L", data, end + 12, ZIP_DIRECTORY_MAX_BYTES + 1)
+    source.write_bytes(data)
+    with pytest.raises(UnpackError, match="identification metadata exceeds"):
+        archive_kind(source)
+
+
+@pytest.mark.parametrize("oversized", [False, True])
+def test_zip64_directory_budget_is_checked_even_without_legacy_sentinel(tmp_path, oversized):
+    source = tmp_path / "zip64.zip"
+    data = _zip_bytes({"values.csv": b"x\n1\n"})
+    end = data.rfind(b"PK\x05\x06")
+    record = struct.unpack_from("<4s4H2LH", data, end)
+    directory_bytes = ZIP_DIRECTORY_MAX_BYTES + 1 if oversized else record[5]
+    zip64 = struct.pack("<4sQ2H2L4Q", b"PK\x06\x06", 44, 45, 45, 0, 0,
+                        record[4], record[4], directory_bytes, record[6])
+    locator = struct.pack("<4sLQL", b"PK\x06\x07", 0, end, 1)
+    source.write_bytes(data[:end] + zip64 + locator + data[end:])
+    if oversized:
+        with pytest.raises(UnpackError, match="identification metadata exceeds"):
+            archive_kind(source)
+    else:
+        assert archive_kind(source) == "zip"
+        manifest = unpack_recursive(source, tmp_path / "unpacked", Limits())
+        assert manifest["summary"]["file_count"] == 1
+
+
+def test_zip_identification_bounds_decompressed_format_metadata(tmp_path):
+    source = tmp_path / "metadata-bomb.xlsx"
+    source.write_bytes(_zip_bytes({
+        "[Content_Types].xml": b"x" * (ZIP_METADATA_MAX_BYTES + 1),
+        "_rels/.rels": b"<Relationships/>",
+        "xl/workbook.xml": b"<workbook/>",
+    }))
+    with pytest.raises(UnpackError, match="format metadata exceeds"):
+        archive_kind(source)
+
+
+@pytest.mark.parametrize("encoding", ["utf-8", "utf-16", "utf-32"])
+def test_container_metadata_rejects_entity_declarations_before_xml_parsing(tmp_path, encoding):
+    source = tmp_path / "entities.xlsx"
+    source.write_bytes(_zip_bytes({
+        "[Content_Types].xml": '<!DOCTYPE Types [<!ENTITY item "unsafe">]><Types>&item;</Types>'.encode(encoding),
+        "_rels/.rels": b"<Relationships/>",
+        "xl/workbook.xml": b"<workbook/>",
+    }))
+    with pytest.raises(UnpackError, match="entity declarations"):
+        archive_kind(source)
+
+
+def test_office_recognition_does_not_bypass_unsafe_member_checks(tmp_path):
+    source = tmp_path / "unsafe.xlsx"
+    data = _office_bytes("xl/workbook.xml", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml")
+    source.write_bytes(data)
+    with zipfile.ZipFile(source, "a") as archive:
+        archive.writestr("../escape.txt", b"unsafe")
+    with pytest.raises(UnpackError, match="unsafe member path"):
+        archive_kind(source)
 
 
 def test_recursively_extracts_nested_zip_and_writes_final_manifest(tmp_path):

@@ -86,21 +86,4 @@ export const router = createRouter({
 
 installFilePanelRouteLifecycle(router)
 
-let rendererConfigsLoaded = false
-
-router.afterEach(() => {
-  if (rendererConfigsLoaded) return
-
-  rendererConfigsLoaded = true
-  void Promise.all([
-    import('@/api/renderer'),
-    import('@/renderers/registry'),
-  ])
-    .then(([{ listRendererConfigs }, { mergeRendererConfigs }]) => listRendererConfigs().then(mergeRendererConfigs))
-    .catch((error) => {
-      rendererConfigsLoaded = false
-      console.warn('Failed to preload renderer configs:', error)
-    })
-})
-
 export default router

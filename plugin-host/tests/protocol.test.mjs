@@ -118,6 +118,12 @@ test('stdio server speaks only NDJSON JSON-RPC and keeps a valid snapshot after 
   assert.deepEqual(initial.result.tools[0].presentation, { kind: 'auto' })
   assert.equal(JSON.stringify(initial).includes(root), false)
 
+  const visualizations = await client.request('visualizations.snapshot')
+  assert.equal(visualizations.result.engine, 'cordis')
+  assert.equal(visualizations.result.plugins.length, 14)
+  const visualizationReload = await client.request('visualizations.reload')
+  assert.deepEqual(visualizationReload.result, visualizations.result)
+
   await writeManifest(root, 'duplicate', {
     ...validManifest(),
     plugin: 'duplicate',
@@ -145,7 +151,7 @@ test('stdio server speaks only NDJSON JSON-RPC and keeps a valid snapshot after 
 
   assert.equal(exitCode, 0)
   assert.equal(stderr.join(''), '')
-  assert.equal(client.frames.length, 6)
+  assert.equal(client.frames.length, 8)
   for (const frame of client.frames) {
     assert.equal(frame.jsonrpc, '2.0')
     assert.equal(JSON.stringify(frame).includes(root), false)

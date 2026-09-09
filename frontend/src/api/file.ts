@@ -17,6 +17,29 @@ export interface FileInfo {
   file_url?: string;
 }
 
+export interface FilePreviewPage {
+  version: string;
+  offset: number;
+  next_offset: number | null;
+  total_bytes: number;
+  text: string;
+  headers: string[];
+  rows: string[][];
+  columns_truncated: boolean;
+  delimiter: ',' | '\t' | null;
+  header_pending: boolean;
+  bytes_read: number;
+}
+
+export async function getFilePreviewPage(
+  fileId: string,
+  options: { mode: 'text' | 'csv'; offset?: number; version?: string; delimiter?: ',' | '\t'; header_pending?: boolean; signal?: AbortSignal },
+): Promise<FilePreviewPage> {
+  const { signal, ...params } = options;
+  const response = await apiClient.get<ApiResponse<FilePreviewPage>>(`/files/${encodeURIComponent(fileId)}/preview`, { params, signal });
+  return response.data.data;
+}
+
 export interface ShapefilePreviewLayer {
   name: string;
   relative_path: string;

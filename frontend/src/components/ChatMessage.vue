@@ -100,6 +100,12 @@
         </button>
       </div>
     </template>
+    <AnalysisOutcomeNotice
+      v-if="analysisOutcome"
+      :outcome="analysisOutcome"
+      :allow-resume="allowAnalysisResume && !isShare && !safetyReview"
+      @resume="$emit('resumeAnalysis')"
+    />
     <Teleport to="body">
       <div v-if="feedbackDialogOpen" class="fixed inset-0 z-[100] flex items-center justify-center bg-black/55 p-4" @click.self="closeFeedbackDialog">
         <section class="w-full max-w-[560px] rounded-lg bg-[#242424] p-4 text-white shadow-2xl" role="dialog" aria-modal="true" aria-label="分享反馈">
@@ -176,6 +182,8 @@ import { ToolContent, StepContent } from '../types/message';
 import { useRelativeTime } from '../composables/useTime';
 import AttachmentsMessage from './AttachmentsMessage.vue';
 import TaskExecutionSummary from './TaskExecutionSummary.vue';
+import AnalysisOutcomeNotice from './AnalysisOutcomeNotice.vue';
+import { readAnalysisOutcome } from '../utils/analysisOutcome';
 import { copyToClipboard } from '../utils/dom';
 import ToolApprovalCard from './ToolApprovalCard.vue';
 import { stripHiddenDatasetResultNotices } from '../utils/datasetResultPresentation';
@@ -194,6 +202,7 @@ const props = defineProps<{
   showAssistantActions?: boolean;
   showProductButton?: boolean;
   taskSummaryExpanded?: boolean;
+  allowAnalysisResume?: boolean;
 }>();
 
 const hideAssistantHeader = computed(() => props.hideHeader ?? false);
@@ -203,6 +212,7 @@ const emit = defineEmits<{
   (e: 'taskSummaryToggle'): void;
   (e: 'jupyterOpened', tool: ToolContent): void;
   (e: 'showProduct'): void;
+  (e: 'resumeAnalysis'): void;
 }>();
 
 const handleToolClick = (tool: ToolContent) => {
@@ -372,6 +382,7 @@ const stepContent = computed(() => props.message.content as StepContent);
 const messageContent = computed(() => props.message.content as MessageContent);
 const visibleAssistantContent = computed(() => stripHiddenDatasetResultNotices(messageContent.value.content));
 const safetyReview = computed(() => messageContent.value.metadata?.safety_review);
+const analysisOutcome = computed(() => readAnalysisOutcome(messageContent.value.metadata?.analysis_outcome));
 const safetyUnavailable = computed(() => safetyReview.value?.categories.includes('safety_review_unavailable') ?? false);
 
 const safetyCategoryLabels: Record<string, string> = {

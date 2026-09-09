@@ -91,7 +91,7 @@ async def test_code_mode_preserves_governance_cancellation_and_rejects_write_too
     flow.plugin_toolkit.tool_execution_pipeline.register(Stop())
     with pytest.raises(ModelBudgetStopped) as caught:
         await code_tool.ainvoke({"id": "cancelled", "args": {
-            "code": 'r = await tools.call("data_format_inspect", {"input_paths": []})\nr',
+            "code": 'r = await tools.call("data_format_inspect", {"input_paths": ["/home/ubuntu/datasets/test/table.csv"]})\nr',
         }})
     assert caught.value is signal
     flow.plugin_toolkit.call_tool.assert_not_awaited()
@@ -102,7 +102,7 @@ async def test_agent_sse_retains_source_identity_but_never_source_program(flow_f
     flow = flow_factory(_profile())
     flow.configure_tool_execution()
     flow.plugin_toolkit.call_tool = AsyncMock(return_value=ToolResult(success=True, data={"ok": True}))
-    source = 'private = "PRIVATE_DATASET_VALUE"\nr = await tools.call("data_format_inspect", {"input_paths": []})\nr'
+    source = 'private = "PRIVATE_DATASET_VALUE"\nr = await tools.call("data_format_inspect", {"input_paths": ["/home/ubuntu/datasets/test/table.csv"]})\nr'
     agent = flow.executor
     agent.ask = AsyncMock(return_value=AIMessage(content="", tool_calls=[{
         "name": "code_mode_run", "id": "code-event", "args": {"code": source},
@@ -145,7 +145,7 @@ async def test_code_mode_inner_calls_keep_individual_jobs_and_read_only_authoriz
     flow.configure_tool_execution()
     flow.plugin_toolkit.call_tool = AsyncMock(return_value=ToolResult(success=True, data={"ok": True}))
     result = await flow.executor.get_tool("code_mode_run").ainvoke({"id": "code-jobs", "args": {
-        "code": 'first = await tools.call("data_format_inspect", {"input_paths": []})\nsecond = await tools.call("data_format_inspect", {"input_paths": []})\n{"first": first, "second": second}',
+        "code": 'first = await tools.call("data_format_inspect", {"input_paths": ["/home/ubuntu/datasets/test/table.csv"]})\nsecond = await tools.call("data_format_inspect", {"input_paths": ["/home/ubuntu/datasets/test/table.csv"]})\n{"first": first, "second": second}',
     }})
     records = list(jobs.records.values())
     assert len(records) == 2
@@ -159,3 +159,23 @@ async def test_code_mode_inner_calls_keep_individual_jobs_and_read_only_authoriz
     }
     assert not approvals.records  # The five admitted tools need no elevated consent.
     assert flow.plugin_toolkit.call_tool.await_count == 2
+
+
+@pytest.mark.asyncio
+async def test_code_mode_rejects_invalid_inner_arguments_before_admission(flow_factory):
+    flow = flow_factory(_profile())
+    flow.configure_tool_execution()
+    flow.plugin_toolkit.call_tool = AsyncMock()
+    admitted = []
+
+    class Observe(ToolExecutionInterceptor):
+        async def pre_execute(self, context):
+            admitted.append(context.tool_name)
+
+    flow.plugin_toolkit.tool_execution_pipeline.register(Observe())
+    with pytest.raises(CodeModeToolCallError):
+        await flow.executor.get_tool("code_mode_run").ainvoke({"id": "invalid-inner", "args": {
+            "code": 'r = await tools.call("data_format_inspect", {"input_paths": []})\nr',
+        }})
+    flow.plugin_toolkit.call_tool.assert_not_awaited()
+    assert admitted == []

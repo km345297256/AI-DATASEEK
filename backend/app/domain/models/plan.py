@@ -2,6 +2,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 from typing import List, Dict, Any, Optional
 from enum import Enum
 import uuid
+from app.domain.models.analysis_outcome import DeliverableRequirement, AnalysisOutcome
 
 class ExecutionStatus(str, Enum):
     PENDING = "pending"
@@ -49,6 +50,8 @@ class Step(BaseModel):
     error: Optional[str] = None
     success: bool = False
     attachments: List[str] = Field(default_factory=list)
+    deliverables: List[DeliverableRequirement] = Field(default_factory=list, max_length=16)
+    outcome: Optional[AnalysisOutcome] = None
 
     @field_validator("status", mode="before")
     @classmethod

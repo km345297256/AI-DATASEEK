@@ -366,7 +366,9 @@ async def test_non_substantive_ask_user_is_not_invoked_or_emitted(ask_text):
     final_event = next(event for event in events if isinstance(event, MessageEvent))
     assert "当前文件不包含可验证的空间坐标范围" in final_event.message
     corrective_messages = agent.ask_with_messages.await_args.args[0]
-    assert len(corrective_messages) == 1
+    assert len(corrective_messages) == 2
+    assert "safe, verified progress" in corrective_messages[-1].content
+    assert "Execution budget" not in corrective_messages[-1].content
     assert isinstance(corrective_messages[0], ToolMessage)
     assert corrective_messages[0].tool_call_id == "ask-placeholder"
     assert "invalid_user_question" in corrective_messages[0].content
@@ -1034,7 +1036,9 @@ async def test_unknown_tool_call_receives_tool_message_before_next_model_turn():
 
     assert not any(event.error == "Unknown tool: removed_tool" for event in events if hasattr(event, "error"))
     assert len(responses) == 1
-    assert len(responses[0]) == 1
+    assert len(responses[0]) == 2
+    assert "safe, verified progress" in responses[0][-1].content
+    assert "Execution budget" not in responses[0][-1].content
     assert isinstance(responses[0][0], ToolMessage)
     assert responses[0][0].tool_call_id == "call-unknown"
 

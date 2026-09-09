@@ -81,6 +81,7 @@ class AgentStatus(str, Enum):
     UPDATING = "updating"
 
 class PlanActFlow(BaseFlow):
+    supports_artifact_repair = True
     # Follow-up dataset questions need conversational continuity, but replaying a
     # complete event/tool transcript would make the hot path slow and noisy. Keep
     # only a small, deterministic window of user/assistant text.
@@ -403,7 +404,6 @@ class PlanActFlow(BaseFlow):
             core = [toolkit for toolkit in self._non_plugin_toolkits
                     if isinstance(toolkit, (DatasetCatalogToolkit, SpillArtifactToolkit))]
             overrides = self._agent_llm_overrides(base_overrides, key)
-            overrides["max_iterations"] = 4
             agent = ExecutionAgent(
                 agent_id=self._agent_id, agent_repository=self._repository,
                 tools=[view, discovery, *core],
@@ -775,9 +775,19 @@ class PlanActFlow(BaseFlow):
             )
 
         await self._session_repository.update_status(self._session_id, SessionStatus.RUNNING)
-        events = await self._session_repository.get_events(self._session_id)
+        events = getattr(message, "_session_events_snapshot", None)
+        if events is None:
+            events = await self._session_repository.get_events(self._session_id)
         last_plan_event = next((e for e in reversed(events) if isinstance(e, PlanEvent)), None)
         self.plan = last_plan_event.plan if last_plan_event else None
+        if message._resume_checkpoint:
+            self.plan = Plan.model_validate(message._resume_checkpoint["plan"])
+            for unfinished in self.plan.steps:
+                if not unfinished.success:
+                    unfinished.status = ExecutionStatus.PENDING
+                    unfinished.outcome = None
+            self.status = AgentStatus.EXECUTING
+            self._dataset_fast_path_active = len(self.plan.steps) == 1
         self.session_context = self._render_session_context(
             events,
             current_user_message=message.message,
@@ -846,6 +856,7 @@ class PlanActFlow(BaseFlow):
                             self.plan = event.plan
                             self._normalize_plan_agents()
                             self._ensure_vision_step_for_image_message(message)
+                            self._bind_delivery_contract(message)
                             logger.info(
                                 "Agent created plan agent=%s step_count=%d",
                                 opaque_log_identifier(self._agent_id, namespace="agent"),
@@ -903,8 +914,21 @@ class PlanActFlow(BaseFlow):
                         yield event
                     complete_after_vision_step = self._should_complete_after_vision_step()
                 else:
-                    async for event in executor.execute_step(self.plan, step, message):
-                        yield event
+                    execution_message = message
+                    while True:
+                        # The outer runner validates/upload-checks the terminal
+                        # StepEvent before this generator resumes. It can offer
+                        # host-authorized local repair feedback for this step.
+                        async for event in executor.execute_step(self.plan, step, execution_message):
+                            yield event
+                        feedback = getattr(self, "_artifact_repair_requests", {}).pop(step.id, None)
+                        if not feedback:
+                            break
+                        execution_message = message.model_copy(deep=True)
+                        execution_message._artifact_repair_context = feedback
+                        step.outcome = None
+                        step.error = None
+                        step.status = ExecutionStatus.PENDING
                 logger.info(
                     "Agent completed step agent=%s step=%s",
                     opaque_log_identifier(self._agent_id, namespace="agent"),
@@ -946,6 +970,7 @@ class PlanActFlow(BaseFlow):
                 async for event in self.planner.update_plan(self.plan, step):
                     if isinstance(event, PlanEvent):
                         self._normalize_plan_agents()
+                        self._bind_delivery_contract(message)
                     yield event
                 logger.info(
                     "Agent plan update completed agent=%s from=%s to=%s",
@@ -971,8 +996,10 @@ class PlanActFlow(BaseFlow):
                 )
                 self.status = AgentStatus.COMPLETED
             elif self.status == AgentStatus.COMPLETED:
-                self.plan.status = ExecutionStatus.COMPLETED
                 self._finalize_incomplete_steps()
+                self.plan.status = (ExecutionStatus.COMPLETED
+                                    if all(item.success for item in self.plan.steps)
+                                    else ExecutionStatus.FAILED)
                 logger.info(
                     "Agent plan completed agent=%s",
                     opaque_log_identifier(self._agent_id, namespace="agent"),
@@ -1031,8 +1058,31 @@ class PlanActFlow(BaseFlow):
         )
         yield DoneEvent()
 
+    def _bind_delivery_contract(self, message: Message) -> None:
+        """Keep the task-level floor on the final step, not on discovery steps.
+
+        Files from earlier successful steps count towards this final check.
+        Replanning cannot silently discard the front-controller checklist.
+        """
+        if not self.plan or not self.plan.steps or not message.deliverables:
+            return
+        final = self.plan.steps[-1]
+        mandatory = [item.model_copy(deep=True) for item in message.deliverables]
+        # Keep additional planner requirements, but do not count the same
+        # requirement twice merely because two planning stages declared it.
+        for requirement in final.deliverables:
+            match = next((item for item in mandatory if item.kind == requirement.kind
+                          and set(item.formats) == set(requirement.formats)), None)
+            if match is None:
+                mandatory.append(requirement)
+            else:
+                match.min_count = max(match.min_count, requirement.min_count)
+        final.deliverables = mandatory
+
     @staticmethod
     def _status_after_execution_step(step: Step) -> AgentStatus:
+        if step.outcome and step.outcome.status != "succeeded":
+            return AgentStatus.COMPLETED
         if step.status == ExecutionStatus.COMPLETED and step.success:
             return AgentStatus.EXECUTING
         return AgentStatus.UPDATING
@@ -1222,6 +1272,7 @@ class PlanActFlow(BaseFlow):
                 Step(
                     id="dataset-fast-path",
                     agent="execution",
+                    deliverables=list(message.deliverables),
                     inputs={
                         # This selects a bounded, dataset-only tool scope. It does
                         # not select a workflow: the execution agent chooses whether
@@ -2320,5 +2371,6 @@ class PlanActFlow(BaseFlow):
             return
         for step in self.plan.steps:
             if step.status in (ExecutionStatus.PENDING, ExecutionStatus.RUNNING):
-                step.status = ExecutionStatus.COMPLETED
-                step.success = True
+                step.status = ExecutionStatus.FAILED
+                step.success = False
+                step.error = step.error or "Step was not executed to completion"

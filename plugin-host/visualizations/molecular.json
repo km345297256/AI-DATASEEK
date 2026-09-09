@@ -1,0 +1,34 @@
+{
+  "contract_version": 1,
+  "id": "molecular",
+  "version": "1.0.0",
+  "name": "分子与晶体结构",
+  "description": "分子及晶体结构三维预览",
+  "extensions": [
+    "cif",
+    "pdb",
+    "ent",
+    "mol",
+    "sdf",
+    "xyz",
+    "mol2",
+    "vasp"
+  ],
+  "filenames": [
+    "poscar",
+    "contcar"
+  ],
+  "view_kind": "structure",
+  "adapter": "molecular",
+  "data_kind": "file",
+  "reader": null,
+  "default_enabled": true,
+  "priority": 50,
+  "permissions": [
+    "file:read"
+  ],
+  "limits": {
+    "max_input_bytes": 268435456,
+    "max_output_bytes": 16777216
+  }
+}

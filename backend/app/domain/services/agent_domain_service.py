@@ -1,11 +1,12 @@
 from typing import Optional, AsyncGenerator, List
 import asyncio
 import logging
+import re
 import shutil
 import tempfile
 import uuid
 import weakref
-from datetime import datetime
+from datetime import UTC, datetime
 from app.domain.models.session import Session, SessionStatus
 from app.domain.external.sandbox import Sandbox
 from app.domain.external.search import SearchEngine
@@ -34,6 +35,9 @@ from app.application.services.dataset_request_resolver import DatasetRequestReso
 from app.application.services.jupyter_service import JupyterService
 from app.domain.services.lightweight_task_runner import LightweightTaskRunner
 from app.domain.services.tools.pipeline import opaque_log_identifier
+from app.domain.models.input_admission import AcceptedInput
+from app.domain.services.input_delivery import InputDeliveryService, InputLeaseLost
+from app.domain.services.analysis_checkpoint import configuration_digest
 
 # Setup logging
 logger = logging.getLogger(__name__)
@@ -41,6 +45,13 @@ logger = logging.getLogger(__name__)
 
 class _SandboxRetirementError(RuntimeError):
     pass
+
+
+class ContinuationRejected(ValueError):
+    """A stale or changed continuation is terminal, not retryable preparation."""
+
+
+CONTINUATION_MESSAGE = "继续未完成的分析"
 
 class AgentDomainService:
     """
@@ -62,6 +73,7 @@ class AgentDomainService:
         analysis_job_service=None,
         tool_approval_service=None,
         credential_service=None,
+        input_repository=None,
     ):
         self._repository = agent_repository
         self._session_repository = session_repository
@@ -76,9 +88,13 @@ class AgentDomainService:
         self._analysis_job_service = analysis_job_service
         self._tool_approval_service = tool_approval_service
         self._credential_service = credential_service
+        self._input_delivery = InputDeliveryService(input_repository, session_repository) if input_repository is not None else None
+        self._input_monitor: asyncio.Task | None = None
+        self._input_dispatching: set[tuple[str, str]] = set()
         self._dataset_service = DataCenterDatasetService()
         self._dataset_request_resolver = DatasetRequestResolver()
         self._chat_bootstrap_tasks: set[asyncio.Task] = set()
+        self._chat_bootstrap_sessions: dict[asyncio.Task, str] = {}
         self._jupyter_prewarm_tasks: set[asyncio.Task] = set()
         self._session_bootstrap_locks: weakref.WeakValueDictionary[str, asyncio.Lock] = (
             weakref.WeakValueDictionary()
@@ -88,6 +104,11 @@ class AgentDomainService:
     async def shutdown(self) -> None:
         """Clean up all Agent's resources"""
         logger.info("Starting to close all Agents")
+        input_monitor = getattr(self, "_input_monitor", None)
+        if input_monitor is not None:
+            input_monitor.cancel()
+            await asyncio.gather(input_monitor, return_exceptions=True)
+            self._input_monitor = None
         bootstrap_tasks = list(self._chat_bootstrap_tasks)
         for task in bootstrap_tasks:
             task.cancel()
@@ -138,6 +159,7 @@ class AgentDomainService:
         session: Session,
         dataset_ids: Optional[List[str]] = None,
         front_controller_resolution: Optional[FrontControllerResolution] = None,
+        session_events_snapshot: list | None = None,
     ) -> Task:
         """Create a new agent task"""
         await self._ensure_plugin_runtime_ready()
@@ -309,6 +331,9 @@ class AgentDomainService:
             analysis_job_service=self._analysis_job_service,
             tool_approval_service=self._tool_approval_service,
             credential_service=self._credential_service,
+            input_delivery=self._input_delivery,
+            session_events_snapshot=session_events_snapshot,
+            effective_dataset_ids=requested_dataset_ids,
         )
 
         task = self._task_cls.create(task_runner)
@@ -345,6 +370,7 @@ class AgentDomainService:
             session_repository=self._session_repository,
             file_storage=self._file_storage,
             llm_overrides=session.llm_overrides,
+            input_delivery=self._input_delivery,
         )
         task = self._task_cls.create(runner)
         session.task_id = task.id
@@ -513,6 +539,11 @@ class AgentDomainService:
             )
             raise RuntimeError("Session not found")
         task = await self._get_task(session)
+        for bootstrap, owner_session in tuple(getattr(self, "_chat_bootstrap_sessions", {}).items()):
+            if owner_session == session_id and bootstrap is not asyncio.current_task():
+                bootstrap.cancel()
+        if self._input_delivery is not None:
+            await self._input_delivery.cancel_session(session_id)
         if task:
             task.cancel()
         await self._session_repository.update_status(session_id, SessionStatus.COMPLETED)
@@ -524,6 +555,10 @@ class AgentDomainService:
             latest_session = await self._session_repository.find_by_id(session.id)
             if latest_session is not None:
                 session = latest_session
+
+            if self._input_delivery is not None:
+                await self._input_delivery.repository.disable_session(session.id)
+                await self._input_delivery.cancel_session(session.id)
 
             task = await self._get_task(session)
             if task is not None:
@@ -550,9 +585,14 @@ class AgentDomainService:
 
     def _track_chat_bootstrap(self, task: asyncio.Task, session_id: str) -> asyncio.Task:
         self._chat_bootstrap_tasks.add(task)
+        sessions = getattr(self, "_chat_bootstrap_sessions", None)
+        if sessions is None:
+            sessions = self._chat_bootstrap_sessions = {}
+        sessions[task] = session_id
 
         def on_done(done_task: asyncio.Task) -> None:
             self._chat_bootstrap_tasks.discard(done_task)
+            self._chat_bootstrap_sessions.pop(done_task, None)
             if done_task.cancelled():
                 return
             done_task.exception()
@@ -617,8 +657,14 @@ class AgentDomainService:
         dataset_ids: Optional[List[str]],
         mcp_access_all: bool,
         client_message_id: Optional[str],
+        resume_from: Optional[str] = None,
     ) -> Optional[Task]:
         """Serialize one session's bootstrap and refresh state inside the lock."""
+        input_generation = None
+        delivery = getattr(self, "_input_delivery", None)
+        get_generation = getattr(delivery.repository, "generation", None) if delivery is not None else None
+        if callable(get_generation):
+            input_generation = await get_generation(session.id)
         lock = self._session_bootstrap_locks.setdefault(session.id, asyncio.Lock())
         async with lock:
             find_session = getattr(
@@ -642,6 +688,8 @@ class AgentDomainService:
                 dataset_ids=dataset_ids,
                 mcp_access_all=mcp_access_all,
                 client_message_id=client_message_id,
+                resume_from=resume_from,
+                input_generation=input_generation,
             )
 
     async def _bootstrap_chat_task_locked(
@@ -656,7 +704,14 @@ class AgentDomainService:
         dataset_ids: Optional[List[str]],
         mcp_access_all: bool,
         client_message_id: Optional[str],
+        input_generation: int | None = None,
+        resume_from: Optional[str] = None,
     ) -> Optional[Task]:
+        if getattr(self, "_input_delivery", None) is not None:
+            return await self._bootstrap_durable_input(session, user_id, message, timestamp, attachments,
+                skills, mcp_servers, dataset_ids, mcp_access_all, client_message_id, input_generation, resume_from)
+        if resume_from:
+            raise ContinuationRejected("当前服务不支持安全续作，请检查原任务。")
         client_message_claimed = False
         queued_event_id: Optional[str] = None
         task: Optional[Task] = None
@@ -902,6 +957,301 @@ class AgentDomainService:
             await self._handle_chat_bootstrap_error(session.id, exc)
             raise
 
+    def start_input_recovery(self) -> None:
+        if self._input_delivery is None or self._input_monitor is not None:
+            return
+
+        async def monitor() -> None:
+            while True:
+                try:
+                    await self._input_delivery.maintain(self._schedule_accepted_input)
+                except asyncio.CancelledError:
+                    raise
+                except Exception as error:
+                    logger.warning("Input recovery failed error_type=%s", type(error).__name__)
+                await asyncio.sleep(5)
+
+        self._input_monitor = asyncio.create_task(monitor(), name="accepted-input-recovery")
+
+    async def _schedule_accepted_input(self, record: AcceptedInput) -> None:
+        identity = (record.session_id, record.key)
+        if identity in self._input_dispatching or len(self._input_dispatching) >= 20:
+            return
+        self._input_dispatching.add(identity)
+
+        async def dispatch() -> None:
+            try:
+                lock = self._session_bootstrap_locks.setdefault(record.session_id, asyncio.Lock())
+                async with lock:
+                    current = await self._input_delivery.repository.get(*identity)
+                    if current is None or current.admission.state != "pending":
+                        return
+                    claimed = await self._input_delivery.claim(current)
+                    if claimed is not None:
+                        await self._dispatch_claimed_input(claimed)
+            except InputLeaseLost:
+                return
+            except Exception as error:
+                logger.warning("Accepted input preparation failed error_type=%s", type(error).__name__)
+            finally:
+                self._input_dispatching.discard(identity)
+
+        self._track_chat_bootstrap(asyncio.create_task(dispatch()), record.session_id)
+
+    @staticmethod
+    def _validate_continuation_payload(resume_from, message, attachments, skills,
+                                       mcp_servers, dataset_ids, mcp_access_all, client_message_id):
+        if not resume_from:
+            return
+        if (not isinstance(resume_from, str) or re.fullmatch(r"[0-9a-f]{32}", resume_from) is None
+                or not isinstance(client_message_id, str) or not client_message_id.strip()
+                or len(client_message_id) > 128):
+            raise ContinuationRejected("续作标识无效，请从原任务的续作入口重试。")
+        # mcp_access_all is derived from the authenticated server identity, not
+        # from ChatRequest. Compare it to the checkpoint at admission below.
+        if ((message or "").strip() or attachments or skills or mcp_servers or dataset_ids):
+            raise ContinuationRejected("续作不能更改原任务、数据范围或执行配置。")
+
+    async def _resume_checkpoint(self, session, user_id, resume_from, client_message_id,
+                                 *, history=None, event=None):
+        getter = getattr(self._session_repository, "get_analysis_checkpoint", None)
+        if not callable(getter):
+            raise ContinuationRejected("当前服务不支持安全续作，请检查原任务。")
+        checkpoint = await getter(session.id, resume_from)
+        expiry = checkpoint.get("expires_at") if isinstance(checkpoint, dict) else None
+        if isinstance(expiry, datetime) and expiry.tzinfo is None:
+            expiry = expiry.replace(tzinfo=UTC)
+        if (not isinstance(checkpoint, dict) or checkpoint.get("id") != resume_from
+                or checkpoint.get("version") != 1 or checkpoint.get("owner_id") != user_id
+                or session.user_id != user_id or not isinstance(expiry, datetime) or expiry <= datetime.now(UTC)
+                or checkpoint.get("configuration_digest") != configuration_digest(session)
+                or not session.sandbox_id or checkpoint.get("sandbox_id") != session.sandbox_id
+                or checkpoint.get("attachment_file_ids")
+                or not isinstance(checkpoint.get("goal"), str) or not checkpoint["goal"].strip()):
+            raise ContinuationRejected("续作进度已失效，或任务配置已变化；系统未重新执行。")
+        if checkpoint.get("claimed_by") not in (None, client_message_id):
+            raise ContinuationRejected("该续作请求已提交，请查看原请求的执行进度。")
+        if event is not None and checkpoint.get("claimed_by") != client_message_id:
+            raise ContinuationRejected("续作请求的领取记录不匹配，系统未重新执行。")
+        for field in ("dataset_ids", "skills", "mcp_servers", "target_files"):
+            values = checkpoint.get(field)
+            if (not isinstance(values, list) or len(values) > 64
+                    or any(not isinstance(value, str) or not value or len(value) > 4096 for value in values)
+                    or len(set(values)) != len(values)):
+                raise ContinuationRejected("续作进度的数据范围记录不完整，系统未重新执行。")
+        if not checkpoint["dataset_ids"]:
+            raise ContinuationRejected("该任务没有可验证的数据集来源，不能安全续作。")
+        source_seq = checkpoint.get("source_seq")
+        if type(source_seq) is not int or source_seq < 1:
+            raise ContinuationRejected("续作进度缺少可靠的原请求记录。")
+        history = history if history is not None else await self._session_repository.get_events(session.id)
+        user_sequences = [item.seq for item in history if isinstance(item, MessageEvent)
+                          and item.role == "user" and type(item.seq) is int]
+        if event is None:
+            current_source_seq = max(user_sequences, default=0)
+        else:
+            if type(event.seq) is not int or max(user_sequences, default=0) != event.seq:
+                raise ContinuationRejected("会话已有更新的请求，原续作已失效。")
+            current_source_seq = max((seq for seq in user_sequences if seq < event.seq), default=0)
+        if current_source_seq != source_seq:
+            raise ContinuationRejected("会话已有新的分析请求，原续作已失效。")
+        current_check = getattr(self._session_repository, "is_analysis_checkpoint_current", None)
+        if event is not None and callable(current_check):
+            if not await current_check(session.id, resume_from, user_id, client_message_id,
+                                       source_seq=source_seq, resume_event_seq=event.seq):
+                raise ContinuationRejected("续作进度已被新的输入取代，系统未重新执行。")
+        return checkpoint
+
+    async def _reject_claimed_continuation(self, record, reason):
+        """Persist a terminal for immutable-request failures, never reschedule them."""
+        event = ErrorEvent(error=str(reason))
+        await self._input_delivery.prepare_event(record.session_id, record.key, event)
+        await self._session_repository.add_event(record.session_id, event)
+        await self._input_delivery.complete(record.session_id, record.key, event)
+        await self._session_repository.update_status(record.session_id, SessionStatus.COMPLETED)
+
+    async def _bootstrap_durable_input(self, session, user_id, message, timestamp, attachments,
+                                       skills, mcp_servers, dataset_ids, mcp_access_all, client_message_id,
+                                       input_generation=None, resume_from=None):
+        self._validate_continuation_payload(resume_from, message, attachments, skills, mcp_servers,
+                                            dataset_ids, mcp_access_all, client_message_id)
+        if client_message_id:
+            from app.domain.models.input_admission import input_key
+            identity = input_key(MessageEvent(id=self._client_message_event_id(session.id, client_message_id),
+                                              role="user", message=message))
+            existing = await self._input_delivery.repository.get(session.id, identity)
+            if existing is not None:
+                previous_metadata = existing.event.metadata or {}
+                if resume_from or previous_metadata.get("resume_from"):
+                    if (not resume_from or previous_metadata.get("resume_from") != resume_from
+                            or existing.admission.actor_user_id != user_id):
+                        raise ContinuationRejected("消息标识已用于其他请求，不能重复执行续作。")
+                    if existing.admission.state == "pending":
+                        await self._schedule_accepted_input(existing)
+                    return self._task_cls.get(existing.admission.task_id) if existing.admission.task_id else None
+                requested_metadata = {"skills": skills or [], "mcp_servers": mcp_servers or [],
+                    "dataset_ids": list(dict.fromkeys(dataset_ids)) if dataset_ids is not None else previous_metadata.get("dataset_ids", []),
+                    "mcp_access_all": mcp_access_all}
+                previous_files = [item.file_id for item in existing.event.attachments or []]
+                requested_files = [item["file_id"] for item in attachments or [] if isinstance(item, dict) and item.get("file_id")]
+                if (existing.admission.actor_user_id != user_id or existing.event.message != message
+                        or previous_files != requested_files
+                        or any(previous_metadata.get(key, False if key == "mcp_access_all" else []) != value
+                               for key, value in requested_metadata.items())):
+                    raise ValueError("Client message identity was reused with different input")
+                # A reconnect attaches immediately, even while the original
+                # task is still running. Preparation/recovery is independent.
+                if existing.admission.state == "pending":
+                    await self._schedule_accepted_input(existing)
+                return self._task_cls.get(existing.admission.task_id) if existing.admission.task_id else None
+        # Keep the current sequential conversation contract: accepting another
+        # turn waits for the prior runner's cleanup before exposing its event.
+        task = await self._get_task(session)
+        if task is not None and (not task.done or not getattr(task, "accepting_input", True)):
+            await task.wait_closed()
+            latest = await self._session_repository.find_by_id_and_user_id(session.id, user_id)
+            if latest is None:
+                raise RuntimeError("Session not found")
+            session = latest
+        checkpoint = None
+        if resume_from:
+            checkpoint = await self._resume_checkpoint(session, user_id, resume_from, client_message_id)
+            if checkpoint.get("mcp_access_all") is not mcp_access_all:
+                raise ContinuationRejected("当前执行权限与原任务不同，不能安全续作。")
+            claim = getattr(self._session_repository, "claim_analysis_checkpoint", None)
+            if not callable(claim):
+                raise ContinuationRejected("当前服务不支持安全续作，请检查原任务。")
+            checkpoint = await claim(session.id, resume_from, user_id, client_message_id,
+                                     expected_source_seq=checkpoint["source_seq"])
+            if not checkpoint:
+                raise ContinuationRejected("该续作进度已被领取或失效，请查看原请求。")
+            message = CONTINUATION_MESSAGE
+            dataset_ids, skills, mcp_servers = (list(checkpoint[field]) for field in ("dataset_ids", "skills", "mcp_servers"))
+            mcp_access_all = bool(checkpoint.get("mcp_access_all", False))
+        effective_ids = list(dict.fromkeys(dataset_ids or session.dataset_ids or []))
+        metadata = {"skills": skills or [], "mcp_servers": mcp_servers or [],
+                    "dataset_ids": effective_ids, "mcp_access_all": mcp_access_all}
+        if client_message_id:
+            metadata["client_message_id"] = client_message_id
+        if resume_from:
+            metadata["resume_from"] = resume_from
+        event = MessageEvent(message=message, role="user", metadata=metadata,
+            attachments=await self._resolve_message_attachments(attachments, user_id))
+        if timestamp is not None:
+            event.timestamp = timestamp
+        if client_message_id:
+            event.id = self._client_message_event_id(session.id, client_message_id)
+        admission_options = {"generation": input_generation} if input_generation is not None else {}
+        record = await self._input_delivery.repository.accept(session.id, user_id, event, **admission_options)
+        if record is None:
+            # An event from before durable admission has unknown execution
+            # status. Never turn this upgrade into automatic tool replay.
+            return await self._get_task(session)
+        if not resume_from:
+            clear_checkpoint = getattr(self._session_repository, "clear_analysis_checkpoint", None)
+            if callable(clear_checkpoint):
+                await clear_checkpoint(session.id)
+        if record.admission.state != "pending":
+            return self._task_cls.get(record.admission.task_id) if record.admission.task_id else None
+        try:
+            await self._session_repository.update_latest_message(session.id, message, event.timestamp)
+            claimed = await self._input_delivery.claim(record)
+            if claimed is None:
+                return await self._get_task(session)
+            return await self._dispatch_claimed_input(claimed)
+        except InputLeaseLost:
+            return None
+        except Exception as error:
+            # Acceptance has committed. Recovery owns transient preparation
+            # failures; publishing a business Error here would falsely close
+            # the UI while the same accepted request remains scheduled.
+            logger.warning("Accepted input preparation deferred error_type=%s", type(error).__name__)
+            return None
+
+    async def _dispatch_claimed_input(self, record: AcceptedInput) -> Optional[Task]:
+        task = None
+        try:
+            session = await self._session_repository.find_by_id_and_user_id(
+                record.session_id, record.admission.actor_user_id)
+            if session is None:
+                raise RuntimeError("Session not found")
+            previous = await self._get_task(session)
+            if previous is not None and (not previous.done or not getattr(previous, "accepting_input", True)):
+                await previous.wait_closed()
+            await self._input_delivery._require_live(record.session_id, record.key, states={"claimed"})
+            event = record.event
+            metadata = event.metadata or {}
+            ids = list(metadata.get("dataset_ids") or [])
+            history = await self._session_repository.get_events(record.session_id)
+            checkpoint = None
+            if metadata.get("resume_from"):
+                checkpoint = await self._resume_checkpoint(
+                    session, record.admission.actor_user_id, metadata["resume_from"],
+                    metadata.get("client_message_id"), history=history, event=event,
+                )
+                if (ids != checkpoint["dataset_ids"]
+                        or metadata.get("skills", []) != checkpoint["skills"]
+                        or metadata.get("mcp_servers", []) != checkpoint["mcp_servers"]
+                        or bool(metadata.get("mcp_access_all", False)) != bool(checkpoint.get("mcp_access_all", False))
+                        or event.attachments):
+                    raise ContinuationRejected("续作请求的数据范围或执行配置已变化。")
+            # The newly accepted input is not prior conversational context.
+            snapshot = [item for item in history if item.seq is None or item.seq <= event.seq]
+            history = [item for item in snapshot if item.seq is None or item.seq < event.seq]
+            if not ids and checkpoint is None:
+                ids = next((list(dict.fromkeys((item.metadata or {}).get("dataset_ids", [])))
+                            for item in reversed(history) if isinstance(item, MessageEvent)
+                            and (item.metadata or {}).get("dataset_ids")), [])
+            try:
+                datasets = [await self._dataset_service.get_dataset(item, user_id=record.admission.actor_user_id) for item in ids]
+            except Exception as exc:
+                if checkpoint is not None:
+                    raise ContinuationRejected("原任务的数据来源不可用或访问权限已变化，不能续作。") from exc
+                raise
+            resolution = await self._dataset_request_resolver.resolve(
+                question=checkpoint["goal"] if checkpoint is not None else event.message, datasets=datasets,
+                events=history, llm_overrides=session.llm_overrides, user_id=record.admission.actor_user_id,
+                session_id=session.id, selected_skills=metadata.get("skills") or [],
+                selected_mcp_servers=metadata.get("mcp_servers") or [],
+                attachment_names=[item.filename for item in event.attachments or []])
+            await self._input_delivery._require_live(record.session_id, record.key, states={"claimed"})
+            if checkpoint is not None:
+                current_session = await self._session_repository.find_by_id_and_user_id(session.id, record.admission.actor_user_id)
+                if current_session is None:
+                    raise ContinuationRejected("续作会话已不可用。")
+                await self._resume_checkpoint(current_session, record.admission.actor_user_id,
+                    metadata["resume_from"], metadata.get("client_message_id"), event=event)
+                if resolution.mode != "reject":
+                    if resolution.mode != "sandbox":
+                        raise ContinuationRejected("前置决策未确认原执行范围，系统未重新执行；请检查原任务。")
+                    original_targets = list(checkpoint["target_files"])
+                    if resolution.target_files and set(resolution.target_files) != set(original_targets):
+                        raise ContinuationRejected("前置决策的数据范围与原任务不一致，系统未重新执行。")
+                    # An omitted advisory selection cannot widen a continuation.
+                    # The registered original selection is authoritative.
+                    resolution.target_files = original_targets
+                    resolution.decision.execution.target_files = original_targets
+            session.dataset_ids = ids
+            await self._session_repository.update_status(session.id, SessionStatus.RUNNING)
+            task = (await self._create_lightweight_task(session, resolution)
+                    if resolution.mode in {"reject", "direct", "catalog"}
+                    else await self._create_task(session, ids or None, front_controller_resolution=resolution,
+                                                 session_events_snapshot=snapshot))
+            await self._input_delivery.bind(record, task)
+            await task.enqueue_input(event.model_dump_json())
+            await task.run()
+            return task
+        except ContinuationRejected as error:
+            if task is not None:
+                task.cancel()
+            await self._reject_claimed_continuation(record, error)
+            return None
+        except BaseException:
+            if task is not None:
+                task.cancel()
+            await self._input_delivery.retry_preparation(record)
+            raise
+
     async def chat(
         self,
         session_id: str,
@@ -917,12 +1267,17 @@ class AgentDomainService:
         mcp_access_all: bool = False,
         llm_overrides: Optional[dict] = None,
         client_message_id: Optional[str] = None,
+        resume_from: Optional[str] = None,
     ) -> AsyncGenerator[BaseEvent, None]:
         """
         Chat with an agent
         """
 
         try:
+            self._validate_continuation_payload(resume_from, message, attachments, skills, mcp_servers,
+                                                dataset_ids, mcp_access_all, client_message_id)
+            if resume_from and llm_overrides is not None:
+                raise ContinuationRejected("续作不能改变原任务的模型或执行配置。")
             session = await self._session_repository.find_by_id_and_user_id(session_id, user_id)
             if not session:
                 logger.error(
@@ -938,13 +1293,13 @@ class AgentDomainService:
 
             task = await self._get_task(session)
 
-            if message:
+            if message or resume_from:
                 bootstrap_task = self._track_chat_bootstrap(
                     asyncio.create_task(
                         self._bootstrap_chat_task(
                             session=session,
                             user_id=user_id,
-                            message=message,
+                            message=message or "",
                             timestamp=timestamp,
                             attachments=attachments,
                             skills=skills,
@@ -952,11 +1307,26 @@ class AgentDomainService:
                             dataset_ids=dataset_ids,
                             mcp_access_all=mcp_access_all,
                             client_message_id=client_message_id,
+                            resume_from=resume_from,
                         )
                     ),
                     session_id,
                 )
                 task = await asyncio.shield(bootstrap_task)
+
+            if latest_event_seq is None and latest_event_id not in {None, "", "0", "0-0", "$"}:
+                resolve_seq = getattr(self._session_repository, "resolve_event_sequence", None)
+                if callable(resolve_seq):
+                    latest_event_seq = await resolve_seq(session_id, latest_event_id)
+
+            stream_input_seq = None
+            stream_input_key = None
+            delivery = getattr(self, "_input_delivery", None)
+            if delivery is not None:
+                current_input = await delivery.repository.latest(session_id)
+                if current_input is not None:
+                    stream_input_seq = current_input.event.seq
+                    stream_input_key = current_input.key
             
             logger.info(
                 "Session stream started session=%s",
@@ -1000,6 +1370,9 @@ class AgentDomainService:
                     # cursor without yielding preserves that UI contract.
                     if isinstance(replay_event, MessageEvent) and replay_event.role == "user":
                         continue
+                    if (isinstance(replay_event, (DoneEvent, ErrorEvent, WaitEvent))
+                            and not await self._terminal_matches_input(session_id, stream_input_key, stream_input_seq, replay_event)):
+                        continue
                     yield replay_event
                     replay_terminal_seq = (
                         event_seq
@@ -1014,6 +1387,7 @@ class AgentDomainService:
                     return
 
             redis_start_id = "0-0" if last_seen_seq is not None else latest_event_id
+            stream_terminal = False
             while task:
                 # A task can finish in the narrow window between the durable
                 # history query above and attaching to Redis. Always drain an
@@ -1021,10 +1395,16 @@ class AgentDomainService:
                 # While it is running, use a bounded block so a task that exits
                 # without publishing cannot leave the SSE request hung forever.
                 task_was_done = task.done
-                event_id, event_str = await task.output_stream.get(
-                    start_id=redis_start_id,
-                    block_ms=None if task_was_done else 1000,
-                )
+                try:
+                    event_id, event_str = await task.output_stream.get(
+                        start_id=redis_start_id,
+                        block_ms=None if task_was_done else 1000,
+                    )
+                except Exception as error:
+                    if getattr(self, "_input_delivery", None) is None:
+                        raise
+                    logger.warning("Live input stream unavailable; using durable events error_type=%s", type(error).__name__)
+                    break
                 latest_event_id = event_id
                 if event_str is None:
                     logger.debug(
@@ -1041,10 +1421,13 @@ class AgentDomainService:
                 redis_start_id = event_id
                 event = TypeAdapter(AgentEvent).validate_json(event_str)
                 event.id = event_id
-                if last_seen_seq is not None and event.seq is not None:
-                    if event.seq <= last_seen_seq:
+                if event.seq is not None:
+                    if last_seen_seq is not None and event.seq <= last_seen_seq:
                         continue
                     last_seen_seq = event.seq
+                if (isinstance(event, (DoneEvent, ErrorEvent, WaitEvent))
+                        and not await self._terminal_matches_input(session_id, stream_input_key, stream_input_seq, event)):
+                    continue
                 logger.debug(
                     "Got event from session queue session=%s event_type=%s",
                     opaque_log_identifier(session_id, namespace="session"),
@@ -1052,7 +1435,11 @@ class AgentDomainService:
                 )
                 yield event
                 if isinstance(event, (DoneEvent, ErrorEvent, WaitEvent)):
+                    stream_terminal = True
                     break
+            if not stream_terminal and getattr(self, "_input_delivery", None) is not None:
+                async for event in self._tail_accepted_input(session_id, last_seen_seq, stream_input_seq, stream_input_key):
+                    yield event
             
             logger.info(
                 "Session stream completed session=%s",
@@ -1081,6 +1468,47 @@ class AgentDomainService:
                     type(persist_error).__name__,
                 )
             yield event # TODO: raise api exception
+
+    async def _terminal_matches_input(self, session_id, key, input_seq, event) -> bool:
+        if input_seq is None or event.seq is None:
+            return True
+        if event.seq < input_seq:
+            return False
+        delivery = getattr(self, "_input_delivery", None)
+        matches = getattr(delivery.repository, "matches_terminal", None) if delivery is not None else None
+        # A late cancellation notice can have a *higher* seq than the next
+        # accepted input. Stable producer identity supplies its true ownership.
+        return await matches(session_id, key, event.seq, event.type) if key and callable(matches) else True
+
+    async def _tail_accepted_input(self, session_id: str, cursor: int | None, input_seq: int | None = None, input_key: str | None = None):
+        """Keep the existing SSE open through a process/Redis recovery gap.
+
+        Mongo is the source of truth. This bounded polling path also follows
+        replacement tasks, including tasks owned by a different worker.
+        """
+        while True:
+            pending = await self._input_delivery.repository.unsettled(session_id)
+            if cursor is None:
+                if pending is None:
+                    return
+                cursor = max(0, pending.event.seq - 1)
+            events = await self._session_repository.get_events_after(session_id, cursor)
+            terminal_seq = None
+            for event in events:
+                if event.seq is None or event.seq <= cursor:
+                    continue
+                cursor = event.seq
+                if isinstance(event, MessageEvent) and event.role == "user":
+                    terminal_seq = None
+                    continue
+                if (isinstance(event, (DoneEvent, ErrorEvent, WaitEvent))
+                        and not await self._terminal_matches_input(session_id, input_key, input_seq, event)):
+                    continue
+                yield event
+                terminal_seq = cursor if isinstance(event, (DoneEvent, ErrorEvent, WaitEvent)) else None
+            if terminal_seq == cursor or pending is None:
+                return
+            await asyncio.sleep(0.5)
 
     async def _resolve_message_attachments(
         self,

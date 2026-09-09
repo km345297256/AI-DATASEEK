@@ -1,10 +1,18 @@
 <template>
-    <section style="display: flex; position: relative; text-align: initial; width: 100%; height: 100%;">
-        <div class="w-full h-full" data-keybinding-context="9" data-mode-id="c"
+    <section class="flex min-h-0 flex-1 flex-col text-left">
+        <div class="flex shrink-0 items-center justify-between border-b border-[var(--border-main)] px-4 py-2 text-xs text-[var(--text-tertiary)]">
+            <span>文本分页预览 · 第 {{ pageIndex + 1 }} 页（每页最多 64 KiB）</span>
+            <div class="flex gap-3">
+                <button :disabled="loading || pageIndex === 0" class="disabled:opacity-40" @click="loadPage(pageIndex - 1)">上一页</button>
+                <button :disabled="loading || page?.next_offset == null" class="disabled:opacity-40" @click="loadPage(pageIndex + 1)">下一页</button>
+            </div>
+        </div>
+        <div v-if="loading || error" class="p-4 text-sm text-[var(--text-secondary)]">{{ loading ? '正在加载文本...' : error }}</div>
+        <div v-else class="min-h-0 flex-1" data-keybinding-context="9" data-mode-id="c"
             style="width: 100%; --vscode-editorCodeLens-lineHeight: 15px; --vscode-editorCodeLens-fontSize: 10px; --vscode-editorCodeLens-fontFeatureSettings: 'liga' off, 'calt' off;">
 
           <MonacoEditor
-            :value="content"
+            :value="page?.text || ''"
             :filename="file.filename"
             :read-only="true"
             theme="vs"
@@ -19,27 +27,13 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch } from 'vue';
 import MonacoEditor from '@/components/ui/MonacoEditor.vue';
 import type { FileInfo } from '../../api/file';
-import { getFileDownloadUrl } from '../../api/file';
-
-const content = ref('');
+import { useFilePreviewPages } from '../../composables/useFilePreviewPages';
 
 const props = defineProps<{
     file: FileInfo;
 }>();
 
-watch(() => props.file, async (file) => {
-    if (!file?.file_id) return;
-    try {
-        const url = await getFileDownloadUrl(file);
-        const response = await fetch(url);
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        content.value = await response.text();
-    } catch (error) {
-        console.error('Failed to load file content:', error);
-        content.value = '(Failed to load file content)';
-    }
-}, { immediate: true, deep: false });
+const { page, loading, error, pageIndex, loadPage } = useFilePreviewPages(() => props.file, 'text');
 </script>

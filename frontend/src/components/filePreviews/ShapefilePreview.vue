@@ -162,6 +162,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
 import { getFileDownloadUrl, type FileInfo } from '../../api/file';
+import { usePreviewLoad, type PreviewLoad } from '../../composables/usePreviewLoad';
 import { useFilePanel } from '../../composables/useFilePanel';
 
 type Point = [number, number];
@@ -198,7 +199,7 @@ const showBasemap = ref(true);
 const selectionMode = ref(false);
 const selectionRect = ref<[number, number, number, number] | null>(null);
 const selectionStart = ref<Point | null>(null);
-let loadVersion = 0;
+const loads = usePreviewLoad();
 
 const getExtension = (filename: string) => filename.split('.').pop()?.toLowerCase() || '';
 const stripExtension = (filename: string) => filename.replace(/\.[^/.]+$/, '');
@@ -458,15 +459,16 @@ const calculateBounds = (items: Geometry[]): [number, number, number, number] | 
   return [Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys)];
 };
 
-const fetchBuffer = async (file: FileInfo) => {
+const fetchBuffer = async (file: FileInfo, load: PreviewLoad) => {
   const url = await getFileDownloadUrl(file);
-  const response = await fetch(url);
+  load.assertCurrent();
+  const response = await fetch(url, { signal: load.signal });
   if (!response.ok) throw new Error(`HTTP ${response.status}`);
   return response.arrayBuffer();
 };
 
 const loadShapefile = async () => {
-  const currentVersion = ++loadVersion;
+  const load = loads.begin();
   status.value = '正在加载 Shapefile...';
   geometries.value = [];
   attributes.value = [];
@@ -492,24 +494,28 @@ const loadShapefile = async () => {
       status.value = '已找到 .shp，但缺少同名 .dbf，当前只能预览几何，无法显示属性表。';
     }
 
-    const parsedGeometries = parseShp(await fetchBuffer(shp));
-    if (currentVersion !== loadVersion) return;
+    const geometryBuffer = await fetchBuffer(shp, load);
+    if (!load.isCurrent()) return;
+    const parsedGeometries = parseShp(geometryBuffer);
     geometries.value = parsedGeometries;
     bounds.value = calculateBounds(parsedGeometries);
     viewBounds.value = bounds.value ? [...bounds.value] as [number, number, number, number] : null;
 
     if (dbf) {
-      attributes.value = parseDbf(await fetchBuffer(dbf));
-      if (currentVersion !== loadVersion) return;
+      const attributeBuffer = await fetchBuffer(dbf, load);
+      if (!load.isCurrent()) return;
+      attributes.value = parseDbf(attributeBuffer);
     }
     if (prj) {
-      const text = new TextDecoder('utf-8', { fatal: false }).decode(await fetchBuffer(prj));
-      if (currentVersion !== loadVersion) return;
+      const buffer = await fetchBuffer(prj, load);
+      if (!load.isCurrent()) return;
+      const text = new TextDecoder('utf-8', { fatal: false }).decode(buffer);
       projectionText.value = text.trim();
     }
 
     status.value = parsedGeometries.length ? '' : '未解析到可预览的 Shapefile 几何。';
   } catch (error) {
+    if (!load.isCurrent()) return;
     console.error('Failed to render Shapefile:', error);
     status.value = 'Shapefile 预览失败。请确认文件未损坏，且 .shp/.dbf/.shx 属于同一组。';
   }

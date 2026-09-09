@@ -191,7 +191,7 @@ async def test_domain_agents_have_independent_views_memories_and_bounded_shared_
     assert isinstance(table, ExecutionAgent) and isinstance(geo, ExecutionAgent)
     assert table is not geo and table is not flow.executor
     assert len({table.name, geo.name, flow.executor.name}) == 3
-    assert table.max_iterations == geo.max_iterations == 4
+    assert table.max_iterations is None and geo.max_iterations is None
     assert all("domain_" in agent.name for agent in (table, geo))
     for agent in (table, geo):
         names = ToolRegistry(agent.toolkits).tool_names()

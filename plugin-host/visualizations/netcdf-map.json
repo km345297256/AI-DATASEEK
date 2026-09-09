@@ -1,0 +1,26 @@
+{
+  "contract_version": 1,
+  "id": "netcdf-map",
+  "version": "1.0.0",
+  "name": "NetCDF 地图",
+  "description": "具有经纬坐标的 NetCDF 栅格地图视图",
+  "extensions": [
+    "nc",
+    "nc4",
+    "netcdf"
+  ],
+  "filenames": [],
+  "view_kind": "map",
+  "adapter": "scientific-map",
+  "data_kind": "scientific",
+  "reader": "netcdf",
+  "default_enabled": true,
+  "priority": 50,
+  "permissions": [
+    "file:read"
+  ],
+  "limits": {
+    "max_input_bytes": 67108864,
+    "max_output_bytes": 524288
+  }
+}

@@ -1,0 +1,26 @@
+{
+  "contract_version": 1,
+  "id": "fits-image",
+  "version": "1.0.0",
+  "name": "FITS 图像",
+  "description": "FITS 图像 HDU 的二维切片",
+  "extensions": [
+    "fits",
+    "fit",
+    "fts"
+  ],
+  "filenames": [],
+  "view_kind": "image",
+  "adapter": "scientific-image",
+  "data_kind": "scientific",
+  "reader": "fits",
+  "default_enabled": true,
+  "priority": 50,
+  "permissions": [
+    "file:read"
+  ],
+  "limits": {
+    "max_input_bytes": 67108864,
+    "max_output_bytes": 524288
+  }
+}

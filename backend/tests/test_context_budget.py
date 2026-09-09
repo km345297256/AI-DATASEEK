@@ -55,6 +55,39 @@ def _snapshot(messages):
     return [message.model_dump(mode="json") for message in messages]
 
 
+@pytest.mark.parametrize("exchange_count", [10, 100, 1000])
+def test_preparation_estimation_work_is_linear_and_exact(monkeypatch, exchange_count):
+    messages = [SystemMessage(content="system"), HumanMessage(content="current request")]
+    for index in range(exchange_count):
+        messages.extend([_call(f"call-{index}"), _result(f"call-{index}", "数" * 1500)])
+    before = _snapshot(messages)
+    schema = {"name": "read", "description": "schema" * 1000, "parameters": {"type": "object"}}
+    actual_estimate = context_budget._estimate_message
+    actual_tool_estimate = context_budget.estimate_tool_tokens
+    counts = {"message": 0, "schemas": 0}
+
+    def estimate(message, **kwargs):
+        counts["message"] += 1
+        return actual_estimate(message, **kwargs)
+
+    def estimate_tools(schemas):
+        counts["schemas"] += 1
+        return actual_tool_estimate(schemas)
+
+    monkeypatch.setattr(context_budget, "_estimate_message", estimate)
+    monkeypatch.setattr(context_budget, "estimate_tool_tokens", estimate_tools)
+    prepared = prepare_context(messages, tool_schemas=[schema], response_format={"type": "json_object"},
+                               capacity_tokens=exchange_count * 200 + 3000,
+                               max_output_tokens=300, safety_tokens=100, max_tool_text_tokens=250)
+    assert counts["schemas"] == 1
+    assert counts["message"] <= len(messages) + 2 * exchange_count
+    assert prepared.input_tokens_after == estimate_context_tokens(
+        prepared.messages, tool_schemas=[schema], response_format={"type": "json_object"},
+    )[0]
+    assert prepared.records
+    assert _snapshot(messages) == before
+
+
 def test_estimator_is_versioned_local_and_handles_english_and_chinese():
     english, _ = estimate_context_tokens([HumanMessage(content="a" * 300)])
     chinese, _ = estimate_context_tokens([HumanMessage(content="数" * 300)])

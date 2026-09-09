@@ -231,6 +231,7 @@ async def lifespan(app: FastAPI):
                 type(exc).__name__,
             )
 
+    get_agent_service().start_input_recovery()
     try:
         yield
     finally:

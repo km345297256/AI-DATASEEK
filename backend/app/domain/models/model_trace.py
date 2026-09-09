@@ -20,6 +20,17 @@ class MemoryChange(BaseModel):
     bytes_after: int = Field(ge=0)
 
 
+class ModelRequestTimings(BaseModel):
+    """Local monotonic phase durations, never provider TTFT or billing data."""
+    model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
+    memory_flush_ms: float | None = Field(default=None, ge=0)
+    context_prepare_ms: float | None = Field(default=None, ge=0)
+    request_identity_ms: float | None = Field(default=None, ge=0)
+    admission_store_ms: float | None = Field(default=None, ge=0)
+    provider_call_ms: float | None = Field(default=None, ge=0)
+    usage_settlement_ms: float | None = Field(default=None, ge=0)
+
+
 class ModelTraceView(BaseModel):
     """Metadata only: no prompts, content, credentials or provider endpoints."""
 
@@ -45,17 +56,19 @@ class ModelTraceView(BaseModel):
     input_limit: int = Field(default=0, ge=0)
     reserved_output_tokens: int = Field(default=0, ge=0)
     task_tokens_charged: int = Field(default=0, ge=0)
-    task_token_limit: int = Field(default=0, ge=0)
-    task_call_limit: int = Field(default=0, ge=0)
+    # None means unlimited; zero must never masquerade as an absent quota.
+    task_token_limit: int | None = Field(default=None, ge=0)
+    task_call_limit: int | None = Field(default=None, ge=0)
     actual_input_tokens: int | None = Field(default=None, ge=0)
     actual_output_tokens: int | None = Field(default=None, ge=0)
     actual_total_tokens: int | None = Field(default=None, ge=0)
     usage_source: Literal["provider", "reservation", "none"] = "none"
-    error_code: Literal["context_budget_exceeded", "task_token_budget_exceeded", "task_call_budget_exceeded", "provider_error", "cancelled", "runtime_closed", "trace_store_unavailable"] | None = None
+    error_code: Literal["context_budget_exceeded", "task_token_budget_exceeded", "task_call_budget_exceeded", "analysis_budget_deadline_exceeded", "provider_error", "cancelled", "runtime_closed", "trace_store_unavailable"] | None = None
     request_hmac_before: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
     request_hmac_after: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
     compactions: list[CompactionRecord] = Field(default_factory=list, max_length=256)
     memory_change: MemoryChange | None = None
+    timings: ModelRequestTimings = Field(default_factory=ModelRequestTimings)
 
 
 class ModelTraceRecord(ModelTraceView):

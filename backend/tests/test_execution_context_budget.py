@@ -591,7 +591,7 @@ async def test_file_preview_rejects_absolute_and_traversal_paths(target):
     ]
 
     agent.invoke_tool.assert_not_awaited()
-    assert step.status == ExecutionStatus.COMPLETED
+    assert step.status == ExecutionStatus.FAILED
     assert step.success is False
     assert step.attachments == []
     assert "安全校验" in step.result
@@ -708,7 +708,7 @@ async def test_file_preview_shell_failure_always_returns_execution_result(tool_r
     ]
 
     agent.invoke_tool.assert_awaited_once()
-    assert step.status == ExecutionStatus.COMPLETED
+    assert step.status == ExecutionStatus.FAILED
     assert step.success is False
     assert step.result == "暂时无法预览文件 `photo.jpg`：安全复制未成功，未生成附件。"
     assert step.attachments == []
@@ -1206,7 +1206,7 @@ def test_large_dataset_inventory_is_aggregated_and_sampled():
     assert len(rendered) < 40_000
 
 
-def test_execution_iteration_override_is_bounded_and_not_forwarded_to_model():
+def test_execution_iteration_override_is_ignored_and_not_forwarded_to_model():
     settings = SimpleNamespace(
         model_provider="openai",
         model_name="test-model",
@@ -1227,8 +1227,11 @@ def test_execution_iteration_override_is_bounded_and_not_forwarded_to_model():
             llm_overrides={"max_iterations": 10_000},
         )
 
-    assert BaseAgent.max_iterations == 12
-    assert agent.max_iterations == BaseAgent.MAX_CONFIGURED_ITERATIONS
+    assert BaseAgent.max_iterations is None
+    assert agent.max_iterations is None
+    assert agent._execution_model_configuration["max_iterations"] is None
+    assert agent._execution_model_configuration["model_runtime"]["task_token_budget"] is None
+    assert agent._execution_model_configuration["model_runtime"]["task_call_budget"] is None
     assert agent.FINALIZATION_TIMEOUT_SECONDS == 61
     assert BaseAgent.FINALIZATION_TIMEOUT_SECONDS == 45
     forwarded_overrides = create_model.call_args.kwargs["overrides"]
@@ -1236,7 +1239,7 @@ def test_execution_iteration_override_is_bounded_and_not_forwarded_to_model():
 
 
 @pytest.mark.asyncio
-async def test_iteration_budget_stops_without_emitting_an_empty_final_message():
+async def test_repeated_missing_tool_stops_without_emitting_an_empty_final_message():
     agent = object.__new__(BaseAgent)
     agent.max_iterations = 2
     looping_message = AIMessage(content="", tool_calls=[{
@@ -1258,11 +1261,12 @@ async def test_iteration_budget_stops_without_emitting_an_empty_final_message():
     assert agent.ask_with_messages.await_count == 2
     final_call = agent.ask_with_messages.await_args_list[-1]
     assert final_call.kwargs["allow_tools"] is False
-    assert "tool budget is now exhausted" in final_call.args[0][-1].content
+    assert "Safe progress cannot continue" in final_call.args[0][-1].content
+    assert "budget is now exhausted" not in final_call.args[0][-1].content
 
 
 @pytest.mark.asyncio
-async def test_last_allowed_tool_batch_can_return_a_final_message():
+async def test_iteration_override_does_not_force_tool_free_synthesis():
     agent = object.__new__(BaseAgent)
     agent.max_iterations = 1
     tool_message = AIMessage(content="", tool_calls=[{
@@ -1279,11 +1283,11 @@ async def test_last_allowed_tool_batch_can_return_a_final_message():
     assert not any(isinstance(event, ErrorEvent) and "Maximum iteration" in event.error for event in events)
     assert any(isinstance(event, MessageEvent) and event.message == "finished" for event in events)
     agent.ask_with_messages.assert_awaited_once()
-    assert agent.ask_with_messages.await_args.kwargs["allow_tools"] is False
+    assert agent.ask_with_messages.await_args.kwargs.get("allow_tools", True) is True
 
 
 @pytest.mark.asyncio
-async def test_budget_finalization_has_a_total_timeout():
+async def test_no_progress_finalization_has_a_single_call_timeout():
     agent = object.__new__(BaseAgent)
     agent.max_iterations = 1
     agent.FINALIZATION_TIMEOUT_SECONDS = 0.01
@@ -1295,6 +1299,8 @@ async def test_budget_finalization_has_a_total_timeout():
     agent.ask = AsyncMock(return_value=tool_message)
 
     async def slow_finalizer(*_args, **_kwargs):
+        if _kwargs.get("allow_tools", True):
+            return tool_message
         await asyncio.sleep(1)
         return AIMessage(content="too late")
 
@@ -1338,13 +1344,15 @@ async def test_budget_finalization_failure_preserves_successful_tool_evidence(
     agent.ask = AsyncMock(return_value=tool_message)
 
     async def failed_finalizer(*_args, **_kwargs):
+        if _kwargs.get("allow_tools", True):
+            return AIMessage(content="", tool_calls=[{"name": "unavailable", "args": {}, "id": "blocked"}])
         if failure_mode == "timeout":
             await asyncio.sleep(1)
             return AIMessage(content="too late")
         raise RuntimeError("provider unavailable")
 
     agent.ask_with_messages = failed_finalizer
-    agent.get_tool = lambda _name: SimpleNamespace(
+    agent.get_tool = lambda _name: None if _name == "unavailable" else SimpleNamespace(
         toolkit=SimpleNamespace(name="file")
     )
     agent.invoke_tool = AsyncMock(return_value=ToolMessage(
@@ -1389,11 +1397,13 @@ async def test_budget_timeout_does_not_promote_arbitrary_shell_output_to_final_r
     agent.ask = AsyncMock(return_value=tool_message)
 
     async def slow_finalizer(*_args, **_kwargs):
+        if _kwargs.get("allow_tools", True):
+            return AIMessage(content="", tool_calls=[{"name": "unavailable", "args": {}, "id": "blocked"}])
         await asyncio.sleep(1)
         return AIMessage(content="too late")
 
     agent.ask_with_messages = slow_finalizer
-    agent.get_tool = lambda _name: SimpleNamespace(
+    agent.get_tool = lambda _name: None if _name == "unavailable" else SimpleNamespace(
         toolkit=SimpleNamespace(name="shell")
     )
     agent.invoke_tool = AsyncMock(return_value=ToolMessage(
@@ -1531,7 +1541,6 @@ async def test_analysis_quicklook_synthesis_failure_returns_validated_interim_ev
 async def test_successful_quicklook_is_a_terminal_fast_path_capability():
     agent = object.__new__(ExecutionAgent)
     agent.max_iterations = 10
-    agent.MAX_CONFIGURED_ITERATIONS = BaseAgent.MAX_CONFIGURED_ITERATIONS
     agent._dataset_fast_path_mode = True
     agent._dataset_intent = ExecutionAgent.DATASET_INTENT_VISUALIZATION
     agent._current_plan = SimpleNamespace(language="zh")
@@ -1626,7 +1635,6 @@ async def test_successful_quicklook_is_a_terminal_fast_path_capability():
 async def test_successful_unpack_is_a_terminal_file_inventory_capability():
     agent = object.__new__(ExecutionAgent)
     agent.max_iterations = 10
-    agent.MAX_CONFIGURED_ITERATIONS = BaseAgent.MAX_CONFIGURED_ITERATIONS
     agent._dataset_fast_path_mode = True
     agent._dataset_intent = ExecutionAgent.DATASET_INTENT_FILE_STRUCTURE
     agent._current_plan = SimpleNamespace(language="zh")
@@ -1858,7 +1866,6 @@ async def test_runtime_package_install_is_blocked_without_invoking_the_shell():
     agent = object.__new__(BaseAgent)
     agent.name = "execution"
     agent.max_iterations = 2
-    agent.MAX_CONFIGURED_ITERATIONS = BaseAgent.MAX_CONFIGURED_ITERATIONS
     install_call = AIMessage(content="", tool_calls=[{
         "name": "shell_run",
         "args": {

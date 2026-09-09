@@ -27,12 +27,13 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, ref, watch } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import { getFileDownloadUrl, type FileInfo } from '../../api/file';
 import { getSessionFiles, getSharedSessionFiles } from '../../api/agent';
 import { useFilePanel } from '../../composables/useFilePanel';
 import { useSessionFileList } from '../../composables/useSessionFileList';
+import { usePreviewLoad, type PreviewLoad } from '../../composables/usePreviewLoad';
 import {
   findRelatedFile,
   isRelativeResourceUrl,
@@ -50,28 +51,25 @@ const status = ref('');
 const previewHtml = ref('');
 const missingResources = ref<string[]>([]);
 const objectUrls = ref<string[]>([]);
-let loadVersion = 0;
+const loads = usePreviewLoad();
 
 const resolvedCount = computed(() => objectUrls.value.length);
 
-const revokeObjectUrls = () => {
-  objectUrls.value.forEach((url) => URL.revokeObjectURL(url));
-  objectUrls.value = [];
-};
-
-onBeforeUnmount(revokeObjectUrls);
-
-const createBlobUrl = async (file: FileInfo) => {
+const createBlobUrl = async (file: FileInfo, load: PreviewLoad) => {
   const url = await getFileDownloadUrl(file);
-  const response = await fetch(url);
+  load.assertCurrent();
+  const response = await fetch(url, { signal: load.signal });
   if (!response.ok) throw new Error(`HTTP ${response.status}`);
   const blob = await response.blob();
+  load.assertCurrent();
   const objectUrl = URL.createObjectURL(blob);
+  load.onDispose(() => URL.revokeObjectURL(objectUrl));
   objectUrls.value.push(objectUrl);
   return objectUrl;
 };
 
-const ensureRelatedFiles = async (force = false) => {
+const ensureRelatedFiles = async (load: PreviewLoad, force = false) => {
+  load.assertCurrent();
   if (!force && relatedFiles.value.length > 1) return;
   const sessionId = route.params.sessionId as string;
   if (!sessionId) return;
@@ -79,16 +77,17 @@ const ensureRelatedFiles = async (force = false) => {
     const sessionFiles = shared.value || route.path.startsWith('/share/')
       ? await getSharedSessionFiles(sessionId)
       : await getSessionFiles(sessionId);
+    load.assertCurrent();
     const filesById = new Map(
       [...relatedFiles.value, ...sessionFiles].map((file) => [file.file_id, file]),
     );
     relatedFiles.value = Array.from(filesById.values());
   } catch (error) {
-    console.warn('Failed to load related HTML files:', error);
+    if (load.isCurrent()) console.warn('Failed to load related HTML files:', error);
   }
 };
 
-const rewriteHtmlResources = async (html: string) => {
+const rewriteHtmlResources = async (html: string, file: FileInfo, load: PreviewLoad) => {
   const replacements = new Map<string, string>();
   const missing = new Set<string>();
   const attrPattern = /\b(src|href|poster)\s*=\s*(["'])(.*?)\2/gi;
@@ -102,20 +101,22 @@ const rewriteHtmlResources = async (html: string) => {
     if (isRelativeResourceUrl(match[2])) urls.add(match[2]);
   }
 
-  if (Array.from(urls).some((url) => !findRelatedFile(props.file, relatedFiles.value, url))) {
-    await ensureRelatedFiles(true);
+  if (Array.from(urls).some((url) => !findRelatedFile(file, relatedFiles.value, url))) {
+    await ensureRelatedFiles(load, true);
   }
+  load.assertCurrent();
 
   await Promise.all(Array.from(urls).map(async (url) => {
-    const related = findRelatedFile(props.file, relatedFiles.value, url);
+    const related = findRelatedFile(file, relatedFiles.value, url);
     if (!related) {
       missing.add(url);
       return;
     }
     const { suffix } = splitResourceUrl(url);
-    replacements.set(url, `${await createBlobUrl(related)}${suffix}`);
+    replacements.set(url, `${await createBlobUrl(related, load)}${suffix}`);
   }));
 
+  load.assertCurrent();
   missingResources.value = Array.from(missing);
   const rewritten = html
     .replace(attrPattern, (full, attr: string, quote: string, value: string) => {
@@ -160,25 +161,28 @@ const injectPreviewViewportStyle = (html: string) => {
   return `${style}${html}`;
 };
 
-const loadHtml = async () => {
-  const currentVersion = ++loadVersion;
+const loadHtml = async (file: FileInfo) => {
+  const load = loads.begin();
   status.value = '正在加载 HTML...';
   previewHtml.value = '';
   missingResources.value = [];
-  revokeObjectUrls();
+  objectUrls.value = [];
 
   try {
-    const url = await getFileDownloadUrl(props.file);
-    const response = await fetch(url);
+    const url = await getFileDownloadUrl(file);
+    load.assertCurrent();
+    const response = await fetch(url, { signal: load.signal });
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const html = await response.text();
-    await ensureRelatedFiles();
-    if (currentVersion !== loadVersion) return;
-    const rewritten = await rewriteHtmlResources(html);
-    if (currentVersion !== loadVersion) return;
+    load.assertCurrent();
+    await ensureRelatedFiles(load);
+    if (!load.isCurrent()) return;
+    const rewritten = await rewriteHtmlResources(html, file, load);
+    if (!load.isCurrent()) return;
     previewHtml.value = rewritten;
     status.value = '';
   } catch (error) {
+    if (!load.isCurrent()) return;
     console.error('Failed to render HTML file:', error);
     status.value = 'HTML 预览失败。请确认文件可访问，且关联资源已同步到当前任务文件列表。';
   }

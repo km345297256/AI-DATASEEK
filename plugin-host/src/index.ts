@@ -15,13 +15,22 @@ function log(message: string, error?: unknown): void {
 interface HostOptions {
   toolsDirectory: string
   executionContractDirectory: string | undefined
+  visualizationsDirectory: string | undefined
 }
 
 function parseOptions(argv: string[]): HostOptions {
   let toolsDirectory: string | undefined
   let executionContractDirectory: string | undefined
+  let visualizationsDirectory: string | undefined
   for (let index = 0; index < argv.length; index += 1) {
     const argument = argv[index]
+    if (argument === '--visualizations-dir') {
+      const value = argv[index + 1]
+      if (!value) throw new Error('--visualizations-dir requires a value')
+      visualizationsDirectory = resolve(value)
+      index += 1
+      continue
+    }
     if (argument === '--tools-dir') {
       const value = argv[index + 1]
       if (!value) throw new Error('--tools-dir requires a value')
@@ -39,6 +48,7 @@ function parseOptions(argv: string[]): HostOptions {
     throw new Error(`Unknown argument: ${argument}`)
   }
   return {
+    visualizationsDirectory,
     toolsDirectory: resolve(
       toolsDirectory ?? process.env.TOOL_PLUGINS_DIR ?? resolve(process.cwd(), 'tools'),
     ),
@@ -64,6 +74,7 @@ async function main(): Promise<void> {
     options.toolsDirectory,
     log,
     options.executionContractDirectory,
+    options.visualizationsDirectory,
   )
   await runtime.start()
 

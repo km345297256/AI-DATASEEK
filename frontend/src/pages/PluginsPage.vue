@@ -386,11 +386,12 @@
           </div>
         </section>
 
+        <VisualizationPluginsPanel v-if="activeTab === 'renderers'" :query="rendererSearchQuery" />
         <section v-if="activeTab === 'renderers'" class="rounded-xl border border-[var(--border-main)] bg-[var(--background-menu-white)] p-4 sm:p-5">
           <div class="mb-4 flex flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <h2 class="text-lg font-semibold text-[var(--text-primary)]">{{ t('Renderers') }}</h2>
-              <p class="mt-1 text-sm text-[var(--text-tertiary)]">{{ t('Renderers map file extensions to preview components or APIs.') }}</p>
+              <h2 class="text-lg font-semibold text-[var(--text-primary)]">历史渲染器配置</h2>
+              <p class="mt-1 text-sm text-[var(--text-tertiary)]">保留旧配置的查看、编辑和删除。这些记录未适配可视化协议，不执行其中的 URL 或组件入口；实际预览请使用上方 Cordis 插件。</p>
             </div>
             <button
               class="inline-flex h-11 w-full items-center justify-center gap-1.5 rounded-lg border border-[var(--border-btn-main)] px-3 text-sm text-[var(--text-primary)] hover:bg-[var(--fill-tsp-white-light)] sm:h-9 sm:w-auto"
@@ -561,6 +562,7 @@ import { createRendererConfig, deleteRendererConfig, installRenderer, listRender
 import { getPluginRuntime, reloadPluginRuntime, type PluginRuntimePlugin, type PluginRuntimeSnapshot } from '@/api/pluginRuntime';
 import { getDomainPresetCatalog, type DomainPreset, type DomainPresetCatalog } from '@/api/domainPreset';
 import ToolCredentialsPanel from '@/components/ToolCredentialsPanel.vue';
+import VisualizationPluginsPanel from '@/visualizations/VisualizationPluginsPanel.vue';
 import { listBuiltinRenderers, listRenderers, rendererDefinitionsFromConfigs, type RendererDefinition } from '@/renderers/registry';
 import { showErrorToast, showSuccessToast } from '@/utils/toast';
 import { useLeftPanel } from '@/composables/useLeftPanel';
@@ -579,7 +581,7 @@ type PluginTab = 'skills' | 'mcp' | 'renderers' | 'runtime' | 'presets' | 'crede
 const tabs = computed<Array<{ key: PluginTab; label: string }>>(() => [
   { key: 'skills', label: t('Skills') },
   { key: 'mcp', label: t('MCP') },
-  { key: 'renderers', label: t('Renderers') },
+  { key: 'renderers', label: '可视化插件' },
   { key: 'runtime', label: t('Analysis Tools') },
   { key: 'presets', label: t('Domain Presets') },
   { key: 'credentials', label: t('Credentials') },

@@ -37,6 +37,8 @@ from app.application.services.api_key_service import APIKeyService
 from app.infrastructure.repositories.api_key_repository import MongoAPIKeyRepository
 from app.application.services.agent_profile_service import AgentProfileService
 from app.application.services.jupyter_service import JupyterService
+from app.application.services.visualization_catalog import VisualizationCatalogService
+from app.infrastructure.repositories.mongo_visualization_repository import MongoVisualizationRepository
 from app.infrastructure.repositories.agent_profile_repository import MongoAgentProfileRepository
 
 
@@ -78,6 +80,11 @@ def get_plugin_runtime() -> PluginRuntime | None:
     )
 
 @lru_cache()
+def get_visualization_catalog() -> VisualizationCatalogService:
+    return VisualizationCatalogService(get_plugin_runtime(), MongoVisualizationRepository())
+
+
+@lru_cache()
 def get_agent_service() -> AgentService:
     """
     Get agent service instance with all required dependencies
@@ -90,6 +97,7 @@ def get_agent_service() -> AgentService:
     # Create all dependencies
     agent_repository = MongoAgentRepository()
     session_repository = MongoSessionRepository()
+    from app.infrastructure.repositories.mongo_input_repository import MongoInputRepository
     sandbox_cls = DockerSandbox
     task_cls = RedisStreamTask
     file_storage = get_file_storage()
@@ -110,6 +118,7 @@ def get_agent_service() -> AgentService:
         analysis_job_service=get_analysis_job_service(),
         tool_approval_service=get_tool_approval_service(),
         credential_service=get_credential_service(),
+        input_repository=MongoInputRepository(session_repository),
     )
 
 

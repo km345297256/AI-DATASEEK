@@ -23,6 +23,8 @@ take no parameters:
 - `host.health`
 - `catalog.snapshot`
 - `plugins.reload`
+- `visualizations.snapshot`
+- `visualizations.reload`
 - `shutdown`
 
 For example:
@@ -97,3 +99,17 @@ waiting for that lock and time spent running the tool in the timeout budget.
 ```bash
 npm test
 ```
+## Visualization Contract v1
+
+The separate Cordis visualization catalog reads `visualizations/*.json` and
+exposes `visualizations.snapshot` / `visualizations.reload` over the existing
+stdio RPC transport. Its Context, fibers, revision and atomic reload are
+independent of Agent tool catalogs and execution-bundle digests. Manifests are
+data-only: trusted adapter/reader enums, explicit file matchers, read permission
+and bounded budgets; arbitrary entries, scripts and URLs are rejected.
+
+User enable/disable preferences belong to the authenticated user in the backend,
+not the shared Cordis fiber. Disabling one user's view cannot dispose another
+user's shared catalog registration. Frontend mounts and authorized reads enforce
+the effective user state. See [the contributor contract](../docs/visualization-plugin-contract.md)
+for extension, lifecycle, migration and compatibility details.

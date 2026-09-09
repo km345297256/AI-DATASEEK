@@ -1,6 +1,6 @@
-from typing import Optional, Dict, Any
+from typing import Literal, Optional, Dict, Any
 from app.domain.external.sandbox import Sandbox
-from app.domain.services.tools.base import BaseToolkit
+from app.domain.services.tools.base import BaseToolkit, tool_execution_contract
 from app.domain.models.tool_result import ToolResult
 from langchain.tools import tool
 
@@ -18,13 +18,14 @@ class FileToolkit(BaseToolkit):
         super().__init__()
         self.sandbox = sandbox
         
+    @tool_execution_contract(effects=("sandbox_read",))
     @tool(parse_docstring=True)
     async def file_read(
         self,
         file: str,
         start_line: Optional[int] = None,
         end_line: Optional[int] = None,
-        sudo: Optional[bool] = False
+        sudo: Literal[False] = False
     ) -> ToolResult:
         """Read file content. Use for checking file contents, analyzing logs, or reading configuration files.
         
@@ -32,7 +33,7 @@ class FileToolkit(BaseToolkit):
             file: Absolute path of the file to read
             start_line: (Optional) Starting line to read from, 0-based
             end_line: (Optional) Ending line number (exclusive)
-            sudo: (Optional) Whether to use sudo privileges
+            sudo: Must remain false; core read-only tools do not support privilege elevation
         """
         # Directly call sandbox's file_read method
         return await self.sandbox.file_read(
@@ -103,19 +104,20 @@ class FileToolkit(BaseToolkit):
             sudo=sudo
         )
     
+    @tool_execution_contract(effects=("sandbox_read",))
     @tool(parse_docstring=True)
     async def file_find_in_content(
         self,
         file: str,
         regex: str,
-        sudo: Optional[bool] = False
+        sudo: Literal[False] = False
     ) -> ToolResult:
         """Search for matching text within file content. Use for finding specific content or patterns in files.
         
         Args:
             file: Absolute path of the file to search within
             regex: Regular expression pattern to match
-            sudo: (Optional) Whether to use sudo privileges
+            sudo: Must remain false; core read-only tools do not support privilege elevation
         """
         # Directly call sandbox's file_search method
         return await self.sandbox.file_search(
@@ -124,6 +126,7 @@ class FileToolkit(BaseToolkit):
             sudo=sudo
         )
     
+    @tool_execution_contract(effects=("sandbox_read",))
     @tool(parse_docstring=True)
     async def file_find_by_name(
         self,
@@ -140,4 +143,4 @@ class FileToolkit(BaseToolkit):
         return await self.sandbox.file_find(
             path=path,
             glob_pattern=glob
-        ) 
+        )

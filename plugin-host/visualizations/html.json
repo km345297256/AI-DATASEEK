@@ -1,0 +1,25 @@
+{
+  "contract_version": 1,
+  "id": "html",
+  "version": "1.0.0",
+  "name": "HTML 文档",
+  "description": "隔离框架中的 HTML 文档预览",
+  "extensions": [
+    "html",
+    "htm"
+  ],
+  "filenames": [],
+  "view_kind": "document",
+  "adapter": "html",
+  "data_kind": "file",
+  "reader": null,
+  "default_enabled": true,
+  "priority": 50,
+  "permissions": [
+    "file:read"
+  ],
+  "limits": {
+    "max_input_bytes": 268435456,
+    "max_output_bytes": 16777216
+  }
+}

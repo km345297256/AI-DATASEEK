@@ -245,6 +245,8 @@ class ToolExecutionPipeline:
         execute: ToolExecutionHandler,
         metadata: Mapping[str, Any] | None = None,
     ) -> Any:
+        from app.domain.services.tools.tool_contract import normalize_failed_tool_result, validate_tool_arguments
+        tool_call = validate_tool_arguments(tool, tool_call)
         context = ToolExecutionContext(
             tool=tool,
             tool_call=tool_call,
@@ -274,6 +276,7 @@ class ToolExecutionPipeline:
                 await interceptor.post_execute(context, value)
             for interceptor in reversed(interceptors):
                 value = await interceptor.result(context, value)
+            value = normalize_failed_tool_result(value)
             for interceptor in reversed(interceptors):
                 await interceptor.complete(context, value)
             return value

@@ -26,6 +26,12 @@ from app.core.config import get_settings
 from app.infrastructure.external.llm import create_chat_model
 from langchain.messages import AIMessage, HumanMessage, ToolCall, ToolMessage, SystemMessage
 from app.domain.services.tools.base import Tool
+from app.domain.models.tool_result import ToolResult
+from app.domain.services.tools.pipeline import ToolExecutionPipeline
+from app.domain.services.tools.tool_contract import (
+    normalize_failed_tool_result, resolved_tool_is_read_only, resolved_tool_can_observe_pending, result_failed,
+    safe_tool_retry, tool_failure_result, tool_reported_failure_data, validate_tool_arguments,
+)
 from app.domain.services.tools.pipeline import opaque_log_identifier, summarize_argument_keys
 from app.domain.services.tools.spill import SPILL_READ_TOOL_NAME
 from app.domain.services.tools.spill_projection import (
@@ -37,13 +43,15 @@ from app.domain.services.tools.spill_projection import (
     spill_notice_from_result,
 )
 from app.domain.services.tools.registry import ToolRegistry
-from app.domain.utils.public_error import public_error_message
 from app.domain.utils.robust_json_parser import RobustJsonParser, ToolCallParseError, parse_json_lenient
 from app.domain.services.token_usage_service import TokenUsageService
 from app.domain.services.execution_identity import private_identity_hmac
+from app.domain.services.analysis_progress import AnalysisProgressGuard
+from app.domain.services.analysis_recovery import current_analysis_recovery
+from app.domain.services.execution_evidence import ToolExecutionLedger, tool_execution_scope
 from app.domain.services.model_runtime import (
     USAGE_RECORDED_KEY, flush_memory_changes, memory_checkpoint, model_call_role,
-    note_memory_change,
+    note_memory_change, current_analysis_budget,
 )
 
 
@@ -78,6 +86,16 @@ def _is_retryable_llm_error(error: Exception) -> bool:
         return True
     if isinstance(error, APIStatusError):
         status_code = getattr(error, "status_code", None)
+        if status_code == 429:
+            # Billing/quota exhaustion is not transient rate limiting. Never
+            # spend more local budget retrying an explicitly exhausted account.
+            body = getattr(error, "body", None)
+            details = body.get("error", body) if isinstance(body, dict) else {}
+            details = details if isinstance(details, dict) else {}
+            code = str(details.get("code") or details.get("type") or "").lower()
+            if code in {"insufficient_quota", "quota_exceeded", "billing_hard_limit_reached",
+                        "billing_not_active", "insufficient_balance", "account_quota_exceeded"}:
+                return False
         return status_code in {408, 409, 429} or (
             isinstance(status_code, int) and 500 <= status_code <= 599
         )
@@ -92,11 +110,9 @@ class BaseAgent(ABC):
     name: str = ""
     system_prompt: str = ""
     format: Optional[str] = None
-    # This limits model/tool round trips, not user token consumption.  A runaway
-    # tool loop used to be able to make 1,500 serial model calls, which turns a
-    # recoverable analysis error into an hours-long task.
-    max_iterations: int = 12
-    MAX_CONFIGURED_ITERATIONS: int = 64
+    # Tasks stop on completion, cancellation, or a concrete inability to make
+    # safe progress, never because a cumulative number of rounds was consumed.
+    max_iterations: None = None
     max_retries: int = 3
     retry_interval: float = 1.0
     tool_choice: Optional[str] = None
@@ -194,23 +210,9 @@ class BaseAgent(ABC):
             )
             self.FINALIZATION_TIMEOUT_SECONDS = type(self).FINALIZATION_TIMEOUT_SECONDS
         llm_overrides = dict(llm_overrides or {})
-        configured_max_iterations = llm_overrides.pop("max_iterations", None)
-        if configured_max_iterations is not None:
-            if isinstance(configured_max_iterations, bool):
-                logger.warning("Ignoring invalid boolean max_iterations override")
-            else:
-                try:
-                    requested_iterations = int(configured_max_iterations)
-                except (TypeError, ValueError):
-                    logger.warning(
-                        "Ignoring invalid max_iterations override %r",
-                        configured_max_iterations,
-                    )
-                else:
-                    self.max_iterations = max(
-                        1,
-                        min(requested_iterations, self.MAX_CONFIGURED_ITERATIONS),
-                    )
+        # Profiles must not silently reinstate a task-consumption hard stop.
+        llm_overrides.pop("max_iterations", None)
+        self.max_iterations = None
         system_prompt_override = llm_overrides.get('system_prompt')
         custom_prompt_hmac = (
             private_identity_hmac({"custom_system_prompt": system_prompt_override})
@@ -250,8 +252,8 @@ class BaseAgent(ABC):
                 "estimator_version": "utf8_bytes_div3_v1",
                 "context_capacity_tokens": getattr(settings, "model_context_capacity_tokens", 131_072),
                 "context_safety_tokens": getattr(settings, "model_context_safety_tokens", 2048),
-                "task_token_budget": getattr(settings, "model_task_token_budget", 1_000_000),
-                "task_call_budget": getattr(settings, "model_task_call_budget", 128),
+                "task_token_budget": None,
+                "task_call_budget": None,
             },
         }
         self._json_output_parser = RetryWithErrorOutputParser.from_llm(
@@ -521,20 +523,84 @@ class BaseAgent(ABC):
         )
 
     async def invoke_tool(self, tool: Tool, tool_call: ToolCall) -> ToolMessage:
-        """Invoke specified tool, with retry mechanism."""
+        """Retry only when an adapter explicitly guarantees replay is safe."""
         retries = 0
+        # Freeze host-authored execution evidence before the call. A returned
+        # result or caller-provided metadata cannot downgrade uncertain writes.
+        read_only = resolved_tool_is_read_only(tool)
+        ledger = getattr(self, "_tool_execution_ledger", None)
+        if ledger is None:
+            ledger = self._tool_execution_ledger = ToolExecutionLedger()
+        call_id = tool_call["id"]
         while retries <= self.max_retries:
             try:
-                return await tool.ainvoke(tool_call)
+                # Registered tools validate at the common pipeline entry, before
+                # jobs or authorization side effects. Standalone adapters use
+                # the same contract here without applying validators twice.
+                pipeline = getattr(getattr(tool, "toolkit", None), "tool_execution_pipeline", None)
+                invocation = tool_call if isinstance(pipeline, ToolExecutionPipeline) else validate_tool_arguments(tool, tool_call)
+                with tool_execution_scope(ledger, call_id):
+                    budget = current_analysis_budget()
+                    if budget is None:
+                        result = normalize_failed_tool_result(await tool.ainvoke(invocation))
+                    else:
+                        from datetime import UTC, datetime
+                        from app.domain.services.model_runtime import ModelBudgetStopped
+                        from app.domain.services.analysis_budget import BudgetUnavailableError
+                        try:
+                            snapshot = await budget.snapshot()
+                        except BudgetUnavailableError:
+                            raise ModelBudgetStopped("trace_store_unavailable") from None
+                        deadline = snapshot.deadline_at
+                        if deadline is None:
+                            # Single-operation deadlines remain in the normal
+                            # tool pipeline; no cumulative task deadline wraps it.
+                            result = normalize_failed_tool_result(await tool.ainvoke(invocation))
+                        else:
+                            # Explicit isolated bounded policies remain usable
+                            # for tests; production policies have no deadline.
+                            deadline = deadline.replace(tzinfo=UTC) if deadline.tzinfo is None else deadline
+                            remaining = (deadline - datetime.now(UTC)).total_seconds()
+                            if remaining <= 0:
+                                raise ModelBudgetStopped("analysis_budget_deadline_exceeded")
+                            deadline_guard = asyncio.timeout(remaining)
+                            try:
+                                async with deadline_guard:
+                                    result = normalize_failed_tool_result(await tool.ainvoke(invocation))
+                            except TimeoutError:
+                                if deadline_guard.expired():
+                                    raise ModelBudgetStopped("analysis_budget_deadline_exceeded") from None
+                                raise
+                if result_failed(result):
+                    result.status = "error"
+                    artifact = result.artifact
+                    if not isinstance(artifact, (ToolResult, dict)):
+                        artifact = ToolResult(success=False, message="Tool execution failed", data={
+                            "error_code": "tool_reported_failure", "side_effect_state": "unknown",
+                        })
+                        result.artifact = artifact
+                    data = artifact.data if isinstance(artifact, ToolResult) else artifact.get("data")
+                    failure_data = tool_reported_failure_data(data, read_only=read_only)
+                    failure_data["side_effect_state"] = ledger.failure_state(call_id, failure_data["side_effect_state"])
+                    self._record_tool_failure(failure_data, call_id=call_id)
+                elif not read_only and not ledger.has_attempts(call_id):
+                    # Successful external writes do not become replay-safe
+                    # merely because their adapter has no process receipt.
+                    ledger.record_nonreplayable(call_id)
+                self._refresh_execution_evidence()
+                return result
             except Exception as e:
-                last_error = public_error_message(e)
+                failure = tool_failure_result(e, read_only=read_only)
+                failure.data["side_effect_state"] = ledger.failure_state(call_id, failure.data["side_effect_state"])
+                self._record_tool_failure(failure.data or {}, call_id=call_id)
                 retries += 1
-                if getattr(e, "retryable", True) is False:
+                if not safe_tool_retry(e):
                     logger.warning(
-                        "Tool execution rejected non-retryable failure tool=%s call_id=%s error_type=%s",
+                        "Tool execution rejected non-retryable failure tool=%s call_id=%s error_type=%s argument_keys=%s",
                         tool_call.get("name") or getattr(tool, "name", ""),
                         opaque_log_identifier(tool_call.get("id", ""), namespace="call"),
                         type(e).__name__,
+                        summarize_argument_keys(tool_call.get("args")),
                     )
                     break
                 if retries <= self.max_retries:
@@ -548,7 +614,63 @@ class BaseAgent(ABC):
                     )
                     break
 
-        return ToolMessage(tool_call_id=tool_call["id"], name=tool.name, content=last_error)
+        return ToolMessage(tool_call_id=tool_call["id"], name=tool.name,
+                           content=failure.model_dump_json(), artifact=failure, status="error")
+
+    def _record_tool_failure(self, data: dict[str, Any], *, call_id: str | None = None) -> None:
+        outcome = dict(getattr(self, "last_execution_outcome", None) or {})
+        outcome["last_tool_error_code"] = data.get("error_code", "tool_reported_failure")
+        state = data.get("side_effect_state", "unknown")
+        outcome["side_effect_state"] = state if state in {"not_started", "idempotent", "confirmed_terminal", "unknown"} else "unknown"
+        ledger = getattr(self, "_tool_execution_ledger", None)
+        if ledger is None:
+            ledger = self._tool_execution_ledger = ToolExecutionLedger()
+        if outcome["side_effect_state"] == "unknown":
+            ledger.record_unknown(call_id or uuid.uuid4().hex)
+        self.last_execution_outcome = outcome
+        self._refresh_execution_evidence()
+
+    def _refresh_execution_evidence(self) -> dict:
+        ledger = getattr(self, "_tool_execution_ledger", None)
+        summary = ledger.summary() if ledger else {}
+        outcome = dict(getattr(self, "last_execution_outcome", {}) or {})
+        if summary:
+            outcome["execution_evidence"] = summary
+            outcome["has_unconfirmed_tool_execution"] = summary["pending_execution"]
+            if not summary["pending_execution"] and outcome.get("side_effect_state") == "unknown":
+                # Confirmation does not grant permission to replay a write.
+                outcome["side_effect_state"] = "confirmed_terminal"
+        self.last_execution_outcome = outcome
+        return summary
+
+    async def _reconcile_execution(self, *, phase: str = "intermediate") -> dict:
+        ledger = getattr(self, "_tool_execution_ledger", None)
+        report = {}
+        if ledger and ledger.summary()["pending_execution"]:
+            report = await ledger.reconcile_pending(phase=phase)
+        self._refresh_execution_evidence()
+        return report
+
+    @staticmethod
+    def _execution_progress_event(report: dict) -> MessageEvent | None:
+        if report.get("changed_count", 0) > 0:
+            return MessageEvent(message="执行状态已更新。", metadata={"analysis_progress": {"stage": "verifying_execution"}})
+        return None
+
+    def _set_execution_outcome(self, code: str) -> None:
+        self.last_execution_outcome = {**getattr(self, "last_execution_outcome", {}), "code": code}
+
+    def _tool_budget_instruction(self) -> str:
+        guard = getattr(self, "_analysis_progress", None)
+        return (
+            "Continue the original task while safe, verified progress is possible. "
+            "Use the available evidence to produce, validate, and deliver the requested results; "
+            "avoid optional exploration, repeated inspections, or drafting without execution. "
+            "Do not replay operations with unconfirmed side effects. Observe an already running "
+            "operation through its original identity before starting another write. "
+            "Single-operation timeouts, authorization, and cancellation still apply."
+            + ("\n" + guard.instruction() if guard else "")
+        )
 
     @staticmethod
     def _tool_presentation(tool: Any) -> Optional[dict[str, Any]]:
@@ -566,30 +688,86 @@ class BaseAgent(ABC):
         format: Optional[str] = None,
         max_iterations: Optional[int] = None,
     ) -> AsyncGenerator[BaseEvent, None]:
+        self.last_execution_outcome = {}
+        recovery = current_analysis_recovery()
+        self._tool_execution_ledger = recovery.executions if recovery else ToolExecutionLedger()
+        self._analysis_progress = recovery.progress if recovery else AnalysisProgressGuard()
+        try:
+            async for event in self._execute_bounded(request, format, max_iterations):
+                yield event
+        except asyncio.CancelledError as error:
+            self._set_execution_outcome(getattr(error, "code", "cancelled"))
+            raise
+        except Exception:
+            self._set_execution_outcome("execution_failed")
+            raise
+
+    async def _execute_bounded(
+        self, request: str, format: Optional[str] = None,
+        max_iterations: Optional[int] = None,
+    ) -> AsyncGenerator[BaseEvent, None]:
         format = format or self.format
-        iteration_budget = self.max_iterations
-        if max_iterations is not None and not isinstance(max_iterations, bool):
-            try:
-                iteration_budget = max(
-                    1,
-                    min(int(max_iterations), self.MAX_CONFIGURED_ITERATIONS),
-                )
-            except (TypeError, ValueError):
-                logger.warning(
-                    "Ignoring invalid per-execution max_iterations %r",
-                    max_iterations,
-                )
-        message = await self.ask(request, format)
+        # Deliberately ignore both profile and per-call max_iterations values.
+        # They are not authority to truncate new tasks with useful progress.
+        adaptive_budget = current_analysis_budget()
+        recovery = current_analysis_recovery()
+        if adaptive_budget is not None:
+            initial_snapshot = await adaptive_budget.snapshot()
+        self.last_execution_outcome = {
+            "code": "running", "tool_batches_used": 0,
+            "tool_batch_limit": None, "tool_hard_limit": None,
+            "reserved_batches": 0,
+            "phase": "analysis", "last_tool_error_code": None,
+            "side_effect_state": "not_started", "has_unconfirmed_tool_execution": False,
+        }
+        if adaptive_budget is not None:
+            self.last_execution_outcome.update(tool_batch_limit=initial_snapshot.soft_limit,
+                tool_batches_used=initial_snapshot.tool_batches_used, tool_hard_limit=initial_snapshot.hard_limit,
+                budget_grants=initial_snapshot.grant_count)
+        self._refresh_execution_evidence()
+        message = await self.ask(request + "\n\n" + self._tool_budget_instruction(), format)
         iterations = 0
         successful_tool_calls: List[tuple[ToolCall, ToolMessage]] = []
         while message.tool_calls:
-            if iterations >= iteration_budget:
-                yield ErrorEvent(error="Maximum iteration count reached, failed to complete the task")
-                return
-            iterations += 1
             tool_responses = []
             completed_tool_results = []
-            for tool_call in message.tool_calls:
+            admission_denied = False
+            if self._tool_execution_ledger.summary()["pending_execution"]:
+                report = await self._reconcile_execution()
+                notice = self._execution_progress_event(report)
+                if notice:
+                    yield notice
+                if report.get("has_unresolvable_pending"):
+                    admission_denied = True
+                    self.last_execution_outcome["budget_reason"] = "tool_execution_unknown"
+            if adaptive_budget is not None and not admission_denied:
+                from app.domain.services.analysis_budget import BudgetEvidence, BudgetUnavailableError
+                try:
+                    snapshot = await adaptive_budget.snapshot()
+                    review_needed = snapshot.soft_limit is not None and snapshot.tool_batches_used >= snapshot.soft_limit
+                    evidence = (await recovery.review(message.tool_calls, review_needed=review_needed)
+                                if recovery else BudgetEvidence(scope_digest=adaptive_budget.scope_digest,
+                                    confirmed_progress_units=0, progress_digest="0" * 64,
+                                    has_unknown_execution=self._tool_execution_ledger.summary()["pending_execution"]))
+                    admission = await adaptive_budget.reserve_tool_batch(evidence, reservation_id=uuid.uuid4().hex)
+                    admission_denied = not admission.allowed
+                    self.last_execution_outcome.update(tool_batches_used=admission.tool_batches_used,
+                        tool_batch_limit=admission.soft_limit, budget_grants=admission.grant_count,
+                        budget_reason=admission.reason)
+                except BudgetUnavailableError:
+                    admission_denied = True
+                    self.last_execution_outcome["budget_reason"] = "analysis_budget_store_unavailable"
+            if admission_denied:
+                # A lost execution identity or unavailable admission audit is
+                # not fixed by asking the model to propose more blocked writes.
+                tool_responses = [ToolMessage(tool_call_id=call["id"], name=call["name"], status="error",
+                    content="This call was NOT executed. Safe execution or its admission audit could not be established. Return verified results and remaining gaps without requesting tools.")
+                    for call in message.tool_calls]
+            if not admission_denied:
+                iterations += 1
+                if adaptive_budget is None:
+                    self.last_execution_outcome["tool_batches_used"] = iterations
+            for tool_call in ([] if admission_denied else message.tool_calls):
                 function_name = tool_call["name"]
                 tool_aliases = {
                     "shell_write": "shell_write_to_process",
@@ -616,6 +794,7 @@ class BaseAgent(ABC):
                         else None
                     )
                     if is_non_substantive_message_text(question_text):
+                        self._analysis_progress.record_blocked(tool_call, "A substantive user question is required; this call did no work.")
                         logger.warning(
                             "Agent %s suppressed a non-substantive message_ask_user call %s",
                             self.name,
@@ -624,6 +803,8 @@ class BaseAgent(ABC):
                         tool_responses.append(ToolMessage(
                             tool_call_id=tool_call_id,
                             name=function_name,
+                            status="error",
+                            artifact=ToolResult(success=False, data={"error_code": "invalid_user_question", "side_effect_state": "not_started"}),
                             content=json.dumps({
                                 "success": False,
                                 "error": "invalid_user_question",
@@ -639,6 +820,8 @@ class BaseAgent(ABC):
                 
                 tool = self.get_tool(function_name)
                 if not tool:
+                    self._analysis_progress.record_blocked(tool_call, "The requested tool is unavailable; choose an available capability.")
+                    self._record_tool_failure({"error_code": "tool_unavailable", "side_effect_state": "not_started"})
                     logger.warning(
                         "Agent %s requested unavailable tool %s; returning a corrective tool message",
                         self.name,
@@ -648,6 +831,8 @@ class BaseAgent(ABC):
                         ToolMessage(
                             tool_call_id=tool_call_id,
                             name=function_name,
+                            status="error",
+                            artifact=ToolResult(success=False, data={"error_code": "tool_unavailable", "side_effect_state": "not_started"}),
                             content=f"Tool is unavailable: {function_name}",
                         )
                     )
@@ -677,16 +862,34 @@ class BaseAgent(ABC):
                 )
 
                 blocked_reason = self._blocked_runtime_install_reason(tool_call)
+                blocked_code = "tool_permission_denied"
+                if not blocked_reason:
+                    blocked_reason = self._analysis_progress.before_call(tool_call)
+                    blocked_code = "analysis_no_progress_loop"
+                if (not blocked_reason and self._tool_execution_ledger.summary()["pending_execution"]
+                        and not resolved_tool_is_read_only(tool)
+                        and not resolved_tool_can_observe_pending(tool, tool_call, self._tool_execution_ledger)):
+                    report = await self._reconcile_execution()
+                    notice = self._execution_progress_event(report)
+                    if notice:
+                        yield notice
+                    if self._tool_execution_ledger.summary()["pending_execution"]:
+                        blocked_reason = ("A prior operation is still unconfirmed after a bounded status check. "
+                                          "This new write was NOT executed. Do not replay it or overwrite outputs. "
+                                          "Use confirmed read-only evidence to report the unresolved state.")
+                        blocked_code = "tool_execution_unknown"
                 if blocked_reason:
+                    self._analysis_progress.record_blocked(tool_call, blocked_reason)
+                    self._record_tool_failure({"error_code": blocked_code, "side_effect_state": "not_started"})
                     logger.warning(
-                        "Blocked runtime dependency installation from agent=%s tool=%s",
+                        "Blocked analysis operation from agent=%s tool=%s",
                         self.name,
                         function_name,
                     )
                     blocked_result = {
                         "success": False,
                         "message": blocked_reason,
-                        "blocked_by_policy": "runtime_dependency_installation",
+                        "blocked_by_policy": "runtime_dependency_installation" if blocked_code == "tool_permission_denied" else blocked_code,
                     }
                     yield ToolEvent(
                         status=ToolStatus.CALLED,
@@ -702,12 +905,22 @@ class BaseAgent(ABC):
                             tool_call_id=tool_call_id,
                             name=function_name,
                             content=json.dumps(blocked_result, ensure_ascii=False),
+                            artifact=ToolResult(success=False, message=blocked_reason, data={"error_code": blocked_code, "side_effect_state": "not_started"}),
+                            status="error",
                         )
                     )
                     continue
 
                 tool_started = time.perf_counter()
                 tool_result = await self.invoke_tool(tool, tool_call)
+                call_evidence = self._tool_execution_ledger.call_summary(tool_call_id)
+                self._analysis_progress.record(tool_call, succeeded=self._tool_result_succeeded(tool_result),
+                    read_only=resolved_tool_is_read_only(tool),
+                    result_digest=private_identity_hmac({"purpose": "analysis-result/v1", "content": str(tool_result.content)[:65536]}),
+                    confirmed_execution=bool(call_evidence["tracked_operation_count"] and call_evidence["execution_confirmed"]))
+                if (self._tool_result_succeeded(tool_result) and call_evidence.get("has_observable_pending")
+                        and resolved_tool_can_observe_pending(tool, tool_call, self._tool_execution_ledger)):
+                    self._analysis_progress.record_observation()
                 logger.info(
                     "agent_tool_call agent=%s session=%s tool=%s duration_ms=%.1f status=%s",
                     self.name,
@@ -818,6 +1031,7 @@ class BaseAgent(ABC):
                     )
 
                 if failure_reason is not None:
+                    self._set_execution_outcome(failure_reason)
                     fallback_completion = self._completion_from_finalization_failure(
                         successful_tool_calls,
                         reason=failure_reason,
@@ -841,17 +1055,28 @@ class BaseAgent(ABC):
                 )
                 break
 
-            if iterations >= iteration_budget:
-                # Do not expose tools on the model call after the final allowed
-                # batch. Previously this call could take tens of seconds, return
-                # another tool request, and then have that request discarded by
-                # the loop guard. Force a useful bounded final response instead.
+            unresolved = self._tool_execution_ledger.summary().get("has_unresolvable_pending", False)
+            if admission_denied or unresolved or self._analysis_progress.should_stop:
+                if self._tool_execution_ledger.summary()["pending_execution"]:
+                    report = await self._reconcile_execution(phase="final")
+                    notice = self._execution_progress_event(report)
+                    if notice:
+                        yield notice
+                reason = self.last_execution_outcome.get("budget_reason")
+                if self._tool_execution_ledger.summary().get("has_unresolvable_pending"):
+                    reason = "tool_execution_unknown"
+                elif self._analysis_progress.should_stop:
+                    reason = "analysis_no_progress_loop"
+                self._set_execution_outcome(reason or "execution_admission_unavailable")
+                self.last_execution_outcome["phase"] = "delivery"
+                # A concrete fault or repeated no-progress dispatch is terminal
+                # for this attempt. Do not spend model rounds planning blocked
+                # writes; preserve verified results in one bounded synthesis.
                 final_instruction = HumanMessage(content=(
-                    "The bounded tool budget is now exhausted. No more tools are available in this "
-                    "execution. Return the required final response immediately using the results and "
-                    "artifacts already produced. Do not request tools or install dependencies. If the "
-                    "deliverable could not be completed, return a concise failure result instead of a "
-                    "new plan."
+                    f"Safe progress cannot continue in this attempt ({self.last_execution_outcome['code']}). "
+                    "Return the required final response using verified results and artifacts already produced. "
+                    "Do not request more tools, repeat unconfirmed operations, or claim missing work was completed. "
+                    "If the deliverable is incomplete, describe the concrete blocker and remaining gaps."
                 ))
                 try:
                     async with asyncio.timeout(self.FINALIZATION_TIMEOUT_SECONDS):
@@ -861,11 +1086,12 @@ class BaseAgent(ABC):
                             allow_tools=False,
                         )
                 except asyncio.TimeoutError:
+                    self._set_execution_outcome("finalization_timeout")
                     logger.warning(
-                        "Agent %s no-tool finalization exceeded %.1fs at budget %d",
+                        "Agent %s no-tool finalization exceeded %.1fs after %d batches",
                         self.name,
                         self.FINALIZATION_TIMEOUT_SECONDS,
-                        iteration_budget,
+                        iterations,
                     )
                     fallback_completion = self._completion_from_finalization_failure(
                         successful_tool_calls,
@@ -877,10 +1103,11 @@ class BaseAgent(ABC):
                         yield ErrorEvent(error=self.FINALIZATION_TIMEOUT_ERROR)
                     return
                 except Exception as exc:
+                    self._set_execution_outcome("finalization_failed")
                     logger.warning(
-                        "Agent %s no-tool finalization failed at budget %d (%s)",
+                        "Agent %s no-tool finalization failed after %d batches (%s)",
                         self.name,
-                        iteration_budget,
+                        iterations,
                         type(exc).__name__,
                     )
                     fallback_completion = self._completion_from_finalization_failure(
@@ -893,10 +1120,11 @@ class BaseAgent(ABC):
                         yield ErrorEvent(error=self.FINALIZATION_FAILED_ERROR)
                     return
                 if message.tool_calls:
+                    self._set_execution_outcome("invalid_final_result")
                     logger.warning(
-                        "Agent %s returned tool calls despite no-tool finalization at budget %d",
+                        "Agent %s returned tool calls despite no-tool fault finalization after %d batches",
                         self.name,
-                        iteration_budget,
+                        iterations,
                     )
                     fallback_completion = self._completion_from_finalization_failure(
                         successful_tool_calls,
@@ -909,8 +1137,17 @@ class BaseAgent(ABC):
                     return
                 break
 
-            message = await self.ask_with_messages(tool_responses, format)
+            message = await self.ask_with_messages(
+                [*tool_responses, HumanMessage(content=self._tool_budget_instruction())], format,
+            )
 
+        if self._tool_execution_ledger.summary()["pending_execution"]:
+            report = await self._reconcile_execution(phase="final")
+            notice = self._execution_progress_event(report)
+            if notice:
+                yield notice
+        if self.last_execution_outcome["code"] == "running":
+            self._set_execution_outcome("completed")
         yield MessageEvent(message=self._message_content_to_text(message.content))
     
     async def _ensure_memory(self):

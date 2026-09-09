@@ -1,0 +1,28 @@
+{
+  "contract_version": 1,
+  "id": "shapefile",
+  "version": "1.0.0",
+  "name": "Shapefile 地图",
+  "description": "关联空间文件的地图预览",
+  "extensions": [
+    "shp",
+    "shx",
+    "dbf",
+    "prj",
+    "cpg"
+  ],
+  "filenames": [],
+  "view_kind": "map",
+  "adapter": "shapefile",
+  "data_kind": "file",
+  "reader": null,
+  "default_enabled": true,
+  "priority": 50,
+  "permissions": [
+    "file:read"
+  ],
+  "limits": {
+    "max_input_bytes": 268435456,
+    "max_output_bytes": 16777216
+  }
+}

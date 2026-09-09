@@ -1,0 +1,25 @@
+{
+  "contract_version": 1,
+  "id": "markdown",
+  "version": "1.0.0",
+  "name": "Markdown 文档",
+  "description": "Markdown 文档预览",
+  "extensions": [
+    "md",
+    "markdown"
+  ],
+  "filenames": [],
+  "view_kind": "document",
+  "adapter": "markdown",
+  "data_kind": "file",
+  "reader": null,
+  "default_enabled": true,
+  "priority": 50,
+  "permissions": [
+    "file:read"
+  ],
+  "limits": {
+    "max_input_bytes": 268435456,
+    "max_output_bytes": 16777216
+  }
+}

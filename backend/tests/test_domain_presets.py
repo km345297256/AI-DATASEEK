@@ -174,7 +174,7 @@ async def test_selected_plugin_keeps_original_governed_pipeline(toolkit):
     ToolRegistry([toolkit]).register_interceptor(Guard())
     toolkit.call_tool = AsyncMock(return_value=ToolResult(success=True, data={"ok": True}))
     result = await view.get_tool("data_format_inspect").ainvoke({
-        "name": "data_format_inspect", "args": {"input_path": "/home/ubuntu/data/input.csv"}, "id": "call1", "type": "tool_call",
+        "name": "data_format_inspect", "args": {"input_paths": ["/home/ubuntu/datasets/test/input.csv"]}, "id": "call1", "type": "tool_call",
     })
     assert result.artifact.success
     assert calls == [("data_format_inspect", "data_foundation")]

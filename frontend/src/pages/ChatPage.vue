@@ -109,10 +109,15 @@
       </div>
       <div class="mx-auto w-full max-w-full sm:max-w-[768px] sm:min-w-[390px] flex flex-col flex-1">
         <div class="flex flex-col w-full gap-[12px] pb-[80px] pt-[12px] flex-1 overflow-y-auto">
-          <ChatMessage v-for="(message, index) in messages" :key="index" :message="message"
+          <button v-if="hasMoreHistory" type="button" :disabled="isLoadingHistory" class="mx-auto rounded-lg px-4 py-2 text-sm text-[var(--text-secondary)] disabled:opacity-50" @click="loadEarlierHistory">
+            {{ isLoadingHistory ? '正在加载历史记录…' : '加载更早的对话' }}
+          </button>
+          <ChatMessage v-for="(message, index) in messages" :key="messageKey(message)" :message="message"
             :hideHeader="isConsecutiveAssistant(messages, index)"
             :session-id="sessionId"
             :show-assistant-actions="!isLoading && isLatestAssistantMessage(messages, index)"
+            :allow-analysis-resume="canResumeAnalysis(index)"
+            @resumeAnalysis="resumeAnalysis(index)"
             @toolClick="handleToolClick"
             @jupyterOpened="handleJupyterOpened" />
 
@@ -137,7 +142,8 @@
           </div>
 
           <!-- Loading indicator -->
-          <LoadingIndicator v-if="isLoading" :text="$t('Thinking')" />
+          <LoadingIndicator v-if="isLoading || isRestoringHistory" role="status" aria-live="polite" :text="isRestoringHistory ? '正在加载最近对话…' : connectionNotice || analysisProgress || $t('Thinking')" />
+          <p v-else-if="connectionNotice" role="status" class="mt-3 text-sm text-[var(--text-tertiary)]">{{ connectionNotice }}</p>
         </div>
 
         <div class="mobile-safe-bottom flex flex-col bg-[var(--background-gray-main)] sticky bottom-0">
@@ -147,7 +153,7 @@
           </button>
           <PlanPanel v-if="plan && plan.steps.length > 0" :plan="plan" />
           <ChatBox v-model="inputMessage" v-model:selected-skills="selectedSkills" v-model:selected-mcp-servers="selectedMcpServers" :rows="1" @submit="handleSubmit" :isRunning="isLoading" @stop="handleStop"
-            :attachments="attachments" />
+            :disabled="isRestoringHistory" :attachments="attachments" />
           <p class="pb-1.5 text-center text-[10px] text-[var(--text-tertiary)]">DataSeek 也可能会犯错。请核查重要信息。</p>
         </div>
       </div>
@@ -213,6 +219,11 @@ import {
   createAgentEventCursor,
   resetAgentEventCursor,
 } from '../utils/agentEventCursor';
+import { createMessageKey, prependHistoricalMessages, projectHistoryMessages } from '../utils/sessionHistory';
+import { continuationAttempt, resumableAnalysisOutcome } from '../utils/analysisOutcome';
+import type { AnalysisContinuationAttempt } from '../types/analysisOutcome';
+import { isAnalysisProgressEvent, isAnalysisProgressMessage } from '../utils/analysisProgress';
+import { useAnalysisProgress } from '../composables/useAnalysisProgress';
 
 const router = useRouter()
 const { t } = useI18n()
@@ -225,6 +236,14 @@ const { selectedProfileId } = useAgentProfile()
 const createInitialState = () => ({
   inputMessage: '',
   isLoading: false,
+  connectionNotice: '',
+  analysisProgress: '',
+  analysisContinuation: null as AnalysisContinuationAttempt | null,
+  hasMoreHistory: false,
+  isLoadingHistory: false,
+  isRestoringHistory: false,
+  historyBeforeSeq: undefined as number | undefined,
+  timelineRevision: 0,
   sessionId: undefined as string | undefined,
   messages: [] as Message[],
   toolPanelSize: 0,
@@ -256,6 +275,14 @@ const state = reactive(createInitialState());
 const {
   inputMessage,
   isLoading,
+  connectionNotice,
+  analysisProgress,
+  analysisContinuation,
+  hasMoreHistory,
+  isLoadingHistory,
+  isRestoringHistory,
+  historyBeforeSeq,
+  timelineRevision,
   sessionId,
   messages,
   toolPanelSize,
@@ -278,6 +305,7 @@ const {
   completionAdvice,
   taskStartedAtMs,
 } = toRefs(state);
+const { updateAnalysisProgress, beginAnalysisProgress, clearAnalysisProgress } = useAnalysisProgress(analysisProgress);
 
 // Non-state refs that don't need reset
 const toolPanel = ref<InstanceType<typeof ToolPanel>>()
@@ -285,9 +313,16 @@ const simpleBarRef = ref<InstanceType<typeof SimpleBar>>();
 const observerRef = ref<HTMLDivElement>();
 const chatContainerRef = ref<HTMLDivElement>();
 const eventCursor = createAgentEventCursor();
+let chatGeneration = 0;
+let viewDisposed = false;
+let historyRequest: AbortController | undefined;
+const messageKey = createMessageKey();
 
 // Reset all refs to their initial values
 const resetState = () => {
+  beginAnalysisProgress();
+  chatGeneration += 1;
+  historyRequest?.abort();
   // Cancel any existing chat connection
   if (cancelCurrentChat.value) {
     cancelCurrentChat.value();
@@ -300,12 +335,12 @@ const resetState = () => {
 };
 
 // Watch message changes and automatically scroll to bottom
-watch(messages, async () => {
+watch([() => messages.value.length, timelineRevision], async () => {
   await nextTick();
   if (follow.value) {
     simpleBarRef.value?.scrollToBottom();
   }
-}, { deep: true });
+});
 
 watch(completionAdvice, async () => {
   await nextTick();
@@ -328,6 +363,7 @@ const failActiveSteps = (currentTurnOnly = true) => {
 };
 
 const startUserTurn = () => {
+  beginAnalysisProgress();
   toolPanel.value?.hideToolPanel();
   realTime.value = false;
   failActiveSteps(false);
@@ -338,6 +374,7 @@ const startUserTurn = () => {
 
 // Handle message event
 const handleMessageEvent = (messageData: MessageEventData) => {
+  if (isAnalysisProgressMessage(messageData)) return;
   if (messageData.role === 'user') {
     startUserTurn();
   }
@@ -418,7 +455,6 @@ const handleStepEvent = (stepData: StepEventData) => {
       existingStep.description = stepData.description;
       existingStep.ended_at = stepData.timestamp;
     }
-    isLoading.value = false;
   }
 }
 
@@ -489,6 +525,8 @@ const isTerminalStepStatus = (status: StepEventData['status']) => {
 // Main event handler function
 const handleEvent = (event: AgentSSEEvent) => {
   if (!acceptAgentEvent(eventCursor, event)) return;
+  updateAnalysisProgress(event);
+  if (!isAnalysisProgressEvent(event)) timelineRevision.value += 1;
   if (event.event === 'message') {
     handleMessageEvent(event.data as MessageEventData);
   } else if (event.event === 'tool') {
@@ -525,6 +563,7 @@ const isCurrentSession = (targetSessionId: string) => {
 }
 
 const handleSubmit = () => {
+  if (isRestoringHistory.value) return;
   chat(inputMessage.value, attachments.value, selectedSkills.value, selectedMcpServers.value, selectedProfileId.value);
 }
 
@@ -534,15 +573,37 @@ const handleFollowUpClick = (question: string) => {
   chat(message, [], selectedSkills.value, selectedMcpServers.value, selectedProfileId.value);
 }
 
+const canResumeAnalysis = (index: number) => Boolean(
+  !viewDisposed && sessionId.value && !isLoading.value && !isRestoringHistory.value
+  && !cancelCurrentChat.value && resumableAnalysisOutcome(messages.value, index),
+);
+
+const resumeAnalysis = (index: number) => {
+  if (!canResumeAnalysis(index) || !sessionId.value) return;
+  const outcome = resumableAnalysisOutcome(messages.value, index);
+  if (!outcome?.resume_from) return;
+  analysisContinuation.value = continuationAttempt(
+    analysisContinuation.value, sessionId.value, outcome.resume_from, agentApi.createClientMessageId,
+  );
+  // This keeps the current session and sends no new natural-language objective.
+  void chat('', [], [], [], null, analysisContinuation.value);
+};
+
 const chat = async (
   message: string = '',
   files: FileInfo[] = [],
   skills: string[] = [],
   mcpServers: string[] = [],
   agentProfileId: string | null = selectedProfileId.value,
+  continuation?: AnalysisContinuationAttempt,
 ) => {
-  if (!sessionId.value) return;
+  if (!sessionId.value || viewDisposed) return;
+  if (continuation && (continuation.sessionId !== sessionId.value || isLoading.value || isRestoringHistory.value)) return;
   const activeSessionId = sessionId.value;
+  const generation = ++chatGeneration;
+  historyRequest?.abort();
+  isLoadingHistory.value = false;
+  const isCurrentChat = () => isCurrentSession(activeSessionId) && generation === chatGeneration;
 
   // Cancel any existing chat connection before starting a new one
   if (cancelCurrentChat.value) {
@@ -551,6 +612,7 @@ const chat = async (
   }
 
   if (message.trim()) {
+    analysisContinuation.value = null;
     startUserTurn();
     // Add user message to conversation list
     messages.value.push({
@@ -561,6 +623,8 @@ const chat = async (
       } as MessageContent,
     });
   }
+
+  if (message.trim() || files.length || continuation) beginAnalysisProgress();
 
   if (files.length > 0) {
     messages.value.push({
@@ -576,15 +640,18 @@ const chat = async (
   follow.value = true;
 
   // Clear input field and attachments (keep skill/MCP selections for next turn)
-  inputMessage.value = '';
-  attachments.value = [];
+  if (!continuation) {
+    inputMessage.value = '';
+    attachments.value = [];
+  }
   completionAdvice.value = undefined;
   taskStartedAtMs.value = performance.now();
   isLoading.value = true;
+  connectionNotice.value = '';
 
   try {
     // Use the split event handler function and store the cancel function
-    cancelCurrentChat.value = await agentApi.chatWithSession(
+    const cancel = await agentApi.chatWithSession(
       activeSessionId,
       message,
       lastEventId.value,
@@ -598,21 +665,29 @@ const chat = async (
       agentProfileId,
       {
         onOpen: () => {
-          if (!isCurrentSession(activeSessionId)) return;
+          if (!isCurrentChat()) return;
           console.log('Chat opened');
           isLoading.value = true;
+          connectionNotice.value = '';
+        },
+        onRetry: ({ attempt, maxAttempts }) => {
+          if (!isCurrentChat()) return;
+          isLoading.value = true;
+          connectionNotice.value = `连接中断，正在恢复（${attempt}/${maxAttempts}）…`;
         },
         onMessage: ({ event, data }) => {
-          if (!isCurrentSession(activeSessionId)) return;
+          if (!isCurrentChat()) return;
           handleEvent({
             event: event as AgentSSEEvent['event'],
             data: data as AgentSSEEvent['data']
           });
         },
         onClose: () => {
-          if (!isCurrentSession(activeSessionId)) return;
+          if (!isCurrentChat()) return;
           console.log('Chat closed');
           isLoading.value = false;
+          clearAnalysisProgress();
+          connectionNotice.value = '';
           taskStartedAtMs.value = undefined;
           eventBus.emit(EVENT_REFRESH_SESSION_LIST);
           // Clear the cancel function when connection is closed normally
@@ -621,25 +696,33 @@ const chat = async (
           }
         },
         onError: (error) => {
-          if (!isCurrentSession(activeSessionId)) return;
+          if (!isCurrentChat()) return;
           console.error('Chat error:', error);
           isLoading.value = false;
+          clearAnalysisProgress();
           taskStartedAtMs.value = undefined;
-          failActiveSteps();
+          // A disconnected viewer cannot decide whether the backend task failed.
+          connectionNotice.value = error.message;
           eventBus.emit(EVENT_REFRESH_SESSION_LIST);
           // Clear the cancel function when there's an error
           if (cancelCurrentChat.value) {
             cancelCurrentChat.value = null;
           }
         }
-      }
+      },
+      undefined,
+      continuation?.clientMessageId,
+      continuation?.resumeFrom,
     );
+    if (isCurrentChat()) cancelCurrentChat.value = cancel;
+    else cancel();
   } catch (error) {
-    if (!isCurrentSession(activeSessionId)) return;
+    if (!isCurrentChat()) return;
     console.error('Chat error:', error);
     isLoading.value = false;
+    clearAnalysisProgress();
     taskStartedAtMs.value = undefined;
-    failActiveSteps();
+    connectionNotice.value = '连接未能建立，请刷新页面确认任务状态。';
     cancelCurrentChat.value = null;
   }
 }
@@ -650,8 +733,21 @@ const restoreSession = async () => {
     return;
   }
   const activeSessionId = sessionId.value;
-  const session = await agentApi.getSession(activeSessionId);
-  if (!isCurrentSession(activeSessionId)) return;
+  const generation = chatGeneration;
+  historyRequest?.abort();
+  const request = new AbortController();
+  historyRequest = request;
+  isRestoringHistory.value = true;
+  const session = await agentApi.getSessionHistory(activeSessionId, undefined, request.signal).catch((error) => {
+    if (!request.signal.aborted) throw error;
+    return null;
+  }).finally(() => {
+    if (generation === chatGeneration) isRestoringHistory.value = false;
+  });
+  if (!session) return;
+  if (!isCurrentSession(activeSessionId) || generation !== chatGeneration) return;
+  hasMoreHistory.value = session.has_more && session.next_before_seq != null;
+  historyBeforeSeq.value = session.next_before_seq ?? undefined;
   // Initialize share mode based on session state
   shareMode.value = session.is_shared ? 'public' : 'private';
   titleManuallySet.value = session.title_manually_set;
@@ -674,8 +770,39 @@ const restoreSession = async () => {
   realTime.value = true;
   if (session.status === SessionStatus.RUNNING || session.status === SessionStatus.PENDING) {
     await chat();
+  } else {
+    isLoading.value = false;
+    clearAnalysisProgress();
   }
   agentApi.clearUnreadMessageCount(activeSessionId);
+}
+
+const loadEarlierHistory = async () => {
+  const activeSessionId = sessionId.value;
+  const beforeSeq = historyBeforeSeq.value;
+  if (!activeSessionId || !beforeSeq || isLoadingHistory.value) return;
+  const generation = chatGeneration;
+  const request = new AbortController();
+  historyRequest?.abort();
+  historyRequest = request;
+  isLoadingHistory.value = true;
+  follow.value = false;
+  try {
+    const page = await agentApi.getSessionHistory(activeSessionId, beforeSeq, request.signal);
+    if (request.signal.aborted || generation !== chatGeneration || !isCurrentSession(activeSessionId)) return;
+    const viewport = chatContainerRef.value?.closest('[data-simplebar]')?.querySelector<HTMLElement>('.simplebar-content-wrapper');
+    const oldHeight = viewport?.scrollHeight ?? 0;
+    const oldTop = viewport?.scrollTop ?? 0;
+    messages.value = prependHistoricalMessages(projectHistoryMessages(page.events), messages.value);
+    hasMoreHistory.value = page.has_more && page.next_before_seq != null && page.next_before_seq < beforeSeq;
+    historyBeforeSeq.value = hasMoreHistory.value ? page.next_before_seq! : undefined;
+    await nextTick();
+    if (viewport && generation === chatGeneration) viewport.scrollTop = oldTop + viewport.scrollHeight - oldHeight;
+  } catch (error) {
+    if (!request.signal.aborted && generation === chatGeneration) showErrorToast('历史记录加载失败，请重试。');
+  } finally {
+    if (generation === chatGeneration) isLoadingHistory.value = false;
+  }
 }
 
 onBeforeRouteUpdate(async (to, _, next) => {
@@ -712,6 +839,10 @@ onMounted(() => {
 });
 
 onUnmounted(() => {
+  viewDisposed = true;
+  clearAnalysisProgress();
+  chatGeneration += 1;
+  historyRequest?.abort();
   eventBus.off(EVENT_SESSION_RENAMED, handleSessionRenamed);
   if (cancelCurrentChat.value) {
     cancelCurrentChat.value();
@@ -765,10 +896,26 @@ const handleScroll = (_: Event) => {
 }
 
 const handleStop = async () => {
-  if (sessionId.value) {
+  const generation = ++chatGeneration;
+  const activeSessionId = sessionId.value;
+  historyRequest?.abort();
+  isLoadingHistory.value = false;
+  isRestoringHistory.value = false;
+  cancelCurrentChat.value?.();
+  cancelCurrentChat.value = null;
+  connectionNotice.value = '';
+  clearAnalysisProgress();
+  if (activeSessionId) {
     isLoading.value = false;
-    await agentApi.stopSession(sessionId.value);
-    eventBus.emit(EVENT_REFRESH_SESSION_LIST);
+    try {
+      await agentApi.stopSession(activeSessionId);
+      if (generation !== chatGeneration || !isCurrentSession(activeSessionId)) return;
+      failActiveSteps();
+      taskStartedAtMs.value = undefined;
+      eventBus.emit(EVENT_REFRESH_SESSION_LIST);
+    } catch {
+      if (generation === chatGeneration) connectionNotice.value = '停止请求未能确认，请刷新页面检查任务状态。';
+    }
   }
 }
 

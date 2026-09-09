@@ -232,8 +232,8 @@ async def test_real_cordis_profiles_model_driver_budget_and_rebinding(
     # Deployment defaults apply only when no saved profile is selected.
     assert Settings.model_fields["model_context_capacity_tokens"].default == 131_072
     assert Settings.model_fields["model_context_safety_tokens"].default == 2_048
-    assert Settings.model_fields["model_task_token_budget"].default == 1_000_000
-    assert Settings.model_fields["model_task_call_budget"].default == 128
+    assert "model_task_token_budget" not in Settings.model_fields
+    assert "model_task_call_budget" not in Settings.model_fields
     assert Settings.model_fields["tool_selection_mode"].default == "on_demand"
     assert Settings.model_fields["tool_preset_id"].default == "general"
     assert Settings.model_fields["code_mode_enabled"].default is False
@@ -477,7 +477,7 @@ async def test_production_pipeline_reconfiguration_and_approval_job_spill_stack(
     result = await tool.ainvoke({
         "id": "stacked-call",
         "name": "data_format_inspect",
-        "args": {"input_paths": []},
+        "args": {"input_paths": ["/home/ubuntu/datasets/test/input.csv"]},
     })
     notice = spill_notice_from_result(result)
     assert notice is not None and notice.status == "stored"

@@ -18,6 +18,7 @@ from app.domain.services.tools.pipeline import (
     summarize_argument_keys,
 )
 from app.domain.services.tools.registry import ToolRegistry
+from app.domain.services.tools.tool_contract import SafeToolRetryError
 
 
 class _RecordingInterceptor(ToolExecutionInterceptor):
@@ -338,11 +339,12 @@ async def test_agent_failure_log_contains_keys_but_no_argument_or_exception_valu
         },
     }
 
-    with caplog.at_level(logging.ERROR):
+    with caplog.at_level(logging.WARNING):
         result = await agent.invoke_tool(tool, tool_call)
 
     assert result.tool_call_id == "call-private"
-    assert result.content == "exception-secret-value"
+    assert result.status == "error" and result.artifact.success is False
+    assert "exception-secret-value" not in result.content
     assert "tool=private_tool" in caplog.text
     assert "call_id=call:sha256:" in caplog.text
     assert "call-private" not in caplog.text
@@ -399,18 +401,19 @@ async def test_agent_does_not_retry_explicit_non_retryable_tool_failure():
     })
 
     assert tool.ainvoke.await_count == 1
-    assert result.content == "denied"
+    assert result.status == "error" and result.artifact.success is False
+    assert result.artifact.data["error_code"] == "tool_execution_unconfirmed"
 
 
 @pytest.mark.asyncio
-async def test_agent_retries_ordinary_retryable_tool_failure():
+async def test_agent_retries_explicit_safely_retryable_tool_failure():
     agent = object.__new__(BaseAgent)
     agent.max_retries = 2
     agent.retry_interval = 0
     expected = ToolMessage(tool_call_id="call-read", name="read", content="ok")
     tool = SimpleNamespace(
         name="read",
-        ainvoke=AsyncMock(side_effect=[RuntimeError("temporary"), expected]),
+        ainvoke=AsyncMock(side_effect=[SafeToolRetryError(), expected]),
     )
 
     result = await agent.invoke_tool(tool, {

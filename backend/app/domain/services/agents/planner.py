@@ -87,6 +87,8 @@ class PlannerAgent(BaseAgent):
                 parsed_response = self._sanitize_plan_payload(parsed_response)
                 plan = Plan.model_validate(parsed_response)
                 plan.steps = self._remove_internal_skill_steps(plan.steps)
+                for step in plan.steps:
+                    self._reset_unexecuted_step(step)
                 yield PlanEvent(status=PlanStatus.CREATED, plan=plan)
             else:
                 yield event
@@ -138,10 +140,18 @@ class PlannerAgent(BaseAgent):
             existing_done_step = done_steps_by_id.get(step.id)
             if existing_done_step:
                 continue
-            if step.status == ExecutionStatus.RUNNING:
-                step.status = ExecutionStatus.PENDING
+            self._reset_unexecuted_step(step)
             sanitized_steps.append(step)
         return sanitized_steps
+
+    @staticmethod
+    def _reset_unexecuted_step(step: Step) -> None:
+        # A planner proposes work; only the executor plus delivery verifier can
+        # attest that it happened. Never let model-authored plan state skip it.
+        step.status = ExecutionStatus.PENDING
+        step.success = False
+        step.result = step.error = step.outcome = None
+        step.attachments = []
 
     def _remove_internal_skill_steps(self, steps: List[Step]) -> List[Step]:
         """Remove planner-visible steps that only describe loading Skill instructions."""
