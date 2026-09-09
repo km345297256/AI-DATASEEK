@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, UploadFile, File, Form, Request, HTTPException, Query
-from fastapi.responses import StreamingResponse
+from fastapi.responses import StreamingResponse, Response
 from starlette.background import BackgroundTask
 import json
 import asyncio
@@ -18,6 +18,7 @@ from app.application.services.scientific_visualization import (
     ScientificVisualizationRequest, ScientificVisualizationResult, ScientificPreviewRejected,
     VisualizationWorkerError, scientific_visualization,
 )
+from app.application.services.extended_visualization import ExtendedPreviewRequest, extended_visualization
 from app.application.services.visualization_catalog import VisualizationDisabledError, VisualizationNotFoundError
 from app.domain.external.plugin_runtime import PluginRuntimeError
 from app.core.config import get_settings
@@ -41,6 +42,8 @@ from app.interfaces.schemas.resource import AccessTokenRequest, SignedUrlRespons
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/files", tags=["files"])
+from app.interfaces.api.visualization_job_routes import router as visualization_job_router
+router.include_router(visualization_job_router)
 
 
 class ShapefilePreviewRequest(BaseModel):
@@ -526,6 +529,59 @@ async def visualize_file(
                 await work
             except asyncio.CancelledError:
                 pass
+
+
+async def _extended_preview_response(file_id, data, request, file_service, user, catalog, *, binary=False):
+    work = asyncio.create_task(extended_visualization(
+        file_service, catalog, get_settings().sandbox_image, file_id, user.id, data, binary=binary,
+    ))
+    try:
+        while not work.done():
+            await asyncio.wait({work}, timeout=0.25)
+            if not work.done() and await request.is_disconnected():
+                raise asyncio.CancelledError()
+        result = await work
+        if binary:
+            content, version = result
+            return Response(content, media_type="application/octet-stream", headers={
+                "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff",
+                "X-Preview-Version": version, "Content-Disposition": "attachment",
+            })
+        return APIResponse.success(result)
+    except VisualizationDisabledError:
+        raise HTTPException(403, "此可视化插件已停用。") from None
+    except (VisualizationNotFoundError, FileNotFoundError, PermissionError):
+        raise HTTPException(404, "文件或插件不存在。") from None
+    except PreviewVersionChanged:
+        raise HTTPException(409, "文件或插件已更新，请重新打开预览。") from None
+    except ScientificPreviewRejected as error:
+        raise HTTPException(422, str(error)) from None
+    except NotImplementedError:
+        raise HTTPException(501, "此存储不支持有界读取。") from None
+    except Exception as error:
+        logger.warning("Extended preview unavailable error_type=%s", type(error).__name__)
+        raise HTTPException(503, "隔离读取器暂不可用，请检查沙箱镜像和插件服务。") from None
+    finally:
+        if not work.done():
+            work.cancel()
+            try:
+                await work
+            except asyncio.CancelledError:
+                pass
+
+
+@router.post("/{file_id}/visualization-v2")
+async def visualize_file_v2(file_id: str, data: ExtendedPreviewRequest, request: Request,
+                            file_service: FileService = Depends(get_file_service),
+                            user: User = Depends(get_current_user), catalog=Depends(get_visualization_catalog)):
+    return await _extended_preview_response(file_id, data, request, file_service, user, catalog)
+
+
+@router.post("/{file_id}/visualization-content")
+async def visualization_content(file_id: str, data: ExtendedPreviewRequest, request: Request,
+                                file_service: FileService = Depends(get_file_service),
+                                user: User = Depends(get_current_user), catalog=Depends(get_visualization_catalog)):
+    return await _extended_preview_response(file_id, data, request, file_service, user, catalog, binary=True)
 
 
 @router.post("/{file_id}/signed-url", response_model=APIResponse[SignedUrlResponse])

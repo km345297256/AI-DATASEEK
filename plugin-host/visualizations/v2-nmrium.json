@@ -1,0 +1,26 @@
+{
+  "contract_version": 2,
+  "id": "viz-nmrium",
+  "version": "2.0.0",
+  "name": "NMRium 核磁谱图",
+  "description": "锁定开放许可版本；只读已处理 JCAMP-DX 光谱，不自动处理原始 FID。",
+  "extensions": [
+    "jdx",
+    "dx",
+    "jcamp"
+  ],
+  "filenames": [],
+  "view_kind": "series",
+  "adapter": "v2-nmrium",
+  "data_kind": "extended",
+  "reader": "jcamp",
+  "default_enabled": true,
+  "priority": 10,
+  "permissions": [
+    "file:read"
+  ],
+  "limits": {
+    "max_input_bytes": 67108864,
+    "max_output_bytes": 8388608
+  }
+}

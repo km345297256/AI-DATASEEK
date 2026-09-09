@@ -8,6 +8,9 @@ from pydantic import BaseModel, ConfigDict, Field, StrictBool, StrictInt, field_
 VisualizationAdapter = Literal[
     "image", "tiff", "shapefile", "molecular", "obj", "html", "markdown", "text", "csv",
     "scientific-map", "scientific-series", "scientific-image", "scientific-quality",
+    "v2-plotly", "v2-h5web", "v2-vtk", "v2-jsroot", "v2-rdkit", "v2-molstar", "v2-nmrium",
+    "v2-openlayers", "v2-maplibre", "v2-cesium", "v2-aladin", "v2-metpy", "v2-igv",
+    "v2-viv", "v2-niivue", "v2-fastqc", "v2-pdfjs", "v2-word", "v2-excel", "v2-powerpoint",
 ]
 _ADAPTER_CONTRACTS = {
     "image": ("file", (None,), "image"),
@@ -23,6 +26,26 @@ _ADAPTER_CONTRACTS = {
     "scientific-series": ("scientific", ("netcdf", "fits"), "series"),
     "scientific-image": ("scientific", ("fits",), "image"),
     "scientific-quality": ("scientific", ("fastq",), "series"),
+    "v2-plotly": ("extended", ("tabular",), "series"),
+    "v2-h5web": ("extended", ("hdf5",), "image"),
+    "v2-vtk": ("extended", ("binary",), "structure"),
+    "v2-jsroot": ("extended", ("root",), "series"),
+    "v2-rdkit": ("extended", ("rdkit",), "image"),
+    "v2-molstar": ("extended", ("binary",), "structure"),
+    "v2-nmrium": ("extended", ("jcamp",), "series"),
+    "v2-openlayers": ("extended", ("binary",), "map"),
+    "v2-maplibre": ("extended", ("binary",), "map"),
+    "v2-cesium": ("extended", ("binary",), "map"),
+    "v2-aladin": ("extended", ("binary",), "map"),
+    "v2-metpy": ("extended", ("metpy",), "image"),
+    "v2-igv": ("extended", ("binary",), "series"),
+    "v2-viv": ("extended", ("binary",), "image"),
+    "v2-niivue": ("extended", ("binary",), "image"),
+    "v2-fastqc": ("extended", ("fastqc",), "table"),
+    "v2-pdfjs": ("extended", ("binary",), "document"),
+    "v2-word": ("extended", ("office",), "document"),
+    "v2-excel": ("extended", ("excel",), "table"),
+    "v2-powerpoint": ("extended", ("office",), "document"),
 }
 
 
@@ -34,7 +57,7 @@ class VisualizationLimits(BaseModel):
 
 class VisualizationPlugin(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
-    contract_version: Literal[1]
+    contract_version: Literal[1, 2]
     id: str = Field(pattern=r"^[a-z][a-z0-9-]{0,63}$")
     version: str = Field(pattern=r"^[0-9A-Za-z][0-9A-Za-z.+_-]{0,63}$")
     name: str = Field(min_length=1, max_length=120)
@@ -43,8 +66,8 @@ class VisualizationPlugin(BaseModel):
     filenames: list[str] = Field(max_length=128)
     view_kind: Literal["image", "map", "series", "table", "text", "structure", "document"]
     adapter: VisualizationAdapter
-    data_kind: Literal["file", "scientific"]
-    reader: Literal["netcdf", "fits", "fastq"] | None
+    data_kind: Literal["file", "scientific", "extended"]
+    reader: Literal["netcdf", "fits", "fastq", "binary", "tabular", "hdf5", "rdkit", "metpy", "fastqc", "office", "excel", "root", "jcamp"] | None
     default_enabled: StrictBool
     priority: StrictInt = Field(ge=-1000, le=1000)
     permissions: list[Literal["file:read"]] = Field(min_length=1, max_length=1)
@@ -53,13 +76,15 @@ class VisualizationPlugin(BaseModel):
     @field_validator("contract_version", mode="before")
     @classmethod
     def strict_contract_version(cls, value):
-        if type(value) is not int or value != 1:
+        if type(value) is not int or value not in (1, 2):
             raise ValueError("Unsupported visualization contract")
         return value
 
     @model_validator(mode="after")
     def validate_contract(self):
         import re
+        if self.contract_version != (2 if self.adapter.startswith("v2-") else 1):
+            raise ValueError("Visualization adapter requires the matching contract version")
         if not self.name.strip() or not (self.extensions or self.filenames):
             raise ValueError("Visualization name and file matchers are required")
         for items, pattern in (

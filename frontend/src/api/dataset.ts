@@ -1,4 +1,22 @@
 import { apiClient, type ApiResponse } from './client';
+import type { FileInfo } from './file';
+
+export interface DatasetFilePreview {
+  file: FileInfo;
+  related_files: FileInfo[];
+}
+
+/** Only a registered logical path is sent; the server supplies authorized opaque IDs. */
+export async function prepareDatasetFilePreview(
+  datasetId: string, path: string, pluginId: string, signal?: AbortSignal,
+): Promise<DatasetFilePreview> {
+  const response = await apiClient.post<ApiResponse<DatasetFilePreview>>(
+    `/datasets/${encodeURIComponent(datasetId)}/files/preview`,
+    { path, plugin_id: pluginId },
+    { signal },
+  );
+  return response.data.data;
+}
 
 export interface DataCenterDatasetFile {
   name: string;

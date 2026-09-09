@@ -1,14 +1,17 @@
-from fastapi import APIRouter, Depends, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import FileResponse, Response, StreamingResponse
 from starlette.background import BackgroundTask
 from tempfile import SpooledTemporaryFile
 from pathlib import PurePosixPath
 import zipfile
+import asyncio
 
 from app.application.errors.exceptions import ForbiddenError, UpstreamServiceError
 from app.application.services.data_center_dataset_service import DataCenterDatasetService
 from app.application.services.dataset_suggested_question_service import DatasetSuggestedQuestionService
 from app.application.services.data_product_service import DataProductService
+from app.application.services.dataset_file_preview import DatasetFilePreviewRequest
+from app.application.services.file_preview import PreviewVersionChanged
 from app.core.config import get_settings
 from app.domain.models.user import User, UserRole
 from app.infrastructure.external.sso_client import resolve_sso_uid
@@ -27,11 +30,52 @@ from app.interfaces.schemas.dataset import (
     DatasetSessionHistoryResponse,
     DataProductResponse,
     DataProductUpdateRequest,
+    DatasetFilePreviewResponse,
     dataset_response,
 )
+from app.interfaces.schemas.file import FileInfoResponse
 
 
 router = APIRouter(prefix="/datasets", tags=["datasets"])
+
+
+@router.post("/{dataset_id}/files/preview", response_model=APIResponse[DatasetFilePreviewResponse])
+async def prepare_dataset_file_preview(
+    dataset_id: str,
+    request: DatasetFilePreviewRequest,
+    http_request: Request,
+    current_user: User = Depends(get_current_user),
+) -> APIResponse[DatasetFilePreviewResponse]:
+    from app.application.services.visualization_catalog import VisualizationNotFoundError, VisualizationDisabledError
+    from app.domain.external.plugin_runtime import PluginRuntimeError
+    work = asyncio.create_task(get_file_storage().previews.prepare(dataset_id, current_user.id, request))
+    try:
+        while not work.done():
+            await asyncio.wait({work}, timeout=0.25)
+            if not work.done() and await http_request.is_disconnected():
+                raise asyncio.CancelledError()
+        prepared = await work
+        return APIResponse.success(DatasetFilePreviewResponse(
+            file=FileInfoResponse.public_from_file_info(prepared.file),
+            related_files=[FileInfoResponse.public_from_file_info(info) for info in prepared.related_files],
+        ))
+    except (FileNotFoundError, VisualizationNotFoundError):
+        raise HTTPException(status_code=404, detail="Dataset file or visualization plugin not found") from None
+    except VisualizationDisabledError:
+        raise HTTPException(status_code=403, detail="当前文件的可视化插件已停用，请先在插件管理中启用。") from None
+    except PluginRuntimeError:
+        raise HTTPException(status_code=503, detail="Cordis visualization runtime is unavailable") from None
+    except PreviewVersionChanged:
+        raise HTTPException(status_code=409, detail="文件或插件版本已变化，请重新打开预览。") from None
+    except (ValueError, OSError):
+        raise HTTPException(status_code=422, detail="此数据文件暂不能预览，请检查文件是否仍存在及其只读访问权限。") from None
+    finally:
+        if not work.done():
+            work.cancel()
+            try:
+                await work
+            except asyncio.CancelledError:
+                pass
 
 
 def _require_dataset_demo_admin(user: User) -> None:

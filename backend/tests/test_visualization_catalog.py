@@ -99,7 +99,9 @@ def test_visualization_protocol_rejects_unsafe_or_inconsistent_descriptors(updat
 def test_all_shipped_manifests_match_python_and_file_selection():
     directory = Path(__file__).resolve().parents[2] / "plugin-host" / "visualizations"
     plugins = [VisualizationPlugin.model_validate_json(path.read_text()) for path in directory.glob("*.json")]
-    assert len(plugins) == 14
+    assert len(plugins) == 34
+    assert sum(plugin.contract_version == 1 for plugin in plugins) == 14
+    assert sum(plugin.contract_version == 2 for plugin in plugins) == 20
     fastq = next(plugin for plugin in plugins if plugin.id == "fastq-quality")
     assert fastq.matches_filename("Reads.FASTQ")
     assert fastq.matches_filename("Reads.fq")

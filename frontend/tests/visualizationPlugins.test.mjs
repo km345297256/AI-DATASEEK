@@ -49,7 +49,9 @@ test('every checked-in Cordis manifest is accepted by the frontend contract with
     const plugin = JSON.parse(readFileSync(new URL(name, directory), 'utf8'));
     return { ...plugin, enabled: plugin.default_enabled };
   });
-  assert.equal(plugins.length, 14);
+  assert.equal(plugins.length, 34);
+  assert.equal(plugins.filter(plugin => plugin.contract_version === 1).length, 14);
+  assert.equal(plugins.filter(plugin => plugin.contract_version === 2).length, 20);
   assert.deepEqual(parseVisualizationCatalog(catalogOf(...plugins)).plugins, plugins);
 });
 
@@ -241,7 +243,7 @@ test('file preview host is destroyed when hidden, and signed share scientific re
   assert.match(panel, /v-if="isShow && visible && fileInfo && fileType"/);
   assert.match(panel, /<VisualizationHost :key="fileInfo.file_id"/);
   const host = source('../src/visualizations/VisualizationHost.vue');
-  assert.match(host, /shared.value && plugin.data_kind === 'scientific'/);
+  assert.match(host, /shared.value && plugin.data_kind !== 'file'/);
   assert.match(host, /props.file.size > plugin.limits.max_input_bytes/);
   assert.match(host, /!\['text', 'csv'\].includes\(plugin.adapter\)/);
   assert.match(host, /catalog.value\?\.revision/);

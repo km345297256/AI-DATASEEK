@@ -21,10 +21,30 @@ export const VISUALIZATION_ADAPTERS = {
   'scientific-series': ['scientific', ['netcdf', 'fits'], 'series'],
   'scientific-image': ['scientific', 'fits', 'image'],
   'scientific-quality': ['scientific', 'fastq', 'series'],
+  'v2-plotly': ['extended', 'tabular', 'series'],
+  'v2-h5web': ['extended', 'hdf5', 'image'],
+  'v2-vtk': ['extended', 'binary', 'structure'],
+  'v2-jsroot': ['extended', 'root', 'series'],
+  'v2-rdkit': ['extended', 'rdkit', 'image'],
+  'v2-molstar': ['extended', 'binary', 'structure'],
+  'v2-nmrium': ['extended', 'jcamp', 'series'],
+  'v2-openlayers': ['extended', 'binary', 'map'],
+  'v2-maplibre': ['extended', 'binary', 'map'],
+  'v2-cesium': ['extended', 'binary', 'map'],
+  'v2-aladin': ['extended', 'binary', 'map'],
+  'v2-metpy': ['extended', 'metpy', 'image'],
+  'v2-igv': ['extended', 'binary', 'series'],
+  'v2-viv': ['extended', 'binary', 'image'],
+  'v2-niivue': ['extended', 'binary', 'image'],
+  'v2-fastqc': ['extended', 'fastqc', 'table'],
+  'v2-pdfjs': ['extended', 'binary', 'document'],
+  'v2-word': ['extended', 'office', 'document'],
+  'v2-excel': ['extended', 'excel', 'table'],
+  'v2-powerpoint': ['extended', 'office', 'document'],
 } as const
 
 export interface VisualizationDescriptor {
-  contract_version: 1
+  contract_version: 1 | 2
   id: string
   version: string
   name: string
@@ -33,8 +53,8 @@ export interface VisualizationDescriptor {
   filenames: string[]
   view_kind: 'image' | 'map' | 'series' | 'table' | 'text' | 'structure' | 'document'
   adapter: keyof typeof VISUALIZATION_ADAPTERS
-  data_kind: 'file' | 'scientific'
-  reader: null | 'netcdf' | 'fits' | 'fastq'
+  data_kind: 'file' | 'scientific' | 'extended'
+  reader: null | 'netcdf' | 'fits' | 'fastq' | 'binary' | 'tabular' | 'hdf5' | 'rdkit' | 'metpy' | 'fastqc' | 'office' | 'excel' | 'root' | 'jcamp'
   default_enabled: boolean
   priority: number
   permissions: ['file:read']
@@ -66,7 +86,7 @@ function reject(): never {
 export function validateVisualization(value: unknown): VisualizationDescriptor {
   if (!record(value) || Object.keys(value).length !== FIELDS.size
     || Object.keys(value).some(key => !FIELDS.has(key))) reject()
-  if (value.contract_version !== 1 || typeof value.id !== 'string'
+  if (![1, 2].includes(value.contract_version as number) || typeof value.id !== 'string'
     || !/^[a-z][a-z0-9-]{0,63}$/.test(value.id)
     || typeof value.version !== 'string' || !/^[0-9A-Za-z][0-9A-Za-z.+_-]{0,63}$/.test(value.version)
     || typeof value.name !== 'string' || !value.name.trim() || value.name.length > 120
@@ -83,6 +103,7 @@ export function validateVisualization(value: unknown): VisualizationDescriptor {
   }
   if (!(value.extensions as unknown[]).length && !(value.filenames as unknown[]).length) reject()
   if (typeof value.adapter !== 'string' || !Object.hasOwn(VISUALIZATION_ADAPTERS, value.adapter)) reject()
+  if (value.contract_version !== (value.adapter.startsWith('v2-') ? 2 : 1)) reject()
   const spec = VISUALIZATION_ADAPTERS[value.adapter as keyof typeof VISUALIZATION_ADAPTERS]
   if (value.data_kind !== spec[0] || value.view_kind !== spec[2]
     || (Array.isArray(spec[1]) ? !spec[1].includes(value.reader as never) : value.reader !== spec[1])) reject()

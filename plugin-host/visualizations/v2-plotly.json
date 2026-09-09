@@ -1,0 +1,28 @@
+{
+  "contract_version": 2,
+  "id": "viz-plotly",
+  "version": "2.0.0",
+  "name": "Plotly 数值图表",
+  "description": "有界数值曲线、散点和热力图；文件由隔离读取器解析。",
+  "extensions": [
+    "csv",
+    "tsv",
+    "npy",
+    "npz",
+    "mat"
+  ],
+  "filenames": [],
+  "view_kind": "series",
+  "adapter": "v2-plotly",
+  "data_kind": "extended",
+  "reader": "tabular",
+  "default_enabled": true,
+  "priority": 10,
+  "permissions": [
+    "file:read"
+  ],
+  "limits": {
+    "max_input_bytes": 67108864,
+    "max_output_bytes": 8388608
+  }
+}

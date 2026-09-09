@@ -1,9 +1,9 @@
 /** Public, versioned capability contract. No script, URL or component entry is executable. */
-export const ADAPTER_IDS = ['image', 'tiff', 'shapefile', 'molecular', 'obj', 'html', 'markdown', 'text', 'csv', 'scientific-map', 'scientific-series', 'scientific-image', 'scientific-quality'] as const;
+export const ADAPTER_IDS = ['image', 'tiff', 'shapefile', 'molecular', 'obj', 'html', 'markdown', 'text', 'csv', 'scientific-map', 'scientific-series', 'scientific-image', 'scientific-quality', 'v2-plotly', 'v2-h5web', 'v2-vtk', 'v2-jsroot', 'v2-rdkit', 'v2-molstar', 'v2-nmrium', 'v2-openlayers', 'v2-maplibre', 'v2-cesium', 'v2-aladin', 'v2-metpy', 'v2-igv', 'v2-viv', 'v2-niivue', 'v2-fastqc', 'v2-pdfjs', 'v2-word', 'v2-excel', 'v2-powerpoint'] as const;
 export type VisualizationAdapter = typeof ADAPTER_IDS[number];
 export type VisualizationKind = 'image' | 'map' | 'series' | 'table' | 'text' | 'structure' | 'document';
 export interface VisualizationPlugin {
-  contract_version: 1;
+  contract_version: 1 | 2;
   id: string;
   version: string;
   name: string;
@@ -12,8 +12,8 @@ export interface VisualizationPlugin {
   filenames: string[];
   view_kind: VisualizationKind;
   adapter: VisualizationAdapter;
-  data_kind: 'file' | 'scientific';
-  reader: 'netcdf' | 'fits' | 'fastq' | null;
+  data_kind: 'file' | 'scientific' | 'extended';
+  reader: 'netcdf' | 'fits' | 'fastq' | 'binary' | 'tabular' | 'hdf5' | 'rdkit' | 'metpy' | 'fastqc' | 'office' | 'excel' | 'root' | 'jcamp' | null;
   default_enabled: boolean;
   enabled: boolean;
   priority: number;
@@ -30,6 +30,18 @@ const adapterKinds: Record<VisualizationAdapter, VisualizationKind> = {
   image: 'image', tiff: 'image', shapefile: 'map', molecular: 'structure', obj: 'structure',
   html: 'document', markdown: 'document', text: 'text', csv: 'table',
   'scientific-map': 'map', 'scientific-series': 'series', 'scientific-image': 'image', 'scientific-quality': 'series',
+  'v2-plotly': 'series', 'v2-h5web': 'image', 'v2-vtk': 'structure', 'v2-jsroot': 'series',
+  'v2-rdkit': 'image', 'v2-molstar': 'structure', 'v2-nmrium': 'series', 'v2-openlayers': 'map',
+  'v2-maplibre': 'map', 'v2-cesium': 'map', 'v2-aladin': 'map', 'v2-metpy': 'image',
+  'v2-igv': 'series', 'v2-viv': 'image', 'v2-niivue': 'image', 'v2-fastqc': 'table',
+  'v2-pdfjs': 'document', 'v2-word': 'document', 'v2-excel': 'table', 'v2-powerpoint': 'document',
+};
+const extendedReaders: Partial<Record<VisualizationAdapter, VisualizationPlugin['reader']>> = {
+  'v2-plotly': 'tabular', 'v2-h5web': 'hdf5', 'v2-vtk': 'binary', 'v2-jsroot': 'root',
+  'v2-rdkit': 'rdkit', 'v2-molstar': 'binary', 'v2-nmrium': 'jcamp', 'v2-openlayers': 'binary',
+  'v2-maplibre': 'binary', 'v2-cesium': 'binary', 'v2-aladin': 'binary', 'v2-metpy': 'metpy',
+  'v2-igv': 'binary', 'v2-viv': 'binary', 'v2-niivue': 'binary', 'v2-fastqc': 'fastqc',
+  'v2-pdfjs': 'binary', 'v2-word': 'office', 'v2-excel': 'excel', 'v2-powerpoint': 'office',
 };
 
 /** Reject the catalog as a whole on incompatible contracts: never revive a fallback renderer. */
@@ -40,7 +52,7 @@ export function parseVisualizationCatalog(value: unknown): VisualizationCatalog 
   }
   const ids = new Set<string>();
   for (const plugin of catalog.plugins) {
-    if (!plugin || plugin.contract_version !== 1 || typeof plugin.id !== 'string' || !/^[a-z][a-z0-9-]{0,63}$/.test(plugin.id) || ids.has(plugin.id)
+    if (!plugin || ![1, 2].includes(plugin.contract_version) || typeof plugin.id !== 'string' || !/^[a-z][a-z0-9-]{0,63}$/.test(plugin.id) || ids.has(plugin.id)
       || typeof plugin.name !== 'string' || typeof plugin.description !== 'string' || typeof plugin.version !== 'string'
       || !(ADAPTER_IDS as readonly string[]).includes(plugin.adapter) || !kinds.has(plugin.view_kind)
       || adapterKinds[plugin.adapter] !== plugin.view_kind
@@ -52,6 +64,14 @@ export function parseVisualizationCatalog(value: unknown): VisualizationCatalog 
       || !Number.isSafeInteger(plugin.limits.max_output_bytes) || plugin.limits.max_output_bytes <= 0 || plugin.limits.max_output_bytes > 16 * 1024 * 1024) {
       throw new Error('可视化插件协议不兼容，已停止加载预览。');
     }
+    if (plugin.adapter.startsWith('v2-')) {
+      if (plugin.contract_version !== 2 || plugin.data_kind !== 'extended' || extendedReaders[plugin.adapter] !== plugin.reader) {
+        throw new Error('可视化插件 v2 读取协议不兼容。');
+      }
+      ids.add(plugin.id);
+      continue;
+    }
+    if (plugin.contract_version !== 1) throw new Error('旧版适配器不可使用新版协议。');
     const scientific = plugin.adapter.startsWith('scientific-');
     if (scientific !== (plugin.data_kind === 'scientific') || (!scientific && (plugin.data_kind !== 'file' || plugin.reader !== null))
       || (scientific && !['netcdf', 'fits', 'fastq'].includes(plugin.reader ?? ''))

@@ -1,5 +1,5 @@
 # Use Node.js as base image
-FROM docker.1ms.run/node:18-alpine AS dev-stage
+FROM docker.1ms.run/node:24-alpine AS dev-stage
 
 # Set working directory
 WORKDIR /app
@@ -11,7 +11,7 @@ COPY package*.json ./
 # exactly the lockfile versions and verifies their integrity hashes.
 ARG NPM_REGISTRY=https://registry.npmmirror.com
 RUN --mount=type=cache,target=/root/.npm,sharing=locked \
-    npm ci --prefer-offline --no-audit --registry="${NPM_REGISTRY}"
+    npm ci --ignore-scripts --prefer-offline --no-audit --registry="${NPM_REGISTRY}"
 
 # Copy project files
 COPY . .
@@ -20,8 +20,9 @@ COPY . .
 
 FROM dev-stage AS build-stage
 
-# Build application - skip type checking
-RUN npm run build
+# The scientific SDK chunks need more than Node's container-default 2 GiB heap.
+# Build-only budget: the production image remains nginx, with no Node process.
+RUN NODE_OPTIONS=--max-old-space-size=4096 npm run build
 
 # Use nginx as production environment image
 FROM docker.1ms.run/nginx:stable-alpine AS production-stage

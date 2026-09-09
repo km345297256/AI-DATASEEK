@@ -1,0 +1,27 @@
+{
+  "contract_version": 2,
+  "id": "viz-molstar",
+  "version": "2.0.0",
+  "name": "Mol* 生物大分子",
+  "description": "本地 PDB/mmCIF 蛋白质和核酸结构；不自动检索 PDB 数据库。",
+  "extensions": [
+    "pdb",
+    "cif",
+    "mmcif",
+    "ent"
+  ],
+  "filenames": [],
+  "view_kind": "structure",
+  "adapter": "v2-molstar",
+  "data_kind": "extended",
+  "reader": "binary",
+  "default_enabled": true,
+  "priority": 10,
+  "permissions": [
+    "file:read"
+  ],
+  "limits": {
+    "max_input_bytes": 67108864,
+    "max_output_bytes": 8388608
+  }
+}

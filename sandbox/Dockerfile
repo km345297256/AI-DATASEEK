@@ -161,6 +161,10 @@ RUN if [ "$TARGETARCH" = "arm64" ]; then \
         uv sync --frozen --no-dev --no-install-project --no-cache; \
     fi
 
+# Optional visualization executables must not invalidate the base browser/desktop layers.
+RUN apt-get update && apt-get install -y --no-install-recommends fastqc default-jre-headless && \
+    apt-get clean && rm -rf /var/lib/apt/lists/*
+
 # Tool plugins change frequently and must not invalidate the scientific dependency layer.
 COPY sandbox/scripts/geoscience_ops.py /usr/local/lib/ai-dataseek/
 COPY tools /opt/ai-dataseek/tools

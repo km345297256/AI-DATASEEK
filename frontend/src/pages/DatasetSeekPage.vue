@@ -93,6 +93,10 @@
               <h3 class="text-xs font-semibold">数据文件</h3>
               <span class="text-[10px] text-[var(--text-tertiary)]">{{ dataset.files.length }} 个</span>
             </div>
+            <p v-if="datasetPreview.error.value" role="status" class="mt-2 text-[11px] text-[var(--text-tertiary)]">
+              预览插件暂不可用。
+              <button type="button" class="underline disabled:opacity-50" :disabled="datasetPreview.loading.value" @click="datasetPreview.refresh">重新连接</button>
+            </p>
             <div v-if="dataset.files.length" class="mt-2.5 overflow-hidden rounded-lg border border-[var(--border-main)] bg-[var(--background-gray-main)]">
               <div
                 v-for="node in datasetFileTreeRows"
@@ -118,6 +122,19 @@
                 <span class="min-w-0 flex-1 truncate text-xs" :class="node.kind === 'directory' ? 'font-medium text-[var(--text-primary)]' : 'text-[var(--text-secondary)]'" :title="node.path">
                   {{ node.name }}
                 </span>
+                <button
+                  v-if="node.file && datasetPreview.candidates.value.get(node.file.path || node.file.name)?.length"
+                  type="button"
+                  class="-my-1.5 flex size-7 shrink-0 items-center justify-center rounded-md text-[#2b7659] transition-colors hover:bg-[var(--fill-tsp-white-dark)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2b7659]/40 disabled:cursor-wait disabled:opacity-60"
+                  :disabled="datasetPreview.pendingPath.value === (node.file.path || node.file.name)"
+                  :aria-busy="datasetPreview.pendingPath.value === (node.file.path || node.file.name)"
+                  :title="`预览 ${node.name} · ${datasetPreview.candidates.value.get(node.file.path || node.file.name)?.map(plugin => plugin.name).join(' / ')}`"
+                  :aria-label="`预览文件 ${node.path}`"
+                  @click.stop="datasetPreview.preview(node.file.path || node.file.name)"
+                >
+                  <LoaderCircle v-if="datasetPreview.pendingPath.value === (node.file.path || node.file.name)" class="size-3.5 animate-spin" />
+                  <Eye v-else class="size-3.5" />
+                </button>
                 <button
                   v-if="node.kind === 'file'"
                   type="button"
@@ -540,6 +557,7 @@ import { prepareShapefilePreview, type FileInfo } from '@/api/file';
 import { getSkillPreferences } from '@/api/skill';
 import { useAgentProfile } from '@/composables/useAgentProfile';
 import { useFilePanel } from '@/composables/useFilePanel';
+import { useDatasetFilePreview } from '@/composables/useDatasetFilePreview';
 import { EVENT_SKILL_PREFERENCES_UPDATED } from '@/constants/event';
 import { DATASET_CHAT_PLACEHOLDER, buildDatasetChatCapabilities } from '@/utils/datasetCapabilitySelection';
 import { isPlaceholderAssistantMessage } from '@/utils/datasetResultPresentation';
@@ -562,6 +580,7 @@ const profileDomainMismatch = computed(() => {
 });
 const { showFilePanel, hideFilePanel, beginFilePreview } = useFilePanel();
 const dataset = ref<DataCenterDataset>();
+const datasetPreview = useDatasetFilePreview(() => dataset.value, () => { mobileCatalogOpen.value = false; });
 const dataProducts = ref<DataProduct[]>([]);
 const productDialogVisible = ref(false);
 const productFileMoveVisible = ref(false);

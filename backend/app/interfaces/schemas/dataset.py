@@ -9,6 +9,8 @@ from pydantic import BaseModel, ConfigDict, Field, HttpUrl, field_validator, mod
 from app.domain.models.dataset import DatasetStorageType
 from app.domain.models.session import SessionStatus
 from app.domain.models.data_product import DataProduct
+from app.domain.services.dataset_file_paths import public_dataset_file_path
+from app.interfaces.schemas.file import FileInfoResponse
 
 
 _OMIT_METADATA_VALUE = object()
@@ -167,6 +169,11 @@ class DatasetFileResponse(BaseModel):
     size: int
     role: str
     content_type: str | None = None
+
+
+class DatasetFilePreviewResponse(BaseModel):
+    file: FileInfoResponse
+    related_files: list[FileInfoResponse] = Field(default_factory=list)
 
 
 class DatasetLocationResponse(BaseModel):
@@ -442,53 +449,9 @@ def dataset_response(
     payload["metadata"] = (
         {} if public_metadata is _OMIT_METADATA_VALUE else public_metadata
     )
-    host_location_roots: list[tuple[PurePosixPath, str]] = []
-    for location in value.locations:
-        if location.storage_type != DatasetStorageType.HOST_PATH:
-            continue
-        # Older records may not have a persisted mount_name.  Mirror the
-        # server-side fallback solely to recognize and remove its synthetic
-        # prefix; the derived value is never put into the response.
-        mount_name = location.mount_name or (
-            PurePosixPath(location.source_path.rstrip("/").replace("\\", "/")).name
-            or "source"
-        )
-        host_location_roots.append((
-            PurePosixPath("sources") / location.location_id,
-            mount_name,
-        ))
     files = []
     for item in value.files:
-        public_path = PurePosixPath(item.path.replace("\\", "/"))
-        if (
-            public_path.is_absolute()
-            or ".." in public_path.parts
-            or str(public_path) in {"", "."}
-            or (
-                public_path.parts
-                and len(public_path.parts[0]) == 2
-                and public_path.parts[0][1] == ":"
-            )
-            or any(
-                ord(character) < 32 or ord(character) == 127
-                for character in str(public_path)
-            )
-        ):
-            # Fail closed for legacy or malformed records.  File paths in an
-            # HTTP response must always be dataset-relative.
-            continue
-        for source_root, mount_name in host_location_roots:
-            if public_path == source_root:
-                public_path = None
-                break
-            if source_root in public_path.parents:
-                relative_to_source = public_path.relative_to(source_root)
-                # New records include the mount name; older records omitted
-                # it. Support both while exposing neither implementation detail.
-                if relative_to_source.parts and relative_to_source.parts[0] == mount_name:
-                    relative_to_source = PurePosixPath(*relative_to_source.parts[1:])
-                public_path = None if str(relative_to_source) in {"", "."} else relative_to_source
-                break
+        public_path = public_dataset_file_path(item.path, value.locations)
         if public_path is None:
             continue
         file_payload = item.model_dump()

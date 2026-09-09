@@ -2,7 +2,7 @@ import { apiClient, type ApiResponse } from './client';
 import { parseVisualizationCatalog, type VisualizationCatalog } from '../visualizations/contract';
 
 export async function getVisualizationCatalog(signal?: AbortSignal): Promise<VisualizationCatalog> {
-  const response = await apiClient.get<ApiResponse<unknown>>('/visualizations', { signal });
+  const response = await apiClient.get<ApiResponse<unknown>>('/visualizations', { signal, params: { contract_version: 2 } });
   return parseVisualizationCatalog(response.data.data);
 }
 

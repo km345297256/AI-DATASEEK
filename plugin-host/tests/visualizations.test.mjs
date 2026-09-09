@@ -18,12 +18,13 @@ async function directory(t, manifest = fixture) {
   return path
 }
 
-test('all 14 shipped visualization contracts load as real Cordis registrations', async () => {
+test('14 legacy and 20 extended visualization contracts load as real Cordis registrations', async () => {
   const context = await buildVisualizationContext(productionDirectory)
   try {
     assert.equal(context.snapshot.engine, 'cordis')
-    assert.equal(context.pluginFibers.length, 14)
-    assert.equal(context.catalog.snapshot().plugins.length, 14)
+    assert.equal(context.pluginFibers.length, 34)
+    assert.equal(context.catalog.snapshot().plugins.length, 34)
+    assert.equal(context.snapshot.plugins.filter(item => item.contract_version === 1).length, 14)
     assert.match(context.snapshot.revision, /^[a-f0-9]{64}$/)
     assert.deepEqual(context.snapshot.plugins.filter(item => item.reader === 'netcdf').map(item => item.view_kind).sort(), ['map', 'series'])
   } finally { await context.context.fiber.dispose() }

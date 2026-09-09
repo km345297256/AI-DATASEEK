@@ -1,0 +1,25 @@
+{
+  "contract_version": 2,
+  "id": "viz-cesium",
+  "version": "2.0.0",
+  "name": "Cesium 三维地球",
+  "description": "离线 GeoJSON 与受控 CZML 位置轨迹；禁用 ion、远程影像、地形和模型。",
+  "extensions": [
+    "geojson",
+    "czml"
+  ],
+  "filenames": [],
+  "view_kind": "map",
+  "adapter": "v2-cesium",
+  "data_kind": "extended",
+  "reader": "binary",
+  "default_enabled": true,
+  "priority": 10,
+  "permissions": [
+    "file:read"
+  ],
+  "limits": {
+    "max_input_bytes": 67108864,
+    "max_output_bytes": 8388608
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "contract_version": 2,
+  "id": "viz-rdkit",
+  "version": "2.0.0",
+  "name": "RDKit 二维化学结构",
+  "description": "隔离 RDKit 生成二维分子结构与描述信息，不访问外部化学数据库。",
+  "extensions": [
+    "sdf",
+    "mol",
+    "smi",
+    "smiles"
+  ],
+  "filenames": [],
+  "view_kind": "image",
+  "adapter": "v2-rdkit",
+  "data_kind": "extended",
+  "reader": "rdkit",
+  "default_enabled": true,
+  "priority": 10,
+  "permissions": [
+    "file:read"
+  ],
+  "limits": {
+    "max_input_bytes": 67108864,
+    "max_output_bytes": 8388608
+  }
+}

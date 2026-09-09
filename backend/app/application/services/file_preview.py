@@ -41,6 +41,8 @@ def preview_version(info: FileInfo) -> str:
     # reject a changed object instead of combining pages from two revisions.
     metadata = info.metadata or {}
     identity = [info.file_id, info.size, str(info.upload_date), metadata.get("sha256"), metadata.get("content_sha256")]
+    if metadata.get("dataset_file_version"):
+        identity.append(metadata["dataset_file_version"])
     return hashlib.sha256(json.dumps(identity, sort_keys=True).encode()).hexdigest()
 
 
