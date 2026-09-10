@@ -115,6 +115,31 @@ test('Plotly does not paint a late response after plugin disposal', async () => 
   adapter.unmount(); assert.equal(signal.aborted, true);
   pending.resolve({ table: { columns: ['x'], rows: [[1]] } }); await flush(); assert.equal(draws, 0);
 });
+test('Plotly abbreviates long legends without losing column identity or numeric values', async () => {
+  const name = 'measurement_with_a_shared_long_prefix_';
+  const table = { columns: ['sample', `${name}one`, `${name}two`], rows: [['a', 1, true], ['b', null, false], ['c', 3, null]] };
+  const frames = [];
+  const adapter = mountScientific('PlotlyPreview', {
+    '../runtime': { requestPreview: async () => ({ table }) },
+    './browserLibraries': { loadBrowserLibrary: async () => ({ react(_target, traces, layout) { frames.push({ traces, layout }); }, purge() {} }) },
+  });
+  try {
+    await flush(); assert.equal(adapter.state.error.value, '');
+    adapter.state.yColumns.value = [1, 2]; adapter.state.xColumn.value = 0; adapter.state.mode.value = 'markers';
+    await adapter.state.draw();
+    const { traces, layout } = frames.at(-1);
+    assert.deepEqual(traces.map((trace) => trace.meta.columnName), table.columns.slice(1));
+    assert.ok(traces.every((trace) => trace.name.length < 30 && trace.hovertemplate.includes('%{meta.columnName}')));
+    assert.notEqual(traces[0].name, traces[1].name, 'Abbreviated columns retain distinct column numbers');
+    assert.deepEqual(traces.map((trace) => trace.y), [[1, null, 3], [1, 0, null]]);
+    assert.deepEqual(traces[0].x, ['a', 'b', 'c']);
+    assert.ok(traces.every((trace) => trace.mode === 'markers' && trace.connectgaps === false));
+    assert.equal(layout.legend.orientation, 'h'); assert.equal(layout.legend.maxheight, 88);
+    adapter.state.mode.value = 'histogram'; await adapter.state.draw();
+    assert.deepEqual(frames.at(-1).traces.map((trace) => trace.x), [[1, null, 3], [1, 0, null]]);
+    assert.deepEqual(frames.at(-1).traces.map((trace) => trace.meta.columnName), table.columns.slice(1));
+  } finally { adapter.unmount(); }
+});
 test('H5Web handles default-only React CommonJS imports and disposes the real root boundary', async () => {
   let mounted, cleaned = false;
   const adapter = mountScientific('H5WebPreview', {

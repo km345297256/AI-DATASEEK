@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { plotlyLayoutCases } from './plotly-layout-fixtures.mjs';
 
 const utf8 = (text) => Buffer.from(text, 'utf8');
 const base = (reader, kind, extra = {}) => ({ contract_version: 2, type: reader, reader, kind, media_type: 'application/json', metadata: {}, warnings: [], sampled: false, ...extra });
@@ -43,6 +44,7 @@ const pdb = [
 const spectral = Array.from({ length: 128 }, (_, index) => [index / 16, Math.exp(-(((index - 40) / 5) ** 2)) + .4 * Math.exp(-(((index - 86) / 7) ** 2))]);
 
 export const scientificCases = [
+  ...plotlyLayoutCases,
   {
     name: 'plotly', component: 'scientific/PlotlyPreview.vue', filename: 'synthetic.csv', reader: 'tabular', kind: 'series',
     bytes: utf8('value,flag\n1,true\n3,false\n2,true\n'),

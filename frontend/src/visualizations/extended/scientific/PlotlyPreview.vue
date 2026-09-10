@@ -1,19 +1,31 @@
 <template>
-  <PreviewFrame :loading="loading" :error="error" note="Plotly · 有界表格数值探索；空值保持缺失，布尔值按 false=0/true=1 绘制，不执行表格公式。">
-    <form v-if="arrayFile" class="mb-2 flex flex-wrap gap-3 text-xs" @submit.prevent="loadData">
-      <label v-if="variables.length">变量 <select v-model="variable" @change="indices = []; sourceShape = []"><option v-for="name in variables" :key="name">{{ name }}</option></select></label>
-      <label>视图 <select v-model="arrayKind" @change="indices = []"><option value="series">数值曲线</option><option value="heatmap">数组热图</option></select></label>
-      <label v-for="(size, index) in sliceShape" :key="index">dim_{{ index }} <input v-model.number="indices[index]" type="number" min="0" :max="size - 1" step="1" class="w-16 border" /></label>
-      <button type="submit" class="rounded border px-2" :disabled="loading">读取变量／切片</button>
+  <PreviewFrame class="plotly-preview" :loading="loading" :error="error" note="Plotly · 有界表格数值探索；空值保持缺失，布尔值按 false=0/true=1 绘制，不执行表格公式。">
+    <form v-if="arrayFile" class="plotly-controls plotly-array-settings" @submit.prevent="loadData">
+      <label v-if="variables.length" class="plotly-field">变量 <select v-model="variable" @change="indices = []; sourceShape = []"><option v-for="name in variables" :key="name">{{ name }}</option></select></label>
+      <label class="plotly-field">视图 <select v-model="arrayKind" @change="indices = []"><option value="series">数值曲线</option><option value="heatmap">数组热图</option></select></label>
+      <label v-for="(size, index) in sliceShape" :key="index" class="plotly-field">dim_{{ index }} <input v-model.number="indices[index]" type="number" min="0" :max="size - 1" step="1" /></label>
+      <button type="submit" class="plotly-draw" :disabled="loading">读取变量／切片</button>
     </form>
-    <form v-if="table" class="mb-2 flex flex-wrap gap-3 text-xs" @submit.prevent="draw">
-      <label>横轴 <select v-model.number="xColumn"><option :value="-1">行号</option><option v-for="(name, index) in table.columns" :key="index" :value="index">{{ name }}</option></select></label>
-      <label>纵轴 <select v-model="yColumns" multiple size="3"><option v-for="index in columns" :key="index" :value="index">{{ table.columns[index] }}</option></select></label>
-      <label>图式 <select v-model="mode"><option value="lines">曲线</option><option value="markers">散点</option><option value="histogram">直方图</option></select></label>
-      <button type="submit" class="rounded border px-2">绘制</button>
+    <form v-if="table" class="plotly-controls" @submit.prevent="draw">
+      <div class="plotly-table-settings">
+        <label class="plotly-field plotly-x-field">横轴 <select v-model.number="xColumn"><option :value="-1">行号</option><option v-for="(name, index) in table.columns" :key="index" :value="index">{{ name }}</option></select></label>
+        <label class="plotly-field">图式 <select v-model="mode"><option value="lines">曲线</option><option value="markers">散点</option><option value="histogram">直方图</option></select></label>
+        <button type="submit" class="plotly-draw" :disabled="loading || !columns.length">绘制</button>
+      </div>
+      <fieldset class="plotly-series">
+        <legend>纵轴 <span>已选 {{ yColumns.length }} / 8 项</span></legend>
+        <div v-if="columns.length" class="plotly-series-list">
+          <label v-for="index in columns" :key="index" class="plotly-series-option" :title="table.columns[index]">
+            <input v-model="yColumns" type="checkbox" :value="index" :disabled="yColumns.length >= 8 && !yColumns.includes(index)" />
+            <span class="plotly-series-name">{{ table.columns[index] }}</span>
+          </label>
+        </div>
+        <p v-else class="plotly-hint">当前预览中没有可绘制的数值列。</p>
+        <p v-if="columns.length && !yColumns.length" class="plotly-hint">勾选数值列后，点击「绘制」更新图表。</p>
+      </fieldset>
     </form>
-    <div ref="target" class="min-h-[430px] flex-1 bg-white" aria-label="Plotly 数值图" />
-    <p v-if="sampled" class="text-xs text-amber-700">当前为有界抽样／窗口，不代表完整数据。</p>
+    <div ref="target" class="plotly-chart" aria-label="Plotly 数值图" />
+    <p v-if="sampled" class="plotly-sampling-note">当前为有界抽样／窗口，不代表完整数据。</p>
   </PreviewFrame>
 </template>
 <script setup lang="ts">
@@ -46,9 +58,13 @@ async function draw() {
   const current = table.value;
   const traces = yColumns.value.slice(0, 8).map((index) => {
     const y = current.rows.map((row) => numericCell(row[index]));
-    return mode.value === 'histogram' ? { type: 'histogram' as const, x: y, name: current.columns[index] } : { type: 'scatter' as const, mode: mode.value as 'lines' | 'markers', name: current.columns[index], x: current.rows.map((row, rowIndex) => { const value = row[xColumn.value]; return xColumn.value < 0 ? rowIndex : typeof value === 'string' ? plainLabel(value) : typeof value === 'boolean' ? Number(value) : value; }), y, connectgaps: false };
+    const columnName = current.columns[index]!;
+    const label = { name: columnName.length > 18 ? `#${index + 1} ${columnName.slice(0, 18)}…` : columnName, meta: { columnName }, hovertemplate: '%{meta.columnName}<br>x: %{x}<br>y: %{y}<extra></extra>' };
+    return mode.value === 'histogram' ? { type: 'histogram' as const, x: y, ...label } : { type: 'scatter' as const, mode: mode.value as 'lines' | 'markers', ...label, x: current.rows.map((row, rowIndex) => { const value = row[xColumn.value]; return xColumn.value < 0 ? rowIndex : typeof value === 'string' ? plainLabel(value) : typeof value === 'boolean' ? Number(value) : value; }), y, connectgaps: false };
   });
-  await plotly.react(target.value, traces, { margin: { l: 60, r: 20, b: 60, t: 30 }, autosize: true, showlegend: true, xaxis: { title: { text: xColumn.value < 0 ? '行号' : current.columns[xColumn.value] } } }, { responsive: true, displaylogo: false, displayModeBar: false, plotGlPixelRatio: 1 });
+  // Plotly 4 supports a scrolling legend height cap; upstream TS types lag this option.
+  const legend: Partial<import('plotly.js').Legend> & { maxheight: number } = { orientation: 'h', x: 0, y: -0.3, xanchor: 'left', yanchor: 'top', maxheight: 88, font: { size: 11 } };
+  await plotly.react(target.value, traces, { margin: { l: 52, r: 16, b: 60, t: 24 }, autosize: true, showlegend: true, legend, xaxis: { automargin: true, title: { text: xColumn.value < 0 ? '行号' : current.columns[xColumn.value], standoff: 12 } } }, { responsive: true, displaylogo: false, displayModeBar: false, plotGlPixelRatio: 1 });
 }
 async function loadData() {
   const load = scope.begin(); loading.value = true; error.value = ''; table.value = undefined; array.value = undefined;
@@ -74,3 +90,161 @@ async function loadData() {
 }
 watch(() => [props.file.file_id, props.plugin.id], () => { variable.value = ''; variables.value = []; sourceShape.value = []; indices.value = []; void loadData(); }, { immediate: true });
 </script>
+
+<style scoped>
+.plotly-preview {
+  container: plotly-preview / inline-size;
+  min-width: 0;
+  gap: 12px;
+}
+
+/* Controls keep their natural height; short panels scroll instead of squeezing labels. */
+.plotly-preview > :deep(p) {
+  flex-shrink: 0;
+  margin: 0;
+  line-height: 1.6;
+}
+
+.plotly-controls {
+  flex: 0 0 auto;
+  min-width: 0;
+  margin: 0;
+  padding: 14px;
+  border: 1px solid var(--border-main);
+  border-radius: 10px;
+  background: var(--background-white-main, #fff);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.plotly-table-settings {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(100px, 160px) auto;
+  align-items: end;
+  gap: 12px;
+}
+
+.plotly-array-settings {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr));
+  align-items: end;
+  gap: 12px;
+}
+
+.plotly-field {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 6px;
+  font-weight: 500;
+}
+
+.plotly-field select,
+.plotly-field input {
+  box-sizing: border-box;
+  display: block;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  height: 38px;
+  margin: 0;
+  padding: 0 10px;
+  border: 1px solid var(--border-main);
+  border-radius: 6px;
+  background: var(--background-white-main, #fff);
+  color: var(--text-primary);
+  font: inherit;
+  font-weight: 400;
+  text-overflow: ellipsis;
+}
+
+.plotly-draw {
+  min-height: 38px;
+  padding: 8px 20px;
+  border: 1px solid #b5d8cc;
+  border-radius: 6px;
+  background: #edf7f2;
+  color: #28654f;
+  font: inherit;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.plotly-draw:hover:not(:disabled) { background: #e0f0e8; }
+.plotly-draw:disabled { opacity: 0.5; cursor: not-allowed; }
+.plotly-field select:focus-visible,
+.plotly-field input:focus-visible,
+.plotly-draw:focus-visible,
+.plotly-series-option input:focus-visible {
+  outline: 2px solid #398469;
+  outline-offset: 2px;
+}
+
+.plotly-series {
+  min-width: 0;
+  margin: 14px 0 0;
+  padding: 0;
+  border: 0;
+}
+
+.plotly-series legend {
+  width: 100%;
+  margin-bottom: 8px;
+  padding: 0;
+  font-weight: 500;
+}
+
+.plotly-series legend span {
+  margin-left: 8px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 400;
+}
+
+.plotly-series-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr));
+  gap: 6px 10px;
+  max-height: 126px;
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding: 3px;
+}
+
+.plotly-series-option {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border: 1px solid var(--border-main);
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.plotly-series-option:has(:checked) {
+  border-color: #b5d8cc;
+  background: #f0f8f4;
+  color: #28654f;
+}
+
+.plotly-series-option:has(:disabled) { opacity: 0.5; cursor: not-allowed; }
+.plotly-series-option input {
+  flex: 0 0 14px;
+  width: 14px;
+  height: 14px;
+  margin: 0;
+  accent-color: #398469;
+}
+
+.plotly-series-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.plotly-hint { margin: 8px 0 0; color: var(--text-secondary); font-size: 12px; }
+.plotly-chart { flex: 1 0 360px; width: 100%; min-width: 0; min-height: 360px; overflow: hidden; border-radius: 8px; background: #fff; }
+.plotly-sampling-note { color: #a45b16; font-size: 12px; }
+
+@container plotly-preview (max-width: 520px) {
+  .plotly-table-settings { grid-template-columns: minmax(0, 1fr) auto; }
+  .plotly-x-field { grid-column: 1 / -1; }
+  .plotly-controls { padding: 12px; }
+}
+</style>
