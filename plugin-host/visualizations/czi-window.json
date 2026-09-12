@@ -1,0 +1,30 @@
+{
+  "contract_version": 2,
+  "id": "viz-czi-window",
+  "version": "1.0.0",
+  "name": "未压缩 CZI 大文件区域",
+  "description": "单文件、单场景 CZI 1.0 / DV 未压缩全分辨率区域读取。显式 C/Z/T 与 ROI，不整文件下载、不补零拼接；压缩 CZI 仍可选择原有官方解码插件。",
+  "extensions": [
+    "czi"
+  ],
+  "filenames": [],
+  "view_kind": "image",
+  "adapter": "czi-window",
+  "reader": "czi-window",
+  "default_enabled": true,
+  "priority": 30,
+  "permissions": [
+    "file:read"
+  ],
+  "limits": {
+    "max_input_bytes": 33554432,
+    "max_output_bytes": 8388608
+  },
+  "capabilities": {
+    "operations": [
+      "preview"
+    ],
+    "input_mode": "window",
+    "shared": false
+  }
+}

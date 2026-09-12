@@ -1,7 +1,7 @@
 {
   "contract_version": 2,
   "id": "tiff",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "name": "TIFF 栅格",
   "description": "TIFF 栅格图像预览",
   "extensions": [
@@ -23,7 +23,8 @@
   },
   "capabilities": {
     "operations": [
-      "bytes"
+      "bytes",
+      "prepare"
     ],
     "input_mode": "whole",
     "shared": true

@@ -1,0 +1,17 @@
+{
+  "contract_version": 2,
+  "id": "viz-columnar-window",
+  "version": "1.0.0",
+  "name": "Parquet / Arrow 分块表格",
+  "description": "先检查列与数据块，再按需读取所选列和分页数据。支持受限单文件 Parquet、Arrow IPC file / Feather v2；不执行 SQL，不读取分区目录。大整数和小数保留精确文本。",
+  "extensions": ["parquet", "parq", "arrow", "feather"],
+  "filenames": [],
+  "view_kind": "table",
+  "adapter": "columnar-window",
+  "reader": "columnar-window",
+  "default_enabled": true,
+  "priority": 40,
+  "permissions": ["file:read"],
+  "limits": {"max_input_bytes": 8388608, "max_output_bytes": 2097152},
+  "capabilities": {"operations": ["preview"], "input_mode": "window", "shared": false}
+}

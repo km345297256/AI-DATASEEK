@@ -1,0 +1,17 @@
+{
+  "contract_version": 2,
+  "id": "viz-archive-members",
+  "version": "1.0.0",
+  "name": "归档成员文本预览",
+  "description": "ZIP/TAR 中经验证的小型 UTF-8 文本，只在选择成员后有界读取；不写入文件、不执行、不递归解压。与只读目录插件独立启停。",
+  "extensions": ["zip", "tar"],
+  "filenames": [],
+  "view_kind": "text",
+  "adapter": "archive-members",
+  "reader": "archive-member",
+  "default_enabled": true,
+  "priority": 30,
+  "permissions": ["file:read"],
+  "limits": {"max_input_bytes": 67108864, "max_output_bytes": 1048576},
+  "capabilities": {"operations": ["preview"], "input_mode": "whole", "shared": false}
+}

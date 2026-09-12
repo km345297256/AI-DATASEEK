@@ -1,0 +1,30 @@
+{
+  "contract_version": 2,
+  "id": "viz-gro-trajectory",
+  "version": "1.0.0",
+  "name": "GRO 多帧轨迹",
+  "description": "受限串接 GRO 原值帧，保留 nm 坐标、时间和速度；不推断键、不展开周期或插值。",
+  "extensions": [
+    "gro"
+  ],
+  "filenames": [],
+  "view_kind": "structure",
+  "adapter": "gro-trajectory",
+  "reader": "gro-trajectory",
+  "capabilities": {
+    "operations": [
+      "preview"
+    ],
+    "input_mode": "whole",
+    "shared": false
+  },
+  "default_enabled": true,
+  "priority": 40,
+  "permissions": [
+    "file:read"
+  ],
+  "limits": {
+    "max_input_bytes": 16777216,
+    "max_output_bytes": 2097152
+  }
+}

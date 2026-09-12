@@ -16,7 +16,7 @@ const props = defineProps<{ file: FileInfo; plugin: VisualizationPlugin }>();
 const scope = usePreviewLoad(), target = ref<HTMLDivElement>(), loading = ref(false), error = ref('');
 const slice = ref(0), minSlice = ref(0), maxSlice = ref(0);
 let updateSlice = () => {};
-watch(() => [props.file.file_id, props.plugin.id], async () => {
+watch([() => props.file.file_id, () => props.plugin.id], async () => {
   const load = scope.begin(); loading.value = true; error.value = ''; maxSlice.value = 0;
   try {
     const bytes = await loadPluginBytes(props.file, props.plugin, load.signal); load.assertCurrent();

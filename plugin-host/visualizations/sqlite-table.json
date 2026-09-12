@@ -1,0 +1,32 @@
+{
+  "contract_version": 2,
+  "id": "viz-sqlite-table",
+  "version": "1.0.0",
+  "name": "SQLite 只读表格",
+  "description": "受控浏览普通 SQLite 表与分页数据；不执行用户 SQL、不加载扩展、不解析 BLOB。",
+  "extensions": [
+    "sqlite",
+    "sqlite3",
+    "db"
+  ],
+  "filenames": [],
+  "view_kind": "table",
+  "adapter": "sqlite-table",
+  "reader": "sqlite-table",
+  "capabilities": {
+    "operations": [
+      "preview"
+    ],
+    "input_mode": "whole",
+    "shared": false
+  },
+  "default_enabled": true,
+  "priority": 40,
+  "permissions": [
+    "file:read"
+  ],
+  "limits": {
+    "max_input_bytes": 16777216,
+    "max_output_bytes": 2097152
+  }
+}

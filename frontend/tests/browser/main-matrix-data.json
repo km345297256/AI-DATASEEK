@@ -1,0 +1,801 @@
+{
+  "tree": {
+    "contract_version": 2,
+    "type": "matrix-workbench",
+    "reader": "matrix-workbench",
+    "kind": "tree",
+    "media_type": "application/json",
+    "selected": {},
+    "matrix": {
+      "arrays": [
+        {
+          "id": "array-0",
+          "name": "tensor",
+          "shape": [
+            2,
+            3,
+            4
+          ],
+          "dtype": "int64",
+          "sparse": false
+        },
+        {
+          "id": "array-1",
+          "name": "S",
+          "shape": [
+            2
+          ],
+          "dtype": "float64",
+          "sparse": false
+        },
+        {
+          "id": "array-2",
+          "name": "eigenvalues",
+          "shape": [
+            2
+          ],
+          "dtype": "complex128",
+          "sparse": false
+        },
+        {
+          "id": "array-3",
+          "name": "residual_history",
+          "shape": [
+            3
+          ],
+          "dtype": "float64",
+          "sparse": false
+        }
+      ],
+      "plane": null,
+      "curves": []
+    },
+    "metadata": {
+      "format": "npz",
+      "input_mode": "whole",
+      "source_bytes": 884,
+      "limits": {
+        "max_input_bytes": 134217728,
+        "max_output_bytes": 8388608,
+        "max_arrays": 512,
+        "max_dimensions": 16,
+        "max_points": 512,
+        "max_values": 262144,
+        "max_curve_points": 4096
+      },
+      "matrix_semantics": "selected component; sampled statistics; sparse structure bins nonzero entries"
+    },
+    "warnings": [
+      "预览仅显示选定分量与索引切片；等步长抽样及统计不代表整个源数组。稀疏结构模式按显示网格分箱非零项；非有限值显示为空。"
+    ],
+    "sampled": false
+  },
+  "image": {
+    "contract_version": 2,
+    "type": "matrix-workbench",
+    "reader": "matrix-workbench",
+    "kind": "image",
+    "media_type": "application/json",
+    "selected": {
+      "variable": "array-0",
+      "axes": [
+        1,
+        2
+      ],
+      "indices": [
+        0,
+        0,
+        0
+      ],
+      "component": "real",
+      "row_range": null,
+      "column_range": null,
+      "max_points": 256,
+      "structure": false
+    },
+    "matrix": {
+      "arrays": [
+        {
+          "id": "array-0",
+          "name": "tensor",
+          "shape": [
+            2,
+            3,
+            4
+          ],
+          "dtype": "int64",
+          "sparse": false
+        },
+        {
+          "id": "array-1",
+          "name": "S",
+          "shape": [
+            2
+          ],
+          "dtype": "float64",
+          "sparse": false
+        },
+        {
+          "id": "array-2",
+          "name": "eigenvalues",
+          "shape": [
+            2
+          ],
+          "dtype": "complex128",
+          "sparse": false
+        },
+        {
+          "id": "array-3",
+          "name": "residual_history",
+          "shape": [
+            3
+          ],
+          "dtype": "float64",
+          "sparse": false
+        }
+      ],
+      "plane": {
+        "values": [
+          [
+            0,
+            1,
+            2,
+            3
+          ],
+          [
+            4,
+            5,
+            6,
+            7
+          ],
+          [
+            8,
+            9,
+            10,
+            11
+          ]
+        ],
+        "rows": [
+          0,
+          1,
+          2
+        ],
+        "columns": [
+          0,
+          1,
+          2,
+          3
+        ],
+        "shape": [
+          2,
+          3,
+          4
+        ],
+        "sampled": false,
+        "row_step": 1,
+        "column_step": 1,
+        "row_range": [
+          0,
+          3
+        ],
+        "column_range": [
+          0,
+          4
+        ],
+        "structure": false,
+        "nonzero": 11,
+        "finite_count": 12,
+        "count": 12,
+        "non_finite": 0,
+        "minimum": 0,
+        "maximum": 11,
+        "mean": 5.5,
+        "standard_deviation": 3.452052529534663,
+        "row_profile": [
+          1.5,
+          5.5,
+          9.5
+        ],
+        "column_profile": [
+          3.9999999999999996,
+          5,
+          6,
+          7
+        ]
+      },
+      "curves": []
+    },
+    "metadata": {
+      "format": "npz",
+      "input_mode": "whole",
+      "source_bytes": 884,
+      "limits": {
+        "max_input_bytes": 134217728,
+        "max_output_bytes": 8388608,
+        "max_arrays": 512,
+        "max_dimensions": 16,
+        "max_points": 512,
+        "max_values": 262144,
+        "max_curve_points": 4096
+      },
+      "matrix_semantics": "selected component; sampled statistics; sparse structure bins nonzero entries"
+    },
+    "warnings": [
+      "预览仅显示选定分量与索引切片；等步长抽样及统计不代表整个源数组。稀疏结构模式按显示网格分箱非零项；非有限值显示为空。"
+    ],
+    "sampled": false
+  },
+  "series": {
+    "contract_version": 2,
+    "type": "matrix-workbench",
+    "reader": "matrix-workbench",
+    "kind": "series",
+    "media_type": "application/json",
+    "selected": {},
+    "matrix": {
+      "arrays": [
+        {
+          "id": "array-0",
+          "name": "tensor",
+          "shape": [
+            2,
+            3,
+            4
+          ],
+          "dtype": "int64",
+          "sparse": false
+        },
+        {
+          "id": "array-1",
+          "name": "S",
+          "shape": [
+            2
+          ],
+          "dtype": "float64",
+          "sparse": false
+        },
+        {
+          "id": "array-2",
+          "name": "eigenvalues",
+          "shape": [
+            2
+          ],
+          "dtype": "complex128",
+          "sparse": false
+        },
+        {
+          "id": "array-3",
+          "name": "residual_history",
+          "shape": [
+            3
+          ],
+          "dtype": "float64",
+          "sparse": false
+        }
+      ],
+      "plane": null,
+      "curves": [
+        {
+          "variable": "S",
+          "title": "奇异值谱",
+          "kind": "line",
+          "x": [
+            0,
+            1
+          ],
+          "y": [
+            4,
+            3
+          ]
+        },
+        {
+          "variable": "S",
+          "title": "已保存奇异值的累计能量比例",
+          "kind": "line",
+          "x": [
+            0,
+            1
+          ],
+          "y": [
+            0.64,
+            1
+          ]
+        },
+        {
+          "variable": "eigenvalues",
+          "title": "特征值分布",
+          "kind": "scatter",
+          "x": [
+            1,
+            1
+          ],
+          "y": [
+            2,
+            -2
+          ]
+        },
+        {
+          "variable": "residual_history",
+          "title": "迭代残差",
+          "kind": "line",
+          "x": [
+            0,
+            1,
+            2
+          ],
+          "y": [
+            1,
+            0.1,
+            0.001
+          ]
+        }
+      ]
+    },
+    "metadata": {
+      "format": "npz",
+      "input_mode": "whole",
+      "source_bytes": 884,
+      "limits": {
+        "max_input_bytes": 134217728,
+        "max_output_bytes": 8388608,
+        "max_arrays": 512,
+        "max_dimensions": 16,
+        "max_points": 512,
+        "max_values": 262144,
+        "max_curve_points": 4096
+      },
+      "matrix_semantics": "selected component; sampled statistics; sparse structure bins nonzero entries"
+    },
+    "warnings": [
+      "预览仅显示选定分量与索引切片；等步长抽样及统计不代表整个源数组。稀疏结构模式按显示网格分箱非零项；非有限值显示为空。"
+    ],
+    "sampled": false
+  },
+  "orthogonal": [
+    {
+      "contract_version": 2,
+      "type": "matrix-workbench",
+      "reader": "matrix-workbench",
+      "kind": "image",
+      "media_type": "application/json",
+      "selected": {
+        "variable": "array-0",
+        "axes": [
+          0,
+          1
+        ],
+        "indices": [
+          0,
+          0,
+          0
+        ],
+        "component": "real",
+        "row_range": null,
+        "column_range": null,
+        "max_points": 32,
+        "structure": false
+      },
+      "matrix": {
+        "arrays": [
+          {
+            "id": "array-0",
+            "name": "tensor",
+            "shape": [
+              2,
+              3,
+              4
+            ],
+            "dtype": "int64",
+            "sparse": false
+          },
+          {
+            "id": "array-1",
+            "name": "S",
+            "shape": [
+              2
+            ],
+            "dtype": "float64",
+            "sparse": false
+          },
+          {
+            "id": "array-2",
+            "name": "eigenvalues",
+            "shape": [
+              2
+            ],
+            "dtype": "complex128",
+            "sparse": false
+          },
+          {
+            "id": "array-3",
+            "name": "residual_history",
+            "shape": [
+              3
+            ],
+            "dtype": "float64",
+            "sparse": false
+          }
+        ],
+        "plane": {
+          "values": [
+            [
+              0,
+              4,
+              8
+            ],
+            [
+              12,
+              16,
+              20
+            ]
+          ],
+          "rows": [
+            0,
+            1
+          ],
+          "columns": [
+            0,
+            1,
+            2
+          ],
+          "shape": [
+            2,
+            3,
+            4
+          ],
+          "sampled": false,
+          "row_step": 1,
+          "column_step": 1,
+          "row_range": [
+            0,
+            2
+          ],
+          "column_range": [
+            0,
+            3
+          ],
+          "structure": false,
+          "nonzero": 5,
+          "finite_count": 6,
+          "count": 6,
+          "non_finite": 0,
+          "minimum": 0,
+          "maximum": 20,
+          "mean": 10,
+          "standard_deviation": 6.831300510639732,
+          "row_profile": [
+            4.000000000000001,
+            15.999999999999998
+          ],
+          "column_profile": [
+            6,
+            10,
+            14
+          ]
+        },
+        "curves": []
+      },
+      "metadata": {
+        "format": "npz",
+        "input_mode": "whole",
+        "source_bytes": 884,
+        "limits": {
+          "max_input_bytes": 134217728,
+          "max_output_bytes": 8388608,
+          "max_arrays": 512,
+          "max_dimensions": 16,
+          "max_points": 512,
+          "max_values": 262144,
+          "max_curve_points": 4096
+        },
+        "matrix_semantics": "selected component; sampled statistics; sparse structure bins nonzero entries"
+      },
+      "warnings": [
+        "预览仅显示选定分量与索引切片；等步长抽样及统计不代表整个源数组。稀疏结构模式按显示网格分箱非零项；非有限值显示为空。"
+      ],
+      "sampled": false
+    },
+    {
+      "contract_version": 2,
+      "type": "matrix-workbench",
+      "reader": "matrix-workbench",
+      "kind": "image",
+      "media_type": "application/json",
+      "selected": {
+        "variable": "array-0",
+        "axes": [
+          0,
+          2
+        ],
+        "indices": [
+          0,
+          0,
+          0
+        ],
+        "component": "real",
+        "row_range": null,
+        "column_range": null,
+        "max_points": 32,
+        "structure": false
+      },
+      "matrix": {
+        "arrays": [
+          {
+            "id": "array-0",
+            "name": "tensor",
+            "shape": [
+              2,
+              3,
+              4
+            ],
+            "dtype": "int64",
+            "sparse": false
+          },
+          {
+            "id": "array-1",
+            "name": "S",
+            "shape": [
+              2
+            ],
+            "dtype": "float64",
+            "sparse": false
+          },
+          {
+            "id": "array-2",
+            "name": "eigenvalues",
+            "shape": [
+              2
+            ],
+            "dtype": "complex128",
+            "sparse": false
+          },
+          {
+            "id": "array-3",
+            "name": "residual_history",
+            "shape": [
+              3
+            ],
+            "dtype": "float64",
+            "sparse": false
+          }
+        ],
+        "plane": {
+          "values": [
+            [
+              0,
+              1,
+              2,
+              3
+            ],
+            [
+              12,
+              13,
+              14,
+              15
+            ]
+          ],
+          "rows": [
+            0,
+            1
+          ],
+          "columns": [
+            0,
+            1,
+            2,
+            3
+          ],
+          "shape": [
+            2,
+            3,
+            4
+          ],
+          "sampled": false,
+          "row_step": 1,
+          "column_step": 1,
+          "row_range": [
+            0,
+            2
+          ],
+          "column_range": [
+            0,
+            4
+          ],
+          "structure": false,
+          "nonzero": 7,
+          "finite_count": 8,
+          "count": 8,
+          "non_finite": 0,
+          "minimum": 0,
+          "maximum": 15,
+          "mean": 7.5,
+          "standard_deviation": 6.103277807866851,
+          "row_profile": [
+            1.5,
+            13.5
+          ],
+          "column_profile": [
+            6,
+            7,
+            8,
+            9
+          ]
+        },
+        "curves": []
+      },
+      "metadata": {
+        "format": "npz",
+        "input_mode": "whole",
+        "source_bytes": 884,
+        "limits": {
+          "max_input_bytes": 134217728,
+          "max_output_bytes": 8388608,
+          "max_arrays": 512,
+          "max_dimensions": 16,
+          "max_points": 512,
+          "max_values": 262144,
+          "max_curve_points": 4096
+        },
+        "matrix_semantics": "selected component; sampled statistics; sparse structure bins nonzero entries"
+      },
+      "warnings": [
+        "预览仅显示选定分量与索引切片；等步长抽样及统计不代表整个源数组。稀疏结构模式按显示网格分箱非零项；非有限值显示为空。"
+      ],
+      "sampled": false
+    },
+    {
+      "contract_version": 2,
+      "type": "matrix-workbench",
+      "reader": "matrix-workbench",
+      "kind": "image",
+      "media_type": "application/json",
+      "selected": {
+        "variable": "array-0",
+        "axes": [
+          1,
+          2
+        ],
+        "indices": [
+          0,
+          0,
+          0
+        ],
+        "component": "real",
+        "row_range": null,
+        "column_range": null,
+        "max_points": 32,
+        "structure": false
+      },
+      "matrix": {
+        "arrays": [
+          {
+            "id": "array-0",
+            "name": "tensor",
+            "shape": [
+              2,
+              3,
+              4
+            ],
+            "dtype": "int64",
+            "sparse": false
+          },
+          {
+            "id": "array-1",
+            "name": "S",
+            "shape": [
+              2
+            ],
+            "dtype": "float64",
+            "sparse": false
+          },
+          {
+            "id": "array-2",
+            "name": "eigenvalues",
+            "shape": [
+              2
+            ],
+            "dtype": "complex128",
+            "sparse": false
+          },
+          {
+            "id": "array-3",
+            "name": "residual_history",
+            "shape": [
+              3
+            ],
+            "dtype": "float64",
+            "sparse": false
+          }
+        ],
+        "plane": {
+          "values": [
+            [
+              0,
+              1,
+              2,
+              3
+            ],
+            [
+              4,
+              5,
+              6,
+              7
+            ],
+            [
+              8,
+              9,
+              10,
+              11
+            ]
+          ],
+          "rows": [
+            0,
+            1,
+            2
+          ],
+          "columns": [
+            0,
+            1,
+            2,
+            3
+          ],
+          "shape": [
+            2,
+            3,
+            4
+          ],
+          "sampled": false,
+          "row_step": 1,
+          "column_step": 1,
+          "row_range": [
+            0,
+            3
+          ],
+          "column_range": [
+            0,
+            4
+          ],
+          "structure": false,
+          "nonzero": 11,
+          "finite_count": 12,
+          "count": 12,
+          "non_finite": 0,
+          "minimum": 0,
+          "maximum": 11,
+          "mean": 5.5,
+          "standard_deviation": 3.452052529534663,
+          "row_profile": [
+            1.5,
+            5.5,
+            9.5
+          ],
+          "column_profile": [
+            3.9999999999999996,
+            5,
+            6,
+            7
+          ]
+        },
+        "curves": []
+      },
+      "metadata": {
+        "format": "npz",
+        "input_mode": "whole",
+        "source_bytes": 884,
+        "limits": {
+          "max_input_bytes": 134217728,
+          "max_output_bytes": 8388608,
+          "max_arrays": 512,
+          "max_dimensions": 16,
+          "max_points": 512,
+          "max_values": 262144,
+          "max_curve_points": 4096
+        },
+        "matrix_semantics": "selected component; sampled statistics; sparse structure bins nonzero entries"
+      },
+      "warnings": [
+        "预览仅显示选定分量与索引切片；等步长抽样及统计不代表整个源数组。稀疏结构模式按显示网格分箱非零项；非有限值显示为空。"
+      ],
+      "sampled": false
+    }
+  ]
+}

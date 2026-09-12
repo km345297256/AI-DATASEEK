@@ -1,0 +1,17 @@
+{
+  "contract_version": 2,
+  "id": "viz-video-player",
+  "version": "1.0.0",
+  "name": "本地视频",
+  "description": "64 MiB 内 MP4/WebM/OGV 本地播放、时间定位；编码须由浏览器支持，不转码、不自动播放。",
+  "extensions": ["mp4", "webm", "ogv"],
+  "filenames": [],
+  "view_kind": "media",
+  "adapter": "video-player",
+  "reader": "binary",
+  "default_enabled": true,
+  "priority": 50,
+  "permissions": ["file:read"],
+  "limits": {"max_input_bytes": 67108864, "max_output_bytes": 1048576},
+  "capabilities": {"operations": ["bytes"], "input_mode": "whole", "shared": false}
+}

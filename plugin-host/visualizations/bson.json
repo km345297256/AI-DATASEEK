@@ -1,0 +1,30 @@
+{
+  "contract_version": 2,
+  "id": "viz-bson",
+  "version": "1.0.0",
+  "name": "BSON 文档记录",
+  "description": "有界只读浏览 MongoDB BSON 文档流，按页展开字段及精确类型；不是 MongoDB 连接或 WiredTiger 原始存储预览。",
+  "extensions": [
+    "bson"
+  ],
+  "filenames": [],
+  "view_kind": "tree",
+  "adapter": "database-records",
+  "reader": "bson",
+  "capabilities": {
+    "operations": [
+      "preview"
+    ],
+    "input_mode": "whole",
+    "shared": false
+  },
+  "default_enabled": true,
+  "priority": 40,
+  "permissions": [
+    "file:read"
+  ],
+  "limits": {
+    "max_input_bytes": 16777216,
+    "max_output_bytes": 2097152
+  }
+}

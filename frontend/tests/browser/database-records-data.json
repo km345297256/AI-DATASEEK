@@ -1,0 +1,1316 @@
+{
+  "bson": {
+    "tree": {
+      "contract_version": 2,
+      "type": "bson",
+      "reader": "bson",
+      "kind": "tree",
+      "media_type": "application/json",
+      "choices": {
+        "groups": [
+          {
+            "id": "g-cac1e7742f337fa2cc597c77",
+            "label": "Documents",
+            "database": null,
+            "record_count": 3,
+            "counts": {
+              "document": 3
+            }
+          }
+        ]
+      },
+      "selected": {},
+      "metadata": {
+        "engine": "bson",
+        "format": "bson",
+        "container": "BSON document stream",
+        "input_mode": "whole",
+        "source_bytes": 1213,
+        "format_version": null,
+        "ordering": "bson-document-order",
+        "total_records": 3,
+        "groups_count": 1,
+        "records_returned": 0,
+        "nodes_returned": 0,
+        "omitted_values": 0,
+        "unsupported_values": 0,
+        "checksum": "not-applicable",
+        "limits": {
+          "max_groups": 32,
+          "max_records": 100000,
+          "max_rows": 50,
+          "max_offset": 100000,
+          "max_depth": 8,
+          "max_record_nodes": 128,
+          "max_page_nodes": 4096,
+          "max_scan_nodes": 100000,
+          "max_text_bytes": 512,
+          "max_document_bytes": 1048576,
+          "max_decompressed_block_bytes": 1048576,
+          "max_decompressed_bytes": 33554432
+        }
+      },
+      "warnings": [
+        "整文件受限只读预览（最多 16 MiB），不是数据库连接或恢复接口。仅显示手动选择的一页；整数、Decimal128 和毫秒时间保留精确表示，二进制仅显示长度。过长或不安全文本明确省略，不执行代码、正则、脚本或数据库命令。Redis 过期键保留文件中的原始过期时刻，不按当前时间过滤。"
+      ],
+      "sampled": false,
+      "tree": [
+        {
+          "path": "/g-cac1e7742f337fa2cc597c77",
+          "node_type": "group",
+          "attributes": {
+            "label": "Documents",
+            "records": 3
+          }
+        }
+      ]
+    },
+    "first": {
+      "contract_version": 2,
+      "type": "bson",
+      "reader": "bson",
+      "kind": "table",
+      "media_type": "application/json",
+      "choices": {
+        "groups": [
+          {
+            "id": "g-cac1e7742f337fa2cc597c77",
+            "label": "Documents",
+            "database": null,
+            "record_count": 3,
+            "counts": {
+              "document": 3
+            }
+          }
+        ]
+      },
+      "selected": {
+        "group_id": "g-cac1e7742f337fa2cc597c77",
+        "offset": 0,
+        "limit": 2
+      },
+      "metadata": {
+        "engine": "bson",
+        "format": "bson",
+        "container": "BSON document stream",
+        "input_mode": "whole",
+        "source_bytes": 1213,
+        "format_version": null,
+        "ordering": "bson-document-order",
+        "total_records": 3,
+        "groups_count": 1,
+        "records_returned": 2,
+        "nodes_returned": 37,
+        "omitted_values": 3,
+        "unsupported_values": 5,
+        "checksum": "not-applicable",
+        "limits": {
+          "max_groups": 32,
+          "max_records": 100000,
+          "max_rows": 50,
+          "max_offset": 100000,
+          "max_depth": 8,
+          "max_record_nodes": 128,
+          "max_page_nodes": 4096,
+          "max_scan_nodes": 100000,
+          "max_text_bytes": 512,
+          "max_document_bytes": 1048576,
+          "max_decompressed_block_bytes": 1048576,
+          "max_decompressed_bytes": 33554432
+        }
+      },
+      "warnings": [
+        "整文件受限只读预览（最多 16 MiB），不是数据库连接或恢复接口。仅显示手动选择的一页；整数、Decimal128 和毫秒时间保留精确表示，二进制仅显示长度。过长或不安全文本明确省略，不执行代码、正则、脚本或数据库命令。Redis 过期键保留文件中的原始过期时刻，不按当前时间过滤。"
+      ],
+      "sampled": true,
+      "table": {
+        "group_id": "g-cac1e7742f337fa2cc597c77",
+        "offset": 0,
+        "limit": 2,
+        "has_more": true,
+        "records": [
+          {
+            "index": "0",
+            "key": null,
+            "expires_at_ms": null,
+            "nodes": [
+              {
+                "id": 0,
+                "parent": null,
+                "key": null,
+                "key_omitted": false,
+                "cell": {
+                  "type": "document",
+                  "count": 26
+                }
+              },
+              {
+                "id": 1,
+                "parent": 0,
+                "key": "_id",
+                "key_omitted": false,
+                "cell": {
+                  "type": "objectid",
+                  "value": "0123456789abcdef01234567"
+                }
+              },
+              {
+                "id": 2,
+                "parent": 0,
+                "key": "integer",
+                "key_omitted": false,
+                "cell": {
+                  "type": "integer",
+                  "value": "9223372036854775807"
+                }
+              },
+              {
+                "id": 3,
+                "parent": 0,
+                "key": "negative",
+                "key_omitted": false,
+                "cell": {
+                  "type": "integer",
+                  "value": "-9223372036854775808"
+                }
+              },
+              {
+                "id": 4,
+                "parent": 0,
+                "key": "decimal",
+                "key_omitted": false,
+                "cell": {
+                  "type": "decimal128",
+                  "value": "123456789012345678901234567890.1234",
+                  "bid": "f2af967ed05c82de3297ff6fde3c3830"
+                }
+              },
+              {
+                "id": 5,
+                "parent": 0,
+                "key": "scaled",
+                "key_omitted": false,
+                "cell": {
+                  "type": "decimal128",
+                  "value": "1.2300",
+                  "bid": "0c300000000000000000000000003830"
+                }
+              },
+              {
+                "id": 6,
+                "parent": 0,
+                "key": "extreme",
+                "key_omitted": false,
+                "cell": {
+                  "type": "decimal128",
+                  "value": "1.000000000000000000000000000000000E+6144",
+                  "bid": "000000000a5bc138938d44c64d31fe5f"
+                }
+              },
+              {
+                "id": 7,
+                "parent": 0,
+                "key": "real",
+                "key_omitted": false,
+                "cell": {
+                  "type": "real",
+                  "value": 1.25
+                }
+              },
+              {
+                "id": 8,
+                "parent": 0,
+                "key": "date",
+                "key_omitted": false,
+                "cell": {
+                  "type": "date-ms",
+                  "value": "-9223372036854775808"
+                }
+              },
+              {
+                "id": 9,
+                "parent": 0,
+                "key": "stamp",
+                "key_omitted": false,
+                "cell": {
+                  "type": "timestamp",
+                  "seconds": "4294967295",
+                  "increment": "4294967295"
+                }
+              },
+              {
+                "id": 10,
+                "parent": 0,
+                "key": "empty",
+                "key_omitted": false,
+                "cell": {
+                  "type": "text",
+                  "value": ""
+                }
+              },
+              {
+                "id": 11,
+                "parent": 0,
+                "key": "null",
+                "key_omitted": false,
+                "cell": {
+                  "type": "null",
+                  "value": null
+                }
+              },
+              {
+                "id": 12,
+                "parent": 0,
+                "key": "boolean",
+                "key_omitted": false,
+                "cell": {
+                  "type": "boolean",
+                  "value": false
+                }
+              },
+              {
+                "id": 13,
+                "parent": 0,
+                "key": "binary",
+                "key_omitted": false,
+                "cell": {
+                  "type": "binary",
+                  "bytes": 2,
+                  "subtype": "04"
+                }
+              },
+              {
+                "id": 14,
+                "parent": 0,
+                "key": "nan",
+                "key_omitted": false,
+                "cell": {
+                  "type": "nonfinite",
+                  "value": "NaN"
+                }
+              },
+              {
+                "id": 15,
+                "parent": 0,
+                "key": "infinity",
+                "key_omitted": false,
+                "cell": {
+                  "type": "nonfinite",
+                  "value": "Infinity"
+                }
+              },
+              {
+                "id": 16,
+                "parent": 0,
+                "key": "negative_infinity",
+                "key_omitted": false,
+                "cell": {
+                  "type": "nonfinite",
+                  "value": "-Infinity"
+                }
+              },
+              {
+                "id": 17,
+                "parent": 0,
+                "key": "decimal_nan",
+                "key_omitted": false,
+                "cell": {
+                  "type": "decimal128",
+                  "value": "NaN",
+                  "bid": "0000000000000000000000000000007c"
+                }
+              },
+              {
+                "id": 18,
+                "parent": 0,
+                "key": "regex",
+                "key_omitted": false,
+                "cell": {
+                  "type": "unsupported",
+                  "name": "regex"
+                }
+              },
+              {
+                "id": 19,
+                "parent": 0,
+                "key": "javascript",
+                "key_omitted": false,
+                "cell": {
+                  "type": "unsupported",
+                  "name": "javascript"
+                }
+              },
+              {
+                "id": 20,
+                "parent": 0,
+                "key": "scope",
+                "key_omitted": false,
+                "cell": {
+                  "type": "unsupported",
+                  "name": "javascript-scope"
+                }
+              },
+              {
+                "id": 21,
+                "parent": 0,
+                "key": "minimum",
+                "key_omitted": false,
+                "cell": {
+                  "type": "unsupported",
+                  "name": "min-key"
+                }
+              },
+              {
+                "id": 22,
+                "parent": 0,
+                "key": "maximum",
+                "key_omitted": false,
+                "cell": {
+                  "type": "unsupported",
+                  "name": "max-key"
+                }
+              },
+              {
+                "id": 23,
+                "parent": 0,
+                "key": "html",
+                "key_omitted": false,
+                "cell": {
+                  "type": "text",
+                  "value": "<img src=x onerror=alert(1)>"
+                }
+              },
+              {
+                "id": 24,
+                "parent": 0,
+                "key": "long",
+                "key_omitted": false,
+                "cell": {
+                  "type": "omitted",
+                  "bytes": 513,
+                  "reason": "text-budget"
+                }
+              },
+              {
+                "id": 25,
+                "parent": 0,
+                "key": "host",
+                "key_omitted": false,
+                "cell": {
+                  "type": "omitted",
+                  "bytes": 21,
+                  "reason": "unsafe-text"
+                }
+              },
+              {
+                "id": 26,
+                "parent": 0,
+                "key": "字段名已省略",
+                "key_omitted": true,
+                "cell": {
+                  "type": "text",
+                  "value": "hidden name"
+                }
+              }
+            ],
+            "truncated": true
+          },
+          {
+            "index": "1",
+            "key": null,
+            "expires_at_ms": null,
+            "nodes": [
+              {
+                "id": 0,
+                "parent": null,
+                "key": null,
+                "key_omitted": false,
+                "cell": {
+                  "type": "document",
+                  "count": 3
+                }
+              },
+              {
+                "id": 1,
+                "parent": 0,
+                "key": "name",
+                "key_omitted": false,
+                "cell": {
+                  "type": "text",
+                  "value": "科学数据"
+                }
+              },
+              {
+                "id": 2,
+                "parent": 0,
+                "key": "nested",
+                "key_omitted": false,
+                "cell": {
+                  "type": "document",
+                  "count": 1
+                }
+              },
+              {
+                "id": 3,
+                "parent": 2,
+                "key": "array",
+                "key_omitted": false,
+                "cell": {
+                  "type": "array",
+                  "count": 4
+                }
+              },
+              {
+                "id": 4,
+                "parent": 3,
+                "key": "0",
+                "key_omitted": false,
+                "cell": {
+                  "type": "integer",
+                  "value": "1"
+                }
+              },
+              {
+                "id": 5,
+                "parent": 3,
+                "key": "1",
+                "key_omitted": false,
+                "cell": {
+                  "type": "document",
+                  "count": 1
+                }
+              },
+              {
+                "id": 6,
+                "parent": 5,
+                "key": "decimal",
+                "key_omitted": false,
+                "cell": {
+                  "type": "decimal128",
+                  "value": "-0.0000",
+                  "bid": "000000000000000000000000000038b0"
+                }
+              },
+              {
+                "id": 7,
+                "parent": 3,
+                "key": "2",
+                "key_omitted": false,
+                "cell": {
+                  "type": "array",
+                  "count": 0
+                }
+              },
+              {
+                "id": 8,
+                "parent": 3,
+                "key": "3",
+                "key_omitted": false,
+                "cell": {
+                  "type": "document",
+                  "count": 0
+                }
+              },
+              {
+                "id": 9,
+                "parent": 0,
+                "key": "bytes",
+                "key_omitted": false,
+                "cell": {
+                  "type": "binary",
+                  "bytes": 0,
+                  "subtype": "00"
+                }
+              }
+            ],
+            "truncated": false
+          }
+        ]
+      }
+    },
+    "second": {
+      "contract_version": 2,
+      "type": "bson",
+      "reader": "bson",
+      "kind": "table",
+      "media_type": "application/json",
+      "choices": {
+        "groups": [
+          {
+            "id": "g-cac1e7742f337fa2cc597c77",
+            "label": "Documents",
+            "database": null,
+            "record_count": 3,
+            "counts": {
+              "document": 3
+            }
+          }
+        ]
+      },
+      "selected": {
+        "group_id": "g-cac1e7742f337fa2cc597c77",
+        "offset": 2,
+        "limit": 2
+      },
+      "metadata": {
+        "engine": "bson",
+        "format": "bson",
+        "container": "BSON document stream",
+        "input_mode": "whole",
+        "source_bytes": 1213,
+        "format_version": null,
+        "ordering": "bson-document-order",
+        "total_records": 3,
+        "groups_count": 1,
+        "records_returned": 1,
+        "nodes_returned": 3,
+        "omitted_values": 0,
+        "unsupported_values": 0,
+        "checksum": "not-applicable",
+        "limits": {
+          "max_groups": 32,
+          "max_records": 100000,
+          "max_rows": 50,
+          "max_offset": 100000,
+          "max_depth": 8,
+          "max_record_nodes": 128,
+          "max_page_nodes": 4096,
+          "max_scan_nodes": 100000,
+          "max_text_bytes": 512,
+          "max_document_bytes": 1048576,
+          "max_decompressed_block_bytes": 1048576,
+          "max_decompressed_bytes": 33554432
+        }
+      },
+      "warnings": [
+        "整文件受限只读预览（最多 16 MiB），不是数据库连接或恢复接口。仅显示手动选择的一页；整数、Decimal128 和毫秒时间保留精确表示，二进制仅显示长度。过长或不安全文本明确省略，不执行代码、正则、脚本或数据库命令。Redis 过期键保留文件中的原始过期时刻，不按当前时间过滤。"
+      ],
+      "sampled": true,
+      "table": {
+        "group_id": "g-cac1e7742f337fa2cc597c77",
+        "offset": 2,
+        "limit": 2,
+        "has_more": false,
+        "records": [
+          {
+            "index": "2",
+            "key": null,
+            "expires_at_ms": null,
+            "nodes": [
+              {
+                "id": 0,
+                "parent": null,
+                "key": null,
+                "key_omitted": false,
+                "cell": {
+                  "type": "document",
+                  "count": 2
+                }
+              },
+              {
+                "id": 1,
+                "parent": 0,
+                "key": "name",
+                "key_omitted": false,
+                "cell": {
+                  "type": "text",
+                  "value": "第三条"
+                }
+              },
+              {
+                "id": 2,
+                "parent": 0,
+                "key": "value",
+                "key_omitted": false,
+                "cell": {
+                  "type": "integer",
+                  "value": "9007199254740993"
+                }
+              }
+            ],
+            "truncated": false
+          }
+        ]
+      }
+    },
+    "empty": {
+      "contract_version": 2,
+      "type": "bson",
+      "reader": "bson",
+      "kind": "tree",
+      "media_type": "application/json",
+      "choices": {
+        "groups": [
+          {
+            "id": "g-cac1e7742f337fa2cc597c77",
+            "label": "Documents",
+            "database": null,
+            "record_count": 1,
+            "counts": {
+              "document": 1
+            }
+          }
+        ]
+      },
+      "selected": {},
+      "metadata": {
+        "engine": "bson",
+        "format": "bson",
+        "container": "BSON document stream",
+        "input_mode": "whole",
+        "source_bytes": 5,
+        "format_version": null,
+        "ordering": "bson-document-order",
+        "total_records": 1,
+        "groups_count": 1,
+        "records_returned": 0,
+        "nodes_returned": 0,
+        "omitted_values": 0,
+        "unsupported_values": 0,
+        "checksum": "not-applicable",
+        "limits": {
+          "max_groups": 32,
+          "max_records": 100000,
+          "max_rows": 50,
+          "max_offset": 100000,
+          "max_depth": 8,
+          "max_record_nodes": 128,
+          "max_page_nodes": 4096,
+          "max_scan_nodes": 100000,
+          "max_text_bytes": 512,
+          "max_document_bytes": 1048576,
+          "max_decompressed_block_bytes": 1048576,
+          "max_decompressed_bytes": 33554432
+        }
+      },
+      "warnings": [
+        "整文件受限只读预览（最多 16 MiB），不是数据库连接或恢复接口。仅显示手动选择的一页；整数、Decimal128 和毫秒时间保留精确表示，二进制仅显示长度。过长或不安全文本明确省略，不执行代码、正则、脚本或数据库命令。Redis 过期键保留文件中的原始过期时刻，不按当前时间过滤。"
+      ],
+      "sampled": false,
+      "tree": [
+        {
+          "path": "/g-cac1e7742f337fa2cc597c77",
+          "node_type": "group",
+          "attributes": {
+            "label": "Documents",
+            "records": 1
+          }
+        }
+      ]
+    },
+    "emptyPage": {
+      "contract_version": 2,
+      "type": "bson",
+      "reader": "bson",
+      "kind": "table",
+      "media_type": "application/json",
+      "choices": {
+        "groups": [
+          {
+            "id": "g-cac1e7742f337fa2cc597c77",
+            "label": "Documents",
+            "database": null,
+            "record_count": 1,
+            "counts": {
+              "document": 1
+            }
+          }
+        ]
+      },
+      "selected": {
+        "group_id": "g-cac1e7742f337fa2cc597c77",
+        "offset": 0,
+        "limit": 2
+      },
+      "metadata": {
+        "engine": "bson",
+        "format": "bson",
+        "container": "BSON document stream",
+        "input_mode": "whole",
+        "source_bytes": 5,
+        "format_version": null,
+        "ordering": "bson-document-order",
+        "total_records": 1,
+        "groups_count": 1,
+        "records_returned": 1,
+        "nodes_returned": 1,
+        "omitted_values": 0,
+        "unsupported_values": 0,
+        "checksum": "not-applicable",
+        "limits": {
+          "max_groups": 32,
+          "max_records": 100000,
+          "max_rows": 50,
+          "max_offset": 100000,
+          "max_depth": 8,
+          "max_record_nodes": 128,
+          "max_page_nodes": 4096,
+          "max_scan_nodes": 100000,
+          "max_text_bytes": 512,
+          "max_document_bytes": 1048576,
+          "max_decompressed_block_bytes": 1048576,
+          "max_decompressed_bytes": 33554432
+        }
+      },
+      "warnings": [
+        "整文件受限只读预览（最多 16 MiB），不是数据库连接或恢复接口。仅显示手动选择的一页；整数、Decimal128 和毫秒时间保留精确表示，二进制仅显示长度。过长或不安全文本明确省略，不执行代码、正则、脚本或数据库命令。Redis 过期键保留文件中的原始过期时刻，不按当前时间过滤。"
+      ],
+      "sampled": false,
+      "table": {
+        "group_id": "g-cac1e7742f337fa2cc597c77",
+        "offset": 0,
+        "limit": 2,
+        "has_more": false,
+        "records": [
+          {
+            "index": "0",
+            "key": null,
+            "expires_at_ms": null,
+            "nodes": [
+              {
+                "id": 0,
+                "parent": null,
+                "key": null,
+                "key_omitted": false,
+                "cell": {
+                  "type": "document",
+                  "count": 0
+                }
+              }
+            ],
+            "truncated": false
+          }
+        ]
+      }
+    }
+  },
+  "redis-rdb": {
+    "tree": {
+      "contract_version": 2,
+      "type": "redis-rdb",
+      "reader": "redis-rdb",
+      "kind": "tree",
+      "media_type": "application/json",
+      "choices": {
+        "groups": [
+          {
+            "id": "g-6bc4024451ce861aada87e48",
+            "label": "Redis DB 0",
+            "database": 0,
+            "record_count": 5,
+            "counts": {
+              "string": 1,
+              "list": 1,
+              "set": 1,
+              "hash": 1,
+              "zset": 1
+            }
+          },
+          {
+            "id": "g-19a74e4d755a4bad24ead105",
+            "label": "Redis DB 2",
+            "database": 2,
+            "record_count": 1,
+            "counts": {
+              "string": 1
+            }
+          }
+        ]
+      },
+      "selected": {},
+      "metadata": {
+        "engine": "redis-rdb",
+        "format": "rdb",
+        "container": "Redis RDB",
+        "input_mode": "whole",
+        "source_bytes": 229,
+        "format_version": 11,
+        "ordering": "rdb-file-order",
+        "total_records": 6,
+        "groups_count": 2,
+        "records_returned": 0,
+        "nodes_returned": 0,
+        "omitted_values": 0,
+        "unsupported_values": 0,
+        "checksum": "verified",
+        "limits": {
+          "max_groups": 32,
+          "max_records": 100000,
+          "max_rows": 50,
+          "max_offset": 100000,
+          "max_depth": 8,
+          "max_record_nodes": 128,
+          "max_page_nodes": 4096,
+          "max_scan_nodes": 100000,
+          "max_text_bytes": 512,
+          "max_document_bytes": 1048576,
+          "max_decompressed_block_bytes": 1048576,
+          "max_decompressed_bytes": 33554432
+        }
+      },
+      "warnings": [
+        "整文件受限只读预览（最多 16 MiB），不是数据库连接或恢复接口。仅显示手动选择的一页；整数、Decimal128 和毫秒时间保留精确表示，二进制仅显示长度。过长或不安全文本明确省略，不执行代码、正则、脚本或数据库命令。Redis 过期键保留文件中的原始过期时刻，不按当前时间过滤。"
+      ],
+      "sampled": false,
+      "tree": [
+        {
+          "path": "/g-6bc4024451ce861aada87e48",
+          "node_type": "group",
+          "attributes": {
+            "label": "Redis DB 0",
+            "records": 5
+          }
+        },
+        {
+          "path": "/g-19a74e4d755a4bad24ead105",
+          "node_type": "group",
+          "attributes": {
+            "label": "Redis DB 2",
+            "records": 1
+          }
+        }
+      ]
+    },
+    "first": {
+      "contract_version": 2,
+      "type": "redis-rdb",
+      "reader": "redis-rdb",
+      "kind": "table",
+      "media_type": "application/json",
+      "choices": {
+        "groups": [
+          {
+            "id": "g-6bc4024451ce861aada87e48",
+            "label": "Redis DB 0",
+            "database": 0,
+            "record_count": 5,
+            "counts": {
+              "string": 1,
+              "list": 1,
+              "set": 1,
+              "hash": 1,
+              "zset": 1
+            }
+          },
+          {
+            "id": "g-19a74e4d755a4bad24ead105",
+            "label": "Redis DB 2",
+            "database": 2,
+            "record_count": 1,
+            "counts": {
+              "string": 1
+            }
+          }
+        ]
+      },
+      "selected": {
+        "group_id": "g-6bc4024451ce861aada87e48",
+        "offset": 0,
+        "limit": 2
+      },
+      "metadata": {
+        "engine": "redis-rdb",
+        "format": "rdb",
+        "container": "Redis RDB",
+        "input_mode": "whole",
+        "source_bytes": 229,
+        "format_version": 11,
+        "ordering": "rdb-file-order",
+        "total_records": 6,
+        "groups_count": 2,
+        "records_returned": 2,
+        "nodes_returned": 5,
+        "omitted_values": 0,
+        "unsupported_values": 0,
+        "checksum": "verified",
+        "limits": {
+          "max_groups": 32,
+          "max_records": 100000,
+          "max_rows": 50,
+          "max_offset": 100000,
+          "max_depth": 8,
+          "max_record_nodes": 128,
+          "max_page_nodes": 4096,
+          "max_scan_nodes": 100000,
+          "max_text_bytes": 512,
+          "max_document_bytes": 1048576,
+          "max_decompressed_block_bytes": 1048576,
+          "max_decompressed_bytes": 33554432
+        }
+      },
+      "warnings": [
+        "整文件受限只读预览（最多 16 MiB），不是数据库连接或恢复接口。仅显示手动选择的一页；整数、Decimal128 和毫秒时间保留精确表示，二进制仅显示长度。过长或不安全文本明确省略，不执行代码、正则、脚本或数据库命令。Redis 过期键保留文件中的原始过期时刻，不按当前时间过滤。"
+      ],
+      "sampled": true,
+      "table": {
+        "group_id": "g-6bc4024451ce861aada87e48",
+        "offset": 0,
+        "limit": 2,
+        "has_more": true,
+        "records": [
+          {
+            "index": "0",
+            "key": {
+              "type": "text",
+              "value": "precise"
+            },
+            "expires_at_ms": "9223372036854775807",
+            "nodes": [
+              {
+                "id": 0,
+                "parent": null,
+                "key": null,
+                "key_omitted": false,
+                "cell": {
+                  "type": "text",
+                  "value": "9007199254740993"
+                }
+              }
+            ],
+            "truncated": false
+          },
+          {
+            "index": "1",
+            "key": {
+              "type": "text",
+              "value": "list"
+            },
+            "expires_at_ms": null,
+            "nodes": [
+              {
+                "id": 0,
+                "parent": null,
+                "key": null,
+                "key_omitted": false,
+                "cell": {
+                  "type": "list",
+                  "count": 3
+                }
+              },
+              {
+                "id": 1,
+                "parent": 0,
+                "key": "0",
+                "key_omitted": false,
+                "cell": {
+                  "type": "text",
+                  "value": "first"
+                }
+              },
+              {
+                "id": 2,
+                "parent": 0,
+                "key": "1",
+                "key_omitted": false,
+                "cell": {
+                  "type": "text",
+                  "value": "-9223372036854775808"
+                }
+              },
+              {
+                "id": 3,
+                "parent": 0,
+                "key": "2",
+                "key_omitted": false,
+                "cell": {
+                  "type": "text",
+                  "value": "科学"
+                }
+              }
+            ],
+            "truncated": false
+          }
+        ]
+      }
+    },
+    "second": {
+      "contract_version": 2,
+      "type": "redis-rdb",
+      "reader": "redis-rdb",
+      "kind": "table",
+      "media_type": "application/json",
+      "choices": {
+        "groups": [
+          {
+            "id": "g-6bc4024451ce861aada87e48",
+            "label": "Redis DB 0",
+            "database": 0,
+            "record_count": 5,
+            "counts": {
+              "string": 1,
+              "list": 1,
+              "set": 1,
+              "hash": 1,
+              "zset": 1
+            }
+          },
+          {
+            "id": "g-19a74e4d755a4bad24ead105",
+            "label": "Redis DB 2",
+            "database": 2,
+            "record_count": 1,
+            "counts": {
+              "string": 1
+            }
+          }
+        ]
+      },
+      "selected": {
+        "group_id": "g-6bc4024451ce861aada87e48",
+        "offset": 2,
+        "limit": 2
+      },
+      "metadata": {
+        "engine": "redis-rdb",
+        "format": "rdb",
+        "container": "Redis RDB",
+        "input_mode": "whole",
+        "source_bytes": 229,
+        "format_version": 11,
+        "ordering": "rdb-file-order",
+        "total_records": 6,
+        "groups_count": 2,
+        "records_returned": 2,
+        "nodes_returned": 6,
+        "omitted_values": 0,
+        "unsupported_values": 0,
+        "checksum": "verified",
+        "limits": {
+          "max_groups": 32,
+          "max_records": 100000,
+          "max_rows": 50,
+          "max_offset": 100000,
+          "max_depth": 8,
+          "max_record_nodes": 128,
+          "max_page_nodes": 4096,
+          "max_scan_nodes": 100000,
+          "max_text_bytes": 512,
+          "max_document_bytes": 1048576,
+          "max_decompressed_block_bytes": 1048576,
+          "max_decompressed_bytes": 33554432
+        }
+      },
+      "warnings": [
+        "整文件受限只读预览（最多 16 MiB），不是数据库连接或恢复接口。仅显示手动选择的一页；整数、Decimal128 和毫秒时间保留精确表示，二进制仅显示长度。过长或不安全文本明确省略，不执行代码、正则、脚本或数据库命令。Redis 过期键保留文件中的原始过期时刻，不按当前时间过滤。"
+      ],
+      "sampled": true,
+      "table": {
+        "group_id": "g-6bc4024451ce861aada87e48",
+        "offset": 2,
+        "limit": 2,
+        "has_more": true,
+        "records": [
+          {
+            "index": "2",
+            "key": {
+              "type": "text",
+              "value": "set"
+            },
+            "expires_at_ms": null,
+            "nodes": [
+              {
+                "id": 0,
+                "parent": null,
+                "key": null,
+                "key_omitted": false,
+                "cell": {
+                  "type": "set",
+                  "count": 2
+                }
+              },
+              {
+                "id": 1,
+                "parent": 0,
+                "key": "0",
+                "key_omitted": false,
+                "cell": {
+                  "type": "text",
+                  "value": "alpha"
+                }
+              },
+              {
+                "id": 2,
+                "parent": 0,
+                "key": "1",
+                "key_omitted": false,
+                "cell": {
+                  "type": "text",
+                  "value": "beta"
+                }
+              }
+            ],
+            "truncated": false
+          },
+          {
+            "index": "3",
+            "key": {
+              "type": "text",
+              "value": "hash"
+            },
+            "expires_at_ms": null,
+            "nodes": [
+              {
+                "id": 0,
+                "parent": null,
+                "key": null,
+                "key_omitted": false,
+                "cell": {
+                  "type": "hash",
+                  "count": 2
+                }
+              },
+              {
+                "id": 1,
+                "parent": 0,
+                "key": "a",
+                "key_omitted": false,
+                "cell": {
+                  "type": "text",
+                  "value": ""
+                }
+              },
+              {
+                "id": 2,
+                "parent": 0,
+                "key": "b",
+                "key_omitted": false,
+                "cell": {
+                  "type": "text",
+                  "value": "<img src=x onerror=alert(1)>"
+                }
+              }
+            ],
+            "truncated": false
+          }
+        ]
+      }
+    },
+    "empty": {
+      "contract_version": 2,
+      "type": "redis-rdb",
+      "reader": "redis-rdb",
+      "kind": "tree",
+      "media_type": "application/json",
+      "choices": {
+        "groups": [
+          {
+            "id": "g-6bc4024451ce861aada87e48",
+            "label": "Redis DB 0",
+            "database": 0,
+            "record_count": 0,
+            "counts": {}
+          }
+        ]
+      },
+      "selected": {},
+      "metadata": {
+        "engine": "redis-rdb",
+        "format": "rdb",
+        "container": "Redis RDB",
+        "input_mode": "whole",
+        "source_bytes": 18,
+        "format_version": 11,
+        "ordering": "rdb-file-order",
+        "total_records": 0,
+        "groups_count": 1,
+        "records_returned": 0,
+        "nodes_returned": 0,
+        "omitted_values": 0,
+        "unsupported_values": 0,
+        "checksum": "verified",
+        "limits": {
+          "max_groups": 32,
+          "max_records": 100000,
+          "max_rows": 50,
+          "max_offset": 100000,
+          "max_depth": 8,
+          "max_record_nodes": 128,
+          "max_page_nodes": 4096,
+          "max_scan_nodes": 100000,
+          "max_text_bytes": 512,
+          "max_document_bytes": 1048576,
+          "max_decompressed_block_bytes": 1048576,
+          "max_decompressed_bytes": 33554432
+        }
+      },
+      "warnings": [
+        "整文件受限只读预览（最多 16 MiB），不是数据库连接或恢复接口。仅显示手动选择的一页；整数、Decimal128 和毫秒时间保留精确表示，二进制仅显示长度。过长或不安全文本明确省略，不执行代码、正则、脚本或数据库命令。Redis 过期键保留文件中的原始过期时刻，不按当前时间过滤。"
+      ],
+      "sampled": false,
+      "tree": [
+        {
+          "path": "/g-6bc4024451ce861aada87e48",
+          "node_type": "group",
+          "attributes": {
+            "label": "Redis DB 0",
+            "records": 0
+          }
+        }
+      ]
+    },
+    "emptyPage": {
+      "contract_version": 2,
+      "type": "redis-rdb",
+      "reader": "redis-rdb",
+      "kind": "table",
+      "media_type": "application/json",
+      "choices": {
+        "groups": [
+          {
+            "id": "g-6bc4024451ce861aada87e48",
+            "label": "Redis DB 0",
+            "database": 0,
+            "record_count": 0,
+            "counts": {}
+          }
+        ]
+      },
+      "selected": {
+        "group_id": "g-6bc4024451ce861aada87e48",
+        "offset": 0,
+        "limit": 2
+      },
+      "metadata": {
+        "engine": "redis-rdb",
+        "format": "rdb",
+        "container": "Redis RDB",
+        "input_mode": "whole",
+        "source_bytes": 18,
+        "format_version": 11,
+        "ordering": "rdb-file-order",
+        "total_records": 0,
+        "groups_count": 1,
+        "records_returned": 0,
+        "nodes_returned": 0,
+        "omitted_values": 0,
+        "unsupported_values": 0,
+        "checksum": "verified",
+        "limits": {
+          "max_groups": 32,
+          "max_records": 100000,
+          "max_rows": 50,
+          "max_offset": 100000,
+          "max_depth": 8,
+          "max_record_nodes": 128,
+          "max_page_nodes": 4096,
+          "max_scan_nodes": 100000,
+          "max_text_bytes": 512,
+          "max_document_bytes": 1048576,
+          "max_decompressed_block_bytes": 1048576,
+          "max_decompressed_bytes": 33554432
+        }
+      },
+      "warnings": [
+        "整文件受限只读预览（最多 16 MiB），不是数据库连接或恢复接口。仅显示手动选择的一页；整数、Decimal128 和毫秒时间保留精确表示，二进制仅显示长度。过长或不安全文本明确省略，不执行代码、正则、脚本或数据库命令。Redis 过期键保留文件中的原始过期时刻，不按当前时间过滤。"
+      ],
+      "sampled": false,
+      "table": {
+        "group_id": "g-6bc4024451ce861aada87e48",
+        "offset": 0,
+        "limit": 2,
+        "has_more": false,
+        "records": []
+      }
+    }
+  }
+}

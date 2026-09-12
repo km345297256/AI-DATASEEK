@@ -16,7 +16,7 @@
         <p class="mt-2 text-xs leading-5 text-[var(--text-tertiary)]">{{ plugin.description }}</p>
         <div class="mt-3 flex flex-wrap gap-1 text-[11px] text-[var(--text-secondary)]"><span class="rounded border border-[var(--border-main)] px-1.5 py-0.5">{{ viewKindLabel(plugin.view_kind) }}</span><span v-for="extension in plugin.extensions" :key="extension" class="rounded border border-[var(--border-main)] px-1.5 py-0.5">.{{ extension }}</span><span v-for="filename in plugin.filenames" :key="filename" class="rounded border border-[var(--border-main)] px-1.5 py-0.5">{{ filename }}</span></div>
         <p class="mt-2 text-[11px] text-[var(--text-tertiary)]">{{ plugin.capabilities.operations.map(operationLabel).join(' · ') }}</p>
-        <p class="mt-2 text-[11px] text-[var(--text-tertiary)]">读取上限 {{ byteLabel(plugin.limits.max_input_bytes) }}{{ plugin.capabilities.input_mode === 'prefix' ? '（前缀抽样）' : plugin.capabilities.input_mode === 'page' ? '（每页；不限制原文件总大小）' : '' }} · {{ plugin.adapter }}</p>
+        <p class="mt-2 text-[11px] text-[var(--text-tertiary)]">读取上限 {{ byteLabel(plugin.limits.max_input_bytes) }}{{ plugin.capabilities.input_mode === 'window' ? '（本次选区/时间窗累计；源文件大小另有限制）' : plugin.capabilities.input_mode === 'prefix' ? '（前缀抽样）' : plugin.capabilities.input_mode === 'page' ? '（每页；不限制原文件总大小）' : '' }} · {{ plugin.adapter }}</p>
         <p v-if="plugin.capabilities.operations.includes('job')" class="mt-2 text-xs text-[var(--text-tertiary)]">启用后不会自动分析；进入预览并明确启动才会运行，可取消。</p>
       </article>
     </div>

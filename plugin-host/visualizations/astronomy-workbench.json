@@ -1,0 +1,36 @@
+{
+  "contract_version": 2,
+  "id": "viz-astronomy-workbench",
+  "version": "1.0.0",
+  "name": "FITS / TIFF 科学图像工作台",
+  "description": "HDU、立方体、图像页、拉伸、像素、区域统计与谱线；32 MiB 有界离线读取。",
+  "extensions": [
+    "fits",
+    "fits.gz",
+    "fit",
+    "fts",
+    "fz",
+    "tif",
+    "tiff"
+  ],
+  "filenames": [],
+  "view_kind": "image",
+  "adapter": "astronomy-workbench",
+  "reader": "astronomy-workbench",
+  "capabilities": {
+    "operations": [
+      "preview"
+    ],
+    "input_mode": "whole",
+    "shared": false
+  },
+  "default_enabled": true,
+  "priority": -20,
+  "permissions": [
+    "file:read"
+  ],
+  "limits": {
+    "max_input_bytes": 33554432,
+    "max_output_bytes": 4194304
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "contract_version": 2,
+  "id": "viz-scientific-graph",
+  "version": "1.0.0",
+  "name": "科学关系网络 · Cytoscape",
+  "description": "展示节点与边、分组和邻域关系。支持规范化网络 JSON、受限静态 GraphML/GEXF；最多 1000 节点、3000 边。禁止动态脚本、外部图标和远程数据库请求；普通 JSON 仍使用原结构树默认视图。",
+  "extensions": ["graphml", "gexf", "json"],
+  "filenames": [],
+  "view_kind": "graph",
+  "adapter": "scientific-graph",
+  "reader": "scientific-graph",
+  "default_enabled": true,
+  "priority": 10,
+  "permissions": ["file:read"],
+  "limits": {"max_input_bytes": 4194304, "max_output_bytes": 1048576},
+  "capabilities": {"operations": ["preview"], "input_mode": "whole", "shared": false}
+}

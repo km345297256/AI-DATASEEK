@@ -55,9 +55,26 @@ const gpuReady = (selector = 'canvas') => async (page) => { await canvasReady(se
 const frameGpuReady = async (page) => { await page.frameLocator('iframe').locator('canvas').first().waitFor({ timeout: 45000 }); await page.frames()[1].waitForFunction(() => window.__webglDraws > 0); await page.waitForTimeout(750); };
 const cesiumReady = async (page) => { await page.getByText('本地图层已加载', { exact: false }).waitFor({ timeout: 20000 }); await frameGpuReady(page); };
 const readyText = (text) => async (page) => { await page.getByText(text, { exact: false }).waitFor({ timeout: 45000 }); await page.waitForTimeout(500); };
+const geotiffReady = async (page) => {
+  // Match the completed fixture status, never the band selector or transient
+  // “正在读取波段 1…” message. ImageStatic may paint after decoding is complete.
+  await page.getByText('波段 1 / 1 · EPSG:4326 · 32×32 最近邻有界预览 · 色标为预览范围，非全量统计', { exact: true }).waitFor({ timeout: 45000 });
+  await page.locator('.surface[aria-busy="false"] canvas').waitFor();
+  await page.waitForFunction(() => {
+    const canvas = document.querySelector('.surface[aria-busy="false"] canvas');
+    if (!canvas?.width || !canvas?.height) return false;
+    const context = canvas.getContext('2d'); if (!context) return false;
+    const pixels = context.getImageData(0, 0, canvas.width, canvas.height).data;
+    let rasterPixels = 0;
+    for (let i = 0; i < pixels.length; i += 4) {
+      if (pixels[i + 3] && pixels[i + 1] <= 190 && pixels[i] + pixels[i + 2] >= 240 && pixels[i] + pixels[i + 2] <= 270 && ++rasterPixels > 100) return true;
+    }
+    return false;
+  }, undefined, { timeout: 20000 });
+};
 export const domainCases = [
   { name: 'openlayers-geojson', component: 'domains/OpenLayersPreview.vue', filename: 'sample.geojson', reader: 'binary', bytes: geo, ready: readyText('2 个要素') },
-  { name: 'openlayers-geotiff', component: 'domains/OpenLayersPreview.vue', filename: 'sample.tif', reader: 'binary', bytes: tiffBytes(), ready: readyText('波段 1') },
+  { name: 'openlayers-geotiff', component: 'domains/OpenLayersPreview.vue', filename: 'sample.tif', reader: 'binary', bytes: tiffBytes(), ready: geotiffReady },
   { name: 'maplibre-deck', component: 'domains/DeckMapPreview.vue', filename: 'sample.geojson', reader: 'binary', bytes: geo, ready: async (page) => { await gpuReady()(page); await frameGpuReady(page); }, verify: async (page) => { assert.equal(await page.locator('canvas').count(), 1); const childCanvas = page.frameLocator('iframe').locator('canvas'); assert.ok(await childCanvas.count() > 0); const before = await page.evaluate(() => window.__webglDraws); const box = await childCanvas.boundingBox(); await page.mouse.move(box.x+box.width/2, box.y+box.height/2); await page.mouse.down(); await page.mouse.move(box.x+box.width/2+80, box.y+box.height/2+20, { steps: 5 }); await page.mouse.up(); await page.waitForFunction(before => window.__webglDraws > before, before); return { parentOverlayTracksChildCamera: true }; } },
   { name: 'cesium-geojson', component: 'domains/CesiumPreview.vue', filename: 'sample.geojson', reader: 'binary', bytes: geo, ready: cesiumReady },
   { name: 'cesium-czml', component: 'domains/CesiumPreview.vue', filename: 'sample.czml', reader: 'binary', bytes: encode(JSON.stringify([{ id: 'document', version: '1.0' }, { id: 'track', position: { epoch: '2026-01-01T00:00:00Z', cartographicDegrees: [0, 10, 20, 1000, 60, 15, 25, 1000, 120, 20, 20, 1000] } }])), ready: cesiumReady },

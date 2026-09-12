@@ -1,0 +1,32 @@
+{
+  "contract_version": 2,
+  "id": "viz-seismic-window",
+  "version": "1.0.0",
+  "name": "MiniSEED / SAC 地震波形",
+  "description": "受限 MiniSEED v2 与二进制均匀采样 SAC，先记录目录再样本窗。显示原值与时间声明，不跨记录拼接、滤波或仪器校正。",
+  "extensions": [
+    "mseed",
+    "miniseed",
+    "sac"
+  ],
+  "filenames": [],
+  "view_kind": "series",
+  "adapter": "seismic-window",
+  "reader": "seismic-window",
+  "default_enabled": true,
+  "priority": 30,
+  "permissions": [
+    "file:read"
+  ],
+  "limits": {
+    "max_input_bytes": 8388608,
+    "max_output_bytes": 2097152
+  },
+  "capabilities": {
+    "operations": [
+      "preview"
+    ],
+    "input_mode": "window",
+    "shared": false
+  }
+}

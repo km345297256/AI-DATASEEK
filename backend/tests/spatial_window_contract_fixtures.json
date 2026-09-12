@@ -1,0 +1,551 @@
+{
+  "dense": {
+    "tree": {
+      "contract_version": 2,
+      "type": "spatial-window",
+      "reader": "spatial-window",
+      "kind": "tree",
+      "media_type": "application/json",
+      "choices": {
+        "observation_count": 4,
+        "feature_count": 3,
+        "feature_labels": "zero-based ordinal"
+      },
+      "selected": {},
+      "warnings": [
+        "只显示 X 存储原值和 obsm/spatial 中同序号坐标；上游是否归一化未知，不做配准、单位换算或图像叠加。",
+        "观测与特征仅显示从 0 开始的序号，不读取 obs/var 身份或名称；窗口不是随机抽样，也不代表全文件校验。"
+      ],
+      "sampled": false,
+      "tree": [
+        {
+          "path": "/spatial",
+          "node_type": "array",
+          "shape": [
+            4,
+            2
+          ]
+        },
+        {
+          "path": "/X",
+          "node_type": "array",
+          "shape": [
+            4,
+            3
+          ]
+        }
+      ],
+      "metadata": {
+        "format": "h5ad",
+        "h5ad_encoding": "0.1.0",
+        "input_mode": "window",
+        "source_bytes": 33696,
+        "read_bytes": 33696,
+        "read_requests": 3,
+        "matrix": {
+          "storage": "dense",
+          "shape": [
+            4,
+            3
+          ],
+          "dtype": "<f4",
+          "nnz": null,
+          "index_dtype": null,
+          "pointer_dtype": null
+        },
+        "coordinates": {
+          "path": "/obsm/spatial",
+          "shape": [
+            4,
+            2
+          ],
+          "dtype": "<f8",
+          "unit": null,
+          "axis_order": "stored columns 0,1; no inversion"
+        },
+        "labels": "ordinal only; obs and var labels not read",
+        "value_semantics": "X storage values; upstream processing unknown; no normalization, registration or unit conversion",
+        "sparse_semantics": "absent entries are zero; sorted unique indices required in inspected segments",
+        "scope": "selected numeric windows; no whole-file validation",
+        "read_strategy": "selected dense feature column and observation rows; HDF5 chunks may include other values",
+        "attribute_buffer_bytes": 2304,
+        "chunks_touched": 0,
+        "decoded_chunk_bytes": 0,
+        "numeric_values_read": 0,
+        "numeric_bytes_read": 0,
+        "sparse_entries_scanned": 0,
+        "null_coordinates": 0,
+        "null_expressions": 0,
+        "plottable_points": 0,
+        "limits": {
+          "max_observations": 8192,
+          "max_scalars": 24576,
+          "max_sparse_entries": 65536,
+          "max_chunk_bytes": 4194304,
+          "max_decoded_chunk_bytes": 16777216,
+          "max_numeric_bytes": 4194304,
+          "max_attribute_buffer_bytes": 4096
+        }
+      }
+    },
+    "geometry": {
+      "contract_version": 2,
+      "type": "spatial-window",
+      "reader": "spatial-window",
+      "kind": "geometry",
+      "media_type": "application/json",
+      "choices": {
+        "observation_count": 4,
+        "feature_count": 3,
+        "feature_labels": "zero-based ordinal"
+      },
+      "selected": {
+        "feature": 1,
+        "observation_start": 1,
+        "observation_count": 2,
+        "decode": "raw"
+      },
+      "warnings": [
+        "只显示 X 存储原值和 obsm/spatial 中同序号坐标；上游是否归一化未知，不做配准、单位换算或图像叠加。",
+        "观测与特征仅显示从 0 开始的序号，不读取 obs/var 身份或名称；窗口不是随机抽样，也不代表全文件校验。"
+      ],
+      "sampled": true,
+      "spatial": {
+        "observations": [
+          1,
+          2
+        ],
+        "x": [
+          2,
+          3
+        ],
+        "y": [
+          20,
+          30
+        ],
+        "values": [
+          0,
+          5
+        ]
+      },
+      "metadata": {
+        "format": "h5ad",
+        "h5ad_encoding": "0.1.0",
+        "input_mode": "window",
+        "source_bytes": 33696,
+        "read_bytes": 33696,
+        "read_requests": 3,
+        "matrix": {
+          "storage": "dense",
+          "shape": [
+            4,
+            3
+          ],
+          "dtype": "<f4",
+          "nnz": null,
+          "index_dtype": null,
+          "pointer_dtype": null
+        },
+        "coordinates": {
+          "path": "/obsm/spatial",
+          "shape": [
+            4,
+            2
+          ],
+          "dtype": "<f8",
+          "unit": null,
+          "axis_order": "stored columns 0,1; no inversion"
+        },
+        "labels": "ordinal only; obs and var labels not read",
+        "value_semantics": "X storage values; upstream processing unknown; no normalization, registration or unit conversion",
+        "sparse_semantics": "absent entries are zero; sorted unique indices required in inspected segments",
+        "scope": "selected numeric windows; no whole-file validation",
+        "read_strategy": "selected dense feature column and observation rows; HDF5 chunks may include other values",
+        "attribute_buffer_bytes": 2304,
+        "chunks_touched": 2,
+        "decoded_chunk_bytes": 112,
+        "numeric_values_read": 6,
+        "numeric_bytes_read": 40,
+        "sparse_entries_scanned": 0,
+        "null_coordinates": 0,
+        "null_expressions": 0,
+        "plottable_points": 2,
+        "limits": {
+          "max_observations": 8192,
+          "max_scalars": 24576,
+          "max_sparse_entries": 65536,
+          "max_chunk_bytes": 4194304,
+          "max_decoded_chunk_bytes": 16777216,
+          "max_numeric_bytes": 4194304,
+          "max_attribute_buffer_bytes": 4096
+        }
+      }
+    }
+  },
+  "csr": {
+    "tree": {
+      "contract_version": 2,
+      "type": "spatial-window",
+      "reader": "spatial-window",
+      "kind": "tree",
+      "media_type": "application/json",
+      "choices": {
+        "observation_count": 4,
+        "feature_count": 3,
+        "feature_labels": "zero-based ordinal"
+      },
+      "selected": {},
+      "warnings": [
+        "只显示 X 存储原值和 obsm/spatial 中同序号坐标；上游是否归一化未知，不做配准、单位换算或图像叠加。",
+        "观测与特征仅显示从 0 开始的序号，不读取 obs/var 身份或名称；窗口不是随机抽样，也不代表全文件校验。"
+      ],
+      "sampled": false,
+      "tree": [
+        {
+          "path": "/spatial",
+          "node_type": "array",
+          "shape": [
+            4,
+            2
+          ]
+        },
+        {
+          "path": "/X",
+          "node_type": "array",
+          "shape": [
+            4,
+            3
+          ]
+        }
+      ],
+      "metadata": {
+        "format": "h5ad",
+        "h5ad_encoding": "0.1.0",
+        "input_mode": "window",
+        "source_bytes": 39104,
+        "read_bytes": 39104,
+        "read_requests": 3,
+        "matrix": {
+          "storage": "csr",
+          "shape": [
+            4,
+            3
+          ],
+          "dtype": "<f4",
+          "nnz": 6,
+          "index_dtype": "<i4",
+          "pointer_dtype": "<i4"
+        },
+        "coordinates": {
+          "path": "/obsm/spatial",
+          "shape": [
+            4,
+            2
+          ],
+          "dtype": "<f8",
+          "unit": null,
+          "axis_order": "stored columns 0,1; no inversion"
+        },
+        "labels": "ordinal only; obs and var labels not read",
+        "value_semantics": "X storage values; upstream processing unknown; no normalization, registration or unit conversion",
+        "sparse_semantics": "absent entries are zero; sorted unique indices required in inspected segments",
+        "scope": "selected numeric windows; no whole-file validation",
+        "read_strategy": "all sparse entries in selected observation rows, then select one feature",
+        "attribute_buffer_bytes": 2320,
+        "chunks_touched": 0,
+        "decoded_chunk_bytes": 0,
+        "numeric_values_read": 0,
+        "numeric_bytes_read": 0,
+        "sparse_entries_scanned": 0,
+        "null_coordinates": 0,
+        "null_expressions": 0,
+        "plottable_points": 0,
+        "limits": {
+          "max_observations": 8192,
+          "max_scalars": 24576,
+          "max_sparse_entries": 65536,
+          "max_chunk_bytes": 4194304,
+          "max_decoded_chunk_bytes": 16777216,
+          "max_numeric_bytes": 4194304,
+          "max_attribute_buffer_bytes": 4096
+        }
+      }
+    },
+    "geometry": {
+      "contract_version": 2,
+      "type": "spatial-window",
+      "reader": "spatial-window",
+      "kind": "geometry",
+      "media_type": "application/json",
+      "choices": {
+        "observation_count": 4,
+        "feature_count": 3,
+        "feature_labels": "zero-based ordinal"
+      },
+      "selected": {
+        "feature": 1,
+        "observation_start": 1,
+        "observation_count": 2,
+        "decode": "raw"
+      },
+      "warnings": [
+        "只显示 X 存储原值和 obsm/spatial 中同序号坐标；上游是否归一化未知，不做配准、单位换算或图像叠加。",
+        "观测与特征仅显示从 0 开始的序号，不读取 obs/var 身份或名称；窗口不是随机抽样，也不代表全文件校验。"
+      ],
+      "sampled": true,
+      "spatial": {
+        "observations": [
+          1,
+          2
+        ],
+        "x": [
+          2,
+          3
+        ],
+        "y": [
+          20,
+          30
+        ],
+        "values": [
+          0,
+          5
+        ]
+      },
+      "metadata": {
+        "format": "h5ad",
+        "h5ad_encoding": "0.1.0",
+        "input_mode": "window",
+        "source_bytes": 39104,
+        "read_bytes": 39104,
+        "read_requests": 3,
+        "matrix": {
+          "storage": "csr",
+          "shape": [
+            4,
+            3
+          ],
+          "dtype": "<f4",
+          "nnz": 6,
+          "index_dtype": "<i4",
+          "pointer_dtype": "<i4"
+        },
+        "coordinates": {
+          "path": "/obsm/spatial",
+          "shape": [
+            4,
+            2
+          ],
+          "dtype": "<f8",
+          "unit": null,
+          "axis_order": "stored columns 0,1; no inversion"
+        },
+        "labels": "ordinal only; obs and var labels not read",
+        "value_semantics": "X storage values; upstream processing unknown; no normalization, registration or unit conversion",
+        "sparse_semantics": "absent entries are zero; sorted unique indices required in inspected segments",
+        "scope": "selected numeric windows; no whole-file validation",
+        "read_strategy": "all sparse entries in selected observation rows, then select one feature",
+        "attribute_buffer_bytes": 2320,
+        "chunks_touched": 6,
+        "decoded_chunk_bytes": 172,
+        "numeric_values_read": 17,
+        "numeric_bytes_read": 84,
+        "sparse_entries_scanned": 4,
+        "null_coordinates": 0,
+        "null_expressions": 0,
+        "plottable_points": 2,
+        "limits": {
+          "max_observations": 8192,
+          "max_scalars": 24576,
+          "max_sparse_entries": 65536,
+          "max_chunk_bytes": 4194304,
+          "max_decoded_chunk_bytes": 16777216,
+          "max_numeric_bytes": 4194304,
+          "max_attribute_buffer_bytes": 4096
+        }
+      }
+    }
+  },
+  "csc": {
+    "tree": {
+      "contract_version": 2,
+      "type": "spatial-window",
+      "reader": "spatial-window",
+      "kind": "tree",
+      "media_type": "application/json",
+      "choices": {
+        "observation_count": 4,
+        "feature_count": 3,
+        "feature_labels": "zero-based ordinal"
+      },
+      "selected": {},
+      "warnings": [
+        "只显示 X 存储原值和 obsm/spatial 中同序号坐标；上游是否归一化未知，不做配准、单位换算或图像叠加。",
+        "观测与特征仅显示从 0 开始的序号，不读取 obs/var 身份或名称；窗口不是随机抽样，也不代表全文件校验。"
+      ],
+      "sampled": false,
+      "tree": [
+        {
+          "path": "/spatial",
+          "node_type": "array",
+          "shape": [
+            4,
+            2
+          ]
+        },
+        {
+          "path": "/X",
+          "node_type": "array",
+          "shape": [
+            4,
+            3
+          ]
+        }
+      ],
+      "metadata": {
+        "format": "h5ad",
+        "h5ad_encoding": "0.1.0",
+        "input_mode": "window",
+        "source_bytes": 39104,
+        "read_bytes": 39104,
+        "read_requests": 3,
+        "matrix": {
+          "storage": "csc",
+          "shape": [
+            4,
+            3
+          ],
+          "dtype": "<f4",
+          "nnz": 6,
+          "index_dtype": "<i4",
+          "pointer_dtype": "<i4"
+        },
+        "coordinates": {
+          "path": "/obsm/spatial",
+          "shape": [
+            4,
+            2
+          ],
+          "dtype": "<f8",
+          "unit": null,
+          "axis_order": "stored columns 0,1; no inversion"
+        },
+        "labels": "ordinal only; obs and var labels not read",
+        "value_semantics": "X storage values; upstream processing unknown; no normalization, registration or unit conversion",
+        "sparse_semantics": "absent entries are zero; sorted unique indices required in inspected segments",
+        "scope": "selected numeric windows; no whole-file validation",
+        "read_strategy": "all sparse entries in selected feature column, then select observation rows",
+        "attribute_buffer_bytes": 2320,
+        "chunks_touched": 0,
+        "decoded_chunk_bytes": 0,
+        "numeric_values_read": 0,
+        "numeric_bytes_read": 0,
+        "sparse_entries_scanned": 0,
+        "null_coordinates": 0,
+        "null_expressions": 0,
+        "plottable_points": 0,
+        "limits": {
+          "max_observations": 8192,
+          "max_scalars": 24576,
+          "max_sparse_entries": 65536,
+          "max_chunk_bytes": 4194304,
+          "max_decoded_chunk_bytes": 16777216,
+          "max_numeric_bytes": 4194304,
+          "max_attribute_buffer_bytes": 4096
+        }
+      }
+    },
+    "geometry": {
+      "contract_version": 2,
+      "type": "spatial-window",
+      "reader": "spatial-window",
+      "kind": "geometry",
+      "media_type": "application/json",
+      "choices": {
+        "observation_count": 4,
+        "feature_count": 3,
+        "feature_labels": "zero-based ordinal"
+      },
+      "selected": {
+        "feature": 1,
+        "observation_start": 1,
+        "observation_count": 2,
+        "decode": "raw"
+      },
+      "warnings": [
+        "只显示 X 存储原值和 obsm/spatial 中同序号坐标；上游是否归一化未知，不做配准、单位换算或图像叠加。",
+        "观测与特征仅显示从 0 开始的序号，不读取 obs/var 身份或名称；窗口不是随机抽样，也不代表全文件校验。"
+      ],
+      "sampled": true,
+      "spatial": {
+        "observations": [
+          1,
+          2
+        ],
+        "x": [
+          2,
+          3
+        ],
+        "y": [
+          20,
+          30
+        ],
+        "values": [
+          0,
+          5
+        ]
+      },
+      "metadata": {
+        "format": "h5ad",
+        "h5ad_encoding": "0.1.0",
+        "input_mode": "window",
+        "source_bytes": 39104,
+        "read_bytes": 39104,
+        "read_requests": 3,
+        "matrix": {
+          "storage": "csc",
+          "shape": [
+            4,
+            3
+          ],
+          "dtype": "<f4",
+          "nnz": 6,
+          "index_dtype": "<i4",
+          "pointer_dtype": "<i4"
+        },
+        "coordinates": {
+          "path": "/obsm/spatial",
+          "shape": [
+            4,
+            2
+          ],
+          "dtype": "<f8",
+          "unit": null,
+          "axis_order": "stored columns 0,1; no inversion"
+        },
+        "labels": "ordinal only; obs and var labels not read",
+        "value_semantics": "X storage values; upstream processing unknown; no normalization, registration or unit conversion",
+        "sparse_semantics": "absent entries are zero; sorted unique indices required in inspected segments",
+        "scope": "selected numeric windows; no whole-file validation",
+        "read_strategy": "all sparse entries in selected feature column, then select observation rows",
+        "attribute_buffer_bytes": 2320,
+        "chunks_touched": 6,
+        "decoded_chunk_bytes": 160,
+        "numeric_values_read": 12,
+        "numeric_bytes_read": 64,
+        "sparse_entries_scanned": 2,
+        "null_coordinates": 0,
+        "null_expressions": 0,
+        "plottable_points": 2,
+        "limits": {
+          "max_observations": 8192,
+          "max_scalars": 24576,
+          "max_sparse_entries": 65536,
+          "max_chunk_bytes": 4194304,
+          "max_decoded_chunk_bytes": 16777216,
+          "max_numeric_bytes": 4194304,
+          "max_attribute_buffer_bytes": 4096
+        }
+      }
+    }
+  }
+}

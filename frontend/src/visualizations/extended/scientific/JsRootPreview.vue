@@ -38,5 +38,5 @@ async function loadObject() {
   } catch (reason) { if (load.isCurrent()) error.value = reason instanceof Error ? reason.message : 'ROOT 预览失败。'; }
   finally { if (load.isCurrent()) loading.value = false; }
 }
-watch(() => [props.file.file_id, props.plugin.id], () => { objects.value = []; objectPath.value = ''; void loadObject(); }, { immediate: true });
+watch([() => props.file.file_id, () => props.plugin.id], () => { objects.value = []; objectPath.value = ''; void loadObject(); }, { immediate: true });
 </script>

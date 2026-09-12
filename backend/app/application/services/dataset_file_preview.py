@@ -132,13 +132,25 @@ class DatasetFilePreviewService:
             raise ValueError("此可视化插件不支持当前文件格式。")
         anchor = selected.path
         paths = [anchor]
-        if plugin.adapter == "shapefile":
+        if plugin.adapter == "shapefile" and PurePosixPath(selected.path).suffix.lower() in _SIDECARS:
             selected_path = strict_relative_path(anchor)
             # Same full logical path stem, never basename-only across folders.
             stem = str(selected_path.with_suffix(""))
-            paths.extend(item.path for item in dataset.files
-                         if item.path != anchor and PurePosixPath(item.path).suffix.lower() in _SIDECARS
-                         and str(PurePosixPath(item.path).with_suffix("")) == stem)
+            components = [item.path for item in dataset.files
+                          if PurePosixPath(item.path).suffix.lower() in _SIDECARS
+                          and str(PurePosixPath(item.path).with_suffix("")) == stem]
+            by_extension: dict[str, list[str]] = {}
+            for path in components:
+                by_extension.setdefault(PurePosixPath(path).suffix.lower(), []).append(path)
+            if any(len(matches) != 1 for matches in by_extension.values()):
+                raise ValueError("Shapefile 配套文件存在重复扩展名，无法确定唯一分组。")
+            if ".shp" not in by_extension:
+                raise ValueError("Shapefile 缺少同组的 .shp 主文件。")
+            # Selection controls presentation; the shared geometry file controls
+            # resource authorization. Every entry point gets the same identity.
+            # Archive entries remain standalone and use archive preparation.
+            anchor = by_extension[".shp"][0]
+            paths.extend(path for path in components if path != selected.path)
         if len(paths) > 5:
             raise ValueError("Shapefile 配套文件声明不明确。")
         infos, references = [], []

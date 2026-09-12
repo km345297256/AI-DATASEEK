@@ -9,6 +9,8 @@ import { coordinateEdges, finiteExtent, seriesSegments } from '../src/visualizat
 import { readBoundedBinary, validateTiffDimensions } from '../src/visualizations/boundedBinary.ts';
 import { usePreviewLoad } from '../src/composables/usePreviewLoad.ts';
 import { VISUALIZATION_ADAPTERS } from '../src/visualizations/adapters.generated.ts';
+import * as contentProfile from '../src/visualizations/contentProfile.ts';
+import * as previewIdentity from '../src/visualizations/previewIdentity.ts';
 
 const descriptor = (overrides = {}) => { const spec = VISUALIZATION_ADAPTERS[overrides.adapter || 'tiff'] || VISUALIZATION_ADAPTERS.tiff; return ({ contract_version: 2, id: 'tiff', version: '1.0.0', name: 'TIFF', description: 'image', extensions: ['tif', 'tiff'], filenames: [], view_kind: spec.view_kind, adapter: 'tiff', reader: spec.readers[0], capabilities: spec.capabilities, default_enabled: true, enabled: true, priority: 20, permissions: ['file:read'], limits: { max_input_bytes: 64 * 1024 * 1024, max_output_bytes: 512 * 1024 }, ...overrides }); };
 const catalogOf = (...plugins) => ({ engine: 'cordis', revision: 'rev1', plugins });
@@ -50,10 +52,45 @@ test('every checked-in Cordis manifest is accepted by the frontend contract with
     const plugin = JSON.parse(readFileSync(new URL(name, directory), 'utf8'));
     return { ...plugin, enabled: plugin.default_enabled };
   });
-  assert.equal(plugins.length, 36);
-  assert.equal(plugins.filter(plugin => plugin.contract_version === 2).length, 36);
+  assert.equal(plugins.length, 81);
+  assert.equal(plugins.filter(plugin => plugin.contract_version === 2).length, 81);
   assert.ok(plugins.every(plugin => !Object.hasOwn(plugin, 'data_kind') && !plugin.adapter.startsWith('v2-')));
   assert.deepEqual(parseVisualizationCatalog(catalogOf(...plugins)).plugins, plugins);
+});
+
+test('database plugins match independently without taking over SQLite or the Shapefile default', () => {
+  const directory = new URL('../../plugin-host/visualizations/', import.meta.url);
+  const plugins = readdirSync(directory).filter(name => name.endsWith('.json')).map(name => {
+    const plugin = JSON.parse(readFileSync(new URL(name, directory), 'utf8'));
+    return { ...plugin, enabled: plugin.default_enabled };
+  });
+  for (const [filename, id] of [['sample.DUCKDB', 'viz-duckdb-table'], ['sample.ddb', 'viz-duckdb-table'],
+    ['sample.mdb', 'viz-access-table'], ['sample.ACCDB', 'viz-access-table'], ['sample.sqlite', 'viz-sqlite-table'], ['sample.db', 'viz-sqlite-table']]) {
+    assert.equal(selectVisualization(plugins, filename, null)?.id, id);
+  }
+  assert.equal(selectVisualization(plugins, 'sample.dbf', null)?.id, 'shapefile');
+  assert.equal(selectVisualization(plugins, 'sample.dbf', 'viz-dbf-table')?.id, 'viz-dbf-table');
+  const stopped = plugins.map(plugin => ({ ...plugin, enabled: plugin.enabled && plugin.id !== 'viz-duckdb-table' }));
+  assert.equal(selectVisualization(stopped, 'sample.duckdb', null), null);
+  assert.equal(selectVisualization(stopped, 'sample.mdb', null)?.id, 'viz-access-table');
+  assert.equal(selectVisualization(stopped, 'sample.dbf', 'viz-dbf-table')?.id, 'viz-dbf-table');
+});
+
+test('dump and record plugins preserve ordinary SQL and archive defaults', () => {
+  const directory = new URL('../../plugin-host/visualizations/', import.meta.url);
+  const plugins = readdirSync(directory).filter(name => name.endsWith('.json')).map(name => {
+    const plugin = JSON.parse(readFileSync(new URL(name, directory), 'utf8'));
+    return { ...plugin, enabled: plugin.default_enabled };
+  });
+  assert.equal(selectVisualization(plugins, 'source.sql', null)?.id, 'text');
+  assert.equal(selectVisualization(plugins, 'source.sql', 'viz-sql-dump')?.id, 'viz-sql-dump');
+  assert.equal(selectVisualization(plugins, 'archive.tar', null)?.id, 'viz-archive-directory');
+  assert.equal(selectVisualization(plugins, 'archive.tar', 'viz-postgres-dump')?.id, 'viz-postgres-dump');
+  for (const [ext,id] of [['dump','viz-postgres-dump'],['bson','viz-bson'],['rdb','viz-redis-rdb']]) {
+    assert.equal(selectVisualization(plugins, 'sample.'+ext, null)?.id, id);
+    const stopped = plugins.map(p => ({...p,enabled:p.enabled&&p.id!==id}));
+    assert.equal(selectVisualization(stopped, 'sample.'+ext, id), null);
+  }
 });
 
 for (const [label, change] of [
@@ -178,6 +215,7 @@ test('plugin host actually unmounts old adapters on view switch, disable, file s
   t.after(() => { if (oldWindow === undefined) delete globalThis.window; else globalThis.window = oldWindow; });
   const catalog = vue.ref(catalogOf(ncMap(), ncSeries()));
   const error = vue.ref('');
+  let confirmRefresh = async () => true;
   const instances = [];
   const Adapter = vue.defineComponent({ props: ['file', 'plugin'], setup(props) {
     const item = { file: props.file.file_id, plugin: props.plugin.id, disposed: false };
@@ -185,9 +223,12 @@ test('plugin host actually unmounts old adapters on view switch, disable, file s
   } });
   const Host = compileSfc('../src/visualizations/VisualizationHost.vue', {
     'vue-router': { useRoute: () => ({ path: '/chat/1' }), RouterLink: { render: () => vue.h('a') } },
-    './catalog': { useVisualizationCatalog: () => ({ catalog, error, loading: vue.ref(false), refresh: async () => {} }) },
+    './catalog': { useVisualizationCatalog: () => ({ catalog, error, loading: vue.ref(false), refresh: () => confirmRefresh() }) },
     './contract': { matchingVisualizations, selectVisualization, viewKindLabel: (value) => value },
     './adapters': { getVisualizationAdapter: () => Adapter },
+    './runtime': { requestVisualization: async () => { throw new Error('Unexpected profile request'); } },
+    './contentProfile': contentProfile,
+    './previewIdentity': previewIdentity,
   }, true);
   const renderer = vue.createRenderer({
     createElement: (type) => ({ type, children: [], props: {} }), createText: (text) => ({ text }), createComment: (text) => ({ text }),
@@ -201,10 +242,28 @@ test('plugin host actually unmounts old adapters on view switch, disable, file s
   const container = { children: [] }; const app = renderer.createApp(Root); app.mount(container); t.after(() => app.unmount());
   await flush(); assert.equal(instances[0].plugin, 'netcdf-map');
   function find(node, type) { if (node.type === type) return node; for (const child of node.children ?? []) { const found = find(child, type); if (found) return found; } }
+  catalog.value = structuredClone(vue.toRaw(catalog.value)); await flush();
+  assert.equal(instances.length, 1, 'equivalent polling objects keep the same scope');
+  let active = instances.at(-1);
+  await find(container, 'button').props.onClick(); await flush();
+  assert.equal(active.disposed, true, 'manual refresh explicitly reloads an unchanged file');
+  assert.equal(instances.length, 2);
+  confirmRefresh = async () => false;
+  await find(container, 'button').props.onClick(); await flush();
+  assert.equal(instances.length, 2, 'unconfirmed manual refresh cannot start a new reader');
+  confirmRefresh = async () => { catalog.value.revision = 'rev2'; return true; };
+  await find(container, 'button').props.onClick(); await flush();
+  assert.equal(instances.length, 3, 'revision change during manual confirmation reloads once, not twice');
+  active = instances.at(-1);
+  catalog.value.plugins[0].limits.max_output_bytes /= 2; await flush();
+  assert.equal(active.disposed, true, 'same-version capability/limit changes still replace the reader scope');
+  active = instances.at(-1);
   find(container, 'select').props.onChange({ target: { value: 'netcdf-series' } }); await flush();
-  assert.equal(instances[0].disposed, true); assert.equal(instances.at(-1).plugin, 'netcdf-series');
-  catalog.value.plugins[1].enabled = false; await flush(); assert.equal(instances[1].disposed, true); assert.equal(instances.at(-1).plugin, 'netcdf-map');
-  currentFile.value = file('b'); await flush(); assert.equal(instances[2].disposed, true); assert.equal(instances.at(-1).file, 'b');
+  assert.equal(active.disposed, true); assert.equal(instances.at(-1).plugin, 'netcdf-series');
+  active = instances.at(-1);
+  catalog.value.plugins[1].enabled = false; await flush(); assert.equal(active.disposed, true); assert.equal(instances.at(-1).plugin, 'netcdf-map');
+  active = instances.at(-1);
+  currentFile.value = file('b'); await flush(); assert.equal(active.disposed, true); assert.equal(instances.at(-1).file, 'b');
   catalog.value.plugins[0].enabled = false; await flush(); assert.equal(instances.at(-1).disposed, true);
   catalog.value.plugins[0].enabled = true; await flush();
   error.value = 'runtime unavailable'; catalog.value = null; await flush(); assert.equal(instances.at(-1).disposed, true);
@@ -215,9 +274,85 @@ test('plugin host actually unmounts old adapters on view switch, disable, file s
 function catalogStore(api) {
   const code = ts.transpileModule(source('../src/visualizations/catalog.ts'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
   const module = { exports: {} };
-  new Function('require', 'module', 'exports', code)((id) => id === 'vue' ? vue : api, module, module.exports);
+  const dependencies = { vue, '../api/visualization': api, './previewIdentity': previewIdentity };
+  new Function('require', 'module', 'exports', code)((id) => {
+    assert.ok(id in dependencies, `Unexpected catalog dependency ${id}`);
+    return dependencies[id];
+  }, module, module.exports);
   return module.exports.useVisualizationCatalog();
 }
+
+test('equal catalog confirmations preserve snapshot and descriptor references', async () => {
+  const effective = catalogOf(descriptor(), ncSeries());
+  const store = catalogStore({ getVisualizationCatalog: async () => structuredClone(effective) });
+  assert.equal(await store.refresh(), true);
+  const snapshot = store.catalog.value, first = snapshot.plugins[0];
+  for (let index = 0; index < 5; index++) {
+    // Descriptor object keys and matcher ordering have no semantic significance.
+    effective.plugins[0] = Object.fromEntries(Object.entries(effective.plugins[0]).reverse());
+    effective.plugins[0].extensions.reverse();
+    await store.refresh();
+    assert.equal(store.catalog.value, snapshot);
+    assert.equal(store.catalog.value.plugins[0], first);
+  }
+});
+
+for (const [label, change] of [
+  ['enabled state', p => { p.enabled = false; }],
+  ['version', p => { p.version = '2.0.0'; }],
+  ['input limit', p => { p.limits.max_input_bytes /= 2; }],
+  ['output limit', p => { p.limits.max_output_bytes /= 2; }],
+  ['capability', p => { p.capabilities.shared = !p.capabilities.shared; }],
+  ['matcher', p => { p.extensions.push('cdf'); }],
+  ['priority', p => { p.priority++; }],
+  ['name', p => { p.name = 'Updated'; }],
+]) test(`same revision still publishes changed ${label} without replacing unrelated descriptors`, async () => {
+  const effective = structuredClone(catalogOf(ncMap(), ncSeries()));
+  const store = catalogStore({ getVisualizationCatalog: async () => structuredClone(effective) });
+  await store.refresh();
+  const snapshot = store.catalog.value, unrelated = snapshot.plugins[1];
+  change(effective.plugins[0]);
+  await store.refresh();
+  assert.notEqual(store.catalog.value, snapshot);
+  assert.equal(store.catalog.value.revision, snapshot.revision);
+  assert.notEqual(store.catalog.value.plugins[0], snapshot.plugins[0]);
+  assert.equal(store.catalog.value.plugins[1], unrelated);
+});
+
+test('catalog revision, removal and recovery from failed confirmation remain authoritative', async () => {
+  let effective = catalogOf(ncMap(), ncSeries()), failed = false;
+  const store = catalogStore({ getVisualizationCatalog: async () => {
+    if (failed) throw new Error('offline');
+    return structuredClone(effective);
+  } });
+  await store.refresh(); const first = store.catalog.value;
+  effective.revision = 'rev2'; await store.refresh();
+  assert.notEqual(store.catalog.value, first);
+  assert.equal(store.catalog.value.plugins[0], first.plugins[0]);
+  effective.plugins.pop(); await store.refresh(); assert.equal(store.catalog.value.plugins.length, 1);
+  failed = true; assert.equal(await store.refresh(), false); assert.equal(store.catalog.value, null);
+  failed = false; assert.equal(await store.refresh(), true); assert.equal(store.error.value, '');
+  assert.notEqual(store.catalog.value.plugins[0], first.plugins[0], 'recovery must not reuse an invalidated preview scope');
+});
+
+test('overlapping page, preview and focus polls share one authoritative request', async () => {
+  const response = deferred(); let reads = 0;
+  const store = catalogStore({ getVisualizationCatalog: () => { reads++; return response.promise; } });
+  const first = store.refresh(), second = store.refresh(), third = store.refresh();
+  assert.equal(first, second); assert.equal(first, third); assert.equal(reads, 1);
+  response.resolve(catalogOf(ncMap())); assert.deepEqual(await Promise.all([first, second, third]), [true, true, true]);
+});
+
+test('file identity excludes transport URLs and arbitrary metadata but tracks public content revisions', () => {
+  const original = file('identity');
+  const key = previewIdentity.filePreviewIdentity(original);
+  assert.equal(previewIdentity.filePreviewIdentity({ ...original, file_url: 'https://signed.invalid/renewed',
+    metadata: { arbitrary_path: '/private/never-a-preview-key', updated_status: 'ready' } }), key);
+  assert.notEqual(previewIdentity.filePreviewIdentity({ ...original, metadata: { dataset_file_version: 'v2' } }), key);
+  assert.notEqual(previewIdentity.filePreviewIdentity({ ...original, size: 201 }), key);
+  assert.notEqual(previewIdentity.filePreviewIdentity({ ...original, filename: 'renamed.nc' }), key);
+  assert.doesNotMatch(key, /signed|private/);
+});
 
 test('authoritative plugin state survives a late pre-toggle poll and network failure fails closed', async () => {
   const old = deferred(), stateResponse = deferred(); let readCount = 0;

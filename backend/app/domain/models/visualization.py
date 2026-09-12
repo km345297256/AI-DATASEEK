@@ -68,7 +68,7 @@ class VisualizationPlugin(BaseModel):
             raise ValueError("Visualization name and file matchers are required")
         for items, pattern in (
             (self.extensions, r"[a-z0-9][a-z0-9.-]{0,31}"),
-            (self.filenames, r"[a-z0-9][a-z0-9._-]{0,127}"),
+            (self.filenames, r"(?:[a-z0-9][a-z0-9._-]{0,127}|\.zattrs)"),
         ):
             if len(set(items)) != len(items) or any(not re.fullmatch(pattern, item) for item in items):
                 raise ValueError("Invalid visualization file matcher")

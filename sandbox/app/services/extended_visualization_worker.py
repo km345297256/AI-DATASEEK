@@ -48,29 +48,60 @@ OFFICE_PDF_SETTINGS = {
     "ExportFormFields": False,
 }
 FORMATS = {
+    "database-table": {"duckdb", "ddb", "dbf", "mdb", "accdb"},
+    "sql-dump": {"sql"}, "pg-dump": {"pgdump", "dump", "backup", "tar"},
+    "bson": {"bson"}, "redis-rdb": {"rdb"},
+    "sqlite-table": {"sqlite", "sqlite3", "db"},
+    "gro-trajectory": {"gro"}, "simulation-mesh": {"vtu"},
+    "mass-spectrum": {"mgf", "mzml"}, "diffraction": {"xrdml", "xml"},
+    "scientific-graph": {"json", "graphml", "gexf"},
+    "phylogeny": {"nwk", "newick", "tree", "tre"},
     "tabular": {"csv", "tsv", "npy", "npz", "mat"},
-    "hdf5": {"h5", "hdf5", "nxs", "nx", "nc4", "nc"},
+    "hdf5": {"h5", "hdf5", "nxs", "nx", "nc4", "nc", "mat"},
     "excel": {"xlsx", "xls"},
     "rdkit": {"smi", "smiles", "mol", "sdf"},
     "metpy": {"csv", "tsv"},
     "office": {"docx", "doc", "pptx", "ppt", "odt", "odp"},
     "fastqc": {"fastq", "fq"},
     "root": {"root"}, "jcamp": {"jdx", "dx", "jcamp"},
+    "structure": {"json", "xml", "yaml", "yml"},
+    "archive": {"zip", "tar", "gz", "gzip", "tgz"}, "archive-member": {"zip", "tar"},
+    "geoformat": {"asc", "grd", "kml"}, "mca": {"mca"}, "czi": {"czi"},
 }
 KINDS = {
+    "database-table": {"tree", "table"},
+    "sql-dump": {"tree", "table"}, "pg-dump": {"tree"},
+    "bson": {"tree", "table"}, "redis-rdb": {"tree", "table"},
+    "sqlite-table": {"tree", "table"},
+    "gro-trajectory": {"tree", "geometry"}, "simulation-mesh": {"tree", "geometry"},
+    "mass-spectrum": {"tree", "series"}, "diffraction": {"tree", "series"},
+    "scientific-graph": {"graph"},
+    "phylogeny": {"tree"},
     "tabular": {"table", "series", "heatmap"},
     "hdf5": {"tree", "series", "heatmap"},
     "excel": {"table"}, "rdkit": {"image"}, "metpy": {"image"},
     "office": {"pdf"}, "fastqc": {"report"},
     "root": {"series", "heatmap"}, "jcamp": {"series"},
+    "structure": {"tree"}, "archive": {"table"}, "archive-member": {"table"},
+    "geoformat": {"map"}, "mca": {"series"}, "czi": {"tree", "image"},
 }
 OPTIONS = {
+    "database-table": {"table", "columns", "row_offset", "row_limit"},
+    "sql-dump": {"dialect", "table", "columns", "row_offset", "row_limit"}, "pg-dump": set(),
+    "bson": {"group_id", "offset", "limit"}, "redis-rdb": {"group_id", "offset", "limit"},
+    "sqlite-table": {"table", "columns", "row_offset", "row_limit"},
+    "gro-trajectory": {"frame"}, "simulation-mesh": {"field", "component"},
+    "mass-spectrum": {"offset", "spectrum"}, "diffraction": {"scan"},
+    "scientific-graph": set(),
+    "phylogeny": set(),
     "tabular": {"variable", "row_offset", "column_offset", "x_column", "y_columns", "indices"},
     "hdf5": {"path", "indices"}, "excel": {"sheet", "row_offset", "column_offset"},
     "rdkit": {"molecule"},
     "metpy": {"pressure_column", "temperature_column", "dewpoint_column", "pressure_unit", "temperature_unit", "dewpoint_unit"},
     "office": set(), "fastqc": {"confirm"},
     "root": {"path"}, "jcamp": set(),
+    "structure": set(), "archive": {"row_offset"}, "archive-member": {"row_offset", "member_id"},
+    "geoformat": {"crs"}, "mca": set(), "czi": {"indices", "roi"},
 }
 
 
@@ -95,8 +126,20 @@ def _integer(value, maximum):
 
 
 def _options(reader, value):
+    if reader in {"sql-dump", "pg-dump", "bson", "redis-rdb"}:
+        if not isinstance(value, dict):
+            raise PreviewError("数据库文件参数必须是已声明的对象。")
+        return value  # The reader's exact schema runs before parsing any bytes.
+    if reader in migration.KINDS:
+        if not isinstance(value, dict):
+            raise PreviewError("工作台参数必须是已声明的对象。")
+        return value  # Each exact reader contract validates before native IO.
     if not isinstance(value, dict) or set(value) - OPTIONS[reader]:
         raise PreviewError("不支持的可视化参数。")
+    if reader in {"archive-member", "geoformat", "mca", "czi", "mass-spectrum", "diffraction", "gro-trajectory", "simulation-mesh", "sqlite-table", "database-table"}:
+        # The independent member reader validates its larger text-page offset
+        # and opaque reference before opening any archive stream.
+        return value
     for key in ("variable", "sheet", "pressure_column", "temperature_column", "dewpoint_column"):
         if key in value and (not _name(value[key]) or "/" in value[key]):
             raise PreviewError("变量、工作表或列名称无效。")
@@ -438,6 +481,12 @@ def hdf5_preview(path, kind, options):
             result["warnings"].append("已阻止软链接、外部链接、外部存储、虚拟数据集或不受信任的过滤器。")
         if len(tree) >= MAX_NODES:
             result["warnings"].append("目录仅列出前 256 个节点，深度最多 8 层。")
+        with open(path, "rb") as source:
+            matlab = source.read(128).startswith(b"MATLAB 7.3 MAT-file")
+        if matlab:
+            result["metadata"]["source_format"] = "matlab-v7.3"
+            result["metadata"]["dimension_order"] = "hdf5-storage"
+            result["warnings"].append("MATLAB v7.3 按 HDF5 存储维度显示（可能与 MATLAB 数组维度次序相反）；不执行对象、引用或工程代码。")
     return result
 
 
@@ -1007,14 +1056,108 @@ def jcamp_preview(data):
     return result
 
 
+from app.services import main_migration_reader as migration
+FORMATS.update(migration.FORMATS)
+KINDS.update(migration.KINDS)
+
+
 def preview_bytes(data, reader, kind, options=None, *, format=None, truncated=False):
     if reader not in FORMATS or kind not in KINDS[reader] or format not in FORMATS[reader]:
         raise PreviewError("未注册的扩展读取器、视图或格式。")
     options = _options(reader, {} if options is None else options)
     if type(truncated) is not bool or truncated:
         raise PreviewError("此扩展读取器需要完整的有界文件。")
-    if not isinstance(data, bytes) or not 0 < len(data) <= MAX_INPUT_BYTES:
-        raise PreviewError("文件为空或超出 64 MiB 读取预算。")
+    if not isinstance(data, bytes) or not 0 < len(data) <= migration.input_limit(reader):
+        raise PreviewError("文件为空或超出此读取器的独立预算。")
+    if reader in {"sql-dump", "pg-dump", "bson", "redis-rdb"}:
+        if len(data) > 16 * 1024 * 1024:
+            raise PreviewError("数据库文件超过独立只读预算。")
+        try:
+            if reader == "sql-dump":
+                from app.services.sql_dump_reader import sql_dump_preview
+                return sql_dump_preview(data, format, kind, options)
+            if reader == "pg-dump":
+                from app.services.pg_dump_reader import pg_dump_preview
+                return pg_dump_preview(data, format, kind, options)
+            if reader == "bson":
+                from app.services.bson_reader import bson_preview
+                return bson_preview(data, format, kind, options)
+            from app.services.redis_rdb_reader import redis_rdb_preview
+            return redis_rdb_preview(data, format, kind, options)
+        except (ValueError, TypeError):
+            raise PreviewError("数据库转储或记录文件的格式、选择或预算不符合只读预览限制。") from None
+    if reader in migration.KINDS:
+        try:
+            return migration.preview(data, reader, kind, options, format)
+        except (ValueError, TypeError):
+            raise PreviewError("工作台格式、选择或预算不符合预览限制；CRAM 必须能够离线解码。") from None
+    if reader == "database-table":
+        from app.services.database_table_reader import database_table_preview
+        try:
+            return database_table_preview(data, format, kind, options)
+        except (ValueError, TypeError):
+            raise PreviewError("数据库文件、表格选择或资源预算不符合只读预览限制。") from None
+    if reader == "sqlite-table":
+        from app.services.sqlite_table_reader import sqlite_table_preview
+        try:
+            return sqlite_table_preview(data, format, kind, options)
+        except (ValueError, TypeError):
+            raise PreviewError("SQLite 文件、表格选择或资源预算不符合预览限制。") from None
+    if reader in {"gro-trajectory", "simulation-mesh"}:
+        try:
+            if reader == "gro-trajectory":
+                from app.services.gro_trajectory_reader import gro_trajectory_preview
+                return gro_trajectory_preview(data, format, kind, options)
+            from app.services.simulation_mesh_reader import simulation_mesh_preview
+            return simulation_mesh_preview(data, format, kind, options)
+        except (ValueError, TypeError):
+            raise PreviewError("几何文件格式、选择或预算不符合预览限制。") from None
+    if reader in {"mass-spectrum", "diffraction"}:
+        try:
+            if reader == "mass-spectrum":
+                from app.services.mass_spectrum_reader import mass_spectrum_preview
+                return mass_spectrum_preview(data, format, kind, options)
+            from app.services.diffraction_reader import diffraction_preview
+            return diffraction_preview(data, format, kind, options)
+        except (ValueError, TypeError):
+            raise PreviewError("谱图格式、扫描选择或资源预算不符合预览限制。") from None
+    if reader == "phylogeny":
+        from app.services.phylogeny_reader import phylogeny_preview
+        try:
+            return phylogeny_preview(data, format, options)
+        except (ValueError, TypeError):
+            raise PreviewError("系统树格式、枝长或资源预算不符合预览限制。") from None
+    if reader == "scientific-graph":
+        from app.services.scientific_graph_reader import scientific_graph_preview
+        try:
+            return scientific_graph_preview(data, format, options)
+        except (ValueError, TypeError):
+            raise PreviewError("网络格式、节点边关系或资源预算不符合预览限制。") from None
+    if reader in {"geoformat", "mca", "czi"}:
+        try:
+            if reader == "geoformat":
+                from app.services.geo_format_readers import geoformat_preview
+                return geoformat_preview(data, format, options)
+            if reader == "mca":
+                from app.services.bounded_mca_reader import mca_preview
+                return mca_preview(data, format, options)
+            from app.services.czi_reader import czi_preview
+            return czi_preview(data, kind, options)
+        except ValueError:
+            raise PreviewError("格式方言、选择范围或资源预算不符合此试点的安全限制。") from None
+    if reader == "archive-member":
+        from app.services.archive_member_reader import archive_member_preview
+        from app.services.bounded_format_readers import BoundedFormatError
+        try:
+            return archive_member_preview(data, format, options)
+        except BoundedFormatError as error:
+            raise PreviewError(str(error)) from None
+    if reader in {"structure", "archive"}:
+        from app.services.bounded_format_readers import BoundedFormatError, structure_preview, archive_preview
+        try:
+            return (structure_preview if reader == "structure" else archive_preview)(data, format, options)
+        except BoundedFormatError as error:
+            raise PreviewError(str(error)) from None
     # Do not allow HDF5 to discover executable filter plugins from the runtime.
     os.environ["HDF5_PLUGIN_PRELOAD"] = "::"
     os.environ["HDF5_PLUGIN_PATH"] = ""
@@ -1053,7 +1196,7 @@ def _encoded_result(stream=None):
         if (not isinstance(header, dict)
                 or set(header) - {"contract_version", "size", "reader", "kind", "format", "options", "truncated"}
                 or type(header.get("contract_version")) is not int or header["contract_version"] != 2
-                or type(header.get("size")) is not int or not 0 < header["size"] <= MAX_INPUT_BYTES):
+                or type(header.get("size")) is not int or not 0 < header["size"] <= migration.input_limit(header.get("reader"))):
             raise PreviewError("无效的预览协议版本或大小。")
         data = stream.read(header["size"])
         if len(data) != header["size"] or stream.read(1):

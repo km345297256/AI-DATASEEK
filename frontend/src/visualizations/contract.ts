@@ -62,7 +62,7 @@ export function parseVisualizationCatalog(value: unknown): VisualizationCatalog 
       || typeof plugin.version !== 'string' || !/^[0-9A-Za-z][0-9A-Za-z.+_-]{0,63}$/.test(plugin.version)
       || typeof plugin.adapter !== 'string' || !Object.prototype.hasOwnProperty.call(VISUALIZATION_ADAPTERS, plugin.adapter)
       || !validMatchers(plugin.extensions, /^[a-z0-9][a-z0-9.-]{0,31}$/)
-      || !validMatchers(plugin.filenames, /^[a-z0-9][a-z0-9._-]{0,127}$/)
+      || !validMatchers(plugin.filenames, /^(?:[a-z0-9][a-z0-9._-]{0,127}|\.zattrs)$/)
       || (!plugin.extensions.length && !plugin.filenames.length)
       || typeof plugin.enabled !== 'boolean' || typeof plugin.default_enabled !== 'boolean'
       || !Number.isSafeInteger(plugin.priority) || Math.abs(plugin.priority) > 1000
@@ -100,4 +100,4 @@ export function selectVisualization(plugins: readonly VisualizationPlugin[], fil
   return candidates.find((plugin) => plugin.id === selectedId) ?? candidates[0] ?? null;
 }
 
-export const viewKindLabel = (kind: VisualizationKind): string => ({ image: '图像', map: '地图', series: '数值曲线', table: '表格', text: '文本', structure: '三维结构', document: '文档' }[kind]);
+export const viewKindLabel = (kind: VisualizationKind): string => ({ image: '图像', map: '地图', series: '数值曲线', table: '表格', text: '文本', structure: '三维结构', document: '文档', tree: '结构树', media: '音视频', graph: '关系网络' }[kind]);

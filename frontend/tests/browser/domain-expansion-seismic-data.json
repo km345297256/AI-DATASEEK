@@ -1,0 +1,1280 @@
+{
+  "provenance": {
+    "generator": "sandbox/tests/seismic_window_browser_payloads.py",
+    "engine": "ObsPy 1.4.2 / libmseed",
+    "synthetic": true
+  },
+  "cases": {
+    "mseed": {
+      "tree": {
+        "contract_version": 2,
+        "type": "seismic-window",
+        "reader": "seismic-window",
+        "kind": "tree",
+        "media_type": "application/json",
+        "choices": {
+          "records": [
+            {
+              "id": 0,
+              "label": "XX.TEST.00.BHZ",
+              "variant": "MiniSEED2",
+              "encoding": "STEIM2",
+              "byte_order": "big",
+              "samples": 8,
+              "sample_interval": 0.05,
+              "unit": "unknown",
+              "unit_source": "not supplied",
+              "declared_scale": null,
+              "start_time": "2024-02-29T00:00:00.123456Z",
+              "begin_seconds": 0,
+              "time_adjustment_seconds": -0.000044,
+              "timing_quality": 0,
+              "quality_flags": 0,
+              "relation": "uncompared",
+              "gap_seconds": null
+            }
+          ]
+        },
+        "selected": {},
+        "metadata": {
+          "format": "mseed",
+          "input_mode": "window",
+          "source_bytes": 4096,
+          "read_bytes": 64,
+          "read_requests": 3,
+          "record_bytes": 4096,
+          "record_slots": 1,
+          "catalog_offset": 0,
+          "catalog_count": 1,
+          "catalog_complete": true,
+          "decoded_samples": 0,
+          "decoded_bytes": 0,
+          "nonfinite_values": 0,
+          "value_semantics": "raw stored samples; SAC SCALE and instrument response not applied; no filtering, resampling, merging or gap filling",
+          "time_axis": "seconds relative to the selected record's first sample; UTC display rounded to microseconds",
+          "limits": {
+            "max_samples": 16384,
+            "max_page_records": 16,
+            "max_record_bytes": 1048576,
+            "max_decoded_samples": 65535,
+            "max_decoded_bytes": 524280
+          }
+        },
+        "warnings": [
+          "只显示单条记录的显式样本窗；不拼接、不补缺口、不重采样、不校正仪器响应。",
+          "单位只来自明确文件声明；MiniSEED 不含响应单位，SAC SCALE 不应用。目录连续性仅比较本页同通道记录。"
+        ],
+        "sampled": false,
+        "tree": [
+          {
+            "path": "/record-0",
+            "node_type": "record",
+            "attributes": {
+              "label": "XX.TEST.00.BHZ",
+              "encoding": "STEIM2"
+            }
+          }
+        ]
+      },
+      "full": {
+        "contract_version": 2,
+        "type": "seismic-window",
+        "reader": "seismic-window",
+        "kind": "series",
+        "media_type": "application/json",
+        "choices": {
+          "records": [
+            {
+              "id": 0,
+              "label": "XX.TEST.00.BHZ",
+              "variant": "MiniSEED2",
+              "encoding": "STEIM2",
+              "byte_order": "big",
+              "samples": 8,
+              "sample_interval": 0.05,
+              "unit": "unknown",
+              "unit_source": "not supplied",
+              "declared_scale": null,
+              "start_time": "2024-02-29T00:00:00.123456Z",
+              "begin_seconds": 0,
+              "time_adjustment_seconds": -0.000044,
+              "timing_quality": 0,
+              "quality_flags": 0,
+              "relation": "uncompared",
+              "gap_seconds": null
+            }
+          ]
+        },
+        "selected": {
+          "record": 0,
+          "start_sample": 0,
+          "sample_count": 8
+        },
+        "metadata": {
+          "format": "mseed",
+          "input_mode": "window",
+          "source_bytes": 4096,
+          "read_bytes": 4096,
+          "read_requests": 4,
+          "record_bytes": 4096,
+          "record_slots": 1,
+          "catalog_offset": 0,
+          "catalog_count": 1,
+          "catalog_complete": true,
+          "decoded_samples": 8,
+          "decoded_bytes": 32,
+          "nonfinite_values": 0,
+          "value_semantics": "raw stored samples; SAC SCALE and instrument response not applied; no filtering, resampling, merging or gap filling",
+          "time_axis": "seconds relative to the selected record's first sample; UTC display rounded to microseconds",
+          "limits": {
+            "max_samples": 16384,
+            "max_page_records": 16,
+            "max_record_bytes": 1048576,
+            "max_decoded_samples": 65535,
+            "max_decoded_bytes": 524280
+          }
+        },
+        "warnings": [
+          "只显示单条记录的显式样本窗；不拼接、不补缺口、不重采样、不校正仪器响应。",
+          "单位只来自明确文件声明；MiniSEED 不含响应单位，SAC SCALE 不应用。目录连续性仅比较本页同通道记录。"
+        ],
+        "sampled": false,
+        "series": [
+          {
+            "record": 0,
+            "label": "XX.TEST.00.BHZ",
+            "unit": "unknown",
+            "x": [
+              0,
+              0.05,
+              0.1,
+              0.15000000000000002,
+              0.2,
+              0.25,
+              0.30000000000000004,
+              0.35000000000000003
+            ],
+            "y": [
+              1,
+              -2,
+              3,
+              4,
+              2,
+              5,
+              -3,
+              2
+            ]
+          }
+        ]
+      },
+      "window": {
+        "contract_version": 2,
+        "type": "seismic-window",
+        "reader": "seismic-window",
+        "kind": "series",
+        "media_type": "application/json",
+        "choices": {
+          "records": [
+            {
+              "id": 0,
+              "label": "XX.TEST.00.BHZ",
+              "variant": "MiniSEED2",
+              "encoding": "STEIM2",
+              "byte_order": "big",
+              "samples": 8,
+              "sample_interval": 0.05,
+              "unit": "unknown",
+              "unit_source": "not supplied",
+              "declared_scale": null,
+              "start_time": "2024-02-29T00:00:00.123456Z",
+              "begin_seconds": 0,
+              "time_adjustment_seconds": -0.000044,
+              "timing_quality": 0,
+              "quality_flags": 0,
+              "relation": "uncompared",
+              "gap_seconds": null
+            }
+          ]
+        },
+        "selected": {
+          "record": 0,
+          "start_sample": 1,
+          "sample_count": 2
+        },
+        "metadata": {
+          "format": "mseed",
+          "input_mode": "window",
+          "source_bytes": 4096,
+          "read_bytes": 4096,
+          "read_requests": 4,
+          "record_bytes": 4096,
+          "record_slots": 1,
+          "catalog_offset": 0,
+          "catalog_count": 1,
+          "catalog_complete": true,
+          "decoded_samples": 8,
+          "decoded_bytes": 32,
+          "nonfinite_values": 0,
+          "value_semantics": "raw stored samples; SAC SCALE and instrument response not applied; no filtering, resampling, merging or gap filling",
+          "time_axis": "seconds relative to the selected record's first sample; UTC display rounded to microseconds",
+          "limits": {
+            "max_samples": 16384,
+            "max_page_records": 16,
+            "max_record_bytes": 1048576,
+            "max_decoded_samples": 65535,
+            "max_decoded_bytes": 524280
+          }
+        },
+        "warnings": [
+          "只显示单条记录的显式样本窗；不拼接、不补缺口、不重采样、不校正仪器响应。",
+          "单位只来自明确文件声明；MiniSEED 不含响应单位，SAC SCALE 不应用。目录连续性仅比较本页同通道记录。"
+        ],
+        "sampled": true,
+        "series": [
+          {
+            "record": 0,
+            "label": "XX.TEST.00.BHZ",
+            "unit": "unknown",
+            "x": [
+              0.05,
+              0.1
+            ],
+            "y": [
+              -2,
+              3
+            ]
+          }
+        ]
+      }
+    },
+    "sac": {
+      "tree": {
+        "contract_version": 2,
+        "type": "seismic-window",
+        "reader": "seismic-window",
+        "kind": "tree",
+        "media_type": "application/json",
+        "choices": {
+          "records": [
+            {
+              "id": 0,
+              "label": "XX.TEST.00.BHZ",
+              "variant": "SAC7",
+              "encoding": "FLOAT32",
+              "byte_order": "little",
+              "samples": 4,
+              "sample_interval": 0.25,
+              "unit": "nm/s",
+              "unit_source": "SAC IDEP",
+              "declared_scale": 2,
+              "start_time": "2024-02-29T12:30:10.375000Z",
+              "begin_seconds": 0.125,
+              "time_adjustment_seconds": 0,
+              "timing_quality": null,
+              "quality_flags": 0,
+              "relation": "uncompared",
+              "gap_seconds": null
+            }
+          ]
+        },
+        "selected": {},
+        "metadata": {
+          "format": "sac",
+          "input_mode": "window",
+          "source_bytes": 824,
+          "read_bytes": 656,
+          "read_requests": 2,
+          "record_bytes": 824,
+          "record_slots": 1,
+          "catalog_offset": 0,
+          "catalog_count": 1,
+          "catalog_complete": true,
+          "decoded_samples": 0,
+          "decoded_bytes": 0,
+          "nonfinite_values": 0,
+          "value_semantics": "raw stored samples; SAC SCALE and instrument response not applied; no filtering, resampling, merging or gap filling",
+          "time_axis": "seconds relative to the selected record's first sample; UTC display rounded to microseconds",
+          "limits": {
+            "max_samples": 16384,
+            "max_page_records": 16,
+            "max_record_bytes": 1048576,
+            "max_decoded_samples": 65535,
+            "max_decoded_bytes": 524280
+          }
+        },
+        "warnings": [
+          "只显示单条记录的显式样本窗；不拼接、不补缺口、不重采样、不校正仪器响应。",
+          "单位只来自明确文件声明；MiniSEED 不含响应单位，SAC SCALE 不应用。目录连续性仅比较本页同通道记录。"
+        ],
+        "sampled": false,
+        "tree": [
+          {
+            "path": "/record-0",
+            "node_type": "record",
+            "attributes": {
+              "label": "XX.TEST.00.BHZ",
+              "encoding": "FLOAT32"
+            }
+          }
+        ]
+      },
+      "full": {
+        "contract_version": 2,
+        "type": "seismic-window",
+        "reader": "seismic-window",
+        "kind": "series",
+        "media_type": "application/json",
+        "choices": {
+          "records": [
+            {
+              "id": 0,
+              "label": "XX.TEST.00.BHZ",
+              "variant": "SAC7",
+              "encoding": "FLOAT32",
+              "byte_order": "little",
+              "samples": 4,
+              "sample_interval": 0.25,
+              "unit": "nm/s",
+              "unit_source": "SAC IDEP",
+              "declared_scale": 2,
+              "start_time": "2024-02-29T12:30:10.375000Z",
+              "begin_seconds": 0.125,
+              "time_adjustment_seconds": 0,
+              "timing_quality": null,
+              "quality_flags": 0,
+              "relation": "uncompared",
+              "gap_seconds": null
+            }
+          ]
+        },
+        "selected": {
+          "record": 0,
+          "start_sample": 0,
+          "sample_count": 4
+        },
+        "metadata": {
+          "format": "sac",
+          "input_mode": "window",
+          "source_bytes": 824,
+          "read_bytes": 672,
+          "read_requests": 3,
+          "record_bytes": 824,
+          "record_slots": 1,
+          "catalog_offset": 0,
+          "catalog_count": 1,
+          "catalog_complete": true,
+          "decoded_samples": 4,
+          "decoded_bytes": 16,
+          "nonfinite_values": 0,
+          "value_semantics": "raw stored samples; SAC SCALE and instrument response not applied; no filtering, resampling, merging or gap filling",
+          "time_axis": "seconds relative to the selected record's first sample; UTC display rounded to microseconds",
+          "limits": {
+            "max_samples": 16384,
+            "max_page_records": 16,
+            "max_record_bytes": 1048576,
+            "max_decoded_samples": 65535,
+            "max_decoded_bytes": 524280
+          }
+        },
+        "warnings": [
+          "只显示单条记录的显式样本窗；不拼接、不补缺口、不重采样、不校正仪器响应。",
+          "单位只来自明确文件声明；MiniSEED 不含响应单位，SAC SCALE 不应用。目录连续性仅比较本页同通道记录。"
+        ],
+        "sampled": false,
+        "series": [
+          {
+            "record": 0,
+            "label": "XX.TEST.00.BHZ",
+            "unit": "nm/s",
+            "x": [
+              0,
+              0.25,
+              0.5,
+              0.75
+            ],
+            "y": [
+              1.25,
+              -2.5,
+              0,
+              4.75
+            ]
+          }
+        ]
+      },
+      "window": {
+        "contract_version": 2,
+        "type": "seismic-window",
+        "reader": "seismic-window",
+        "kind": "series",
+        "media_type": "application/json",
+        "choices": {
+          "records": [
+            {
+              "id": 0,
+              "label": "XX.TEST.00.BHZ",
+              "variant": "SAC7",
+              "encoding": "FLOAT32",
+              "byte_order": "little",
+              "samples": 4,
+              "sample_interval": 0.25,
+              "unit": "nm/s",
+              "unit_source": "SAC IDEP",
+              "declared_scale": 2,
+              "start_time": "2024-02-29T12:30:10.375000Z",
+              "begin_seconds": 0.125,
+              "time_adjustment_seconds": 0,
+              "timing_quality": null,
+              "quality_flags": 0,
+              "relation": "uncompared",
+              "gap_seconds": null
+            }
+          ]
+        },
+        "selected": {
+          "record": 0,
+          "start_sample": 1,
+          "sample_count": 2
+        },
+        "metadata": {
+          "format": "sac",
+          "input_mode": "window",
+          "source_bytes": 824,
+          "read_bytes": 664,
+          "read_requests": 3,
+          "record_bytes": 824,
+          "record_slots": 1,
+          "catalog_offset": 0,
+          "catalog_count": 1,
+          "catalog_complete": true,
+          "decoded_samples": 2,
+          "decoded_bytes": 8,
+          "nonfinite_values": 0,
+          "value_semantics": "raw stored samples; SAC SCALE and instrument response not applied; no filtering, resampling, merging or gap filling",
+          "time_axis": "seconds relative to the selected record's first sample; UTC display rounded to microseconds",
+          "limits": {
+            "max_samples": 16384,
+            "max_page_records": 16,
+            "max_record_bytes": 1048576,
+            "max_decoded_samples": 65535,
+            "max_decoded_bytes": 524280
+          }
+        },
+        "warnings": [
+          "只显示单条记录的显式样本窗；不拼接、不补缺口、不重采样、不校正仪器响应。",
+          "单位只来自明确文件声明；MiniSEED 不含响应单位，SAC SCALE 不应用。目录连续性仅比较本页同通道记录。"
+        ],
+        "sampled": true,
+        "series": [
+          {
+            "record": 0,
+            "label": "XX.TEST.00.BHZ",
+            "unit": "nm/s",
+            "x": [
+              0.25,
+              0.5
+            ],
+            "y": [
+              -2.5,
+              0
+            ]
+          }
+        ]
+      }
+    },
+    "paged": {
+      "tree": {
+        "contract_version": 2,
+        "type": "seismic-window",
+        "reader": "seismic-window",
+        "kind": "tree",
+        "media_type": "application/json",
+        "choices": {
+          "records": [
+            {
+              "id": 0,
+              "label": "XX.TEST.00.BHZ",
+              "variant": "MiniSEED2",
+              "encoding": "INT32",
+              "byte_order": "big",
+              "samples": 4,
+              "sample_interval": 0.25,
+              "unit": "unknown",
+              "unit_source": "not supplied",
+              "declared_scale": null,
+              "start_time": "2024-02-29T00:00:00.000000Z",
+              "begin_seconds": 0,
+              "time_adjustment_seconds": 0,
+              "timing_quality": null,
+              "quality_flags": 0,
+              "relation": "uncompared",
+              "gap_seconds": null
+            },
+            {
+              "id": 1,
+              "label": "XX.TEST.00.BHZ",
+              "variant": "MiniSEED2",
+              "encoding": "INT32",
+              "byte_order": "big",
+              "samples": 4,
+              "sample_interval": 0.25,
+              "unit": "unknown",
+              "unit_source": "not supplied",
+              "declared_scale": null,
+              "start_time": "2024-02-29T00:00:01.000000Z",
+              "begin_seconds": 0,
+              "time_adjustment_seconds": 0,
+              "timing_quality": null,
+              "quality_flags": 0,
+              "relation": "continuous",
+              "gap_seconds": 0
+            },
+            {
+              "id": 2,
+              "label": "XX.TEST.00.BHZ",
+              "variant": "MiniSEED2",
+              "encoding": "INT32",
+              "byte_order": "big",
+              "samples": 4,
+              "sample_interval": 0.25,
+              "unit": "unknown",
+              "unit_source": "not supplied",
+              "declared_scale": null,
+              "start_time": "2024-02-29T00:00:03.000000Z",
+              "begin_seconds": 0,
+              "time_adjustment_seconds": 0,
+              "timing_quality": null,
+              "quality_flags": 0,
+              "relation": "gap",
+              "gap_seconds": 1
+            },
+            {
+              "id": 3,
+              "label": "XX.TEST.00.BHZ",
+              "variant": "MiniSEED2",
+              "encoding": "INT32",
+              "byte_order": "big",
+              "samples": 4,
+              "sample_interval": 0.25,
+              "unit": "unknown",
+              "unit_source": "not supplied",
+              "declared_scale": null,
+              "start_time": "2024-02-29T00:00:04.000000Z",
+              "begin_seconds": 0,
+              "time_adjustment_seconds": 0,
+              "timing_quality": null,
+              "quality_flags": 0,
+              "relation": "continuous",
+              "gap_seconds": 0
+            },
+            {
+              "id": 4,
+              "label": "XX.TEST.00.BHZ",
+              "variant": "MiniSEED2",
+              "encoding": "INT32",
+              "byte_order": "big",
+              "samples": 4,
+              "sample_interval": 0.25,
+              "unit": "unknown",
+              "unit_source": "not supplied",
+              "declared_scale": null,
+              "start_time": "2024-02-29T00:00:05.000000Z",
+              "begin_seconds": 0,
+              "time_adjustment_seconds": 0,
+              "timing_quality": null,
+              "quality_flags": 0,
+              "relation": "continuous",
+              "gap_seconds": 0
+            },
+            {
+              "id": 5,
+              "label": "XX.TEST.00.BHZ",
+              "variant": "MiniSEED2",
+              "encoding": "INT32",
+              "byte_order": "big",
+              "samples": 4,
+              "sample_interval": 0.25,
+              "unit": "unknown",
+              "unit_source": "not supplied",
+              "declared_scale": null,
+              "start_time": "2024-02-29T00:00:06.000000Z",
+              "begin_seconds": 0,
+              "time_adjustment_seconds": 0,
+              "timing_quality": null,
+              "quality_flags": 0,
+              "relation": "continuous",
+              "gap_seconds": 0
+            },
+            {
+              "id": 6,
+              "label": "XX.TEST.00.BHZ",
+              "variant": "MiniSEED2",
+              "encoding": "INT32",
+              "byte_order": "big",
+              "samples": 4,
+              "sample_interval": 0.25,
+              "unit": "unknown",
+              "unit_source": "not supplied",
+              "declared_scale": null,
+              "start_time": "2024-02-29T00:00:07.000000Z",
+              "begin_seconds": 0,
+              "time_adjustment_seconds": 0,
+              "timing_quality": null,
+              "quality_flags": 0,
+              "relation": "continuous",
+              "gap_seconds": 0
+            },
+            {
+              "id": 7,
+              "label": "XX.TEST.00.BHZ",
+              "variant": "MiniSEED2",
+              "encoding": "INT32",
+              "byte_order": "big",
+              "samples": 4,
+              "sample_interval": 0.25,
+              "unit": "unknown",
+              "unit_source": "not supplied",
+              "declared_scale": null,
+              "start_time": "2024-02-29T00:00:08.000000Z",
+              "begin_seconds": 0,
+              "time_adjustment_seconds": 0,
+              "timing_quality": null,
+              "quality_flags": 0,
+              "relation": "continuous",
+              "gap_seconds": 0
+            },
+            {
+              "id": 8,
+              "label": "XX.TEST.00.BHZ",
+              "variant": "MiniSEED2",
+              "encoding": "INT32",
+              "byte_order": "big",
+              "samples": 4,
+              "sample_interval": 0.25,
+              "unit": "unknown",
+              "unit_source": "not supplied",
+              "declared_scale": null,
+              "start_time": "2024-02-29T00:00:09.000000Z",
+              "begin_seconds": 0,
+              "time_adjustment_seconds": 0,
+              "timing_quality": null,
+              "quality_flags": 0,
+              "relation": "continuous",
+              "gap_seconds": 0
+            },
+            {
+              "id": 9,
+              "label": "XX.TEST.00.BHZ",
+              "variant": "MiniSEED2",
+              "encoding": "INT32",
+              "byte_order": "big",
+              "samples": 4,
+              "sample_interval": 0.25,
+              "unit": "unknown",
+              "unit_source": "not supplied",
+              "declared_scale": null,
+              "start_time": "2024-02-29T00:00:10.000000Z",
+              "begin_seconds": 0,
+              "time_adjustment_seconds": 0,
+              "timing_quality": null,
+              "quality_flags": 0,
+              "relation": "continuous",
+              "gap_seconds": 0
+            },
+            {
+              "id": 10,
+              "label": "XX.TEST.00.BHZ",
+              "variant": "MiniSEED2",
+              "encoding": "INT32",
+              "byte_order": "big",
+              "samples": 4,
+              "sample_interval": 0.25,
+              "unit": "unknown",
+              "unit_source": "not supplied",
+              "declared_scale": null,
+              "start_time": "2024-02-29T00:00:11.000000Z",
+              "begin_seconds": 0,
+              "time_adjustment_seconds": 0,
+              "timing_quality": null,
+              "quality_flags": 0,
+              "relation": "continuous",
+              "gap_seconds": 0
+            },
+            {
+              "id": 11,
+              "label": "XX.TEST.00.BHZ",
+              "variant": "MiniSEED2",
+              "encoding": "INT32",
+              "byte_order": "big",
+              "samples": 4,
+              "sample_interval": 0.25,
+              "unit": "unknown",
+              "unit_source": "not supplied",
+              "declared_scale": null,
+              "start_time": "2024-02-29T00:00:12.000000Z",
+              "begin_seconds": 0,
+              "time_adjustment_seconds": 0,
+              "timing_quality": null,
+              "quality_flags": 0,
+              "relation": "continuous",
+              "gap_seconds": 0
+            },
+            {
+              "id": 12,
+              "label": "XX.TEST.00.BHZ",
+              "variant": "MiniSEED2",
+              "encoding": "INT32",
+              "byte_order": "big",
+              "samples": 4,
+              "sample_interval": 0.25,
+              "unit": "unknown",
+              "unit_source": "not supplied",
+              "declared_scale": null,
+              "start_time": "2024-02-29T00:00:13.000000Z",
+              "begin_seconds": 0,
+              "time_adjustment_seconds": 0,
+              "timing_quality": null,
+              "quality_flags": 0,
+              "relation": "continuous",
+              "gap_seconds": 0
+            },
+            {
+              "id": 13,
+              "label": "XX.TEST.00.BHZ",
+              "variant": "MiniSEED2",
+              "encoding": "INT32",
+              "byte_order": "big",
+              "samples": 4,
+              "sample_interval": 0.25,
+              "unit": "unknown",
+              "unit_source": "not supplied",
+              "declared_scale": null,
+              "start_time": "2024-02-29T00:00:14.000000Z",
+              "begin_seconds": 0,
+              "time_adjustment_seconds": 0,
+              "timing_quality": null,
+              "quality_flags": 0,
+              "relation": "continuous",
+              "gap_seconds": 0
+            },
+            {
+              "id": 14,
+              "label": "XX.TEST.00.BHZ",
+              "variant": "MiniSEED2",
+              "encoding": "INT32",
+              "byte_order": "big",
+              "samples": 4,
+              "sample_interval": 0.25,
+              "unit": "unknown",
+              "unit_source": "not supplied",
+              "declared_scale": null,
+              "start_time": "2024-02-29T00:00:15.000000Z",
+              "begin_seconds": 0,
+              "time_adjustment_seconds": 0,
+              "timing_quality": null,
+              "quality_flags": 0,
+              "relation": "continuous",
+              "gap_seconds": 0
+            },
+            {
+              "id": 15,
+              "label": "XX.TEST.00.BHZ",
+              "variant": "MiniSEED2",
+              "encoding": "INT32",
+              "byte_order": "big",
+              "samples": 4,
+              "sample_interval": 0.25,
+              "unit": "unknown",
+              "unit_source": "not supplied",
+              "declared_scale": null,
+              "start_time": "2024-02-29T00:00:16.000000Z",
+              "begin_seconds": 0,
+              "time_adjustment_seconds": 0,
+              "timing_quality": null,
+              "quality_flags": 0,
+              "relation": "continuous",
+              "gap_seconds": 0
+            }
+          ]
+        },
+        "selected": {},
+        "metadata": {
+          "format": "miniseed",
+          "input_mode": "window",
+          "source_bytes": 10240,
+          "read_bytes": 896,
+          "read_requests": 32,
+          "record_bytes": 512,
+          "record_slots": 20,
+          "catalog_offset": 0,
+          "catalog_count": 16,
+          "catalog_complete": false,
+          "decoded_samples": 0,
+          "decoded_bytes": 0,
+          "nonfinite_values": 0,
+          "value_semantics": "raw stored samples; SAC SCALE and instrument response not applied; no filtering, resampling, merging or gap filling",
+          "time_axis": "seconds relative to the selected record's first sample; UTC display rounded to microseconds",
+          "limits": {
+            "max_samples": 16384,
+            "max_page_records": 16,
+            "max_record_bytes": 1048576,
+            "max_decoded_samples": 65535,
+            "max_decoded_bytes": 524280
+          }
+        },
+        "warnings": [
+          "只显示单条记录的显式样本窗；不拼接、不补缺口、不重采样、不校正仪器响应。",
+          "单位只来自明确文件声明；MiniSEED 不含响应单位，SAC SCALE 不应用。目录连续性仅比较本页同通道记录。"
+        ],
+        "sampled": false,
+        "tree": [
+          {
+            "path": "/record-0",
+            "node_type": "record",
+            "attributes": {
+              "label": "XX.TEST.00.BHZ",
+              "encoding": "INT32"
+            }
+          },
+          {
+            "path": "/record-1",
+            "node_type": "record",
+            "attributes": {
+              "label": "XX.TEST.00.BHZ",
+              "encoding": "INT32"
+            }
+          },
+          {
+            "path": "/record-2",
+            "node_type": "record",
+            "attributes": {
+              "label": "XX.TEST.00.BHZ",
+              "encoding": "INT32"
+            }
+          },
+          {
+            "path": "/record-3",
+            "node_type": "record",
+            "attributes": {
+              "label": "XX.TEST.00.BHZ",
+              "encoding": "INT32"
+            }
+          },
+          {
+            "path": "/record-4",
+            "node_type": "record",
+            "attributes": {
+              "label": "XX.TEST.00.BHZ",
+              "encoding": "INT32"
+            }
+          },
+          {
+            "path": "/record-5",
+            "node_type": "record",
+            "attributes": {
+              "label": "XX.TEST.00.BHZ",
+              "encoding": "INT32"
+            }
+          },
+          {
+            "path": "/record-6",
+            "node_type": "record",
+            "attributes": {
+              "label": "XX.TEST.00.BHZ",
+              "encoding": "INT32"
+            }
+          },
+          {
+            "path": "/record-7",
+            "node_type": "record",
+            "attributes": {
+              "label": "XX.TEST.00.BHZ",
+              "encoding": "INT32"
+            }
+          },
+          {
+            "path": "/record-8",
+            "node_type": "record",
+            "attributes": {
+              "label": "XX.TEST.00.BHZ",
+              "encoding": "INT32"
+            }
+          },
+          {
+            "path": "/record-9",
+            "node_type": "record",
+            "attributes": {
+              "label": "XX.TEST.00.BHZ",
+              "encoding": "INT32"
+            }
+          },
+          {
+            "path": "/record-10",
+            "node_type": "record",
+            "attributes": {
+              "label": "XX.TEST.00.BHZ",
+              "encoding": "INT32"
+            }
+          },
+          {
+            "path": "/record-11",
+            "node_type": "record",
+            "attributes": {
+              "label": "XX.TEST.00.BHZ",
+              "encoding": "INT32"
+            }
+          },
+          {
+            "path": "/record-12",
+            "node_type": "record",
+            "attributes": {
+              "label": "XX.TEST.00.BHZ",
+              "encoding": "INT32"
+            }
+          },
+          {
+            "path": "/record-13",
+            "node_type": "record",
+            "attributes": {
+              "label": "XX.TEST.00.BHZ",
+              "encoding": "INT32"
+            }
+          },
+          {
+            "path": "/record-14",
+            "node_type": "record",
+            "attributes": {
+              "label": "XX.TEST.00.BHZ",
+              "encoding": "INT32"
+            }
+          },
+          {
+            "path": "/record-15",
+            "node_type": "record",
+            "attributes": {
+              "label": "XX.TEST.00.BHZ",
+              "encoding": "INT32"
+            }
+          }
+        ]
+      },
+      "page": {
+        "contract_version": 2,
+        "type": "seismic-window",
+        "reader": "seismic-window",
+        "kind": "tree",
+        "media_type": "application/json",
+        "choices": {
+          "records": [
+            {
+              "id": 16,
+              "label": "XX.TEST.00.BHZ",
+              "variant": "MiniSEED2",
+              "encoding": "INT32",
+              "byte_order": "big",
+              "samples": 4,
+              "sample_interval": 0.25,
+              "unit": "unknown",
+              "unit_source": "not supplied",
+              "declared_scale": null,
+              "start_time": "2024-02-29T00:00:17.000000Z",
+              "begin_seconds": 0,
+              "time_adjustment_seconds": 0,
+              "timing_quality": null,
+              "quality_flags": 0,
+              "relation": "uncompared",
+              "gap_seconds": null
+            },
+            {
+              "id": 17,
+              "label": "XX.TEST.00.BHZ",
+              "variant": "MiniSEED2",
+              "encoding": "INT32",
+              "byte_order": "big",
+              "samples": 4,
+              "sample_interval": 0.25,
+              "unit": "unknown",
+              "unit_source": "not supplied",
+              "declared_scale": null,
+              "start_time": "2024-02-29T00:00:18.000000Z",
+              "begin_seconds": 0,
+              "time_adjustment_seconds": 0,
+              "timing_quality": null,
+              "quality_flags": 0,
+              "relation": "continuous",
+              "gap_seconds": 0
+            },
+            {
+              "id": 18,
+              "label": "XX.TEST.00.BHZ",
+              "variant": "MiniSEED2",
+              "encoding": "INT32",
+              "byte_order": "big",
+              "samples": 4,
+              "sample_interval": 0.25,
+              "unit": "unknown",
+              "unit_source": "not supplied",
+              "declared_scale": null,
+              "start_time": "2024-02-29T00:00:19.000000Z",
+              "begin_seconds": 0,
+              "time_adjustment_seconds": 0,
+              "timing_quality": null,
+              "quality_flags": 0,
+              "relation": "continuous",
+              "gap_seconds": 0
+            },
+            {
+              "id": 19,
+              "label": "XX.TEST.00.BHZ",
+              "variant": "MiniSEED2",
+              "encoding": "INT32",
+              "byte_order": "big",
+              "samples": 4,
+              "sample_interval": 0.25,
+              "unit": "unknown",
+              "unit_source": "not supplied",
+              "declared_scale": null,
+              "start_time": "2024-02-29T00:00:20.000000Z",
+              "begin_seconds": 0,
+              "time_adjustment_seconds": 0,
+              "timing_quality": null,
+              "quality_flags": 0,
+              "relation": "continuous",
+              "gap_seconds": 0
+            }
+          ]
+        },
+        "selected": {
+          "record_offset": 16,
+          "record_limit": 16
+        },
+        "metadata": {
+          "format": "miniseed",
+          "input_mode": "window",
+          "source_bytes": 10240,
+          "read_bytes": 280,
+          "read_requests": 10,
+          "record_bytes": 512,
+          "record_slots": 20,
+          "catalog_offset": 16,
+          "catalog_count": 4,
+          "catalog_complete": false,
+          "decoded_samples": 0,
+          "decoded_bytes": 0,
+          "nonfinite_values": 0,
+          "value_semantics": "raw stored samples; SAC SCALE and instrument response not applied; no filtering, resampling, merging or gap filling",
+          "time_axis": "seconds relative to the selected record's first sample; UTC display rounded to microseconds",
+          "limits": {
+            "max_samples": 16384,
+            "max_page_records": 16,
+            "max_record_bytes": 1048576,
+            "max_decoded_samples": 65535,
+            "max_decoded_bytes": 524280
+          }
+        },
+        "warnings": [
+          "只显示单条记录的显式样本窗；不拼接、不补缺口、不重采样、不校正仪器响应。",
+          "单位只来自明确文件声明；MiniSEED 不含响应单位，SAC SCALE 不应用。目录连续性仅比较本页同通道记录。"
+        ],
+        "sampled": false,
+        "tree": [
+          {
+            "path": "/record-16",
+            "node_type": "record",
+            "attributes": {
+              "label": "XX.TEST.00.BHZ",
+              "encoding": "INT32"
+            }
+          },
+          {
+            "path": "/record-17",
+            "node_type": "record",
+            "attributes": {
+              "label": "XX.TEST.00.BHZ",
+              "encoding": "INT32"
+            }
+          },
+          {
+            "path": "/record-18",
+            "node_type": "record",
+            "attributes": {
+              "label": "XX.TEST.00.BHZ",
+              "encoding": "INT32"
+            }
+          },
+          {
+            "path": "/record-19",
+            "node_type": "record",
+            "attributes": {
+              "label": "XX.TEST.00.BHZ",
+              "encoding": "INT32"
+            }
+          }
+        ]
+      },
+      "window": {
+        "contract_version": 2,
+        "type": "seismic-window",
+        "reader": "seismic-window",
+        "kind": "series",
+        "media_type": "application/json",
+        "choices": {
+          "records": [
+            {
+              "id": 16,
+              "label": "XX.TEST.00.BHZ",
+              "variant": "MiniSEED2",
+              "encoding": "INT32",
+              "byte_order": "big",
+              "samples": 4,
+              "sample_interval": 0.25,
+              "unit": "unknown",
+              "unit_source": "not supplied",
+              "declared_scale": null,
+              "start_time": "2024-02-29T00:00:17.000000Z",
+              "begin_seconds": 0,
+              "time_adjustment_seconds": 0,
+              "timing_quality": null,
+              "quality_flags": 0,
+              "relation": "uncompared",
+              "gap_seconds": null
+            }
+          ]
+        },
+        "selected": {
+          "record": 16,
+          "start_sample": 1,
+          "sample_count": 2
+        },
+        "metadata": {
+          "format": "miniseed",
+          "input_mode": "window",
+          "source_bytes": 10240,
+          "read_bytes": 120,
+          "read_requests": 5,
+          "record_bytes": 512,
+          "record_slots": 20,
+          "catalog_offset": 16,
+          "catalog_count": 1,
+          "catalog_complete": false,
+          "decoded_samples": 2,
+          "decoded_bytes": 8,
+          "nonfinite_values": 0,
+          "value_semantics": "raw stored samples; SAC SCALE and instrument response not applied; no filtering, resampling, merging or gap filling",
+          "time_axis": "seconds relative to the selected record's first sample; UTC display rounded to microseconds",
+          "limits": {
+            "max_samples": 16384,
+            "max_page_records": 16,
+            "max_record_bytes": 1048576,
+            "max_decoded_samples": 65535,
+            "max_decoded_bytes": 524280
+          }
+        },
+        "warnings": [
+          "只显示单条记录的显式样本窗；不拼接、不补缺口、不重采样、不校正仪器响应。",
+          "单位只来自明确文件声明；MiniSEED 不含响应单位，SAC SCALE 不应用。目录连续性仅比较本页同通道记录。"
+        ],
+        "sampled": true,
+        "series": [
+          {
+            "record": 16,
+            "label": "XX.TEST.00.BHZ",
+            "unit": "unknown",
+            "x": [
+              0.25,
+              0.5
+            ],
+            "y": [
+              -2,
+              3
+            ]
+          }
+        ]
+      }
+    },
+    "large_sac": {
+      "window": {
+        "contract_version": 2,
+        "type": "seismic-window",
+        "reader": "seismic-window",
+        "kind": "series",
+        "media_type": "application/json",
+        "choices": {
+          "records": [
+            {
+              "id": 0,
+              "label": "XX.TEST.00.BHZ",
+              "variant": "SAC6",
+              "encoding": "FLOAT32",
+              "byte_order": "little",
+              "samples": 300000000,
+              "sample_interval": 0.25,
+              "unit": "nm/s",
+              "unit_source": "SAC IDEP",
+              "declared_scale": 2,
+              "start_time": "2024-02-29T12:30:10.375000Z",
+              "begin_seconds": 0.125,
+              "time_adjustment_seconds": 0,
+              "timing_quality": null,
+              "quality_flags": 0,
+              "relation": "uncompared",
+              "gap_seconds": null
+            }
+          ]
+        },
+        "selected": {
+          "record": 0,
+          "start_sample": 299999996,
+          "sample_count": 4
+        },
+        "metadata": {
+          "format": "sac",
+          "input_mode": "window",
+          "source_bytes": 1200000632,
+          "read_bytes": 648,
+          "read_requests": 2,
+          "record_bytes": 1200000632,
+          "record_slots": 1,
+          "catalog_offset": 0,
+          "catalog_count": 1,
+          "catalog_complete": true,
+          "decoded_samples": 4,
+          "decoded_bytes": 16,
+          "nonfinite_values": 0,
+          "value_semantics": "raw stored samples; SAC SCALE and instrument response not applied; no filtering, resampling, merging or gap filling",
+          "time_axis": "seconds relative to the selected record's first sample; UTC display rounded to microseconds",
+          "limits": {
+            "max_samples": 16384,
+            "max_page_records": 16,
+            "max_record_bytes": 1048576,
+            "max_decoded_samples": 65535,
+            "max_decoded_bytes": 524280
+          }
+        },
+        "warnings": [
+          "只显示单条记录的显式样本窗；不拼接、不补缺口、不重采样、不校正仪器响应。",
+          "单位只来自明确文件声明；MiniSEED 不含响应单位，SAC SCALE 不应用。目录连续性仅比较本页同通道记录。"
+        ],
+        "sampled": true,
+        "series": [
+          {
+            "record": 0,
+            "label": "XX.TEST.00.BHZ",
+            "unit": "nm/s",
+            "x": [
+              74999999,
+              74999999.25,
+              74999999.5,
+              74999999.75
+            ],
+            "y": [
+              1.25,
+              1.25,
+              1.25,
+              1.25
+            ]
+          }
+        ]
+      }
+    }
+  }
+}

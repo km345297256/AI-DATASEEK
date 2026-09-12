@@ -241,7 +241,8 @@ async def test_unchanged_required_failure_after_one_local_repair_stops_without_s
     assert sum(isinstance(event, DoneEvent) for event in events) == 1
     assert len([event for event in events if isinstance(event, StepEvent)
                 and event.status in {StepStatus.COMPLETED, StepStatus.FAILED}]) == 1
-    assert any("Measured findings" in event.message for event in terminal_messages(events))
+    assert all("Measured findings" not in event.message for event in terminal_messages(events))
+    assert any("分析说明尚未通过完整核验" in event.message for event in terminal_messages(events))
 
 
 @pytest.mark.asyncio

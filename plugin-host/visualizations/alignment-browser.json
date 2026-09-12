@@ -1,0 +1,32 @@
+{
+  "contract_version": 2,
+  "id": "viz-alignment-browser",
+  "version": "1.0.0",
+  "name": "SAM / BAM / CRAM 比对工作台",
+  "description": "离线比对区域、覆盖度、CIGAR 事件和配对轨道；64 MiB 有界顺序扫描，不获取外部参考。",
+  "extensions": [
+    "sam",
+    "bam",
+    "cram"
+  ],
+  "filenames": [],
+  "view_kind": "map",
+  "adapter": "alignment-browser",
+  "reader": "alignment-browser",
+  "capabilities": {
+    "operations": [
+      "preview"
+    ],
+    "input_mode": "whole",
+    "shared": false
+  },
+  "default_enabled": true,
+  "priority": -20,
+  "permissions": [
+    "file:read"
+  ],
+  "limits": {
+    "max_input_bytes": 67108864,
+    "max_output_bytes": 4194304
+  }
+}

@@ -1,0 +1,173 @@
+{
+  "complete": {
+    "contract_version": 2,
+    "type": "phylogeny",
+    "reader": "phylogeny",
+    "kind": "tree",
+    "media_type": "application/json",
+    "phylogeny": {
+      "root": "n0",
+      "rootedness": "unspecified",
+      "nodes": [
+        {
+          "id": "n0",
+          "parent": null,
+          "label": "Root",
+          "length": "0.01"
+        },
+        {
+          "id": "n1",
+          "parent": "n0",
+          "label": "95",
+          "length": "0.3"
+        },
+        {
+          "id": "n2",
+          "parent": "n1",
+          "label": "Human",
+          "length": "0.1"
+        },
+        {
+          "id": "n3",
+          "parent": "n1",
+          "label": "Chimp",
+          "length": "0.2"
+        },
+        {
+          "id": "n4",
+          "parent": "n0",
+          "label": "Mouse",
+          "length": "0.8"
+        }
+      ]
+    },
+    "metadata": {
+      "format": "nwk",
+      "dialect": "newick-single-v1",
+      "input_mode": "whole",
+      "source_bytes": 49,
+      "node_count": 5,
+      "leaf_count": 3,
+      "max_depth": 2,
+      "missing_lengths": 0,
+      "root_length_present": true,
+      "branch_length_mode": true
+    },
+    "warnings": [
+      "仅显示单棵 Newick 树；显示起点不表示已确认的生物学根，不进行重定根或系统发育推断。",
+      "内部节点标签（包括数字）仍是标签，不自动解释为支持度；枝长单位未知，根的入枝长不参与坐标。",
+      "缺失枝长不补零；只有全部非根枝长明确且并非全零时才提供枝长模式，数值坐标用于展示。"
+    ],
+    "sampled": false
+  },
+  "missing": {
+    "contract_version": 2,
+    "type": "phylogeny",
+    "reader": "phylogeny",
+    "kind": "tree",
+    "media_type": "application/json",
+    "phylogeny": {
+      "root": "n0",
+      "rootedness": "unspecified",
+      "nodes": [
+        {
+          "id": "n0",
+          "parent": null,
+          "label": "Root",
+          "length": null
+        },
+        {
+          "id": "n1",
+          "parent": "n0",
+          "label": "95",
+          "length": "0.3"
+        },
+        {
+          "id": "n2",
+          "parent": "n1",
+          "label": "Human",
+          "length": null
+        },
+        {
+          "id": "n3",
+          "parent": "n1",
+          "label": "Chimp",
+          "length": "0.2"
+        },
+        {
+          "id": "n4",
+          "parent": "n0",
+          "label": "Mouse",
+          "length": "0.8"
+        }
+      ]
+    },
+    "metadata": {
+      "format": "nwk",
+      "dialect": "newick-single-v1",
+      "input_mode": "whole",
+      "source_bytes": 40,
+      "node_count": 5,
+      "leaf_count": 3,
+      "max_depth": 2,
+      "missing_lengths": 1,
+      "root_length_present": false,
+      "branch_length_mode": false
+    },
+    "warnings": [
+      "仅显示单棵 Newick 树；显示起点不表示已确认的生物学根，不进行重定根或系统发育推断。",
+      "内部节点标签（包括数字）仍是标签，不自动解释为支持度；枝长单位未知，根的入枝长不参与坐标。",
+      "缺失枝长不补零；只有全部非根枝长明确且并非全零时才提供枝长模式，数值坐标用于展示。"
+    ],
+    "sampled": false
+  },
+  "zero": {
+    "contract_version": 2,
+    "type": "phylogeny",
+    "reader": "phylogeny",
+    "kind": "tree",
+    "media_type": "application/json",
+    "phylogeny": {
+      "root": "n0",
+      "rootedness": "unspecified",
+      "nodes": [
+        {
+          "id": "n0",
+          "parent": null,
+          "label": "Root",
+          "length": "5"
+        },
+        {
+          "id": "n1",
+          "parent": "n0",
+          "label": "Human",
+          "length": "0"
+        },
+        {
+          "id": "n2",
+          "parent": "n0",
+          "label": "Chimp",
+          "length": "0"
+        }
+      ]
+    },
+    "metadata": {
+      "format": "nwk",
+      "dialect": "newick-single-v1",
+      "input_mode": "whole",
+      "source_bytes": 24,
+      "node_count": 3,
+      "leaf_count": 2,
+      "max_depth": 1,
+      "missing_lengths": 0,
+      "root_length_present": true,
+      "branch_length_mode": false
+    },
+    "warnings": [
+      "仅显示单棵 Newick 树；显示起点不表示已确认的生物学根，不进行重定根或系统发育推断。",
+      "内部节点标签（包括数字）仍是标签，不自动解释为支持度；枝长单位未知，根的入枝长不参与坐标。",
+      "缺失枝长不补零；只有全部非根枝长明确且并非全零时才提供枝长模式，数值坐标用于展示。"
+    ],
+    "sampled": false
+  }
+}

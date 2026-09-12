@@ -9,7 +9,7 @@ export interface VisualizationResult {
   plugin_id: string;
   version: string;
   revision: string;
-  kind: 'page' | 'series' | 'raster' | 'table' | 'array' | 'tree' | 'media' | 'report' | 'molecule' | 'resources';
+  kind: 'page' | 'series' | 'raster' | 'table' | 'array' | 'tree' | 'media' | 'report' | 'molecule' | 'resources' | 'features' | 'graph' | 'geometry';
   payload: Record<string, unknown>;
   metadata: Record<string, unknown>;
   warnings: string[];
@@ -24,7 +24,7 @@ function pinVersion(file: FileInfo, plugin: VisualizationPlugin, version: string
   entries.set(versionKey(file, plugin), version); versions.set(signal, entries);
 }
 const VERSION = /^[a-f0-9]{64}$/;
-const kinds = new Set(['page', 'series', 'raster', 'table', 'array', 'tree', 'media', 'report', 'molecule', 'resources']);
+const kinds = new Set(['page', 'series', 'raster', 'table', 'array', 'tree', 'media', 'report', 'molecule', 'resources', 'features', 'graph', 'geometry']);
 const record = (value: unknown): value is Record<string, unknown> => !!value && typeof value === 'object' && !Array.isArray(value);
 function requireOperation(plugin: VisualizationPlugin, operation: VisualizationOperation | 'job') {
   if (!plugin.enabled || plugin.contract_version !== 2 || !plugin.capabilities.operations.includes(operation)) throw new Error('可视化插件未启用或不支持此操作。');
@@ -52,10 +52,11 @@ export function parseVisualizationResult(value: unknown, plugin: VisualizationPl
   const fields = ['contract_version', 'plugin_id', 'version', 'revision', 'kind', 'payload', 'metadata', 'warnings', 'sampled'];
   if (!record(value) || Object.keys(value).length !== fields.length || Object.keys(value).some(key => !fields.includes(key))
     || value.contract_version !== 2 || value.plugin_id !== plugin.id || typeof value.version !== 'string' || !VERSION.test(value.version)
-    || typeof value.revision !== 'string' || !VERSION.test(value.revision) || !kinds.has(String(value.kind)) || !record(value.payload) || !record(value.metadata)
+    || typeof value.revision !== 'string' || !VERSION.test(value.revision) || typeof value.kind !== 'string' || !kinds.has(value.kind) || !record(value.payload) || !record(value.metadata)
     || !Array.isArray(value.warnings) || !value.warnings.every(item => typeof item === 'string') || typeof value.sampled !== 'boolean') {
     throw new Error('预览响应不符合统一插件协议。');
   }
+  if (value.kind === 'geometry' && !['spatial-window','pointcloud-window','gro-trajectory','simulation-mesh','ugrid-window'].includes(plugin.reader)) throw new Error('此插件没有几何结果能力。');
   return value as unknown as VisualizationResult;
 }
 export async function readVisualizationResult(response: Response, plugin: VisualizationPlugin, signal: AbortSignal): Promise<VisualizationResult> {

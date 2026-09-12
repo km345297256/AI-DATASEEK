@@ -1,0 +1,480 @@
+{
+  "first": {
+    "contract_version": 2,
+    "type": "grib-window",
+    "reader": "grib-window",
+    "kind": "tree",
+    "media_type": "application/json",
+    "choices": {
+      "messages": [
+        {
+          "id": "g-0000000000000000",
+          "byte_length": 228,
+          "label": "2 metre temperature",
+          "short_name": "2t",
+          "unit": "K",
+          "shape": [
+            4,
+            6
+          ],
+          "first": [
+            10,
+            50
+          ],
+          "step": [
+            1,
+            -1
+          ],
+          "scanning_mode": 0,
+          "earth_shape": 6,
+          "bitmap": true,
+          "missing_count": 1,
+          "packing_bits": 16,
+          "discipline": 0,
+          "parameter_category": 0,
+          "parameter_number": 0,
+          "reference_time": "2026-09-10T00:00:00Z",
+          "forecast_time": 6,
+          "forecast_unit": 1,
+          "surface_type": 103,
+          "surface_scale": 0,
+          "surface_value": 2
+        },
+        {
+          "id": "g-00000000000000e4",
+          "byte_length": 228,
+          "label": "2 metre temperature",
+          "short_name": "2t",
+          "unit": "K",
+          "shape": [
+            4,
+            6
+          ],
+          "first": [
+            10,
+            50
+          ],
+          "step": [
+            1,
+            -1
+          ],
+          "scanning_mode": 0,
+          "earth_shape": 6,
+          "bitmap": true,
+          "missing_count": 1,
+          "packing_bits": 16,
+          "discipline": 0,
+          "parameter_category": 0,
+          "parameter_number": 0,
+          "reference_time": "2026-09-10T00:00:00Z",
+          "forecast_time": 6,
+          "forecast_unit": 1,
+          "surface_type": 103,
+          "surface_scale": 0,
+          "surface_value": 2
+        },
+        {
+          "id": "g-00000000000001c8",
+          "byte_length": 228,
+          "label": "2 metre temperature",
+          "short_name": "2t",
+          "unit": "K",
+          "shape": [
+            4,
+            6
+          ],
+          "first": [
+            10,
+            50
+          ],
+          "step": [
+            1,
+            -1
+          ],
+          "scanning_mode": 0,
+          "earth_shape": 6,
+          "bitmap": true,
+          "missing_count": 1,
+          "packing_bits": 16,
+          "discipline": 0,
+          "parameter_category": 0,
+          "parameter_number": 0,
+          "reference_time": "2026-09-10T00:00:00Z",
+          "forecast_time": 6,
+          "forecast_unit": 1,
+          "surface_type": 103,
+          "surface_scale": 0,
+          "surface_value": 2
+        },
+        {
+          "id": "g-00000000000002ac",
+          "byte_length": 228,
+          "label": "2 metre temperature",
+          "short_name": "2t",
+          "unit": "K",
+          "shape": [
+            4,
+            6
+          ],
+          "first": [
+            10,
+            50
+          ],
+          "step": [
+            1,
+            -1
+          ],
+          "scanning_mode": 0,
+          "earth_shape": 6,
+          "bitmap": true,
+          "missing_count": 1,
+          "packing_bits": 16,
+          "discipline": 0,
+          "parameter_category": 0,
+          "parameter_number": 0,
+          "reference_time": "2026-09-10T00:00:00Z",
+          "forecast_time": 6,
+          "forecast_unit": 1,
+          "surface_type": 103,
+          "surface_scale": 0,
+          "surface_value": 2
+        },
+        {
+          "id": "g-0000000000000390",
+          "byte_length": 228,
+          "label": "2 metre temperature",
+          "short_name": "2t",
+          "unit": "K",
+          "shape": [
+            4,
+            6
+          ],
+          "first": [
+            10,
+            50
+          ],
+          "step": [
+            1,
+            -1
+          ],
+          "scanning_mode": 0,
+          "earth_shape": 6,
+          "bitmap": true,
+          "missing_count": 1,
+          "packing_bits": 16,
+          "discipline": 0,
+          "parameter_category": 0,
+          "parameter_number": 0,
+          "reference_time": "2026-09-10T00:00:00Z",
+          "forecast_time": 6,
+          "forecast_unit": 1,
+          "surface_type": 103,
+          "surface_scale": 0,
+          "surface_value": 2
+        },
+        {
+          "id": "g-0000000000000474",
+          "byte_length": 228,
+          "label": "2 metre temperature",
+          "short_name": "2t",
+          "unit": "K",
+          "shape": [
+            4,
+            6
+          ],
+          "first": [
+            10,
+            50
+          ],
+          "step": [
+            1,
+            -1
+          ],
+          "scanning_mode": 0,
+          "earth_shape": 6,
+          "bitmap": true,
+          "missing_count": 1,
+          "packing_bits": 16,
+          "discipline": 0,
+          "parameter_category": 0,
+          "parameter_number": 0,
+          "reference_time": "2026-09-10T00:00:00Z",
+          "forecast_time": 6,
+          "forecast_unit": 1,
+          "surface_type": 103,
+          "surface_scale": 0,
+          "surface_value": 2
+        },
+        {
+          "id": "g-0000000000000558",
+          "byte_length": 228,
+          "label": "2 metre temperature",
+          "short_name": "2t",
+          "unit": "K",
+          "shape": [
+            4,
+            6
+          ],
+          "first": [
+            10,
+            50
+          ],
+          "step": [
+            1,
+            -1
+          ],
+          "scanning_mode": 0,
+          "earth_shape": 6,
+          "bitmap": true,
+          "missing_count": 1,
+          "packing_bits": 16,
+          "discipline": 0,
+          "parameter_category": 0,
+          "parameter_number": 0,
+          "reference_time": "2026-09-10T00:00:00Z",
+          "forecast_time": 6,
+          "forecast_unit": 1,
+          "surface_type": 103,
+          "surface_scale": 0,
+          "surface_value": 2
+        },
+        {
+          "id": "g-000000000000063c",
+          "byte_length": 228,
+          "label": "2 metre temperature",
+          "short_name": "2t",
+          "unit": "K",
+          "shape": [
+            4,
+            6
+          ],
+          "first": [
+            10,
+            50
+          ],
+          "step": [
+            1,
+            -1
+          ],
+          "scanning_mode": 0,
+          "earth_shape": 6,
+          "bitmap": true,
+          "missing_count": 1,
+          "packing_bits": 16,
+          "discipline": 0,
+          "parameter_category": 0,
+          "parameter_number": 0,
+          "reference_time": "2026-09-10T00:00:00Z",
+          "forecast_time": 6,
+          "forecast_unit": 1,
+          "surface_type": 103,
+          "surface_scale": 0,
+          "surface_value": 2
+        }
+      ]
+    },
+    "selected": {
+      "offset": 0
+    },
+    "warnings": [
+      "按单条 GRIB2 消息解码原始气象场及缺失位图；不合并变量、层或时刻，不额外换算单位、插值、排序经度或请求在线底图。"
+    ],
+    "sampled": false,
+    "metadata": {
+      "format": "grib2",
+      "edition": 2,
+      "grid_type": "regular_ll",
+      "packing": "grid_simple",
+      "decoder": "ecCodes",
+      "input_mode": "window",
+      "value_semantics": "ecCodes decoded values; explicit bitmap; longitude [0,360); no extra unit conversion or interpolation",
+      "source_bytes": 2280,
+      "read_bytes": 1456,
+      "read_requests": 104,
+      "page_offset": 0,
+      "next_offset": 1824,
+      "scanned_messages": 8,
+      "skipped_messages": 0,
+      "decoded_points": 0,
+      "output_values": 0,
+      "missing_values": 0
+    },
+    "tree": [
+      {
+        "path": "/g-0000000000000000",
+        "node_type": "array",
+        "attributes": {
+          "label": "2t"
+        }
+      },
+      {
+        "path": "/g-00000000000000e4",
+        "node_type": "array",
+        "attributes": {
+          "label": "2t"
+        }
+      },
+      {
+        "path": "/g-00000000000001c8",
+        "node_type": "array",
+        "attributes": {
+          "label": "2t"
+        }
+      },
+      {
+        "path": "/g-00000000000002ac",
+        "node_type": "array",
+        "attributes": {
+          "label": "2t"
+        }
+      },
+      {
+        "path": "/g-0000000000000390",
+        "node_type": "array",
+        "attributes": {
+          "label": "2t"
+        }
+      },
+      {
+        "path": "/g-0000000000000474",
+        "node_type": "array",
+        "attributes": {
+          "label": "2t"
+        }
+      },
+      {
+        "path": "/g-0000000000000558",
+        "node_type": "array",
+        "attributes": {
+          "label": "2t"
+        }
+      },
+      {
+        "path": "/g-000000000000063c",
+        "node_type": "array",
+        "attributes": {
+          "label": "2t"
+        }
+      }
+    ]
+  },
+  "second": {
+    "contract_version": 2,
+    "type": "grib-window",
+    "reader": "grib-window",
+    "kind": "tree",
+    "media_type": "application/json",
+    "choices": {
+      "messages": [
+        {
+          "id": "g-0000000000000720",
+          "byte_length": 228,
+          "label": "2 metre temperature",
+          "short_name": "2t",
+          "unit": "K",
+          "shape": [
+            4,
+            6
+          ],
+          "first": [
+            10,
+            50
+          ],
+          "step": [
+            1,
+            -1
+          ],
+          "scanning_mode": 0,
+          "earth_shape": 6,
+          "bitmap": true,
+          "missing_count": 1,
+          "packing_bits": 16,
+          "discipline": 0,
+          "parameter_category": 0,
+          "parameter_number": 0,
+          "reference_time": "2026-09-10T00:00:00Z",
+          "forecast_time": 6,
+          "forecast_unit": 1,
+          "surface_type": 103,
+          "surface_scale": 0,
+          "surface_value": 2
+        },
+        {
+          "id": "g-0000000000000804",
+          "byte_length": 228,
+          "label": "2 metre temperature",
+          "short_name": "2t",
+          "unit": "K",
+          "shape": [
+            4,
+            6
+          ],
+          "first": [
+            10,
+            50
+          ],
+          "step": [
+            1,
+            -1
+          ],
+          "scanning_mode": 0,
+          "earth_shape": 6,
+          "bitmap": true,
+          "missing_count": 1,
+          "packing_bits": 16,
+          "discipline": 0,
+          "parameter_category": 0,
+          "parameter_number": 0,
+          "reference_time": "2026-09-10T00:00:00Z",
+          "forecast_time": 6,
+          "forecast_unit": 1,
+          "surface_type": 103,
+          "surface_scale": 0,
+          "surface_value": 2
+        }
+      ]
+    },
+    "selected": {
+      "offset": 1824
+    },
+    "warnings": [
+      "按单条 GRIB2 消息解码原始气象场及缺失位图；不合并变量、层或时刻，不额外换算单位、插值、排序经度或请求在线底图。"
+    ],
+    "sampled": false,
+    "metadata": {
+      "format": "grib2",
+      "edition": 2,
+      "grid_type": "regular_ll",
+      "packing": "grid_simple",
+      "decoder": "ecCodes",
+      "input_mode": "window",
+      "value_semantics": "ecCodes decoded values; explicit bitmap; longitude [0,360); no extra unit conversion or interpolation",
+      "source_bytes": 2280,
+      "read_bytes": 364,
+      "read_requests": 26,
+      "page_offset": 1824,
+      "next_offset": null,
+      "scanned_messages": 2,
+      "skipped_messages": 0,
+      "decoded_points": 0,
+      "output_values": 0,
+      "missing_values": 0
+    },
+    "tree": [
+      {
+        "path": "/g-0000000000000720",
+        "node_type": "array",
+        "attributes": {
+          "label": "2t"
+        }
+      },
+      {
+        "path": "/g-0000000000000804",
+        "node_type": "array",
+        "attributes": {
+          "label": "2t"
+        }
+      }
+    ]
+  }
+}

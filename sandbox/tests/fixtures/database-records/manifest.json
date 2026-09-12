@@ -1,0 +1,28 @@
+{
+  "synthetic-pymongo-4.17.0.bson": {
+    "sha256": "239cddebb3967003caf75cf5b20cd1de3c47b0a16df1f66481cee29a244db986",
+    "bytes": 1213,
+    "producer": "PyMongo 4.17.0 official BSON encoder"
+  },
+  "empty-document.bson": {
+    "sha256": "49e8e3297545c15ab6a79471a7a34d43e24a8f1cb25ea3d8417c61f699267a3f",
+    "bytes": 5,
+    "producer": "PyMongo 4.17.0 official BSON encoder"
+  },
+  "synthetic-rdb11-wire.rdb": {
+    "sha256": "05ca53fca0e111f7d1e79fba79ca787086b2b55d65f8571b48582989bcc33470",
+    "bytes": 229,
+    "producer": "project wire fixture; not native Redis evidence"
+  },
+  "empty-rdb11-wire.rdb": {
+    "sha256": "133b5316e3800ab13615a9d4ddc40a6a0c1c133523e5506b284cee353a2c3c9b",
+    "bytes": 18,
+    "producer": "project wire fixture; not native Redis evidence"
+  },
+  "native-redis-7.2.7.rdb": {
+    "sha256": "d7853cacc4bbee20f5d632226ac309ce3b913da47a669f2bfa373426431fed69",
+    "bytes": 346,
+    "producer": "Redis 7.2.7 native SAVE + redis-check-rdb",
+    "image_digest": "redis@sha256:96af50b9ce0cd7f44f73266ce90bb63a6d6d5655adb8854d2723a0382524c8f3"
+  }
+}

@@ -1,0 +1,30 @@
+{
+  "contract_version": 2,
+  "id": "viz-fcs-window",
+  "version": "1.0.0",
+  "name": "流式细胞原始事件",
+  "description": "受限 FCS 3.0/3.1 事件窗口、散点与直方图，不应用补偿、logicle 或门控。",
+  "extensions": [
+    "fcs"
+  ],
+  "filenames": [],
+  "view_kind": "series",
+  "adapter": "fcs-window",
+  "reader": "fcs-window",
+  "default_enabled": true,
+  "priority": 30,
+  "permissions": [
+    "file:read"
+  ],
+  "limits": {
+    "max_input_bytes": 8388608,
+    "max_output_bytes": 2097152
+  },
+  "capabilities": {
+    "operations": [
+      "preview"
+    ],
+    "input_mode": "window",
+    "shared": false
+  }
+}

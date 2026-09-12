@@ -17,6 +17,7 @@ from app.application.services.dataset_file_preview import DatasetFilePreviewRequ
 from app.application.services.file_preview import PreviewVersionChanged, preview_version
 from app.application.services.file_service import FileService
 from app.application.services.visualization_catalog import VisualizationCatalogService, VisualizationDisabledError
+from app.application.services.unified_visualization import VisualizationRequest, unified_visualization
 from app.domain.models.dataset import DataCenterDataset, DatasetFile, DatasetLocation, DatasetStorageType
 from app.domain.models.visualization import VisualizationSnapshot
 from app.infrastructure.external.file.datasetfile import DatasetPreviewFileStorage
@@ -151,6 +152,13 @@ async def test_reference_reads_keep_owner_scope_and_allow_other_enabled_view(env
     # file reference must stay available until every matching view is stopped.
     assert await env.service.get_file_info(file_id, "owner") is not None
     await env.catalog.set_state("owner", "viz-h5web", False)
+    # The independent range-array view is also authorized for NetCDF4.
+    assert await env.service.get_file_info(file_id, "owner") is not None
+    await env.catalog.set_state("owner", "viz-array-window", False)
+    # UGRID is another independently switchable NetCDF4 view. Its availability
+    # does not imply that arbitrary NetCDF files satisfy its stricter reader.
+    assert await env.service.get_file_info(file_id, "owner") is not None
+    await env.catalog.set_state("owner", "viz-ugrid-window", False)
     assert await env.service.get_file_info(file_id, "owner") is None
     with pytest.raises(VisualizationDisabledError):
         await env.service.download_file_range(file_id, "owner", offset=0, length=1)
@@ -285,6 +293,94 @@ async def test_shapefile_sidecars_same_logical_stem_only(env):
     assert (await env.service.get_file_info(sidecar, "owner")).filename == "roads.dbf"
     await env.catalog.set_state("owner", "shapefile", False)
     assert await env.service.get_file_info(sidecar, "owner") is None
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("entry_extension", ["shp", "shx", "dbf", "prj", "cpg"])
+@pytest.mark.parametrize("host_source", [False, True])
+@pytest.mark.parametrize("uppercase_extensions", [False, True])
+async def test_each_shapefile_entry_has_one_anchor_and_authorized_resource_bytes(
+    env, entry_extension, host_source, uppercase_extensions,
+):
+    extensions = ["shp", "shx", "dbf", "prj", "cpg"]
+    location = env.datasets.dataset.locations[0]
+    prefix = ""
+    if host_source:
+        location.storage_type = DatasetStorageType.HOST_PATH
+        location.source_path, location.mount_name = "/allowed/private-source", "data"
+        prefix = f"sources/{location.location_id}/data/"
+    filenames = {extension: f"roads.{extension.upper() if uppercase_extensions else extension}" for extension in extensions}
+    env.datasets.dataset.files = [DatasetFile(path=f"{prefix}folder/{filename}") for filename in filenames.values()]
+    # A same-basename layer in another folder must never join this group.
+    env.datasets.dataset.files.extend(DatasetFile(path=f"{prefix}other/{filename}") for filename in filenames.values())
+    response = await prepare(env, path=f"folder/{filenames[entry_extension]}", plugin="shapefile")
+    assert response.file.filename == filenames[entry_extension]
+    assert response.related_files[0] == response.file
+    assert len(response.related_files) == 5
+    assert {info.metadata["logical_path"] for info in response.related_files} == {
+        f"folder/{filename}" for filename in filenames.values()
+    }
+    assert {row["anchor"] for row in env.repository.rows.values()} == {f"{prefix}folder/{filenames['shp']}"}
+    ids = {info.filename: info.file_id for info in response.related_files}
+    source = ids[filenames["shp"]]
+    storage = DatasetPreviewFileStorage(SimpleNamespace(), env.service)
+    files = FileService(storage)
+    for info in response.related_files:
+        assert await storage.authorize_visualization_resource(source, info.file_id, "owner", "shapefile")
+        # Exercise the same source+resource byte operation used by the browser,
+        # including authorization both before and after bounded source reads.
+        result = await unified_visualization(files, env.catalog, "unused-image", source, "owner",
+            VisualizationRequest(plugin_id="shapefile", operation="bytes", options={"resource_id": info.file_id}))
+        try:
+            assert result.stream.read() == env.state["data"]
+        finally:
+            result.close()
+    # The IDs are canonical across entry points, while selection stays intact.
+    reopened = await prepare(env, path=f"folder/{filenames['shp']}", plugin="shapefile")
+    assert {info.filename: info.file_id for info in reopened.related_files} == ids
+    assert any(read[3] > 0 for read in env.state["reads"])
+    if host_source:
+        serialized = response.model_dump_json()
+        assert "private-source" not in serialized and location.location_id not in serialized and "/allowed" not in serialized
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("entry_extension", ["shx", "dbf", "prj", "cpg"])
+async def test_sidecar_entry_cannot_borrow_geometry_from_another_folder(env, entry_extension):
+    env.datasets.dataset.files = [DatasetFile(path=f"one/roads.{entry_extension}"), DatasetFile(path="two/roads.shp")]
+    with pytest.raises(ValueError, match="缺少同组的 .shp"):
+        await prepare(env, path=f"one/roads.{entry_extension}", plugin="shapefile")
+    assert not env.repository.rows and not env.state["reads"]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("duplicate", ["shp", "SHP", "SHX", "DBF", "PRJ", "CPG"])
+async def test_ambiguous_shapefile_components_are_rejected_before_reference_writes(env, duplicate):
+    env.datasets.dataset.files = [DatasetFile(path=f"folder/roads.{extension}")
+                                 for extension in ["shp", "shx", "dbf", "prj", "cpg", duplicate]]
+    with pytest.raises(ValueError, match="重复扩展名"):
+        await prepare(env, path="folder/roads.shx", plugin="shapefile")
+    assert not env.repository.rows and not env.state["reads"]
+
+
+@pytest.mark.asyncio
+async def test_sidecar_preparation_keeps_owner_dataset_and_anchor_authorization_fences(env):
+    env.datasets.dataset.files = [DatasetFile(path=f"folder/roads.{extension}") for extension in ["shp", "dbf", "prj"]]
+    prepared = await prepare(env, path="folder/roads.prj", plugin="shapefile")
+    ids = {info.filename: info.file_id for info in prepared.related_files}
+    source, resource = ids["roads.shp"], ids["roads.dbf"]
+    authorize = env.service.authorize_visualization_resource
+    assert await authorize(source, resource, "owner", "shapefile")
+    # The selected .prj is not a replacement geometry capability.
+    assert not await authorize(ids["roads.prj"], resource, "owner", "shapefile")
+    assert not await authorize(source, resource, "foreign", "shapefile")
+    original = env.repository.rows[resource].copy()
+    for field, value in [("dataset_id", "other-dataset"), ("anchor", "elsewhere/roads.shp"),
+                         ("owner_id", "foreign"), ("path", "elsewhere/roads.dbf")]:
+        env.repository.rows[resource] = {**original, field: value}
+        assert not await authorize(source, resource, "owner", "shapefile")
+    env.repository.rows[resource] = original
+    assert await authorize(source, resource, "owner", "shapefile")
 
 
 @pytest.mark.asyncio

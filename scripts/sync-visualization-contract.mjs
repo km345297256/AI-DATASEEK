@@ -7,8 +7,8 @@ const root = new URL('../', import.meta.url);
 const sourcePath = 'contracts/visualization-adapters.json';
 const source = JSON.parse(await readFile(new URL(sourcePath, root), 'utf8'));
 const operationNames = ['bytes', 'page', 'preview', 'prepare', 'job'];
-const inputModes = ['whole', 'page', 'prefix'];
-const viewKinds = ['image', 'map', 'series', 'table', 'text', 'structure', 'document'];
+const inputModes = ['whole', 'page', 'prefix', 'window'];
+const viewKinds = ['image', 'map', 'series', 'table', 'text', 'structure', 'document', 'tree', 'media', 'graph'];
 const exact = (value, keys) => value && typeof value === 'object' && !Array.isArray(value)
   && Object.keys(value).sort().join(',') === [...keys].sort().join(',');
 if (!exact(source, ['contract_version', 'adapters']) || source.contract_version !== 2

@@ -22,6 +22,8 @@ import httpx
 from app.application.services.unified_visualization import VisualizationResult
 from app.core.config import get_settings
 from app.infrastructure.storage.mongodb import get_mongodb
+from app.interfaces.dependencies import get_current_user
+from visualization_acceptance_safety import FixtureLedger, local_base
 
 
 async def business_snapshot(database):
@@ -37,7 +39,7 @@ async def business_snapshot(database):
 
 async def main():
     prefix = "visualization-regression-" + uuid.uuid4().hex
-    base = os.environ.get("DATASEEK_VERIFY_BASE_URL", "http://frontend")
+    base = local_base(os.environ.get("DATASEEK_VERIFY_BASE_URL", "http://frontend"))
     resources = Path(__file__).resolve().parents[1] / "app/resources/datasets"
     uploaded: list[str] = []
     deleted: list[str] = []
@@ -53,8 +55,11 @@ async def main():
     await mongo.initialize()
     try:
         database = mongo.client[get_settings().mongodb_database]
+        user_id = (await get_current_user()).id
+        ledger = FixtureLedger(database, "visualization_http_regression", prefix, user_id=user_id)
         before = await business_snapshot(database)
-        async with httpx.AsyncClient(base_url=base, timeout=httpx.Timeout(120, connect=10)) as client:
+        async with httpx.AsyncClient(base_url=base, timeout=httpx.Timeout(120, connect=10), trust_env=False,
+                follow_redirects=False, transport=httpx.AsyncHTTPTransport(retries=0)) as client:
             async def request(method, path, **kwargs):
                 response = await client.request(method, path, **kwargs)
                 response.raise_for_status()
@@ -68,16 +73,12 @@ async def main():
                 return value
 
             async def upload(name, payload, content_type):
-                value = await request("POST", "/api/v1/files", files={"file": (prefix + "-" + name, payload, content_type)},
+                filename = ledger.declare(name, len(payload))  # Before the one, non-retried POST.
+                value = await request("POST", "/api/v1/files", files={"file": (filename, payload, content_type)},
                                       data={"metadata": json.dumps({"source": "visualization_http_regression", "regression_run": prefix})})
-                file_id = value.get("file_id")
-                assert isinstance(file_id, str) and file_id, "Upload did not return an opaque file ID"
-                # Register immediately, before checking anything else, so any
-                # later assertion still deletes exactly this returned object.
+                file_id = await ledger.accept(value)
                 uploaded.append(file_id)
                 print(json.dumps({"fixture_uploaded": file_id, "run": prefix}), file=sys.stderr, flush=True)
-                assert re.fullmatch(r"[A-Za-z0-9_:-]{1,256}", file_id), "Unexpected opaque file ID syntax"
-                assert value["filename"].startswith(prefix + "-")
                 return file_id
 
             async def preview(file_id, plugin, reader, kind):
@@ -153,23 +154,35 @@ async def main():
                         cleanup_errors.append("map_preference_restore_failed")
                 else:
                     preference_restored = True
+                try:
+                    await ledger.recover()
+                except Exception:
+                    cleanup_errors.append("fixture_inventory_failed")
+                uploaded[:] = ledger.records
                 for file_id in reversed(uploaded):
                     try:
                         path = f"/api/v1/files/{quote(file_id, safe='')}"
-                        response = await client.delete(path)
-                        assert response.status_code in (200, 404)
+                        if await ledger.assert_owned(file_id):
+                            response = await client.delete(path)
+                            assert response.status_code in (200, 404)
+                            if response.status_code == 200: assert response.json()["code"] == 0
                         absent = await client.get(path + "/info")
                         assert absent.status_code == 404, "Deleted fixture remains readable"
+                        await ledger.assert_absent(file_id)
                         deleted.append(file_id)
                     except Exception:
                         cleanup_errors.append("fixture_delete_failed:" + file_id)
+                try:
+                    await ledger.assert_clean()
+                except Exception:
+                    cleanup_errors.append("fixture_readback_failed")
             after = await business_snapshot(database)
             summary = {"run": prefix, "successful_previews": checks, "view_types": len({(c["reader"], c["view"]) for c in checks}),
                        "negative_http_checks": negative_checks, "fixtures_uploaded": len(uploaded), "fixtures_deleted": len(deleted),
                        "map_preference_restored": preference_restored, "business_state_preserved": before == after,
                        "business_counts_before": before, "business_counts_after": after,
-                       "sessions_or_model_requests_created": 0, "cleanup_errors": cleanup_errors,
-                       "passed": error is None and not cleanup_errors and before == after}
+                       "script_model_endpoint_calls": 0, "cleanup_errors": cleanup_errors,
+                       "passed": error is None and not cleanup_errors and before == after and set(uploaded) == set(deleted)}
             print(json.dumps(summary, ensure_ascii=False, indent=2), flush=True)
             if error is not None:
                 raise RuntimeError("HTTP visualization acceptance failed; inspect the summary and cleanup status") from error

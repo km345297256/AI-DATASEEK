@@ -9,6 +9,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_serializer, field_valid
 DELIVERABLE_LABELS = {"image": "图表", "table": "数据表", "report": "报告", "code": "代码", "any": "结果文件"}
 
 ArtifactReasonCode = Literal[
+    "missing_artifact",
     "invalid_content", "unavailable_or_unsafe_path", "unsupported_kind", "unsupported_format",
     "kind_mismatch", "format_mismatch", "not_regular_file", "file_size_limit", "batch_size_limit",
     "empty_file", "changed_during_read", "empty_or_binary_text", "image_size_limit", "table_size_limit",

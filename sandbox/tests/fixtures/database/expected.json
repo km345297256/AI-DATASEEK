@@ -1,0 +1,28 @@
+{
+  "provenance": "Original synthetic data created by GenerateAccessFixtures.java using Jackcess 4.0.11, no user records",
+  "files": ["synthetic-v2000.mdb", "synthetic-v2010.accdb"],
+  "tables": {
+    "Samples": {
+      "columns": ["ID", "Label", "Amount", "Exact", "Enabled", "Observed", "Score", "Binary"],
+      "types": ["LONG", "TEXT", "MONEY", "NUMERIC(28,4)", "BOOLEAN", "SHORT_DATE_TIME", "DOUBLE", "BINARY(4)"],
+      "rows": [
+        [1, "科学数据", "1234.5678", "123456789012345678901234.5678", true, "2024-02-29T12:34:56", 1.25, "01020304"],
+        [2, "", "-0.0001", "-9007199254740993.0001", false, "2000-01-01T00:00:00", -2.5, null],
+        [3, null, null, null, true, null, null, null],
+        [4, "<script>inert</script>", "922337203685477.5807", "0.0000", false, "2026-09-11T00:00:00", 0.0, "00000000"]
+      ]
+    },
+    "Empty": {"columns": ["Value"], "types": ["TEXT"], "rows": []}
+  },
+  "interpretation": {
+    "Amount": "Exact MONEY decimal text, four fractional digits, never convert via float",
+    "Exact": "Exact NUMERIC decimal text; deliberately exceeds JavaScript safe integer precision",
+    "Observed": "Access local wall time without a timezone; do not assert UTC",
+    "Binary": "Hex shown in this oracle only, preview must omit raw binary content with explicit type/size or reject unsupported types",
+    "Label": "Empty text and NULL must remain distinct; HTML-looking value must be inert text"
+  },
+  "boundary_files": {
+    "synthetic-linked-v2000.mdb": "Contains only an ExternalTable linked-table metadata record pointing to an intentionally nonexistent synthetic path; never follow or expose the target",
+    "synthetic-memo-ole-v2010.accdb": "Unsupported table ID LONG, Note MEMO, Object OLE with synthetic bytes; reject or explicitly omit complex fields without decoding embedded content"
+  }
+}

@@ -23,6 +23,7 @@ import httpx
 
 from check_extended_visualization_workers import JCAMP, METPY_OPTIONS, _fixtures, _remove_owned
 from check_visualization_http import business_snapshot
+from visualization_acceptance_safety import FixtureLedger, local_base
 from app.application.services.unified_visualization import VisualizationResult
 from app.application.services.visualization_jobs import scope_for_file
 from app.core.config import get_settings
@@ -50,7 +51,7 @@ async def snapshot(database):
 
 async def main():
     prefix = "visualization-unified-http-" + uuid.uuid4().hex
-    base = os.environ.get("DATASEEK_VERIFY_BASE_URL", "http://frontend")
+    base = local_base(os.environ.get("DATASEEK_VERIFY_BASE_URL", "http://frontend"))
     uploaded, deleted, scopes, cleanup_errors = [], [], {}, []
     checks, negatives, job_checks = [], {}, {}
     original_fastqc = None
@@ -58,6 +59,7 @@ async def main():
     preference_restored = False
     error = None
     user_id = None
+    blocked_files = set()
     cleanup_jobs = cleanup_artifacts = 0
     mongo = get_mongodb()
     await mongo.initialize()
@@ -67,7 +69,11 @@ async def main():
     jobs, artifacts = get_analysis_job_service(), get_spill_artifact_store()
     before = await snapshot(database)
     try:
-        async with httpx.AsyncClient(base_url=base, timeout=httpx.Timeout(120, connect=10)) as client:
+        user_id = (await get_current_user()).id
+        assert isinstance(user_id, str) and user_id
+        ledger = FixtureLedger(database, "visualization_unified_http_regression", prefix, user_id=user_id)
+        async with httpx.AsyncClient(base_url=base, timeout=httpx.Timeout(120, connect=10), trust_env=False,
+                follow_redirects=False, transport=httpx.AsyncHTTPTransport(retries=0)) as client:
             async def request(method, path, **kwargs):
                 response = await client.request(method, path, **kwargs)
                 response.raise_for_status()
@@ -84,21 +90,24 @@ async def main():
                 negatives[label] = status
 
             async def upload(name, data, content_type="application/octet-stream"):
-                response = await client.post("/api/v1/files", files={"file": (prefix + "-" + name, data, content_type)},
+                filename = ledger.declare(name, len(data))  # Recoverable even if POST response is lost.
+                response = await client.post("/api/v1/files", files={"file": (filename, data, content_type)},
                                             data={"metadata": json.dumps({"source": "visualization_unified_http_regression", "regression_run": prefix})})
                 response.raise_for_status()
                 envelope = response.json()
                 value = envelope.get("data", {})
-                file_id = value.get("file_id")
-                assert isinstance(file_id, str) and file_id, "Upload did not return an opaque file ID"
-                # Track immediately, before any assertion that could fail.
+                assert envelope.get("code") == 0
+                file_id = await ledger.accept(value)
+                scope = scope_for_file(file_id)
+                # Existing scoped work is a failed safety precondition, never
+                # authority to delete it. Also retain its file for inspection.
+                blocked_files.add(file_id)
+                assert await database.analysis_jobs.count_documents({"user_id": user_id, "session_id": scope}) == 0
+                assert await database.spill_artifacts.count_documents({"owner_user_id": user_id, "owner_session_id": scope}) == 0
+                blocked_files.discard(file_id)
                 uploaded.append(file_id)
-                scopes[file_id] = scope_for_file(file_id)
+                scopes[file_id] = scope
                 print(json.dumps({"fixture_uploaded": file_id, "run": prefix}), file=sys.stderr, flush=True)
-                assert envelope.get("code") == 0 and re.fullmatch(r"[A-Za-z0-9_:-]{1,256}", file_id)
-                assert value["filename"] == prefix + "-" + name
-                assert await database.analysis_jobs.count_documents({"user_id": user_id, "session_id": scopes[file_id]}) == 0
-                assert await database.spill_artifacts.count_documents({"owner_user_id": user_id, "owner_session_id": scopes[file_id]}) == 0
                 return file_id
 
             async def preview(file_id, plugin, reader, kind, options=None):
@@ -135,11 +144,12 @@ async def main():
                 # Authentication routes are intentionally removed. Reuse the
                 # current API's fixed system-identity dependency, not a legacy
                 # /auth/me endpoint or a guessed administrator identifier.
-                user_id = (await get_current_user()).id
-                assert isinstance(user_id, str) and user_id
                 unified = await request("GET", "/api/v1/visualizations")
                 assert unified["engine"] == "cordis"
-                assert len(unified["plugins"]) == 36 and all(p["contract_version"] == 2 for p in unified["plugins"])
+                # This checks the original capabilities, not the historical
+                # catalog size: newly approved domain plugins may coexist.
+                assert len({p["id"] for p in unified["plugins"]}) == len(unified["plugins"])
+                assert all(type(p["contract_version"]) is int and p["contract_version"] == 2 for p in unified["plugins"])
                 assert all("data_kind" not in p and p["capabilities"]["operations"] for p in unified["plugins"])
                 catalog = {p["id"]: p for p in unified["plugins"]}
                 needed = {"viz-plotly", "viz-h5web", "viz-excel", "viz-rdkit", "viz-metpy", "viz-word", "viz-powerpoint", "viz-jsroot", "viz-nmrium", "viz-pdfjs", "netcdf-series"}
@@ -156,9 +166,11 @@ async def main():
                 # This unique opaque ID has no file and requires no upload.
                 confirmation_id = prefix + "-numeric-confirmation"
                 confirmation_scope = scope_for_file(confirmation_id)
-                scopes[confirmation_id] = confirmation_scope
                 jobs_before_confirmation = await database.analysis_jobs.count_documents({})
+                assert not await database.stored_files.count_documents({"file_id": confirmation_id})
                 assert await database.analysis_jobs.count_documents({"user_id": user_id, "session_id": confirmation_scope}) == 0
+                assert await database.spill_artifacts.count_documents({"owner_user_id": user_id, "owner_session_id": confirmation_scope}) == 0
+                scopes[confirmation_id] = confirmation_scope
                 for value, label in [(1, "qc_integer_confirmation_rejected"), (1.0, "qc_float_confirmation_rejected")]:
                     await expect("POST", file_path(confirmation_id, "/visualization/jobs"), 422, label,
                                  json={"plugin_id": "viz-fastqc", "kind": "report", "options": {"confirm": value}})
@@ -285,6 +297,11 @@ async def main():
                 if user_id is not None:
                     for file_id, scope in scopes.items():
                         try:
+                            if file_id in ledger.records:
+                                assert await ledger.assert_owned(file_id), "Scoped fixture disappeared; refusing owner cleanup"
+                            else:
+                                assert file_id == confirmation_id and scope == confirmation_scope
+                                assert not await database.stored_files.count_documents({"file_id": file_id})
                             records = await database.analysis_jobs.find({"user_id": user_id, "session_id": scope}).to_list()
                             for record in records:
                                 if record["status"] in ACTIVE:
@@ -298,6 +315,7 @@ async def main():
                             assert await database.analysis_jobs.count_documents({"user_id": user_id, "session_id": scope}) == 0
                             assert await database.spill_artifacts.count_documents({"owner_user_id": user_id, "owner_session_id": scope}) == 0
                         except Exception:
+                            blocked_files.add(file_id)
                             cleanup_errors.append("owned_job_or_artifact_cleanup_failed:" + file_id)
                 if restore_fastqc and original_fastqc is not None:
                     try:
@@ -309,23 +327,41 @@ async def main():
                         cleanup_errors.append("fastqc_preference_restore_failed")
                 else:
                     preference_restored = True
+                try:
+                    await ledger.recover()
+                except Exception:
+                    cleanup_errors.append("fixture_inventory_failed")
+                uploaded[:] = ledger.records
                 for file_id in reversed(uploaded):
                     try:
-                        response = await client.delete(file_path(file_id))
-                        assert response.status_code in {200, 404}
+                        assert file_id not in blocked_files, "Scoped work was not safe to clean; refusing file deletion"
+                        # A response-lost upload has no granted job-cleanup
+                        # scope. Do not remove it if unexpected work appeared.
+                        scope = scope_for_file(file_id)
+                        assert not await database.analysis_jobs.count_documents({"user_id": user_id, "session_id": scope})
+                        assert not await database.spill_artifacts.count_documents({"owner_user_id": user_id, "owner_session_id": scope})
+                        if await ledger.assert_owned(file_id):
+                            response = await client.delete(file_path(file_id))
+                            assert response.status_code in {200, 404}
+                            if response.status_code == 200: assert response.json()["code"] == 0
                         absent = await client.get(file_path(file_id, "/info"))
                         assert absent.status_code == 404
+                        await ledger.assert_absent(file_id)
                         deleted.append(file_id)
                     except Exception:
                         cleanup_errors.append("fixture_delete_failed:" + file_id)
+                try:
+                    await ledger.assert_clean()
+                except Exception:
+                    cleanup_errors.append("fixture_readback_failed")
             after = await snapshot(database)
-            summary = {"run": prefix, "passed": error is None and not cleanup_errors and before == after,
+            summary = {"run": prefix, "passed": error is None and not cleanup_errors and before == after and set(uploaded) == set(deleted),
                        "checks": checks, "negative_http_checks": negatives, "qc_jobs": job_checks,
                        "fixtures_uploaded": len(uploaded), "fixtures_deleted": len(deleted),
                        "owned_jobs_deleted": cleanup_jobs, "owned_artifacts_deleted": cleanup_artifacts,
                        "fastqc_preference_restored": preference_restored, "business_state_preserved": before == after,
                        "business_counts_before": before, "business_counts_after": after,
-                       "existing_user_files_accessed": 0, "sessions_created": 0, "model_calls": 0, "cleanup_errors": cleanup_errors}
+                       "existing_user_files_accessed": 0, "script_model_endpoint_calls": 0, "cleanup_errors": cleanup_errors}
             print(json.dumps(summary, ensure_ascii=False, indent=2), flush=True)
             if error is not None:
                 raise RuntimeError("Extended HTTP acceptance failed; inspect the summary and cleanup status") from error

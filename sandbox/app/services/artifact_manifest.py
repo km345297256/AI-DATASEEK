@@ -17,25 +17,77 @@ def _identity(value: os.stat_result) -> tuple[int, ...]:
     return (value.st_dev, value.st_ino, value.st_size, value.st_mtime_ns, value.st_ctime_ns)
 
 
-def _open_output(path: str, root: Path):
+class MissingArtifact(FileNotFoundError):
+    """Absence proven beneath a stable, no-follow output ancestry."""
+
+
+class _MissingOutputEntry(FileNotFoundError):
+    def __init__(self, proof):
+        super().__init__("output_entry_missing")
+        self.proof = proof
+
+
+def _open_output_once(path: str, root: Path):
     relative = Path(path).relative_to(root)
-    if not relative.parts or any(part in {".", ".."} for part in relative.parts):
+    if (not root.is_absolute() or root == Path("/") or ".." in root.parts
+            or not relative.parts or any(part in {".", ".."} for part in relative.parts)
+            or str(Path(path)) != path or "\\" in path
+            or any(ord(char) < 32 or ord(char) == 127 for char in path)):
         raise ValueError("outside_output")
     # Traverse with directory handles: symlink parents, last-component links,
     # FIFOs/devices and directory-swap races must not turn hashing into a read
     # of arbitrary dataset/private files or block the worker on a pipe.
-    directory = os.open(root, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+    # Root parents need the same protection as descendants. Opening the root
+    # by its absolute path would follow a symlink in an earlier component.
+    parts = root.parts[1:] + relative.parts
+    directory = os.open("/", os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+    ancestry = []
     try:
-        for part in relative.parts[:-1]:
-            child = os.open(part, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=directory)
+        for index, part in enumerate(parts):
+            # Keep private directory identities, not resolved path strings.
+            parent = os.stat(".", dir_fd=directory, follow_symlinks=False)
+            ancestry.append((_identity(parent), parent.st_mode, parent.st_uid, parent.st_gid))
+            flags = os.O_RDONLY | os.O_NOFOLLOW
+            flags |= os.O_DIRECTORY if index < len(parts) - 1 else os.O_NONBLOCK
+            try:
+                child = os.open(part, flags, dir_fd=directory)
+            except FileNotFoundError:
+                # A missing runtime ancestor is not a missing deliverable.
+                # The output root itself may not have been created yet, but
+                # only its fully verified existing parent can prove that.
+                if index >= len(root.parts) - 2:
+                    raise _MissingOutputEntry((index, tuple(ancestry))) from None
+                raise
+            if index == len(parts) - 1:
+                try:
+                    return os.fdopen(child, "rb")
+                except BaseException:
+                    try:
+                        os.close(child)
+                    except OSError:
+                        pass  # fdopen may already have closed a rejected FD.
+                    raise
             os.close(directory)
             directory = child
-        descriptor = os.open(
-            relative.name, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK, dir_fd=directory,
-        )
-        return os.fdopen(descriptor, "rb")
     finally:
         os.close(directory)
+
+
+def _open_output(path: str, root: Path):
+    try:
+        return _open_output_once(path, root)
+    except _MissingOutputEntry as first:
+        # Re-traverse from / so a detached directory FD or a replacement root
+        # cannot turn an environment race into permission to create outputs.
+        try:
+            current = _open_output_once(path, root)
+        except _MissingOutputEntry as second:
+            if first.proof == second.proof:
+                raise MissingArtifact("missing_artifact") from None
+            raise FileNotFoundError("output_ancestry_changed") from None
+        else:
+            current.close()
+            raise FileNotFoundError("output_entry_changed") from None
 
 
 def _fingerprint(path: str, root: Path, cancelled: threading.Event, deadline: float) -> dict:

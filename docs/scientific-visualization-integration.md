@@ -10,21 +10,21 @@
 
 AgentLoop、PlanActFlow、工具调度和 SSE 消息结构没有替换；可视化读取不会向模型发起请求。数据集只读挂载、主机路径白名单和浏览器不接收真实主机路径的边界保留。
 
-2026-09-09 高清阅读扩展另增 `viz-docx` 与 `viz-onlyoffice`，因此当前总目录为 **36 个插件**；上表述的 34 个为原 21 组集成基线。新增两项继续使用相同 `contract_version: 2`，不改变原插件默认优先级。详见 [PDF / Office 清晰阅读改造](./pdf-office-preview-quality.md) 与 [ONLYOFFICE 本机服务](./onlyoffice-local-viewer.md)。
+2026-09-09 高清阅读扩展另增 `viz-docx` 与 `viz-onlyoffice`，当时总目录为 36 个插件；2026-09-10 [第一批格式增强](./changes-2026-09-10-visualization-batch-one.md)再增结构树、压缩包目录、视频与音频 4 项，达到 40 个插件。[第二批](./changes-2026-09-10-visualization-batch-two.md)增加受控信号窗口、MCA、地理格式、CZI 与归档文本成员，达到 45 个；[第三批](./changes-2026-09-10-visualization-batch-three.md)再增 HDF5/NetCDF4 分块、本地 OME-Zarr、大型未压缩 CZI 与仪器图像，当时为 **49 个插件**。随后领域扩展第五批增至 68 个插件、67 个批准适配器，范围见[SQLite、天气雷达与海洋网格](changes-2026-09-11-domain-visualization-batch-five.md)。main 迁移另增六个独立 Cordis 插件，当时合并目录为 **74 个插件、73 个批准适配器**，见[main 可视化迁移记录](changes-2026-09-11-main-visualization-migration.md)；[数据库文件集成](database-visualization-integration.md)再增加三个独立插件，共用一个新适配器，当时为 **77 个插件、74 个批准适配器**；本轮[SQL／PG／BSON／Redis 扩展](database-dump-records-integration.md)新增四个独立插件和两个适配器，当前为 **81 个插件、76 个批准适配器**。上文 34 个为原 21 组集成基线，所有新增项继续使用相同 `contract_version: 2`，不改变原插件默认优先级。详见 [PDF / Office 清晰阅读改造](./pdf-office-preview-quality.md) 与 [ONLYOFFICE 本机服务](./onlyoffice-local-viewer.md)。
 
 ## 21 组能力与明确边界
 
 | # | 上游工具 / 插件 ID | 本次可用范围 | 不包含或需要显式条件 |
 |---|---|---|---|
 | 1 | [Plotly.js](https://github.com/plotly/plotly.js) / `viz-plotly` | CSV/TSV 选列，NPY/NPZ/MAT 数组、变量和切片；曲线、散点、直方图、热图 | 仅有界数值；不执行 pickle 或用户 Plotly 配置 |
-| 2 | [H5Web](https://github.com/silx-kit/h5web) / `viz-h5web` | HDF5/NeXus/NetCDF4 内部变量树与曲线、热图切片 | 不支持经典 NetCDF3；禁止 HDF5 外部链接和 VDS |
+| 2 | [H5Web](https://github.com/silx-kit/h5web) / `viz-h5web` | HDF5/NeXus/NetCDF4/MATLAB v7.3 内部变量树与曲线、热图切片 | 不支持经典 NetCDF3；禁止 HDF5 外部链接和 VDS；MATLAB 按 HDF5 存储维度显示，不还原对象语义 |
 | 3 | [vtk.js](https://github.com/Kitware/vtk-js) / `viz-vtk` | 小型 ASCII VTP/VTI、STL、OBJ；网格及体数据切片 | 8 MiB 输入；不支持压缩/附加二进制 VTK、VTU、OpenFOAM |
 | 4 | [JSROOT](https://github.com/root-project/jsroot) / `viz-jsroot` | 隔离 uproot 提取 TH1/TH2/TGraph，保留真实分箱后重建图形 | 不执行 TExec、TF1、Canvas 绘图脚本或文件自带 Streamer 代码 |
 | 5 | [3Dmol.js](https://github.com/3dmol/3Dmol.js) / `molecular` | 复用已符合 Cordis 规范的分子／晶体结构预览 | 既有格式和行为保留，不重复造新注册 |
 | 6 | [RDKit](https://github.com/rdkit/rdkit) / `viz-rdkit` | SDF/MOL/SMI/SMILES 二维结构、分子序号选择和元数据 | 隔离生成 PNG，不连接化学数据库 |
 | 7 | [Mol*](https://github.com/molstar/molstar) / `viz-molstar` | 本地 PDB/mmCIF 生物大分子结构 | 禁外部下载、工作区导入；有限原子预算 |
 | 8 | [NMRium](https://github.com/cheminfo/nmrium) / `viz-nmrium` | 已处理 1D JCAMP-DX，明确 ppm 和观测核 | 仅 AFFN/PAC 子集；不自动处理 FID、二维谱或压缩 JCAMP；只读工具栏 |
-| 9 | [OpenLayers](https://github.com/openlayers/openlayers) + [geotiff.js](https://github.com/geotiffjs/geotiff.js) / `viz-openlayers` | GeoJSON；明确 EPSG:4326/3857 的轴对齐 GeoTIFF 第一波段 | 不猜测 CRS，不加载在线底图 |
+| 9 | [OpenLayers](https://github.com/openlayers/openlayers) + [geotiff.js](https://github.com/geotiffjs/geotiff.js) / `viz-openlayers` | GeoJSON；明确 EPSG:4326/3857 的轴对齐 GeoTIFF 波段切换、色标和 NoData | 最多 256 波段，切换复用已读文件，最多 1,024×1,024 显示采样；不猜测 CRS，不加载在线底图 |
 | 10 | [MapLibre](https://github.com/maplibre/maplibre-gl-js) + [deck.gl](https://github.com/visgl/deck.gl) / `viz-maplibre` | GeoJSON 点、线、面 GPU 地图 | 离线空白底图；不接受远程样式、瓦片或任意属性 HTML |
 | 11 | [Cesium](https://github.com/CesiumGS/cesium) / `viz-cesium` | GeoJSON 与白名单 CZML 位置／轨迹 | 不调用 ion，不下载影像、地形、3D Tiles 或外部模型 |
 | 12 | [Aladin Lite](https://github.com/cds-astro/aladin-lite) / `viz-aladin` | primary HDU 二维 FITS + RA/DEC WCS 天空图 | 独立离线 frame；不联网取 HiPS/catalog；非 WCS 图像可继续用原 FITS 插件 |
@@ -42,10 +42,10 @@ AgentLoop、PlanActFlow、工具调度和 SSE 消息结构没有替换；可视�
 
 ## 统一能力协议
 
-- `GET /api/v1/visualizations` 返回完整 34 个当前描述符及启停状态，不再按客户端版本拆分两个目录。描述符 `contract_version` 只能为严格整数 2；插件自身的 `version` 仍独立表示发布版本。
-- 所有插件统一声明 `capabilities: {operations, input_mode, shared}`。操作为 `bytes/page/preview/prepare/job`；输入粒度为 `whole/page/prefix`，不能通过能力声明绕过批准组合或读取预算。
+- `GET /api/v1/visualizations` 返回当前合并目录的完整 81 个描述符及启停状态（含 DuckDB／DBF／Access、SQL／PG／BSON／Redis），不再按客户端版本拆分两个目录。描述符 `contract_version` 只能为严格整数 2；插件自身的 `version` 仍独立表示发布版本。本文上方的 21 组是当时的集成批次，不是当前目录总量；后续范围读取及领域插件见[统一插件协议](visualization-plugin-contract.md)、[数据库文件集成](database-visualization-integration.md)与[领域扩展路线](domain-visualization-expansion-roadmap.md)。
+- 所有插件统一声明 `capabilities: {operations, input_mode, shared}`。操作为 `bytes/page/preview/prepare/job`；输入粒度为 `whole/page/prefix/window`，不能通过能力声明绕过批准组合或读取预算。
 - `POST /api/v1/files/{opaque_id}/visualization`：`{plugin_id, operation, version?, kind?, options:{...}}`。普通字节、分页、科学切片和分子只读准备使用同一个授权入口；完整 QC 通过统一命名的作业资源显式启动。
-- 非字节响应使用统一 `VisualizationResult`：`{contract_version:2, plugin_id, version, revision, kind, payload, metadata, warnings, sampled}`，外层保持 `APIResponse`。类型包括 page、series、raster、table、array、tree、media、report、molecule、resources；表格、数组、树、PNG/PDF 和 QC 数据在 `payload` 中，按批准读取器校验。
+- 非字节响应使用统一 `VisualizationResult`：`{contract_version:2, plugin_id, version, revision, kind, payload, metadata, warnings, sampled}`，外层保持 `APIResponse`。类型包括 page、series、raster、table、array、tree、media、report、molecule、resources、features、graph；表格、数组、树、清洗后的地理要素/关系网络、PNG/PDF 和 QC 数据在 `payload` 中，按批准读取器校验。
 - `bytes` 操作返回有界原始字节流及 `X-Preview-Version / X-Visualization-Revision / X-Visualization-Plugin` 标识，不再使用单独的 binary 协议接口；不会返回主机路径、签名绕过链接或第三方 URL。
 - 输入格式由后端从已授权文件名推导，不接受客户端路径或读取器名称。不同读取器有各自 options 白名单；HDF5/ROOT `path` 只表示文件内部节点。
 - 读取前后检查文件版本和插件状态／目录 revision；切换、卸载、取消或停用后，过期结果不得挂载。
@@ -57,7 +57,7 @@ AgentLoop、PlanActFlow、工具调度和 SSE 消息结构没有替换；可视�
 
 本清单中的新增专业插件输入最大 64 MiB，且服从更小的适配器解码限制。原有插件预算没有被统一改写：文本每页 64 KiB、CSV 每页 128 KiB，FASTQ 采样最多 2 MiB 前缀，NetCDF/FITS 最大 64 MiB。部分原字节适配器仍保留 256 MiB 清单预算，分子另受 50 MiB 实际限制；数据集 helper 继续限制单次范围读取，不能因此突破存储边界。
 
-`max_output_bytes` 限制**派生的统一 JSON 结果封装**，包含 payload、metadata、warnings 等；专业读取器上限 8 MiB，原 NetCDF/FITS/FASTQ 采样上限 512 KiB，并服从更小的当前插件预算。原始字节流按输入预算，不误称为 8 MiB 派生输出。PNG/PDF 媒体在 worker 内最多 5 MiB；数组最多 16384 个数值；表格窗口 200×100；HDF5 树 256 节点／8 层。QC 模块表独立限制为每模块 1000×20、最多 32 模块。
+`max_output_bytes` 限制**派生的统一 JSON 结果封装**，包含 payload、metadata、warnings 等；专业读取器上限 8 MiB，原 NetCDF/FITS/FASTQ 采样上限 512 KiB，并服从更小的当前插件预算。原始字节流按输入预算，不误称为 8 MiB 派生输出。PNG/PDF 媒体在 worker 内最多 5 MiB；旧数组最多 16384 个数值（后来新增的质谱契约单独允许 16384 对 m/z-强度值，不放宽旧读取器）；表格窗口 200×100；HDF5 树 256 节点／8 层。QC 模块表独立限制为每模块 1000×20、最多 32 模块。
 
 复杂读取器只在无网络、非 root、只读根文件系统、无数据集挂载、无凭据的短命容器中运行。扩展读取容器上限 1 GiB 内存、1 CPU、96 PID、512 MiB 临时空间、50 秒外层期限；另有不依赖后端的 55 秒硬时限及 Docker 自动删除。NetCDF/FITS/FASTQ 仍保持较小的 512 MiB/32 PID/30 秒配置。取消后保留并发准入槽，直到原生读取线程/容器完成清理。统一协议不会把所有预览升级为重任务。
 
@@ -85,7 +85,7 @@ Sandbox 的原有锁定包版本保留，新增读取器依赖增量锁定；不
 
 ## 验证方式
 
-1. 运行 `node scripts/sync-visualization-contract.mjs --check`，确保唯一批准规范与三个生成副本一致。插件页面确认 34 个统一注册，分别启停并刷新验证偏好保留。同文件切换多个适配器，例如 GeoTIFF 图像／地图、NetCDF 地图／曲线／H5Web（后者仅限 HDF5 型 NetCDF4）。
+1. 运行 `node scripts/sync-visualization-contract.mjs --check`，确保唯一批准规范与三个生成副本一致。插件页面确认当前 49 个统一注册，分别启停并刷新验证偏好保留。同文件切换多个适配器，例如 GeoTIFF 图像／地图、NetCDF 地图／曲线／H5Web／数组分块（后两者仅限 HDF5 型 NetCDF4）。
 2. 运行前端 type-check、build、测试，Cordis 主机测试，backend/sandbox 完整 pytest 和 Compose 配置检查；`scripts/check-regressions.sh` 已包含生成规范前置校验。新增插件须修改批准源、生成副本、实现 adapter/reader/预算及生命周期，并补正常与拒绝路径测试，不是只添加清单。
 3. 真实隔离网关合成文件验收由 `backend/scripts/check_extended_visualization_workers.py` 执行，不用用户数据、不调用模型。
 4. 浏览器验收需区分“编译/协议测试通过”和“实际 SDK/WebGL 画面通过”。[原 21 组工具验收记录](./scientific-visualization-acceptance.md)属于统一改造前的历史事实，不能充当本次迁移已通过的证明；本次结果由独立验收记录说明。不能仅靠清单或 mock 宣称所有画面可用。

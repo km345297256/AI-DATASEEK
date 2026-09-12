@@ -69,7 +69,7 @@ export function validateVisualization(value: unknown): VisualizationDescriptor {
     || !Number.isSafeInteger(value.priority) || Math.abs(value.priority as number) > 1000) reject()
   for (const [field, pattern] of [
     ['extensions', /^[a-z0-9][a-z0-9.-]{0,31}$/],
-    ['filenames', /^[a-z0-9][a-z0-9._-]{0,127}$/],
+    ['filenames', /^(?:[a-z0-9][a-z0-9._-]{0,127}|\.zattrs)$/],
   ] as const) {
     const items = value[field]
     if (!Array.isArray(items) || items.length > 128 || new Set(items).size !== items.length

@@ -13,7 +13,7 @@ import { assertMolecularText, safeText } from './data';
 import PreviewFrame from './PreviewFrame.vue';
 const props = defineProps<{ file: FileInfo; plugin: VisualizationPlugin }>();
 const scope = usePreviewLoad(), target = ref<HTMLDivElement>(), loading = ref(false), error = ref('');
-watch(() => [props.file.file_id, props.plugin.id], async () => {
+watch([() => props.file.file_id, () => props.plugin.id], async () => {
   const load = scope.begin(); loading.value = true; error.value = '';
   try {
     const bytes = await loadPluginBytes(props.file, props.plugin, load.signal), format = props.file.filename.toLowerCase().endsWith('.pdb') ? 'pdb' : 'mmcif';

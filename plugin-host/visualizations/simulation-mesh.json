@@ -1,0 +1,30 @@
+{
+  "contract_version": 2,
+  "id": "viz-simulation-mesh",
+  "version": "1.0.0",
+  "name": "VTU 仿真网格与场",
+  "description": "受限 ASCII VTU 线框及明确节点/单元分量；不作求解、表面提取或物理单位推断。",
+  "extensions": [
+    "vtu"
+  ],
+  "filenames": [],
+  "view_kind": "structure",
+  "adapter": "simulation-mesh",
+  "reader": "simulation-mesh",
+  "capabilities": {
+    "operations": [
+      "preview"
+    ],
+    "input_mode": "whole",
+    "shared": false
+  },
+  "default_enabled": true,
+  "priority": 40,
+  "permissions": [
+    "file:read"
+  ],
+  "limits": {
+    "max_input_bytes": 16777216,
+    "max_output_bytes": 2097152
+  }
+}

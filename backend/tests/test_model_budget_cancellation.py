@@ -2,6 +2,7 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
 import pytest
+from langchain.messages import AIMessage
 
 from app.domain.models.analysis_job import AnalysisJobStatus
 from app.domain.services.agents.execution import ExecutionAgent
@@ -12,18 +13,20 @@ from app.domain.services.tools.pipeline import ToolExecutionContext
 
 
 @pytest.mark.asyncio
-async def test_execution_model_timeout_boundary_preserves_budget_stop() -> None:
+async def test_execution_protocol_correction_preserves_runtime_cancellation() -> None:
     agent = object.__new__(ExecutionAgent)
-    agent.EXECUTION_RESULT_REPAIR_TIMEOUT_SECONDS = 1
-    agent.format = None
+    agent.ask = AsyncMock(return_value=AIMessage(content="null"))
+    agent.get_tools = lambda: [object()]
     agent.ask_with_messages = AsyncMock(
         side_effect=ModelBudgetStopped("task_call_budget_exceeded")
     )
 
     with pytest.raises(ModelBudgetStopped) as caught:
-        await agent._repair_execution_result()
+        _events = [event async for event in agent.execute("Analyze synthetic data")]
 
     assert caught.value.code == "task_call_budget_exceeded"
+    assert agent.last_execution_outcome["code"] == "task_call_budget_exceeded"
+    agent.ask_with_messages.assert_awaited_once()
 
 
 @pytest.mark.asyncio

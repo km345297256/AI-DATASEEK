@@ -1,12 +1,14 @@
 {
   "contract_version": 2,
   "id": "viz-viv",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "name": "Viv 多通道显微图像",
   "description": "有界单文件 OME-TIFF 多通道视图；不声明支持目录型 OME-Zarr。",
   "extensions": [
     "ome.tif",
-    "ome.tiff"
+    "ome.tiff",
+    "tif",
+    "tiff"
   ],
   "filenames": [],
   "view_kind": "image",
@@ -23,7 +25,8 @@
   },
   "capabilities": {
     "operations": [
-      "bytes"
+      "bytes",
+      "prepare"
     ],
     "input_mode": "whole",
     "shared": false

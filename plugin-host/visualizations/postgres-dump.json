@@ -1,0 +1,33 @@
+{
+  "contract_version": 2,
+  "id": "viz-postgres-dump",
+  "version": "1.0.0",
+  "name": "PostgreSQL 备份目录",
+  "description": "只读提取受支持 custom/tar 备份中的对象目录；不恢复数据库，不解释对象 SQL，也不校验或解压数据段。",
+  "extensions": [
+    "pgdump",
+    "dump",
+    "backup",
+    "tar"
+  ],
+  "filenames": [],
+  "view_kind": "table",
+  "adapter": "database-dump",
+  "reader": "pg-dump",
+  "capabilities": {
+    "operations": [
+      "preview"
+    ],
+    "input_mode": "whole",
+    "shared": false
+  },
+  "default_enabled": true,
+  "priority": 30,
+  "permissions": [
+    "file:read"
+  ],
+  "limits": {
+    "max_input_bytes": 16777216,
+    "max_output_bytes": 2097152
+  }
+}

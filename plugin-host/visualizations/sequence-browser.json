@@ -1,0 +1,37 @@
+{
+  "contract_version": 2,
+  "id": "viz-sequence-browser",
+  "version": "1.0.0",
+  "name": "FASTA / FASTQ 序列浏览器",
+  "description": "多记录序列窗口、模体搜索、GC 概览与显式编码质量轨道；16 MiB 有界离线读取。",
+  "extensions": [
+    "fasta",
+    "fa",
+    "fna",
+    "faa",
+    "ffn",
+    "frn",
+    "fastq",
+    "fq"
+  ],
+  "filenames": [],
+  "view_kind": "series",
+  "adapter": "sequence-browser",
+  "reader": "sequence-browser",
+  "capabilities": {
+    "operations": [
+      "preview"
+    ],
+    "input_mode": "whole",
+    "shared": false
+  },
+  "default_enabled": true,
+  "priority": -20,
+  "permissions": [
+    "file:read"
+  ],
+  "limits": {
+    "max_input_bytes": 16777216,
+    "max_output_bytes": 2097152
+  }
+}

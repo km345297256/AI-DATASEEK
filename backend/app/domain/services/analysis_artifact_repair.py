@@ -20,6 +20,7 @@ from app.domain.models.analysis_outcome import DeliverableRequirement
 
 
 REPAIRABLE_REASONS = frozenset({
+    "missing_artifact",
     "empty_file", "empty_or_binary_text", "empty_table", "invalid_content",
     "format_mismatch", "inconsistent_table_width", "duplicate_json_key",
     "invalid_json_constant", "invalid_json_table", "invalid_notebook", "kind_mismatch",
@@ -89,6 +90,8 @@ def _receipt(value: Any) -> dict[str, Any]:
     reason = "validated" if valid else value.get("reason")
     if not valid and reason not in REPAIRABLE_REASONS | NON_REPAIRABLE_REASONS:
         raise ValueError("invalid_receipt")
+    if reason == "missing_artifact" and (digest is not None or size is not None):
+        raise ValueError("invalid_missing_receipt")
     observations = {}
     for key in ("metadata", "details", "observations", "diagnostics"):
         fields = value.get(key)

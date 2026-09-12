@@ -1,0 +1,437 @@
+{
+  "provenance": "Synthetic in-memory HDF5 NXdata, modern fixed-size attributes; no user data",
+  "tree": {
+    "contract_version": 2,
+    "type": "nexus-window",
+    "reader": "nexus-window",
+    "kind": "tree",
+    "media_type": "application/json",
+    "choices": {
+      "signals": [
+        {
+          "id": "n-f819ec5c0ce11e753e1110ee60d4fa40",
+          "label": "detector",
+          "signal": "counts",
+          "shape": [
+            4,
+            6
+          ],
+          "dtype": "<i2",
+          "chunks": [
+            4,
+            4
+          ],
+          "unit": "counts",
+          "axes": [
+            {
+              "label": "y",
+              "unit": "mm",
+              "source": "dataset",
+              "dtype": "<f8",
+              "chunks": null
+            },
+            {
+              "label": "x",
+              "unit": "mm",
+              "source": "dataset",
+              "dtype": "<f8",
+              "chunks": null
+            }
+          ],
+          "errors": {
+            "dtype": "<f8",
+            "chunks": [
+              4,
+              4
+            ]
+          }
+        },
+        {
+          "id": "n-cdd068ef705500667ca1c1f1a043e776",
+          "label": "spectrum",
+          "signal": "counts",
+          "shape": [
+            12
+          ],
+          "dtype": "<f8",
+          "chunks": [
+            4
+          ],
+          "unit": "counts",
+          "axes": [
+            {
+              "label": "energy",
+              "unit": "eV",
+              "source": "dataset",
+              "dtype": "<f8",
+              "chunks": null
+            }
+          ],
+          "errors": {
+            "dtype": "<f8",
+            "chunks": [
+              4
+            ]
+          }
+        }
+      ]
+    },
+    "selected": {},
+    "warnings": [
+      "只显示 NXdata 声明的原始信号、坐标和标准差；不应用缩放、单位转换或有限填充值掩膜。未声明坐标的轴使用索引，非有限信号留空。"
+    ],
+    "sampled": false,
+    "tree": [
+      {
+        "path": "/n-f819ec5c0ce11e753e1110ee60d4fa40",
+        "node_type": "array",
+        "attributes": {
+          "label": "detector"
+        }
+      },
+      {
+        "path": "/n-cdd068ef705500667ca1c1f1a043e776",
+        "node_type": "array",
+        "attributes": {
+          "label": "spectrum"
+        }
+      }
+    ],
+    "metadata": {
+      "format": "nxs",
+      "container": "HDF5",
+      "standard": "NXdata",
+      "input_mode": "window",
+      "value_semantics": "raw signal and coordinates; no scaling, unit conversion or finite fill masking",
+      "source_bytes": 16674,
+      "read_bytes": 16384,
+      "read_requests": 1,
+      "catalog_truncated": false,
+      "skipped_nxdata": 0,
+      "attribute_bytes": 126,
+      "chunks_touched": 0,
+      "decoded_chunk_bytes": 0,
+      "nonfinite_values": 0,
+      "output_values": 0
+    }
+  },
+  "series": {
+    "contract_version": 2,
+    "type": "nexus-window",
+    "reader": "nexus-window",
+    "kind": "series",
+    "media_type": "application/json",
+    "choices": {
+      "signals": [
+        {
+          "id": "n-f819ec5c0ce11e753e1110ee60d4fa40",
+          "label": "detector",
+          "signal": "counts",
+          "shape": [
+            4,
+            6
+          ],
+          "dtype": "<i2",
+          "chunks": [
+            4,
+            4
+          ],
+          "unit": "counts",
+          "axes": [
+            {
+              "label": "y",
+              "unit": "mm",
+              "source": "dataset",
+              "dtype": "<f8",
+              "chunks": null
+            },
+            {
+              "label": "x",
+              "unit": "mm",
+              "source": "dataset",
+              "dtype": "<f8",
+              "chunks": null
+            }
+          ],
+          "errors": {
+            "dtype": "<f8",
+            "chunks": [
+              4,
+              4
+            ]
+          }
+        },
+        {
+          "id": "n-cdd068ef705500667ca1c1f1a043e776",
+          "label": "spectrum",
+          "signal": "counts",
+          "shape": [
+            12
+          ],
+          "dtype": "<f8",
+          "chunks": [
+            4
+          ],
+          "unit": "counts",
+          "axes": [
+            {
+              "label": "energy",
+              "unit": "eV",
+              "source": "dataset",
+              "dtype": "<f8",
+              "chunks": null
+            }
+          ],
+          "errors": {
+            "dtype": "<f8",
+            "chunks": [
+              4
+            ]
+          }
+        }
+      ]
+    },
+    "selected": {
+      "nxdata": "n-cdd068ef705500667ca1c1f1a043e776",
+      "selection": [
+        {
+          "start": 2,
+          "stop": 10,
+          "step": 2
+        }
+      ]
+    },
+    "warnings": [
+      "只显示 NXdata 声明的原始信号、坐标和标准差；不应用缩放、单位转换或有限填充值掩膜。未声明坐标的轴使用索引，非有限信号留空。"
+    ],
+    "sampled": false,
+    "array": {
+      "shape": [
+        4
+      ],
+      "dimensions": [
+        "energy"
+      ],
+      "values": [
+        2,
+        4,
+        6,
+        8
+      ]
+    },
+    "axes": [
+      {
+        "dimension": 0,
+        "indices": [
+          2,
+          4,
+          6,
+          8
+        ],
+        "values": [
+          101,
+          102,
+          103,
+          104
+        ],
+        "label": "energy",
+        "unit": "eV",
+        "source": "dataset"
+      }
+    ],
+    "errors": [
+      1,
+      1,
+      1,
+      1
+    ],
+    "metadata": {
+      "format": "nxs",
+      "container": "HDF5",
+      "standard": "NXdata",
+      "input_mode": "window",
+      "value_semantics": "raw signal and coordinates; no scaling, unit conversion or finite fill masking",
+      "source_bytes": 16674,
+      "read_bytes": 16384,
+      "read_requests": 1,
+      "catalog_truncated": false,
+      "skipped_nxdata": 0,
+      "attribute_bytes": 126,
+      "chunks_touched": 6,
+      "decoded_chunk_bytes": 192,
+      "nonfinite_values": 0,
+      "output_values": 12
+    }
+  },
+  "image": {
+    "contract_version": 2,
+    "type": "nexus-window",
+    "reader": "nexus-window",
+    "kind": "image",
+    "media_type": "application/json",
+    "choices": {
+      "signals": [
+        {
+          "id": "n-f819ec5c0ce11e753e1110ee60d4fa40",
+          "label": "detector",
+          "signal": "counts",
+          "shape": [
+            4,
+            6
+          ],
+          "dtype": "<i2",
+          "chunks": [
+            4,
+            4
+          ],
+          "unit": "counts",
+          "axes": [
+            {
+              "label": "y",
+              "unit": "mm",
+              "source": "dataset",
+              "dtype": "<f8",
+              "chunks": null
+            },
+            {
+              "label": "x",
+              "unit": "mm",
+              "source": "dataset",
+              "dtype": "<f8",
+              "chunks": null
+            }
+          ],
+          "errors": {
+            "dtype": "<f8",
+            "chunks": [
+              4,
+              4
+            ]
+          }
+        },
+        {
+          "id": "n-cdd068ef705500667ca1c1f1a043e776",
+          "label": "spectrum",
+          "signal": "counts",
+          "shape": [
+            12
+          ],
+          "dtype": "<f8",
+          "chunks": [
+            4
+          ],
+          "unit": "counts",
+          "axes": [
+            {
+              "label": "energy",
+              "unit": "eV",
+              "source": "dataset",
+              "dtype": "<f8",
+              "chunks": null
+            }
+          ],
+          "errors": {
+            "dtype": "<f8",
+            "chunks": [
+              4
+            ]
+          }
+        }
+      ]
+    },
+    "selected": {
+      "nxdata": "n-f819ec5c0ce11e753e1110ee60d4fa40",
+      "selection": [
+        {
+          "start": 1,
+          "stop": 3,
+          "step": 1
+        },
+        {
+          "start": 2,
+          "stop": 5,
+          "step": 1
+        }
+      ]
+    },
+    "warnings": [
+      "只显示 NXdata 声明的原始信号、坐标和标准差；不应用缩放、单位转换或有限填充值掩膜。未声明坐标的轴使用索引，非有限信号留空。"
+    ],
+    "sampled": false,
+    "array": {
+      "shape": [
+        2,
+        3
+      ],
+      "dimensions": [
+        "y",
+        "x"
+      ],
+      "values": [
+        8,
+        9,
+        10,
+        14,
+        15,
+        16
+      ]
+    },
+    "axes": [
+      {
+        "dimension": 0,
+        "indices": [
+          1,
+          2
+        ],
+        "values": [
+          100.5,
+          101
+        ],
+        "label": "y",
+        "unit": "mm",
+        "source": "dataset"
+      },
+      {
+        "dimension": 1,
+        "indices": [
+          2,
+          3,
+          4
+        ],
+        "values": [
+          201,
+          201.5,
+          202
+        ],
+        "label": "x",
+        "unit": "mm",
+        "source": "dataset"
+      }
+    ],
+    "errors": [
+      1,
+      1,
+      1,
+      1,
+      1,
+      1
+    ],
+    "metadata": {
+      "format": "nxs",
+      "container": "HDF5",
+      "standard": "NXdata",
+      "input_mode": "window",
+      "value_semantics": "raw signal and coordinates; no scaling, unit conversion or finite fill masking",
+      "source_bytes": 16674,
+      "read_bytes": 16674,
+      "read_requests": 2,
+      "catalog_truncated": false,
+      "skipped_nxdata": 0,
+      "attribute_bytes": 126,
+      "chunks_touched": 4,
+      "decoded_chunk_bytes": 320,
+      "nonfinite_values": 0,
+      "output_values": 17
+    }
+  }
+}

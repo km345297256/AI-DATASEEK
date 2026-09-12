@@ -1,0 +1,30 @@
+{
+  "contract_version": 2,
+  "id": "viz-ripple-window",
+  "version": "1.0.0",
+  "name": "电子显微 Ripple 谱像",
+  "description": "数据集内 .rpl 与唯一同名 .raw 配对，读取单通道区域或像元谱线，不做元素定量或自动能量校准。",
+  "extensions": [
+    "rpl"
+  ],
+  "filenames": [],
+  "view_kind": "image",
+  "adapter": "ripple-window",
+  "reader": "ripple-window",
+  "default_enabled": true,
+  "priority": 30,
+  "permissions": [
+    "file:read"
+  ],
+  "limits": {
+    "max_input_bytes": 8388608,
+    "max_output_bytes": 2097152
+  },
+  "capabilities": {
+    "operations": [
+      "preview"
+    ],
+    "input_mode": "window",
+    "shared": false
+  }
+}

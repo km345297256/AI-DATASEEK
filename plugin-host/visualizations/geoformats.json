@@ -1,0 +1,17 @@
+{
+  "contract_version": 2,
+  "id": "viz-geoformats",
+  "version": "1.0.0",
+  "name": "ASC/GRD/KML 地理数据",
+  "description": "ESRI ASCII Grid、Surfer ASCII DSAA 网格与受限 KML 几何。网格 CRS 未知时使用数值热图；地图坐标系需明确，不连接外部图层。",
+  "extensions": ["asc", "grd", "kml"],
+  "filenames": [],
+  "view_kind": "map",
+  "adapter": "geoscience-formats",
+  "reader": "geoformat",
+  "default_enabled": true,
+  "priority": 40,
+  "permissions": ["file:read"],
+  "limits": {"max_input_bytes": 16777216, "max_output_bytes": 2097152},
+  "capabilities": {"operations": ["preview"], "input_mode": "whole", "shared": false}
+}

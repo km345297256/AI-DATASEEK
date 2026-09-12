@@ -1,0 +1,17 @@
+{
+  "contract_version": 2,
+  "id": "viz-access-table",
+  "version": "1.0.0",
+  "name": "Access 只读数据库",
+  "description": "使用隔离 MDB Tools 浏览 MDB/ACCDB 普通本地表，提供结构、选列分页与当前页数值图表；不运行宏、保存查询或链接表。",
+  "extensions": ["mdb", "accdb"],
+  "filenames": [],
+  "view_kind": "table",
+  "adapter": "database-table",
+  "reader": "database-table",
+  "capabilities": {"operations": ["preview"], "input_mode": "whole", "shared": false},
+  "default_enabled": true,
+  "priority": 40,
+  "permissions": ["file:read"],
+  "limits": {"max_input_bytes": 16777216, "max_output_bytes": 2097152}
+}

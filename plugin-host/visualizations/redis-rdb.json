@@ -1,0 +1,30 @@
+{
+  "contract_version": 2,
+  "id": "viz-redis-rdb",
+  "version": "1.0.0",
+  "name": "Redis RDB 键值记录",
+  "description": "CRC64 校验后只读浏览 RDB 11 的字符串、列表、集合、哈希及有序集合；保留原始过期时刻，不恢复服务、不执行命令。",
+  "extensions": [
+    "rdb"
+  ],
+  "filenames": [],
+  "view_kind": "tree",
+  "adapter": "database-records",
+  "reader": "redis-rdb",
+  "capabilities": {
+    "operations": [
+      "preview"
+    ],
+    "input_mode": "whole",
+    "shared": false
+  },
+  "default_enabled": true,
+  "priority": 40,
+  "permissions": [
+    "file:read"
+  ],
+  "limits": {
+    "max_input_bytes": 16777216,
+    "max_output_bytes": 2097152
+  }
+}

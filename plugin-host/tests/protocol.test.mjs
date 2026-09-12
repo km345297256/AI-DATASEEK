@@ -120,8 +120,8 @@ test('stdio server speaks only NDJSON JSON-RPC and keeps a valid snapshot after 
 
   const visualizations = await client.request('visualizations.snapshot')
   assert.equal(visualizations.result.engine, 'cordis')
-  assert.equal(visualizations.result.plugins.length, 36)
-  assert.equal(visualizations.result.plugins.filter(plugin => plugin.contract_version === 2).length, 36)
+  assert.equal(visualizations.result.plugins.length, 81)
+  assert.equal(visualizations.result.plugins.filter(plugin => plugin.contract_version === 2).length, 81)
   const visualizationReload = await client.request('visualizations.reload')
   assert.deepEqual(visualizationReload.result, visualizations.result)
 

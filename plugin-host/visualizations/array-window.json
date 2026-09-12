@@ -1,0 +1,36 @@
+{
+  "contract_version": 2,
+  "id": "viz-array-window",
+  "version": "1.0.0",
+  "name": "HDF5 / NetCDF4 分块变量",
+  "description": "按需读取 HDF5、NetCDF4 的原始数值变量和切片；不整文件下载，不自动套用 CF 缩放或有限填充值掩码。经典 NetCDF3 请使用原 NetCDF 视图。",
+  "extensions": [
+    "h5",
+    "hdf5",
+    "hdf",
+    "nc",
+    "nc4",
+    "netcdf",
+    "mat"
+  ],
+  "filenames": [],
+  "view_kind": "image",
+  "adapter": "array-window",
+  "reader": "array-window",
+  "default_enabled": true,
+  "priority": 30,
+  "permissions": [
+    "file:read"
+  ],
+  "limits": {
+    "max_input_bytes": 8388608,
+    "max_output_bytes": 2097152
+  },
+  "capabilities": {
+    "operations": [
+      "preview"
+    ],
+    "input_mode": "window",
+    "shared": false
+  }
+}

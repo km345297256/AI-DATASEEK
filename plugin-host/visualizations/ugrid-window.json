@@ -1,0 +1,35 @@
+{
+  "contract_version": 2,
+  "id": "viz-ugrid-window",
+  "version": "1.0.0",
+  "name": "UGRID 海洋网格窗口",
+  "description": "受限 UGRID 1.0 二维非结构网格与节点/面场；原生坐标展示，不插值或自动投影。",
+  "extensions": [
+    "nc",
+    "nc4",
+    "netcdf",
+    "h5",
+    "hdf5",
+    "hdf"
+  ],
+  "filenames": [],
+  "view_kind": "map",
+  "adapter": "ugrid-window",
+  "reader": "ugrid-window",
+  "capabilities": {
+    "operations": [
+      "preview"
+    ],
+    "input_mode": "window",
+    "shared": false
+  },
+  "default_enabled": true,
+  "priority": 40,
+  "permissions": [
+    "file:read"
+  ],
+  "limits": {
+    "max_input_bytes": 8388608,
+    "max_output_bytes": 2097152
+  }
+}

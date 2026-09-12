@@ -1,0 +1,1065 @@
+{
+  "tree": {
+    "contract_version": 2,
+    "type": "alignment-browser",
+    "reader": "alignment-browser",
+    "kind": "tree",
+    "media_type": "application/json",
+    "choices": {
+      "references": [
+        {
+          "id": 0,
+          "name": "chr1",
+          "length": 5000
+        }
+      ],
+      "sort_order": "coordinate",
+      "read_groups": 1
+    },
+    "selected": {},
+    "metadata": {
+      "format": "sam",
+      "source_bytes": 531,
+      "input_mode": "whole",
+      "coordinate_system": "0-based-half-open",
+      "limits": {
+        "references": 256,
+        "records": 100000,
+        "region_width": 2000000,
+        "reads": 2000,
+        "bins": 1000,
+        "query_bases": 4000000
+      }
+    },
+    "warnings": [
+      "坐标为 0 基半开区间；覆盖度是已扫描记录的 M/=/X 碱基数除以分箱长度，不过滤重复或次级比对。无索引顺序扫描；达到预算时不是全区域覆盖度。CRAM 不读取外部参考序列。"
+    ],
+    "sampled": false,
+    "tree": [
+      {
+        "path": "/references/0",
+        "node_type": "reference",
+        "attributes": {
+          "label": "chr1",
+          "length": 5000
+        }
+      }
+    ]
+  },
+  "table": {
+    "contract_version": 2,
+    "type": "alignment-browser",
+    "reader": "alignment-browser",
+    "kind": "table",
+    "media_type": "application/json",
+    "choices": {
+      "references": [
+        {
+          "id": 0,
+          "name": "chr1",
+          "length": 5000
+        }
+      ],
+      "sort_order": "coordinate",
+      "read_groups": 1
+    },
+    "selected": {
+      "reference": 0,
+      "start": 100,
+      "end": 160,
+      "max_reads": 20,
+      "bins": 20
+    },
+    "metadata": {
+      "format": "sam",
+      "source_bytes": 531,
+      "input_mode": "whole",
+      "coordinate_system": "0-based-half-open",
+      "limits": {
+        "references": 256,
+        "records": 100000,
+        "region_width": 2000000,
+        "reads": 2000,
+        "bins": 1000,
+        "query_bases": 4000000
+      }
+    },
+    "warnings": [
+      "坐标为 0 基半开区间；覆盖度是已扫描记录的 M/=/X 碱基数除以分箱长度，不过滤重复或次级比对。无索引顺序扫描；达到预算时不是全区域覆盖度。CRAM 不读取外部参考序列。"
+    ],
+    "sampled": false,
+    "alignment": {
+      "reads": [
+        {
+          "name": "pair",
+          "start": 100,
+          "end": 122,
+          "reverse": false,
+          "mapq": 60,
+          "cigar": "5M2I3M2D4M5N3M",
+          "flag": 99,
+          "paired": true,
+          "duplicate": false,
+          "secondary": false,
+          "supplementary": false,
+          "read1": true,
+          "read2": false,
+          "mate_start": 140,
+          "mate_reference": "chr1",
+          "template_length": 62,
+          "read_group": "rg1",
+          "nm": 4,
+          "md": "2C5^AA7",
+          "blocks": [
+            {
+              "start": 100,
+              "end": 105
+            },
+            {
+              "start": 105,
+              "end": 108
+            },
+            {
+              "start": 110,
+              "end": 114
+            },
+            {
+              "start": 119,
+              "end": 122
+            }
+          ],
+          "mismatches": [
+            {
+              "position": 102,
+              "query": "G",
+              "reference": "C"
+            }
+          ],
+          "insertions": [
+            {
+              "position": 105,
+              "length": 2,
+              "sequence": "AA"
+            }
+          ],
+          "deletions": [
+            {
+              "start": 108,
+              "end": 110,
+              "length": 2
+            }
+          ],
+          "splices": [
+            {
+              "start": 114,
+              "end": 119,
+              "length": 5
+            }
+          ],
+          "mismatch_available": true,
+          "detail_truncated": false
+        },
+        {
+          "name": "duplicate",
+          "start": 104,
+          "end": 110,
+          "reverse": false,
+          "mapq": 60,
+          "cigar": "6M",
+          "flag": 1024,
+          "paired": false,
+          "duplicate": true,
+          "secondary": false,
+          "supplementary": false,
+          "read1": false,
+          "read2": false,
+          "mate_start": null,
+          "mate_reference": null,
+          "template_length": 0,
+          "read_group": "rg1",
+          "nm": 0,
+          "md": "6",
+          "blocks": [
+            {
+              "start": 104,
+              "end": 110
+            }
+          ],
+          "mismatches": [],
+          "insertions": [],
+          "deletions": [],
+          "splices": [],
+          "mismatch_available": true,
+          "detail_truncated": false
+        },
+        {
+          "name": "secondary",
+          "start": 106,
+          "end": 110,
+          "reverse": false,
+          "mapq": 60,
+          "cigar": "4M",
+          "flag": 256,
+          "paired": false,
+          "duplicate": false,
+          "secondary": true,
+          "supplementary": false,
+          "read1": false,
+          "read2": false,
+          "mate_start": null,
+          "mate_reference": null,
+          "template_length": 0,
+          "read_group": "rg1",
+          "nm": 0,
+          "md": "4",
+          "blocks": [
+            {
+              "start": 106,
+              "end": 110
+            }
+          ],
+          "mismatches": [],
+          "insertions": [],
+          "deletions": [],
+          "splices": [],
+          "mismatch_available": true,
+          "detail_truncated": false
+        },
+        {
+          "name": "without-md",
+          "start": 125,
+          "end": 128,
+          "reverse": false,
+          "mapq": 60,
+          "cigar": "3M",
+          "flag": 0,
+          "paired": false,
+          "duplicate": false,
+          "secondary": false,
+          "supplementary": false,
+          "read1": false,
+          "read2": false,
+          "mate_start": null,
+          "mate_reference": null,
+          "template_length": 0,
+          "read_group": "rg1",
+          "nm": null,
+          "md": null,
+          "blocks": [
+            {
+              "start": 125,
+              "end": 128
+            }
+          ],
+          "mismatches": [],
+          "insertions": [],
+          "deletions": [],
+          "splices": [],
+          "mismatch_available": false,
+          "detail_truncated": false
+        },
+        {
+          "name": "pair",
+          "start": 140,
+          "end": 150,
+          "reverse": true,
+          "mapq": 60,
+          "cigar": "4=1X5=",
+          "flag": 147,
+          "paired": true,
+          "duplicate": false,
+          "secondary": false,
+          "supplementary": false,
+          "read1": false,
+          "read2": true,
+          "mate_start": 100,
+          "mate_reference": "chr1",
+          "template_length": -62,
+          "read_group": "rg1",
+          "nm": 1,
+          "md": "4A5",
+          "blocks": [
+            {
+              "start": 140,
+              "end": 144
+            },
+            {
+              "start": 144,
+              "end": 145
+            },
+            {
+              "start": 145,
+              "end": 150
+            }
+          ],
+          "mismatches": [
+            {
+              "position": 144,
+              "query": "C",
+              "reference": "A"
+            }
+          ],
+          "insertions": [],
+          "deletions": [],
+          "splices": [],
+          "mismatch_available": true,
+          "detail_truncated": false
+        }
+      ],
+      "coverage": [
+        {
+          "start": 100,
+          "end": 103,
+          "covered_bases": 3,
+          "depth": 1.0
+        },
+        {
+          "start": 103,
+          "end": 106,
+          "covered_bases": 5,
+          "depth": 1.6666666666666667
+        },
+        {
+          "start": 106,
+          "end": 109,
+          "covered_bases": 8,
+          "depth": 2.6666666666666665
+        },
+        {
+          "start": 109,
+          "end": 112,
+          "covered_bases": 4,
+          "depth": 1.3333333333333333
+        },
+        {
+          "start": 112,
+          "end": 115,
+          "covered_bases": 2,
+          "depth": 0.6666666666666666
+        },
+        {
+          "start": 115,
+          "end": 118,
+          "covered_bases": 0,
+          "depth": 0.0
+        },
+        {
+          "start": 118,
+          "end": 121,
+          "covered_bases": 2,
+          "depth": 0.6666666666666666
+        },
+        {
+          "start": 121,
+          "end": 124,
+          "covered_bases": 1,
+          "depth": 0.3333333333333333
+        },
+        {
+          "start": 124,
+          "end": 127,
+          "covered_bases": 2,
+          "depth": 0.6666666666666666
+        },
+        {
+          "start": 127,
+          "end": 130,
+          "covered_bases": 1,
+          "depth": 0.3333333333333333
+        },
+        {
+          "start": 130,
+          "end": 133,
+          "covered_bases": 0,
+          "depth": 0.0
+        },
+        {
+          "start": 133,
+          "end": 136,
+          "covered_bases": 0,
+          "depth": 0.0
+        },
+        {
+          "start": 136,
+          "end": 139,
+          "covered_bases": 0,
+          "depth": 0.0
+        },
+        {
+          "start": 139,
+          "end": 142,
+          "covered_bases": 2,
+          "depth": 0.6666666666666666
+        },
+        {
+          "start": 142,
+          "end": 145,
+          "covered_bases": 3,
+          "depth": 1.0
+        },
+        {
+          "start": 145,
+          "end": 148,
+          "covered_bases": 3,
+          "depth": 1.0
+        },
+        {
+          "start": 148,
+          "end": 151,
+          "covered_bases": 2,
+          "depth": 0.6666666666666666
+        },
+        {
+          "start": 151,
+          "end": 154,
+          "covered_bases": 0,
+          "depth": 0.0
+        },
+        {
+          "start": 154,
+          "end": 157,
+          "covered_bases": 0,
+          "depth": 0.0
+        },
+        {
+          "start": 157,
+          "end": 160,
+          "covered_bases": 0,
+          "depth": 0.0
+        }
+      ],
+      "records_scanned": 5,
+      "matched_reads": 5,
+      "scan_complete": true,
+      "reads_truncated": false
+    }
+  },
+  "table_ui": {
+    "contract_version": 2,
+    "type": "alignment-browser",
+    "reader": "alignment-browser",
+    "kind": "table",
+    "media_type": "application/json",
+    "choices": {
+      "references": [
+        {
+          "id": 0,
+          "name": "chr1",
+          "length": 5000
+        }
+      ],
+      "sort_order": "coordinate",
+      "read_groups": 1
+    },
+    "selected": {
+      "reference": 0,
+      "start": 100,
+      "end": 160,
+      "max_reads": 20,
+      "bins": 500
+    },
+    "metadata": {
+      "format": "sam",
+      "source_bytes": 531,
+      "input_mode": "whole",
+      "coordinate_system": "0-based-half-open",
+      "limits": {
+        "references": 256,
+        "records": 100000,
+        "region_width": 2000000,
+        "reads": 2000,
+        "bins": 1000,
+        "query_bases": 4000000
+      }
+    },
+    "warnings": [
+      "坐标为 0 基半开区间；覆盖度是已扫描记录的 M/=/X 碱基数除以分箱长度，不过滤重复或次级比对。无索引顺序扫描；达到预算时不是全区域覆盖度。CRAM 不读取外部参考序列。"
+    ],
+    "sampled": false,
+    "alignment": {
+      "reads": [
+        {
+          "name": "pair",
+          "start": 100,
+          "end": 122,
+          "reverse": false,
+          "mapq": 60,
+          "cigar": "5M2I3M2D4M5N3M",
+          "flag": 99,
+          "paired": true,
+          "duplicate": false,
+          "secondary": false,
+          "supplementary": false,
+          "read1": true,
+          "read2": false,
+          "mate_start": 140,
+          "mate_reference": "chr1",
+          "template_length": 62,
+          "read_group": "rg1",
+          "nm": 4,
+          "md": "2C5^AA7",
+          "blocks": [
+            {
+              "start": 100,
+              "end": 105
+            },
+            {
+              "start": 105,
+              "end": 108
+            },
+            {
+              "start": 110,
+              "end": 114
+            },
+            {
+              "start": 119,
+              "end": 122
+            }
+          ],
+          "mismatches": [
+            {
+              "position": 102,
+              "query": "G",
+              "reference": "C"
+            }
+          ],
+          "insertions": [
+            {
+              "position": 105,
+              "length": 2,
+              "sequence": "AA"
+            }
+          ],
+          "deletions": [
+            {
+              "start": 108,
+              "end": 110,
+              "length": 2
+            }
+          ],
+          "splices": [
+            {
+              "start": 114,
+              "end": 119,
+              "length": 5
+            }
+          ],
+          "mismatch_available": true,
+          "detail_truncated": false
+        },
+        {
+          "name": "duplicate",
+          "start": 104,
+          "end": 110,
+          "reverse": false,
+          "mapq": 60,
+          "cigar": "6M",
+          "flag": 1024,
+          "paired": false,
+          "duplicate": true,
+          "secondary": false,
+          "supplementary": false,
+          "read1": false,
+          "read2": false,
+          "mate_start": null,
+          "mate_reference": null,
+          "template_length": 0,
+          "read_group": "rg1",
+          "nm": 0,
+          "md": "6",
+          "blocks": [
+            {
+              "start": 104,
+              "end": 110
+            }
+          ],
+          "mismatches": [],
+          "insertions": [],
+          "deletions": [],
+          "splices": [],
+          "mismatch_available": true,
+          "detail_truncated": false
+        },
+        {
+          "name": "secondary",
+          "start": 106,
+          "end": 110,
+          "reverse": false,
+          "mapq": 60,
+          "cigar": "4M",
+          "flag": 256,
+          "paired": false,
+          "duplicate": false,
+          "secondary": true,
+          "supplementary": false,
+          "read1": false,
+          "read2": false,
+          "mate_start": null,
+          "mate_reference": null,
+          "template_length": 0,
+          "read_group": "rg1",
+          "nm": 0,
+          "md": "4",
+          "blocks": [
+            {
+              "start": 106,
+              "end": 110
+            }
+          ],
+          "mismatches": [],
+          "insertions": [],
+          "deletions": [],
+          "splices": [],
+          "mismatch_available": true,
+          "detail_truncated": false
+        },
+        {
+          "name": "without-md",
+          "start": 125,
+          "end": 128,
+          "reverse": false,
+          "mapq": 60,
+          "cigar": "3M",
+          "flag": 0,
+          "paired": false,
+          "duplicate": false,
+          "secondary": false,
+          "supplementary": false,
+          "read1": false,
+          "read2": false,
+          "mate_start": null,
+          "mate_reference": null,
+          "template_length": 0,
+          "read_group": "rg1",
+          "nm": null,
+          "md": null,
+          "blocks": [
+            {
+              "start": 125,
+              "end": 128
+            }
+          ],
+          "mismatches": [],
+          "insertions": [],
+          "deletions": [],
+          "splices": [],
+          "mismatch_available": false,
+          "detail_truncated": false
+        },
+        {
+          "name": "pair",
+          "start": 140,
+          "end": 150,
+          "reverse": true,
+          "mapq": 60,
+          "cigar": "4=1X5=",
+          "flag": 147,
+          "paired": true,
+          "duplicate": false,
+          "secondary": false,
+          "supplementary": false,
+          "read1": false,
+          "read2": true,
+          "mate_start": 100,
+          "mate_reference": "chr1",
+          "template_length": -62,
+          "read_group": "rg1",
+          "nm": 1,
+          "md": "4A5",
+          "blocks": [
+            {
+              "start": 140,
+              "end": 144
+            },
+            {
+              "start": 144,
+              "end": 145
+            },
+            {
+              "start": 145,
+              "end": 150
+            }
+          ],
+          "mismatches": [
+            {
+              "position": 144,
+              "query": "C",
+              "reference": "A"
+            }
+          ],
+          "insertions": [],
+          "deletions": [],
+          "splices": [],
+          "mismatch_available": true,
+          "detail_truncated": false
+        }
+      ],
+      "coverage": [
+        {
+          "start": 100,
+          "end": 101,
+          "covered_bases": 1,
+          "depth": 1.0
+        },
+        {
+          "start": 101,
+          "end": 102,
+          "covered_bases": 1,
+          "depth": 1.0
+        },
+        {
+          "start": 102,
+          "end": 103,
+          "covered_bases": 1,
+          "depth": 1.0
+        },
+        {
+          "start": 103,
+          "end": 104,
+          "covered_bases": 1,
+          "depth": 1.0
+        },
+        {
+          "start": 104,
+          "end": 105,
+          "covered_bases": 2,
+          "depth": 2.0
+        },
+        {
+          "start": 105,
+          "end": 106,
+          "covered_bases": 2,
+          "depth": 2.0
+        },
+        {
+          "start": 106,
+          "end": 107,
+          "covered_bases": 3,
+          "depth": 3.0
+        },
+        {
+          "start": 107,
+          "end": 108,
+          "covered_bases": 3,
+          "depth": 3.0
+        },
+        {
+          "start": 108,
+          "end": 109,
+          "covered_bases": 2,
+          "depth": 2.0
+        },
+        {
+          "start": 109,
+          "end": 110,
+          "covered_bases": 2,
+          "depth": 2.0
+        },
+        {
+          "start": 110,
+          "end": 111,
+          "covered_bases": 1,
+          "depth": 1.0
+        },
+        {
+          "start": 111,
+          "end": 112,
+          "covered_bases": 1,
+          "depth": 1.0
+        },
+        {
+          "start": 112,
+          "end": 113,
+          "covered_bases": 1,
+          "depth": 1.0
+        },
+        {
+          "start": 113,
+          "end": 114,
+          "covered_bases": 1,
+          "depth": 1.0
+        },
+        {
+          "start": 114,
+          "end": 115,
+          "covered_bases": 0,
+          "depth": 0.0
+        },
+        {
+          "start": 115,
+          "end": 116,
+          "covered_bases": 0,
+          "depth": 0.0
+        },
+        {
+          "start": 116,
+          "end": 117,
+          "covered_bases": 0,
+          "depth": 0.0
+        },
+        {
+          "start": 117,
+          "end": 118,
+          "covered_bases": 0,
+          "depth": 0.0
+        },
+        {
+          "start": 118,
+          "end": 119,
+          "covered_bases": 0,
+          "depth": 0.0
+        },
+        {
+          "start": 119,
+          "end": 120,
+          "covered_bases": 1,
+          "depth": 1.0
+        },
+        {
+          "start": 120,
+          "end": 121,
+          "covered_bases": 1,
+          "depth": 1.0
+        },
+        {
+          "start": 121,
+          "end": 122,
+          "covered_bases": 1,
+          "depth": 1.0
+        },
+        {
+          "start": 122,
+          "end": 123,
+          "covered_bases": 0,
+          "depth": 0.0
+        },
+        {
+          "start": 123,
+          "end": 124,
+          "covered_bases": 0,
+          "depth": 0.0
+        },
+        {
+          "start": 124,
+          "end": 125,
+          "covered_bases": 0,
+          "depth": 0.0
+        },
+        {
+          "start": 125,
+          "end": 126,
+          "covered_bases": 1,
+          "depth": 1.0
+        },
+        {
+          "start": 126,
+          "end": 127,
+          "covered_bases": 1,
+          "depth": 1.0
+        },
+        {
+          "start": 127,
+          "end": 128,
+          "covered_bases": 1,
+          "depth": 1.0
+        },
+        {
+          "start": 128,
+          "end": 129,
+          "covered_bases": 0,
+          "depth": 0.0
+        },
+        {
+          "start": 129,
+          "end": 130,
+          "covered_bases": 0,
+          "depth": 0.0
+        },
+        {
+          "start": 130,
+          "end": 131,
+          "covered_bases": 0,
+          "depth": 0.0
+        },
+        {
+          "start": 131,
+          "end": 132,
+          "covered_bases": 0,
+          "depth": 0.0
+        },
+        {
+          "start": 132,
+          "end": 133,
+          "covered_bases": 0,
+          "depth": 0.0
+        },
+        {
+          "start": 133,
+          "end": 134,
+          "covered_bases": 0,
+          "depth": 0.0
+        },
+        {
+          "start": 134,
+          "end": 135,
+          "covered_bases": 0,
+          "depth": 0.0
+        },
+        {
+          "start": 135,
+          "end": 136,
+          "covered_bases": 0,
+          "depth": 0.0
+        },
+        {
+          "start": 136,
+          "end": 137,
+          "covered_bases": 0,
+          "depth": 0.0
+        },
+        {
+          "start": 137,
+          "end": 138,
+          "covered_bases": 0,
+          "depth": 0.0
+        },
+        {
+          "start": 138,
+          "end": 139,
+          "covered_bases": 0,
+          "depth": 0.0
+        },
+        {
+          "start": 139,
+          "end": 140,
+          "covered_bases": 0,
+          "depth": 0.0
+        },
+        {
+          "start": 140,
+          "end": 141,
+          "covered_bases": 1,
+          "depth": 1.0
+        },
+        {
+          "start": 141,
+          "end": 142,
+          "covered_bases": 1,
+          "depth": 1.0
+        },
+        {
+          "start": 142,
+          "end": 143,
+          "covered_bases": 1,
+          "depth": 1.0
+        },
+        {
+          "start": 143,
+          "end": 144,
+          "covered_bases": 1,
+          "depth": 1.0
+        },
+        {
+          "start": 144,
+          "end": 145,
+          "covered_bases": 1,
+          "depth": 1.0
+        },
+        {
+          "start": 145,
+          "end": 146,
+          "covered_bases": 1,
+          "depth": 1.0
+        },
+        {
+          "start": 146,
+          "end": 147,
+          "covered_bases": 1,
+          "depth": 1.0
+        },
+        {
+          "start": 147,
+          "end": 148,
+          "covered_bases": 1,
+          "depth": 1.0
+        },
+        {
+          "start": 148,
+          "end": 149,
+          "covered_bases": 1,
+          "depth": 1.0
+        },
+        {
+          "start": 149,
+          "end": 150,
+          "covered_bases": 1,
+          "depth": 1.0
+        },
+        {
+          "start": 150,
+          "end": 151,
+          "covered_bases": 0,
+          "depth": 0.0
+        },
+        {
+          "start": 151,
+          "end": 152,
+          "covered_bases": 0,
+          "depth": 0.0
+        },
+        {
+          "start": 152,
+          "end": 153,
+          "covered_bases": 0,
+          "depth": 0.0
+        },
+        {
+          "start": 153,
+          "end": 154,
+          "covered_bases": 0,
+          "depth": 0.0
+        },
+        {
+          "start": 154,
+          "end": 155,
+          "covered_bases": 0,
+          "depth": 0.0
+        },
+        {
+          "start": 155,
+          "end": 156,
+          "covered_bases": 0,
+          "depth": 0.0
+        },
+        {
+          "start": 156,
+          "end": 157,
+          "covered_bases": 0,
+          "depth": 0.0
+        },
+        {
+          "start": 157,
+          "end": 158,
+          "covered_bases": 0,
+          "depth": 0.0
+        },
+        {
+          "start": 158,
+          "end": 159,
+          "covered_bases": 0,
+          "depth": 0.0
+        },
+        {
+          "start": 159,
+          "end": 160,
+          "covered_bases": 0,
+          "depth": 0.0
+        }
+      ],
+      "records_scanned": 5,
+      "matched_reads": 5,
+      "scan_complete": true,
+      "reads_truncated": false
+    }
+  }
+}

@@ -1,0 +1,30 @@
+{
+  "contract_version": 2,
+  "id": "viz-ome-zarr",
+  "version": "1.0.0",
+  "name": "OME-Zarr 本地分块图像",
+  "description": "从已登记本地数据集内 .zarr 目录的 .zattrs 打开 OME-NGFF 0.4 / Zarr v2；先查看金字塔，再显式选择层级、平面与 ROI，只读授权块，不连接外部存储。",
+  "extensions": [],
+  "filenames": [
+    ".zattrs"
+  ],
+  "view_kind": "image",
+  "adapter": "ome-zarr",
+  "reader": "ome-zarr",
+  "default_enabled": true,
+  "priority": 40,
+  "permissions": [
+    "file:read"
+  ],
+  "limits": {
+    "max_input_bytes": 33554432,
+    "max_output_bytes": 2097152
+  },
+  "capabilities": {
+    "operations": [
+      "preview"
+    ],
+    "input_mode": "window",
+    "shared": false
+  }
+}

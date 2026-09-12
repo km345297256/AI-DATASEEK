@@ -41,6 +41,7 @@ from app.domain.models.tool_result import ToolResult
 from app.core.config import get_settings
 from app.domain.utils.public_error import public_error_message
 from app.domain.services.analysis_completion import requirements_for_step
+from app.domain.utils.robust_json_parser import parse_json_lenient
 
 logger = logging.getLogger(__name__)
 
@@ -74,7 +75,6 @@ class ExecutionAgent(BaseAgent):
     DATASET_PROGRAM_MAX_TOKENS = 8192
     DATASET_PROGRAM_TIMEOUT_SECONDS = 120
     DATASET_PROGRAM_REPAIR_TIMEOUT_SECONDS = 120
-    EXECUTION_RESULT_REPAIR_TIMEOUT_SECONDS = 30.0
     SHELL_OUTPUT_MAX_CHARS = 8 * 1024
     SHELL_OUTPUT_MAX_BLOCKS = 4
     SHELL_SUMMARY_MAX_FACTS = 8
@@ -3317,10 +3317,34 @@ class ExecutionAgent(BaseAgent):
             "</dataset_execution_contract>"
         )
 
-    async def _decode_execution_result(self, raw_message: Any) -> Optional[ExecutionResult]:
-        """Decode one model result without allowing parser/schema errors to escape."""
+    def _terminal_response_problem(self, message: AIMessage) -> str | None:
+        """Keep an unfinished execution in the tool loop, never invent a final.
+
+        A transport-level stop is not a task completion receipt. Both malformed
+        tool envelopes and unusable result objects need correction while the
+        original tool scope and execution ledger are still active.
+        """
+        problem = super()._terminal_response_problem(message)
+        if problem or message.tool_calls:
+            return problem
         try:
-            parsed_response = await self._parse_json(
+            parsed = parse_json_lenient(self._message_content_to_text(message.content))
+            result = ExecutionResult.model_validate(parsed)
+            if not result.result or is_non_substantive_message_text(result.result):
+                return "invalid_execution_result"
+        except Exception:
+            return "invalid_execution_result"
+        return None
+
+    async def _decode_execution_result(self, raw_message: Any) -> Optional[ExecutionResult]:
+        """Local syntax decoding only; never synthesize evidence to fill a schema.
+
+        Model-assisted correction belongs to the live execution loop. Calling
+        the generic JSON-repair model here could turn an unexecuted script into
+        a plausible success report after tools have already been closed.
+        """
+        try:
+            parsed_response = parse_json_lenient(
                 self._message_content_to_text(raw_message)
             )
         except Exception as exc:
@@ -3345,38 +3369,6 @@ class ExecutionAgent(BaseAgent):
             logger.warning("Execution result contained only placeholder text")
             return None
         return result
-
-    async def _repair_execution_result(self) -> Optional[ExecutionResult]:
-        """Request one bounded, tool-free repair for an unusable terminal result."""
-        try:
-            async with asyncio.timeout(self.EXECUTION_RESULT_REPAIR_TIMEOUT_SECONDS):
-                repair_message = await self.ask_with_messages(
-                    [HumanMessage(content=(
-                        "Your previous final response could not be decoded as the required result object. "
-                        "Using only the evidence already available in this conversation, return exactly one "
-                        "JSON object with keys `success` (boolean), `result` (a substantive string), and "
-                        "`attachments` (an array of paths that were actually produced). Tools are disabled. "
-                        "Do not add prose or Markdown outside the JSON object and do not return null."
-                    ))],
-                    self.format,
-                    allow_tools=False,
-                )
-        except asyncio.TimeoutError:
-            logger.warning(
-                "Execution result repair exceeded %.1fs",
-                self.EXECUTION_RESULT_REPAIR_TIMEOUT_SECONDS,
-            )
-            return None
-        except Exception as exc:
-            logger.warning(
-                "Execution result repair failed (%s)",
-                type(exc).__name__,
-            )
-            return None
-        if repair_message.tool_calls:
-            logger.warning("Execution result repair returned a tool call despite tools being disabled")
-            return None
-        return await self._decode_execution_result(repair_message.content)
 
     async def _compile_dataset_analysis_program(
         self,
@@ -3667,6 +3659,12 @@ class ExecutionAgent(BaseAgent):
             dataset_intent=dataset_intent,
             dataset_contract=dataset_contract,
         )
+        if message._artifact_repair_context or message._resume_checkpoint:
+            # The prior draft belongs only to the private repair feedback. A
+            # STARTED event must not republish it as the new attempt's result.
+            step.result = None
+            step.attachments = []
+            step.success = False
         step.status = ExecutionStatus.RUNNING
         yield StepEvent(status=StepStatus.STARTED, step=event_step())
         scoped_request = f"{step_context}\n\n{request}"
@@ -3687,7 +3685,9 @@ class ExecutionAgent(BaseAgent):
                 "If replacing an invalid auxiliary file at a new path, leave the old file alone "
                 "and report which file remains invalid; do not delete user data. "
                 "Keep the original user goal and provide a consolidated analysis explanation, "
-                "preserving the useful findings from previous_analysis while correcting unsupported claims. "
+                "Treat previous_analysis as an unverified model draft, not execution evidence. "
+                "Retain findings only when supported by actual tool results or verified artifacts; "
+                "correct unsupported claims rather than repeating them. "
                 "Report any remaining limitations truthfully."
             )
         step.deliverables = requirements_for_step(step, message)
@@ -3751,12 +3751,6 @@ class ExecutionAgent(BaseAgent):
                         continue
                     execution_result = await self._decode_execution_result(event.message)
                     if execution_result is None:
-                        logger.warning(
-                            "Execution step %s returned an unusable final response; attempting one repair",
-                            step.id,
-                        )
-                        execution_result = await self._repair_execution_result()
-                    if execution_result is None:
                         shell_fallback = self._shell_output_completion(
                             observed_shell_results,
                             direct=self._direct_shell_output_request(message),
@@ -3768,9 +3762,9 @@ class ExecutionAgent(BaseAgent):
                     if execution_result is None:
                         language = (plan.language or "").casefold()
                         error = (
-                            "模型未返回可用的分析结果；系统已自动修复但仍未成功，请重新提交问题。"
+                            "模型未返回可验证的分析结果，本步骤未计为完成。"
                             if language == "zh"
-                            else "The model returned no usable analysis result after one automatic repair; please retry the request."
+                            else "The model returned no verifiable analysis result; this step is not complete."
                         )
                         step.status = ExecutionStatus.FAILED
                         step.success = False

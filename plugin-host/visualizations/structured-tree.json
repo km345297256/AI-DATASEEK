@@ -1,0 +1,17 @@
+{
+  "contract_version": 2,
+  "id": "viz-structured-tree",
+  "version": "1.0.0",
+  "name": "结构化数据树",
+  "description": "JSON/XML/YAML 只读结构树；保留数字原文，明确截断；禁止实体、脚本和外链。",
+  "extensions": ["json", "xml", "yaml", "yml"],
+  "filenames": [],
+  "view_kind": "tree",
+  "adapter": "structured-tree",
+  "reader": "structure",
+  "default_enabled": true,
+  "priority": 40,
+  "permissions": ["file:read"],
+  "limits": {"max_input_bytes": 4194304, "max_output_bytes": 1048576},
+  "capabilities": {"operations": ["preview"], "input_mode": "whole", "shared": false}
+}

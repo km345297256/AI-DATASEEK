@@ -1,0 +1,480 @@
+{
+  "wavelength": {
+    "tree": {
+      "contract_version": 2,
+      "type": "envi-window",
+      "reader": "envi-window",
+      "kind": "tree",
+      "media_type": "application/json",
+      "choices": {
+        "cube": {
+          "samples": 4,
+          "lines": 3,
+          "bands": 5,
+          "data_type": 4,
+          "byte_order": 0,
+          "interleave": "bip",
+          "header_offset": 8,
+          "wavelengths": [
+            400,
+            500,
+            600,
+            700,
+            800
+          ],
+          "wavelength_unit": "Nanometers",
+          "ignore_value": null
+        }
+      },
+      "selected": {},
+      "warnings": [
+        "仅显示原始存储值；不应用增益、反射率缩放、坏波段修复或地图投影。缺失值不插值。"
+      ],
+      "sampled": false,
+      "tree": [
+        {
+          "path": "/cube",
+          "node_type": "array",
+          "shape": [
+            5,
+            3,
+            4
+          ],
+          "dtype": "float32"
+        }
+      ],
+      "metadata": {
+        "format": "hdr",
+        "input_mode": "window",
+        "source_bytes": 444,
+        "header_bytes": 196,
+        "data_bytes": 248,
+        "read_bytes": 196,
+        "read_requests": 1,
+        "null_values": 0,
+        "limits": {
+          "max_values": 16384,
+          "max_bands": 2048,
+          "max_spectrum_bands": 128
+        },
+        "no_calibration": true,
+        "no_georeferencing": true
+      }
+    },
+    "image": {
+      "contract_version": 2,
+      "type": "envi-window",
+      "reader": "envi-window",
+      "kind": "image",
+      "media_type": "application/json",
+      "choices": {
+        "cube": {
+          "samples": 4,
+          "lines": 3,
+          "bands": 5,
+          "data_type": 4,
+          "byte_order": 0,
+          "interleave": "bip",
+          "header_offset": 8,
+          "wavelengths": [
+            400,
+            500,
+            600,
+            700,
+            800
+          ],
+          "wavelength_unit": "Nanometers",
+          "ignore_value": null
+        }
+      },
+      "selected": {
+        "band": 2,
+        "x": 1,
+        "y": 1,
+        "width": 3,
+        "height": 2
+      },
+      "warnings": [
+        "仅显示原始存储值；不应用增益、反射率缩放、坏波段修复或地图投影。缺失值不插值。"
+      ],
+      "sampled": false,
+      "array": {
+        "shape": [
+          2,
+          3
+        ],
+        "dimensions": [
+          "row",
+          "column"
+        ],
+        "dtype": "float32",
+        "values": [
+          211,
+          212,
+          213,
+          221,
+          222,
+          223
+        ]
+      },
+      "axes": [
+        {
+          "label": "行索引",
+          "unit": null,
+          "values": [
+            1,
+            2
+          ]
+        },
+        {
+          "label": "列索引",
+          "unit": null,
+          "values": [
+            1,
+            2,
+            3
+          ]
+        }
+      ],
+      "metadata": {
+        "format": "hdr",
+        "input_mode": "window",
+        "source_bytes": 444,
+        "header_bytes": 196,
+        "data_bytes": 248,
+        "read_bytes": 320,
+        "read_requests": 2,
+        "null_values": 0,
+        "limits": {
+          "max_values": 16384,
+          "max_bands": 2048,
+          "max_spectrum_bands": 128
+        },
+        "no_calibration": true,
+        "no_georeferencing": true
+      }
+    },
+    "series": {
+      "contract_version": 2,
+      "type": "envi-window",
+      "reader": "envi-window",
+      "kind": "series",
+      "media_type": "application/json",
+      "choices": {
+        "cube": {
+          "samples": 4,
+          "lines": 3,
+          "bands": 5,
+          "data_type": 4,
+          "byte_order": 0,
+          "interleave": "bip",
+          "header_offset": 8,
+          "wavelengths": [
+            400,
+            500,
+            600,
+            700,
+            800
+          ],
+          "wavelength_unit": "Nanometers",
+          "ignore_value": null
+        }
+      },
+      "selected": {
+        "x": 2,
+        "y": 1,
+        "band_start": 0,
+        "band_count": 5
+      },
+      "warnings": [
+        "仅显示原始存储值；不应用增益、反射率缩放、坏波段修复或地图投影。缺失值不插值。"
+      ],
+      "sampled": false,
+      "array": {
+        "shape": [
+          5
+        ],
+        "dimensions": [
+          "band"
+        ],
+        "dtype": "float32",
+        "values": [
+          12,
+          112,
+          212,
+          312,
+          412
+        ]
+      },
+      "axes": [
+        {
+          "label": "光谱坐标",
+          "unit": "Nanometers",
+          "values": [
+            400,
+            500,
+            600,
+            700,
+            800
+          ]
+        }
+      ],
+      "metadata": {
+        "format": "hdr",
+        "input_mode": "window",
+        "source_bytes": 444,
+        "header_bytes": 196,
+        "data_bytes": 248,
+        "read_bytes": 216,
+        "read_requests": 2,
+        "null_values": 0,
+        "limits": {
+          "max_values": 16384,
+          "max_bands": 2048,
+          "max_spectrum_bands": 128
+        },
+        "no_calibration": true,
+        "no_georeferencing": true
+      }
+    }
+  },
+  "frequency": {
+    "tree": {
+      "contract_version": 2,
+      "type": "envi-window",
+      "reader": "envi-window",
+      "kind": "tree",
+      "media_type": "application/json",
+      "choices": {
+        "cube": {
+          "samples": 4,
+          "lines": 3,
+          "bands": 5,
+          "data_type": 4,
+          "byte_order": 0,
+          "interleave": "bip",
+          "header_offset": 8,
+          "wavelengths": [
+            400,
+            500,
+            600,
+            700,
+            800
+          ],
+          "wavelength_unit": "GHz",
+          "ignore_value": null
+        }
+      },
+      "selected": {},
+      "warnings": [
+        "仅显示原始存储值；不应用增益、反射率缩放、坏波段修复或地图投影。缺失值不插值。"
+      ],
+      "sampled": false,
+      "tree": [
+        {
+          "path": "/cube",
+          "node_type": "array",
+          "shape": [
+            5,
+            3,
+            4
+          ],
+          "dtype": "float32"
+        }
+      ],
+      "metadata": {
+        "format": "hdr",
+        "input_mode": "window",
+        "source_bytes": 437,
+        "header_bytes": 189,
+        "data_bytes": 248,
+        "read_bytes": 189,
+        "read_requests": 1,
+        "null_values": 0,
+        "limits": {
+          "max_values": 16384,
+          "max_bands": 2048,
+          "max_spectrum_bands": 128
+        },
+        "no_calibration": true,
+        "no_georeferencing": true
+      }
+    },
+    "image": {
+      "contract_version": 2,
+      "type": "envi-window",
+      "reader": "envi-window",
+      "kind": "image",
+      "media_type": "application/json",
+      "choices": {
+        "cube": {
+          "samples": 4,
+          "lines": 3,
+          "bands": 5,
+          "data_type": 4,
+          "byte_order": 0,
+          "interleave": "bip",
+          "header_offset": 8,
+          "wavelengths": [
+            400,
+            500,
+            600,
+            700,
+            800
+          ],
+          "wavelength_unit": "GHz",
+          "ignore_value": null
+        }
+      },
+      "selected": {
+        "band": 2,
+        "x": 1,
+        "y": 1,
+        "width": 3,
+        "height": 2
+      },
+      "warnings": [
+        "仅显示原始存储值；不应用增益、反射率缩放、坏波段修复或地图投影。缺失值不插值。"
+      ],
+      "sampled": false,
+      "array": {
+        "shape": [
+          2,
+          3
+        ],
+        "dimensions": [
+          "row",
+          "column"
+        ],
+        "dtype": "float32",
+        "values": [
+          211,
+          212,
+          213,
+          221,
+          222,
+          223
+        ]
+      },
+      "axes": [
+        {
+          "label": "行索引",
+          "unit": null,
+          "values": [
+            1,
+            2
+          ]
+        },
+        {
+          "label": "列索引",
+          "unit": null,
+          "values": [
+            1,
+            2,
+            3
+          ]
+        }
+      ],
+      "metadata": {
+        "format": "hdr",
+        "input_mode": "window",
+        "source_bytes": 437,
+        "header_bytes": 189,
+        "data_bytes": 248,
+        "read_bytes": 313,
+        "read_requests": 2,
+        "null_values": 0,
+        "limits": {
+          "max_values": 16384,
+          "max_bands": 2048,
+          "max_spectrum_bands": 128
+        },
+        "no_calibration": true,
+        "no_georeferencing": true
+      }
+    },
+    "series": {
+      "contract_version": 2,
+      "type": "envi-window",
+      "reader": "envi-window",
+      "kind": "series",
+      "media_type": "application/json",
+      "choices": {
+        "cube": {
+          "samples": 4,
+          "lines": 3,
+          "bands": 5,
+          "data_type": 4,
+          "byte_order": 0,
+          "interleave": "bip",
+          "header_offset": 8,
+          "wavelengths": [
+            400,
+            500,
+            600,
+            700,
+            800
+          ],
+          "wavelength_unit": "GHz",
+          "ignore_value": null
+        }
+      },
+      "selected": {
+        "x": 2,
+        "y": 1,
+        "band_start": 0,
+        "band_count": 5
+      },
+      "warnings": [
+        "仅显示原始存储值；不应用增益、反射率缩放、坏波段修复或地图投影。缺失值不插值。"
+      ],
+      "sampled": false,
+      "array": {
+        "shape": [
+          5
+        ],
+        "dimensions": [
+          "band"
+        ],
+        "dtype": "float32",
+        "values": [
+          12,
+          112,
+          212,
+          312,
+          412
+        ]
+      },
+      "axes": [
+        {
+          "label": "光谱坐标",
+          "unit": "GHz",
+          "values": [
+            400,
+            500,
+            600,
+            700,
+            800
+          ]
+        }
+      ],
+      "metadata": {
+        "format": "hdr",
+        "input_mode": "window",
+        "source_bytes": 437,
+        "header_bytes": 189,
+        "data_bytes": 248,
+        "read_bytes": 209,
+        "read_requests": 2,
+        "null_values": 0,
+        "limits": {
+          "max_values": 16384,
+          "max_bands": 2048,
+          "max_spectrum_bands": 128
+        },
+        "no_calibration": true,
+        "no_georeferencing": true
+      }
+    }
+  }
+}

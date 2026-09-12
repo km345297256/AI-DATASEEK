@@ -1,0 +1,17 @@
+{
+  "contract_version": 2,
+  "id": "viz-audio-waveform",
+  "version": "1.0.0",
+  "name": "音频与 WAV 波形",
+  "description": "16 MiB 内 WAV/MP3/OGG 本地播放；受支持 PCM WAV 有界波形，压缩音频不自动全量解码。",
+  "extensions": ["wav", "mp3", "ogg"],
+  "filenames": [],
+  "view_kind": "series",
+  "adapter": "audio-waveform",
+  "reader": "binary",
+  "default_enabled": true,
+  "priority": 50,
+  "permissions": ["file:read"],
+  "limits": {"max_input_bytes": 16777216, "max_output_bytes": 1048576},
+  "capabilities": {"operations": ["bytes"], "input_mode": "whole", "shared": false}
+}

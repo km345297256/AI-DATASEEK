@@ -1,0 +1,689 @@
+{
+  "tree": {
+    "contract_version": 2,
+    "type": "sql-dump",
+    "reader": "sql-dump",
+    "kind": "tree",
+    "media_type": "application/json",
+    "choices": {
+      "tables": [
+        {
+          "id": "s-9e95637b962c7119bc62e989",
+          "label": "empty",
+          "columns": [
+            {
+              "id": 0,
+              "label": "note",
+              "declared_type": "TEXT"
+            }
+          ]
+        },
+        {
+          "id": "s-866abef245a162e1e8465acd",
+          "label": "measurements",
+          "columns": [
+            {
+              "id": 0,
+              "label": "id",
+              "declared_type": "INTEGER"
+            },
+            {
+              "id": 1,
+              "label": "amount",
+              "declared_type": "TEXT"
+            },
+            {
+              "id": 2,
+              "label": "signal",
+              "declared_type": "REAL"
+            },
+            {
+              "id": 3,
+              "label": "label",
+              "declared_type": "TEXT"
+            },
+            {
+              "id": 4,
+              "label": "optional",
+              "declared_type": "TEXT"
+            },
+            {
+              "id": 5,
+              "label": "payload",
+              "declared_type": "BLOB"
+            }
+          ]
+        }
+      ]
+    },
+    "selected": {
+      "dialect": "sqlite"
+    },
+    "metadata": {
+      "dialect": "sqlite",
+      "format": "sql",
+      "input_mode": "whole",
+      "source_bytes": 504,
+      "statement_count": 7,
+      "ignored_statement_count": 2,
+      "source_rows": 3,
+      "schema_bytes": 135,
+      "value_semantics": "Source SQL literals only; COPY fields remain text; no execution, type coercion or restored database state",
+      "ordering": "source-literal-order",
+      "limits": {
+        "max_statements": 4096,
+        "max_statement_bytes": 1048576,
+        "max_depth": 32,
+        "max_tables": 32,
+        "max_schema_columns": 128,
+        "max_schema_bytes": 131072,
+        "max_columns": 16,
+        "max_rows": 200,
+        "max_offset": 100000,
+        "max_cell_bytes": 512,
+        "max_number_bytes": 128,
+        "max_source_rows": 1000000
+      }
+    },
+    "warnings": [
+      "仅显示受支持 CREATE TABLE、INSERT VALUES 和 PostgreSQL COPY 文本中的结构与字面量；不执行任何 SQL，也不计算类型转换、默认值、约束、触发器或其他语句。行数与顺序来自转储片段，不代表恢复后的数据库状态。未支持的结构或行语法会拒绝，其他跳过语句只计数。"
+    ],
+    "sampled": false,
+    "tree": [
+      {
+        "path": "/s-9e95637b962c7119bc62e989",
+        "node_type": "table",
+        "attributes": {
+          "label": "empty",
+          "columns": 1
+        }
+      },
+      {
+        "path": "/s-866abef245a162e1e8465acd",
+        "node_type": "table",
+        "attributes": {
+          "label": "measurements",
+          "columns": 6
+        }
+      }
+    ]
+  },
+  "first": {
+    "contract_version": 2,
+    "type": "sql-dump",
+    "reader": "sql-dump",
+    "kind": "table",
+    "media_type": "application/json",
+    "choices": {
+      "tables": [
+        {
+          "id": "s-9e95637b962c7119bc62e989",
+          "label": "empty",
+          "columns": [
+            {
+              "id": 0,
+              "label": "note",
+              "declared_type": "TEXT"
+            }
+          ]
+        },
+        {
+          "id": "s-866abef245a162e1e8465acd",
+          "label": "measurements",
+          "columns": [
+            {
+              "id": 0,
+              "label": "id",
+              "declared_type": "INTEGER"
+            },
+            {
+              "id": 1,
+              "label": "amount",
+              "declared_type": "TEXT"
+            },
+            {
+              "id": 2,
+              "label": "signal",
+              "declared_type": "REAL"
+            },
+            {
+              "id": 3,
+              "label": "label",
+              "declared_type": "TEXT"
+            },
+            {
+              "id": 4,
+              "label": "optional",
+              "declared_type": "TEXT"
+            },
+            {
+              "id": 5,
+              "label": "payload",
+              "declared_type": "BLOB"
+            }
+          ]
+        }
+      ]
+    },
+    "selected": {
+      "dialect": "sqlite",
+      "table": "s-866abef245a162e1e8465acd",
+      "columns": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "row_offset": 0,
+      "row_limit": 2
+    },
+    "metadata": {
+      "dialect": "sqlite",
+      "format": "sql",
+      "input_mode": "whole",
+      "source_bytes": 504,
+      "statement_count": 7,
+      "ignored_statement_count": 2,
+      "source_rows": 3,
+      "schema_bytes": 135,
+      "value_semantics": "Source SQL literals only; COPY fields remain text; no execution, type coercion or restored database state",
+      "ordering": "source-literal-order",
+      "limits": {
+        "max_statements": 4096,
+        "max_statement_bytes": 1048576,
+        "max_depth": 32,
+        "max_tables": 32,
+        "max_schema_columns": 128,
+        "max_schema_bytes": 131072,
+        "max_columns": 16,
+        "max_rows": 200,
+        "max_offset": 100000,
+        "max_cell_bytes": 512,
+        "max_number_bytes": 128,
+        "max_source_rows": 1000000
+      }
+    },
+    "warnings": [
+      "仅显示受支持 CREATE TABLE、INSERT VALUES 和 PostgreSQL COPY 文本中的结构与字面量；不执行任何 SQL，也不计算类型转换、默认值、约束、触发器或其他语句。行数与顺序来自转储片段，不代表恢复后的数据库状态。未支持的结构或行语法会拒绝，其他跳过语句只计数。"
+    ],
+    "sampled": true,
+    "table": {
+      "column_ids": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "columns": [
+        "id",
+        "amount",
+        "signal",
+        "label",
+        "optional",
+        "payload"
+      ],
+      "rows": [
+        [
+          {
+            "type": "number-literal",
+            "value": "9223372036854775807"
+          },
+          {
+            "type": "text",
+            "value": "1.230000000000000001"
+          },
+          {
+            "type": "number-literal",
+            "value": "7.5"
+          },
+          {
+            "type": "text",
+            "value": "观测一"
+          },
+          {
+            "type": "null",
+            "value": null
+          },
+          {
+            "type": "blob",
+            "bytes": 2
+          }
+        ],
+        [
+          {
+            "type": "number-literal",
+            "value": "9007199254740993"
+          },
+          {
+            "type": "text",
+            "value": "-99999999999999999999.123456789012345678"
+          },
+          {
+            "type": "number-literal",
+            "value": "9.0"
+          },
+          {
+            "type": "text",
+            "value": "<img src=x onerror=alert(1)>"
+          },
+          {
+            "type": "text",
+            "value": ""
+          },
+          {
+            "type": "null",
+            "value": null
+          }
+        ]
+      ],
+      "row_ids": [
+        "0",
+        "1"
+      ],
+      "row_offset": 0,
+      "has_more": true
+    }
+  },
+  "second": {
+    "contract_version": 2,
+    "type": "sql-dump",
+    "reader": "sql-dump",
+    "kind": "table",
+    "media_type": "application/json",
+    "choices": {
+      "tables": [
+        {
+          "id": "s-9e95637b962c7119bc62e989",
+          "label": "empty",
+          "columns": [
+            {
+              "id": 0,
+              "label": "note",
+              "declared_type": "TEXT"
+            }
+          ]
+        },
+        {
+          "id": "s-866abef245a162e1e8465acd",
+          "label": "measurements",
+          "columns": [
+            {
+              "id": 0,
+              "label": "id",
+              "declared_type": "INTEGER"
+            },
+            {
+              "id": 1,
+              "label": "amount",
+              "declared_type": "TEXT"
+            },
+            {
+              "id": 2,
+              "label": "signal",
+              "declared_type": "REAL"
+            },
+            {
+              "id": 3,
+              "label": "label",
+              "declared_type": "TEXT"
+            },
+            {
+              "id": 4,
+              "label": "optional",
+              "declared_type": "TEXT"
+            },
+            {
+              "id": 5,
+              "label": "payload",
+              "declared_type": "BLOB"
+            }
+          ]
+        }
+      ]
+    },
+    "selected": {
+      "dialect": "sqlite",
+      "table": "s-866abef245a162e1e8465acd",
+      "columns": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "row_offset": 2,
+      "row_limit": 2
+    },
+    "metadata": {
+      "dialect": "sqlite",
+      "format": "sql",
+      "input_mode": "whole",
+      "source_bytes": 504,
+      "statement_count": 7,
+      "ignored_statement_count": 2,
+      "source_rows": 3,
+      "schema_bytes": 135,
+      "value_semantics": "Source SQL literals only; COPY fields remain text; no execution, type coercion or restored database state",
+      "ordering": "source-literal-order",
+      "limits": {
+        "max_statements": 4096,
+        "max_statement_bytes": 1048576,
+        "max_depth": 32,
+        "max_tables": 32,
+        "max_schema_columns": 128,
+        "max_schema_bytes": 131072,
+        "max_columns": 16,
+        "max_rows": 200,
+        "max_offset": 100000,
+        "max_cell_bytes": 512,
+        "max_number_bytes": 128,
+        "max_source_rows": 1000000
+      }
+    },
+    "warnings": [
+      "仅显示受支持 CREATE TABLE、INSERT VALUES 和 PostgreSQL COPY 文本中的结构与字面量；不执行任何 SQL，也不计算类型转换、默认值、约束、触发器或其他语句。行数与顺序来自转储片段，不代表恢复后的数据库状态。未支持的结构或行语法会拒绝，其他跳过语句只计数。"
+    ],
+    "sampled": true,
+    "table": {
+      "column_ids": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "columns": [
+        "id",
+        "amount",
+        "signal",
+        "label",
+        "optional",
+        "payload"
+      ],
+      "rows": [
+        [
+          {
+            "type": "number-literal",
+            "value": "3"
+          },
+          {
+            "type": "text",
+            "value": "0.000000000000000001"
+          },
+          {
+            "type": "number-literal",
+            "value": "12.0"
+          },
+          {
+            "type": "text",
+            "value": "观测三"
+          },
+          {
+            "type": "text",
+            "value": "完成"
+          },
+          {
+            "type": "blob",
+            "bytes": 0
+          }
+        ]
+      ],
+      "row_ids": [
+        "2"
+      ],
+      "row_offset": 2,
+      "has_more": false
+    }
+  },
+  "empty": {
+    "contract_version": 2,
+    "type": "sql-dump",
+    "reader": "sql-dump",
+    "kind": "table",
+    "media_type": "application/json",
+    "choices": {
+      "tables": [
+        {
+          "id": "s-9e95637b962c7119bc62e989",
+          "label": "empty",
+          "columns": [
+            {
+              "id": 0,
+              "label": "note",
+              "declared_type": "TEXT"
+            }
+          ]
+        },
+        {
+          "id": "s-866abef245a162e1e8465acd",
+          "label": "measurements",
+          "columns": [
+            {
+              "id": 0,
+              "label": "id",
+              "declared_type": "INTEGER"
+            },
+            {
+              "id": 1,
+              "label": "amount",
+              "declared_type": "TEXT"
+            },
+            {
+              "id": 2,
+              "label": "signal",
+              "declared_type": "REAL"
+            },
+            {
+              "id": 3,
+              "label": "label",
+              "declared_type": "TEXT"
+            },
+            {
+              "id": 4,
+              "label": "optional",
+              "declared_type": "TEXT"
+            },
+            {
+              "id": 5,
+              "label": "payload",
+              "declared_type": "BLOB"
+            }
+          ]
+        }
+      ]
+    },
+    "selected": {
+      "dialect": "sqlite",
+      "table": "s-9e95637b962c7119bc62e989",
+      "columns": [
+        0
+      ],
+      "row_offset": 0,
+      "row_limit": 2
+    },
+    "metadata": {
+      "dialect": "sqlite",
+      "format": "sql",
+      "input_mode": "whole",
+      "source_bytes": 504,
+      "statement_count": 7,
+      "ignored_statement_count": 2,
+      "source_rows": 3,
+      "schema_bytes": 135,
+      "value_semantics": "Source SQL literals only; COPY fields remain text; no execution, type coercion or restored database state",
+      "ordering": "source-literal-order",
+      "limits": {
+        "max_statements": 4096,
+        "max_statement_bytes": 1048576,
+        "max_depth": 32,
+        "max_tables": 32,
+        "max_schema_columns": 128,
+        "max_schema_bytes": 131072,
+        "max_columns": 16,
+        "max_rows": 200,
+        "max_offset": 100000,
+        "max_cell_bytes": 512,
+        "max_number_bytes": 128,
+        "max_source_rows": 1000000
+      }
+    },
+    "warnings": [
+      "仅显示受支持 CREATE TABLE、INSERT VALUES 和 PostgreSQL COPY 文本中的结构与字面量；不执行任何 SQL，也不计算类型转换、默认值、约束、触发器或其他语句。行数与顺序来自转储片段，不代表恢复后的数据库状态。未支持的结构或行语法会拒绝，其他跳过语句只计数。"
+    ],
+    "sampled": false,
+    "table": {
+      "column_ids": [
+        0
+      ],
+      "columns": [
+        "note"
+      ],
+      "rows": [],
+      "row_ids": [],
+      "row_offset": 0,
+      "has_more": false
+    }
+  },
+  "columns": {
+    "contract_version": 2,
+    "type": "sql-dump",
+    "reader": "sql-dump",
+    "kind": "table",
+    "media_type": "application/json",
+    "choices": {
+      "tables": [
+        {
+          "id": "s-9e95637b962c7119bc62e989",
+          "label": "empty",
+          "columns": [
+            {
+              "id": 0,
+              "label": "note",
+              "declared_type": "TEXT"
+            }
+          ]
+        },
+        {
+          "id": "s-866abef245a162e1e8465acd",
+          "label": "measurements",
+          "columns": [
+            {
+              "id": 0,
+              "label": "id",
+              "declared_type": "INTEGER"
+            },
+            {
+              "id": 1,
+              "label": "amount",
+              "declared_type": "TEXT"
+            },
+            {
+              "id": 2,
+              "label": "signal",
+              "declared_type": "REAL"
+            },
+            {
+              "id": 3,
+              "label": "label",
+              "declared_type": "TEXT"
+            },
+            {
+              "id": 4,
+              "label": "optional",
+              "declared_type": "TEXT"
+            },
+            {
+              "id": 5,
+              "label": "payload",
+              "declared_type": "BLOB"
+            }
+          ]
+        }
+      ]
+    },
+    "selected": {
+      "dialect": "sqlite",
+      "table": "s-866abef245a162e1e8465acd",
+      "columns": [
+        0,
+        2
+      ],
+      "row_offset": 0,
+      "row_limit": 2
+    },
+    "metadata": {
+      "dialect": "sqlite",
+      "format": "sql",
+      "input_mode": "whole",
+      "source_bytes": 504,
+      "statement_count": 7,
+      "ignored_statement_count": 2,
+      "source_rows": 3,
+      "schema_bytes": 135,
+      "value_semantics": "Source SQL literals only; COPY fields remain text; no execution, type coercion or restored database state",
+      "ordering": "source-literal-order",
+      "limits": {
+        "max_statements": 4096,
+        "max_statement_bytes": 1048576,
+        "max_depth": 32,
+        "max_tables": 32,
+        "max_schema_columns": 128,
+        "max_schema_bytes": 131072,
+        "max_columns": 16,
+        "max_rows": 200,
+        "max_offset": 100000,
+        "max_cell_bytes": 512,
+        "max_number_bytes": 128,
+        "max_source_rows": 1000000
+      }
+    },
+    "warnings": [
+      "仅显示受支持 CREATE TABLE、INSERT VALUES 和 PostgreSQL COPY 文本中的结构与字面量；不执行任何 SQL，也不计算类型转换、默认值、约束、触发器或其他语句。行数与顺序来自转储片段，不代表恢复后的数据库状态。未支持的结构或行语法会拒绝，其他跳过语句只计数。"
+    ],
+    "sampled": true,
+    "table": {
+      "column_ids": [
+        0,
+        2
+      ],
+      "columns": [
+        "id",
+        "signal"
+      ],
+      "rows": [
+        [
+          {
+            "type": "number-literal",
+            "value": "9223372036854775807"
+          },
+          {
+            "type": "number-literal",
+            "value": "7.5"
+          }
+        ],
+        [
+          {
+            "type": "number-literal",
+            "value": "9007199254740993"
+          },
+          {
+            "type": "number-literal",
+            "value": "9.0"
+          }
+        ]
+      ],
+      "row_ids": [
+        "0",
+        "1"
+      ],
+      "row_offset": 0,
+      "has_more": true
+    }
+  }
+}

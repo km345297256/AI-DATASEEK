@@ -1,0 +1,33 @@
+{
+  "contract_version": 2,
+  "id": "viz-phylogeny",
+  "version": "1.0.0",
+  "name": "系统发育树 · Newick",
+  "description": "独立拓扑与枝长视图、搜索和折叠。只读单棵 Newick 树，不推断支持度，不执行系统发育分析。",
+  "extensions": [
+    "nwk",
+    "newick",
+    "tree",
+    "tre"
+  ],
+  "filenames": [],
+  "view_kind": "tree",
+  "adapter": "phylogeny",
+  "reader": "phylogeny",
+  "default_enabled": true,
+  "priority": 30,
+  "permissions": [
+    "file:read"
+  ],
+  "limits": {
+    "max_input_bytes": 4194304,
+    "max_output_bytes": 1048576
+  },
+  "capabilities": {
+    "operations": [
+      "preview"
+    ],
+    "input_mode": "whole",
+    "shared": false
+  }
+}

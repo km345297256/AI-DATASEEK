@@ -1,0 +1,36 @@
+{
+  "contract_version": 2,
+  "id": "viz-genome-tracks",
+  "version": "1.0.0",
+  "name": "基因组注释轨道",
+  "description": "VCF、GFF/GTF、BED、WIG / bedGraph 区域、信号与变异轨道；不推断参考组装。",
+  "extensions": [
+    "vcf",
+    "gff",
+    "gff3",
+    "gtf",
+    "bed",
+    "wig",
+    "bedgraph"
+  ],
+  "filenames": [],
+  "view_kind": "map",
+  "adapter": "genome-tracks",
+  "reader": "genome-tracks",
+  "capabilities": {
+    "operations": [
+      "preview"
+    ],
+    "input_mode": "whole",
+    "shared": false
+  },
+  "default_enabled": true,
+  "priority": -20,
+  "permissions": [
+    "file:read"
+  ],
+  "limits": {
+    "max_input_bytes": 16777216,
+    "max_output_bytes": 2097152
+  }
+}

@@ -1,0 +1,214 @@
+{
+  "provenance": {
+    "generator": "pylibCZIrw 6.1.0",
+    "synthetic_only": true,
+    "source_bytes": 80008896,
+    "tree_ranges": [
+      [
+        0,
+        544
+      ],
+      [
+        80006496,
+        160
+      ],
+      [
+        80006656,
+        2236
+      ]
+    ],
+    "image_ranges": [
+      [
+        0,
+        544
+      ],
+      [
+        80006496,
+        160
+      ],
+      [
+        80006656,
+        2236
+      ],
+      [
+        544,
+        288
+      ],
+      [
+        310995,
+        16
+      ],
+      [
+        317147,
+        16
+      ],
+      [
+        323299,
+        16
+      ],
+      [
+        329451,
+        16
+      ]
+    ]
+  },
+  "tree": {
+    "contract_version": 2,
+    "type": "czi-window",
+    "reader": "czi-window",
+    "kind": "tree",
+    "media_type": "application/json",
+    "metadata": {
+      "format": "CZI",
+      "variant": "CZI 1.0 DV uncompressed full-resolution",
+      "engine": "dataseek-czi-dv-window-v1",
+      "scene": 0,
+      "scene_shape": [
+        1000,
+        40000
+      ],
+      "dimension_sizes": {
+        "C": 1,
+        "Z": 1,
+        "T": 1
+      },
+      "pixel_types": [
+        "Gray16"
+      ],
+      "input_mode": "window",
+      "source_bytes": 80008896,
+      "directory_bytes": 2396,
+      "subblocks": 13,
+      "metadata_hidden": true,
+      "coverage": "not decoded",
+      "limits": {
+        "max_read_bytes": 1048576,
+        "max_total_bytes": 33554432,
+        "max_reads": 4096,
+        "max_source_bytes": 8589934592,
+        "max_directory_bytes": 4194304,
+        "max_entries": 16384,
+        "max_roi_size": 1024
+      },
+      "read_bytes": 2940,
+      "read_requests": 3
+    },
+    "choices": {
+      "channels": [
+        0
+      ],
+      "z_count": 1,
+      "time_count": 1,
+      "max_roi_size": 1024
+    },
+    "selected": {
+      "indices": [
+        0,
+        0,
+        0
+      ],
+      "roi": [
+        0,
+        0,
+        1024,
+        1000
+      ]
+    },
+    "sampled": false,
+    "warnings": [
+      "仅支持未压缩 CZI 1.0 DV、显式单 scene 0 和原始分辨率；不支持压缩、金字塔、分卷或像素掩码附件。",
+      "只读取目录及所选 ROI 的实际像素范围；缺失覆盖或重叠子块会拒绝，不补零、不重采样。",
+      "不读取采集 XML、标注或附件；显示为像素坐标，不推测物理单位，灰度范围仅针对当前 ROI。"
+    ],
+    "tree": [
+      {
+        "path": "/0",
+        "node_type": "object",
+        "attributes": {
+          "label": "Uncompressed CZI directory",
+          "children_count": 0
+        }
+      }
+    ]
+  },
+  "image": {
+    "contract_version": 2,
+    "type": "czi-window",
+    "reader": "czi-window",
+    "kind": "image",
+    "media_type": "image/png",
+    "metadata": {
+      "format": "CZI",
+      "variant": "CZI 1.0 DV uncompressed full-resolution",
+      "engine": "dataseek-czi-dv-window-v1",
+      "scene": 0,
+      "scene_shape": [
+        1000,
+        40000
+      ],
+      "dimension_sizes": {
+        "C": 1,
+        "Z": 1,
+        "T": 1
+      },
+      "pixel_types": [
+        "Gray16"
+      ],
+      "input_mode": "window",
+      "source_bytes": 80008896,
+      "directory_bytes": 2396,
+      "subblocks": 13,
+      "metadata_hidden": true,
+      "coverage": "complete and non-overlapping",
+      "limits": {
+        "max_read_bytes": 1048576,
+        "max_total_bytes": 33554432,
+        "max_reads": 4096,
+        "max_source_bytes": 8589934592,
+        "max_directory_bytes": 4194304,
+        "max_entries": 16384,
+        "max_roi_size": 1024
+      },
+      "display_range": [
+        9618,
+        49625
+      ],
+      "normalization": "ROI min-max to uint8 grayscale; original data unchanged",
+      "invalid_pixels": 0,
+      "output_shape": [
+        4,
+        8
+      ],
+      "read_bytes": 3292,
+      "read_requests": 8
+    },
+    "choices": {
+      "channels": [
+        0
+      ],
+      "z_count": 1,
+      "time_count": 1,
+      "max_roi_size": 1024
+    },
+    "selected": {
+      "indices": [
+        0,
+        0,
+        0
+      ],
+      "roi": [
+        1234,
+        50,
+        8,
+        4
+      ]
+    },
+    "sampled": true,
+    "warnings": [
+      "仅支持未压缩 CZI 1.0 DV、显式单 scene 0 和原始分辨率；不支持压缩、金字塔、分卷或像素掩码附件。",
+      "只读取目录及所选 ROI 的实际像素范围；缺失覆盖或重叠子块会拒绝，不补零、不重采样。",
+      "不读取采集 XML、标注或附件；显示为像素坐标，不推测物理单位，灰度范围仅针对当前 ROI。"
+    ],
+    "data_base64": "iVBORw0KGgoAAAANSUhEUgAAAAgAAAAECAYAAACzzX7wAAAAI0lEQVR4nGNcvHjxfwY8gJGBgQGvApb///HKMzDGxMTgVQEA1rQI/7GL7SsAAAAASUVORK5CYII="
+  }
+}

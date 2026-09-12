@@ -44,6 +44,7 @@ from app.domain.services.tools.spill_projection import (
 )
 from app.domain.services.tools.registry import ToolRegistry
 from app.domain.utils.robust_json_parser import RobustJsonParser, ToolCallParseError, parse_json_lenient
+from app.domain.utils.tool_response_protocol import textual_tool_envelope_reason, terminal_response_correction
 from app.domain.services.token_usage_service import TokenUsageService
 from app.domain.services.execution_identity import private_identity_hmac
 from app.domain.services.analysis_progress import AnalysisProgressGuard
@@ -475,9 +476,15 @@ class BaseAgent(ABC):
 
     def _tool_free_completion_is_valid(self, message: AIMessage) -> bool:
         """Validate a terminal synthesis before it leaves the bounded loop."""
-        return not message.tool_calls and bool(
+        return not message.tool_calls and not self._terminal_response_problem(message) and bool(
             self._message_content_to_text(message.content).strip()
         )
+
+    def _terminal_response_problem(self, message: AIMessage) -> str | None:
+        """Execution-only terminal gate; native calls keep their normal dispatch."""
+        if message.tool_calls:
+            return None
+        return textual_tool_envelope_reason(message.content)
 
     def _tool_free_completion_tool_responses(
         self,
@@ -728,7 +735,42 @@ class BaseAgent(ABC):
         message = await self.ask(request + "\n\n" + self._tool_budget_instruction(), format)
         iterations = 0
         successful_tool_calls: List[tuple[ToolCall, ToolMessage]] = []
-        while message.tool_calls:
+        last_protocol_correction_progress = None
+        while True:
+            if not message.tool_calls:
+                problem = self._terminal_response_problem(message)
+                if not problem:
+                    break
+                # Correct the model protocol, never parse/execute parameters in
+                # assistant prose. Keep the current scope, registry and ledger.
+                if self._tool_execution_ledger.summary()["pending_execution"]:
+                    report = await self._reconcile_execution(phase="final")
+                    notice = self._execution_progress_event(report)
+                    if notice:
+                        yield notice
+                evidence = self._tool_execution_ledger.summary()
+                progress = (self._analysis_progress.evidence_digest(), evidence["tracked_operation_count"])
+                blocked = (evidence["pending_execution"] or self._analysis_progress.should_stop
+                           or not self.bind_tools or not self.get_tools()
+                           or last_protocol_correction_progress == progress)
+                if blocked:
+                    code = ("tool_execution_unknown" if evidence["pending_execution"] else
+                            "invalid_execution_result" if problem == "invalid_execution_result" else
+                            "tool_protocol_error")
+                    self._set_execution_outcome(code)
+                    detail = ("已有操作的执行状态尚未确认，未重新执行。" if evidence["pending_execution"] else
+                              "模型未返回可验证的分析结果或有效的工具调用，当前无法安全继续；未将正文中的指令作为工具执行。")
+                    yield ErrorEvent(error=f"{code}: {detail}")
+                    return
+                last_protocol_correction_progress = progress
+                logger.warning("agent_terminal_protocol_correction agent=%s reason=%s", self.name, problem)
+                message = await self.ask_with_messages(
+                    [HumanMessage(content=terminal_response_correction(problem))],
+                    # Remove a conflicting JSON-only constraint for this one
+                    # correction. Later normal calls retain the original format.
+                    format=None,
+                )
+                continue
             tool_responses = []
             completed_tool_results = []
             admission_denied = False
@@ -1119,7 +1161,7 @@ class BaseAgent(ABC):
                     else:
                         yield ErrorEvent(error=self.FINALIZATION_FAILED_ERROR)
                     return
-                if message.tool_calls:
+                if message.tool_calls or self._terminal_response_problem(message):
                     self._set_execution_outcome("invalid_final_result")
                     logger.warning(
                         "Agent %s returned tool calls despite no-tool fault finalization after %d batches",
@@ -1141,6 +1183,12 @@ class BaseAgent(ABC):
                 [*tool_responses, HumanMessage(content=self._tool_budget_instruction())], format,
             )
 
+        if self._terminal_response_problem(message):
+            # Deterministic/tool-free completion branches must not publish a
+            # textual invocation, and must not reopen tools after finalization.
+            self._set_execution_outcome("invalid_final_result")
+            yield ErrorEvent(error=self.INVALID_FINAL_RESULT_ERROR)
+            return
         if self._tool_execution_ledger.summary()["pending_execution"]:
             report = await self._reconcile_execution(phase="final")
             notice = self._execution_progress_event(report)

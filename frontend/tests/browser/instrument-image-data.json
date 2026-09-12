@@ -1,0 +1,231 @@
+{
+  "provenance": "Synthetic 4x3 two-frame fixtures; independent bounded EDF/SPE reader; no real experimental data.",
+  "edf_tree": {
+    "contract_version": 2,
+    "type": "instrument",
+    "reader": "instrument-window",
+    "kind": "tree",
+    "media_type": "application/json",
+    "metadata": {
+      "format": "esrf-edf",
+      "dialect": "edf-inline-2d-uncompressed",
+      "format_version": null,
+      "frame_count": 2,
+      "frame_shape": [
+        3,
+        4
+      ],
+      "dtype": "uint16",
+      "byte_order": "little",
+      "input_mode": "window",
+      "source_bytes": 1072,
+      "read_bytes": 1024,
+      "read_requests": 2,
+      "header_bytes": 1024,
+      "header_text_hidden": true,
+      "calibration": "none; raw detector values",
+      "storage_layout": "row-major; x fastest",
+      "selection_mode": "explicit frame and pixel ROI"
+    },
+    "choices": {
+      "frame_count": 2,
+      "max_roi_size": 1024
+    },
+    "selected": {
+      "frame": 0,
+      "roi": [
+        0,
+        0,
+        4,
+        3
+      ]
+    },
+    "warnings": [
+      "仅显示显式选择的帧和像素窗口；不执行校准、拟合或重采样。",
+      "灰度图按当前 ROI 有限原值范围映射；非有限值显示为黑色，原始数据不变。"
+    ],
+    "sampled": true,
+    "tree": [
+      {
+        "path": "/0",
+        "node_type": "object",
+        "attributes": {
+          "label": "Instrument image dataset",
+          "children_count": 0
+        }
+      }
+    ]
+  },
+  "edf_image": {
+    "contract_version": 2,
+    "type": "instrument",
+    "reader": "instrument-window",
+    "kind": "image",
+    "media_type": "image/png",
+    "metadata": {
+      "format": "esrf-edf",
+      "dialect": "edf-inline-2d-uncompressed",
+      "format_version": null,
+      "frame_count": 2,
+      "frame_shape": [
+        3,
+        4
+      ],
+      "dtype": "uint16",
+      "byte_order": "little",
+      "input_mode": "window",
+      "source_bytes": 1072,
+      "read_bytes": 1032,
+      "read_requests": 4,
+      "header_bytes": 1024,
+      "header_text_hidden": true,
+      "calibration": "none; raw detector values",
+      "storage_layout": "row-major; x fastest",
+      "selection_mode": "explicit frame and pixel ROI",
+      "output_shape": [
+        2,
+        2
+      ],
+      "display_range": [
+        105.0,
+        110.0
+      ],
+      "normalization": "ROI min-max to uint8 grayscale; original data unchanged",
+      "invalid_pixels": 0,
+      "roi_origin": "frame top-left; x right, y down"
+    },
+    "choices": {
+      "frame_count": 2,
+      "max_roi_size": 1024
+    },
+    "selected": {
+      "frame": 1,
+      "roi": [
+        1,
+        1,
+        2,
+        2
+      ]
+    },
+    "warnings": [
+      "仅显示显式选择的帧和像素窗口；不执行校准、拟合或重采样。",
+      "灰度图按当前 ROI 有限原值范围映射；非有限值显示为黑色，原始数据不变。"
+    ],
+    "sampled": true,
+    "data_base64": "iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAAAAABX3VL4AAAADklEQVR4AWNgMGY48x8AA2kB/1OOfK4AAAAASUVORK5CYII="
+  },
+  "spe_tree": {
+    "contract_version": 2,
+    "type": "instrument",
+    "reader": "instrument-window",
+    "kind": "tree",
+    "media_type": "application/json",
+    "metadata": {
+      "format": "princeton-spe",
+      "dialect": "spe-2.x-fixed-4100",
+      "format_version": 2.5999999046325684,
+      "frame_count": 2,
+      "frame_shape": [
+        3,
+        4
+      ],
+      "dtype": "uint16",
+      "byte_order": "little",
+      "input_mode": "window",
+      "source_bytes": 4148,
+      "read_bytes": 4100,
+      "read_requests": 1,
+      "header_bytes": 4100,
+      "header_text_hidden": true,
+      "calibration": "none; raw detector values",
+      "storage_layout": "row-major; x fastest",
+      "selection_mode": "explicit frame and pixel ROI"
+    },
+    "choices": {
+      "frame_count": 2,
+      "max_roi_size": 1024
+    },
+    "selected": {
+      "frame": 0,
+      "roi": [
+        0,
+        0,
+        4,
+        3
+      ]
+    },
+    "warnings": [
+      "仅显示显式选择的帧和像素窗口；不执行校准、拟合或重采样。",
+      "灰度图按当前 ROI 有限原值范围映射；非有限值显示为黑色，原始数据不变。"
+    ],
+    "sampled": true,
+    "tree": [
+      {
+        "path": "/0",
+        "node_type": "object",
+        "attributes": {
+          "label": "Instrument image dataset",
+          "children_count": 0
+        }
+      }
+    ]
+  },
+  "spe_image": {
+    "contract_version": 2,
+    "type": "instrument",
+    "reader": "instrument-window",
+    "kind": "image",
+    "media_type": "image/png",
+    "metadata": {
+      "format": "princeton-spe",
+      "dialect": "spe-2.x-fixed-4100",
+      "format_version": 2.5999999046325684,
+      "frame_count": 2,
+      "frame_shape": [
+        3,
+        4
+      ],
+      "dtype": "uint16",
+      "byte_order": "little",
+      "input_mode": "window",
+      "source_bytes": 4148,
+      "read_bytes": 4108,
+      "read_requests": 3,
+      "header_bytes": 4100,
+      "header_text_hidden": true,
+      "calibration": "none; raw detector values",
+      "storage_layout": "row-major; x fastest",
+      "selection_mode": "explicit frame and pixel ROI",
+      "output_shape": [
+        2,
+        2
+      ],
+      "display_range": [
+        105.0,
+        110.0
+      ],
+      "normalization": "ROI min-max to uint8 grayscale; original data unchanged",
+      "invalid_pixels": 0,
+      "roi_origin": "frame top-left; x right, y down"
+    },
+    "choices": {
+      "frame_count": 2,
+      "max_roi_size": 1024
+    },
+    "selected": {
+      "frame": 1,
+      "roi": [
+        1,
+        1,
+        2,
+        2
+      ]
+    },
+    "warnings": [
+      "仅显示显式选择的帧和像素窗口；不执行校准、拟合或重采样。",
+      "灰度图按当前 ROI 有限原值范围映射；非有限值显示为黑色，原始数据不变。"
+    ],
+    "sampled": true,
+    "data_base64": "iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAAAAABX3VL4AAAADklEQVR4AWNgMGY48x8AA2kB/1OOfK4AAAAASUVORK5CYII="
+  }
+}

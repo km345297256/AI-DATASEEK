@@ -1,0 +1,31 @@
+{
+  "contract_version": 2,
+  "id": "viz-mass-spectrum",
+  "version": "1.0.0",
+  "name": "质谱谱图",
+  "description": "受限 MGF / mzML 单谱查看，明确 centroid/profile、原始 m/z 与强度，不做识别、搜索或定量。",
+  "extensions": [
+    "mgf",
+    "mzml"
+  ],
+  "filenames": [],
+  "view_kind": "series",
+  "adapter": "mass-spectrum",
+  "reader": "mass-spectrum",
+  "default_enabled": true,
+  "priority": 40,
+  "permissions": [
+    "file:read"
+  ],
+  "limits": {
+    "max_input_bytes": 16777216,
+    "max_output_bytes": 2097152
+  },
+  "capabilities": {
+    "operations": [
+      "preview"
+    ],
+    "input_mode": "whole",
+    "shared": false
+  }
+}

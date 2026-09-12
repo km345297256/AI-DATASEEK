@@ -10,5 +10,5 @@ export interface ExtendedPreview {
 }
 export async function requestPreview(file: FileInfo, plugin: VisualizationPlugin, options: Record<string, unknown>, signal: AbortSignal): Promise<ExtendedPreview> {
   const result = await requestVisualization(file, plugin, 'preview', options, signal);
-  return { ...result.payload, contract_version: 2, type: plugin.reader, kind: result.payload.view_kind ?? result.kind, metadata: result.metadata, warnings: result.warnings, sampled: result.sampled };
+  return { ...result.payload, contract_version: 2, type: plugin.reader, kind: result.payload.view_kind ?? result.kind, version: result.version, revision: result.revision, metadata: result.metadata, warnings: result.warnings, sampled: result.sampled };
 }

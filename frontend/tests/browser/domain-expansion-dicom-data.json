@@ -1,0 +1,310 @@
+{
+  "mono2": {
+    "tree": {
+      "contract_version": 2,
+      "type": "dicom-window",
+      "reader": "dicom-window",
+      "kind": "tree",
+      "media_type": "application/json",
+      "choices": {
+        "image": {
+          "rows": 3,
+          "columns": 4,
+          "frames": 2,
+          "bits_allocated": 16,
+          "bits_stored": 16,
+          "pixel_representation": 0,
+          "photometric": "MONOCHROME2",
+          "sop_class": "SC-multiframe-16",
+          "rescale": {
+            "slope": 2,
+            "intercept": -1000,
+            "unit": "HU",
+            "declared": true
+          },
+          "window": {
+            "center": 1350,
+            "width": 1000,
+            "function": "LINEAR"
+          },
+          "padding": null
+        }
+      },
+      "selected": {},
+      "warnings": [
+        "仅用于已脱敏科学图像探索，不用于诊断；单文件不代表完整临床序列，不做配准、三维重建或空间方向推断。",
+        "不返回患者、机构、日期、UID 或任意文本标签；文件声明与用户确认不保证像素真正脱敏，本工具不是脱敏工具。",
+        "返回原始存储整数；浏览器仅为显示应用声明的线性 rescale、LINEAR 窗宽窗位及 MONOCHROME1 反转，不修改源数据。"
+      ],
+      "sampled": false,
+      "tree": [
+        {
+          "path": "/pixels",
+          "node_type": "array",
+          "shape": [
+            2,
+            3,
+            4
+          ],
+          "dtype": "uint16"
+        }
+      ],
+      "metadata": {
+        "format": "dicom",
+        "transfer_syntax": "explicit-little",
+        "input_mode": "window",
+        "source_bytes": 674,
+        "read_bytes": 572,
+        "read_requests": 43,
+        "header_bytes": 626,
+        "pixel_bytes": 48,
+        "padding_pixels": 0,
+        "metadata_hidden": true,
+        "privacy": "source-declarations-and-user-confirmation-only",
+        "value_semantics": "raw-stored-integers",
+        "limits": {
+          "max_roi": 128,
+          "max_frames": 4096,
+          "max_header_bytes": 1048576
+        }
+      }
+    },
+    "image": {
+      "contract_version": 2,
+      "type": "dicom-window",
+      "reader": "dicom-window",
+      "kind": "image",
+      "media_type": "application/json",
+      "choices": {
+        "image": {
+          "rows": 3,
+          "columns": 4,
+          "frames": 2,
+          "bits_allocated": 16,
+          "bits_stored": 16,
+          "pixel_representation": 0,
+          "photometric": "MONOCHROME2",
+          "sop_class": "SC-multiframe-16",
+          "rescale": {
+            "slope": 2,
+            "intercept": -1000,
+            "unit": "HU",
+            "declared": true
+          },
+          "window": {
+            "center": 1350,
+            "width": 1000,
+            "function": "LINEAR"
+          },
+          "padding": null
+        }
+      },
+      "selected": {
+        "frame": 1,
+        "roi": [
+          1,
+          1,
+          2,
+          2
+        ],
+        "confirm_deidentified": true
+      },
+      "warnings": [
+        "仅用于已脱敏科学图像探索，不用于诊断；单文件不代表完整临床序列，不做配准、三维重建或空间方向推断。",
+        "不返回患者、机构、日期、UID 或任意文本标签；文件声明与用户确认不保证像素真正脱敏，本工具不是脱敏工具。",
+        "返回原始存储整数；浏览器仅为显示应用声明的线性 rescale、LINEAR 窗宽窗位及 MONOCHROME1 反转，不修改源数据。"
+      ],
+      "sampled": false,
+      "array": {
+        "shape": [
+          2,
+          2
+        ],
+        "dimensions": [
+          "row",
+          "column"
+        ],
+        "dtype": "uint16",
+        "values": [
+          1110,
+          1120,
+          1210,
+          1220
+        ]
+      },
+      "metadata": {
+        "format": "dicom",
+        "transfer_syntax": "explicit-little",
+        "input_mode": "window",
+        "source_bytes": 674,
+        "read_bytes": 584,
+        "read_requests": 44,
+        "header_bytes": 626,
+        "pixel_bytes": 48,
+        "padding_pixels": 0,
+        "metadata_hidden": true,
+        "privacy": "source-declarations-and-user-confirmation-only",
+        "value_semantics": "raw-stored-integers",
+        "limits": {
+          "max_roi": 128,
+          "max_frames": 4096,
+          "max_header_bytes": 1048576
+        }
+      }
+    }
+  },
+  "mono1": {
+    "tree": {
+      "contract_version": 2,
+      "type": "dicom-window",
+      "reader": "dicom-window",
+      "kind": "tree",
+      "media_type": "application/json",
+      "choices": {
+        "image": {
+          "rows": 3,
+          "columns": 4,
+          "frames": 2,
+          "bits_allocated": 16,
+          "bits_stored": 16,
+          "pixel_representation": 0,
+          "photometric": "MONOCHROME1",
+          "sop_class": "SC-multiframe-16",
+          "rescale": {
+            "slope": 2,
+            "intercept": -1000,
+            "unit": "HU",
+            "declared": true
+          },
+          "window": {
+            "center": 1350,
+            "width": 1000,
+            "function": "LINEAR"
+          },
+          "padding": null
+        }
+      },
+      "selected": {},
+      "warnings": [
+        "仅用于已脱敏科学图像探索，不用于诊断；单文件不代表完整临床序列，不做配准、三维重建或空间方向推断。",
+        "不返回患者、机构、日期、UID 或任意文本标签；文件声明与用户确认不保证像素真正脱敏，本工具不是脱敏工具。",
+        "返回原始存储整数；浏览器仅为显示应用声明的线性 rescale、LINEAR 窗宽窗位及 MONOCHROME1 反转，不修改源数据。"
+      ],
+      "sampled": false,
+      "tree": [
+        {
+          "path": "/pixels",
+          "node_type": "array",
+          "shape": [
+            2,
+            3,
+            4
+          ],
+          "dtype": "uint16"
+        }
+      ],
+      "metadata": {
+        "format": "dicom",
+        "transfer_syntax": "explicit-little",
+        "input_mode": "window",
+        "source_bytes": 674,
+        "read_bytes": 572,
+        "read_requests": 43,
+        "header_bytes": 626,
+        "pixel_bytes": 48,
+        "padding_pixels": 0,
+        "metadata_hidden": true,
+        "privacy": "source-declarations-and-user-confirmation-only",
+        "value_semantics": "raw-stored-integers",
+        "limits": {
+          "max_roi": 128,
+          "max_frames": 4096,
+          "max_header_bytes": 1048576
+        }
+      }
+    },
+    "image": {
+      "contract_version": 2,
+      "type": "dicom-window",
+      "reader": "dicom-window",
+      "kind": "image",
+      "media_type": "application/json",
+      "choices": {
+        "image": {
+          "rows": 3,
+          "columns": 4,
+          "frames": 2,
+          "bits_allocated": 16,
+          "bits_stored": 16,
+          "pixel_representation": 0,
+          "photometric": "MONOCHROME1",
+          "sop_class": "SC-multiframe-16",
+          "rescale": {
+            "slope": 2,
+            "intercept": -1000,
+            "unit": "HU",
+            "declared": true
+          },
+          "window": {
+            "center": 1350,
+            "width": 1000,
+            "function": "LINEAR"
+          },
+          "padding": null
+        }
+      },
+      "selected": {
+        "frame": 1,
+        "roi": [
+          1,
+          1,
+          2,
+          2
+        ],
+        "confirm_deidentified": true
+      },
+      "warnings": [
+        "仅用于已脱敏科学图像探索，不用于诊断；单文件不代表完整临床序列，不做配准、三维重建或空间方向推断。",
+        "不返回患者、机构、日期、UID 或任意文本标签；文件声明与用户确认不保证像素真正脱敏，本工具不是脱敏工具。",
+        "返回原始存储整数；浏览器仅为显示应用声明的线性 rescale、LINEAR 窗宽窗位及 MONOCHROME1 反转，不修改源数据。"
+      ],
+      "sampled": false,
+      "array": {
+        "shape": [
+          2,
+          2
+        ],
+        "dimensions": [
+          "row",
+          "column"
+        ],
+        "dtype": "uint16",
+        "values": [
+          1110,
+          1120,
+          1210,
+          1220
+        ]
+      },
+      "metadata": {
+        "format": "dicom",
+        "transfer_syntax": "explicit-little",
+        "input_mode": "window",
+        "source_bytes": 674,
+        "read_bytes": 584,
+        "read_requests": 44,
+        "header_bytes": 626,
+        "pixel_bytes": 48,
+        "padding_pixels": 0,
+        "metadata_hidden": true,
+        "privacy": "source-declarations-and-user-confirmation-only",
+        "value_semantics": "raw-stored-integers",
+        "limits": {
+          "max_roi": 128,
+          "max_frames": 4096,
+          "max_header_bytes": 1048576
+        }
+      }
+    }
+  }
+}

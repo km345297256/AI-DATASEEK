@@ -815,18 +815,14 @@ async def test_execution_result_ignores_llm_status_without_changing_step_state()
     agent.reset_context = AsyncMock()
 
     async def fake_execute(_message):
-        yield MessageEvent(message='{"success": true, "result": "done"}')
-
-    async def fake_parse_json(_message):
-        return {
+        yield MessageEvent(message=json.dumps({
             "success": True,
             "result": "done",
             "attachments": ["/tmp/chart.png"],
             "status": "available",
-        }
+        }))
 
     agent.execute = fake_execute
-    agent._parse_json = fake_parse_json
     step = Step(description="generate chart")
 
     events = [

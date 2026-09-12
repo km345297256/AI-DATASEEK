@@ -1,0 +1,17 @@
+{
+  "contract_version": 2,
+  "id": "viz-edf-signals",
+  "version": "1.0.0",
+  "name": "EDF/BDF 通道时间窗",
+  "description": "连续 EDF/BDF 生理信号的授权通道和时间窗读取，保留各通道采样率及物理单位；源文件最多 8 GiB，单次累计取回最多 8 MiB。隐藏身份和注释，不支持不连续记录或 ESRF EDF，不作诊断。",
+  "extensions": ["edf", "bdf"],
+  "filenames": [],
+  "view_kind": "series",
+  "adapter": "signal-window",
+  "reader": "edf",
+  "default_enabled": true,
+  "priority": 40,
+  "permissions": ["file:read"],
+  "limits": {"max_input_bytes": 8388608, "max_output_bytes": 2097152},
+  "capabilities": {"operations": ["preview"], "input_mode": "window", "shared": false}
+}

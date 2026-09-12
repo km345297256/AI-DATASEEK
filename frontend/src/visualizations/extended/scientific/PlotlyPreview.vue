@@ -88,7 +88,7 @@ async function loadData() {
   } catch (reason) { if (load.isCurrent()) error.value = reason instanceof Error ? reason.message : '图表加载失败。'; }
   finally { if (load.isCurrent()) loading.value = false; }
 }
-watch(() => [props.file.file_id, props.plugin.id], () => { variable.value = ''; variables.value = []; sourceShape.value = []; indices.value = []; void loadData(); }, { immediate: true });
+watch([() => props.file.file_id, () => props.plugin.id], () => { variable.value = ''; variables.value = []; sourceShape.value = []; indices.value = []; void loadData(); }, { immediate: true });
 </script>
 
 <style scoped>

@@ -20,10 +20,43 @@ if (!playwrightEntry) { try { playwrightEntry = require.resolve('playwright'); }
 const { chromium } = await import(pathToFileURL(resolve(playwrightEntry)).href);
 const output = await mkdtemp(join(tmpdir(), 'dataseek-visualization-browser-'));
 let cases = domainCases;
+try { const { mainMatrixCases } = await import('./main-matrix-fixtures.mjs'); cases = [...cases, ...mainMatrixCases]; } catch (error) { if (error.code !== 'ERR_MODULE_NOT_FOUND') throw error; }
+try { const { mainAstronomyCases } = await import('./main-astronomy-fixtures.mjs'); cases = [...cases, ...mainAstronomyCases]; } catch (error) { if (error.code !== 'ERR_MODULE_NOT_FOUND') throw error; }
+try { const { mainBioCases } = await import('./main-bio-fixtures.mjs'); cases = [...cases, ...mainBioCases]; } catch (error) { if (error.code !== 'ERR_MODULE_NOT_FOUND') throw error; }
+try { const { alignmentBrowserCases } = await import('./alignment-browser-fixtures.mjs'); cases = [...cases, ...alignmentBrowserCases]; } catch (error) { if (error.code !== 'ERR_MODULE_NOT_FOUND') throw error; }
 try { const { scientificCases } = await import('./scientific-fixtures.mjs'); cases = [...cases, ...scientificCases]; } catch (error) { if (error.code !== 'ERR_MODULE_NOT_FOUND') throw error; }
 try { const { officeCases } = await import('./office-fixtures.mjs'); cases = [...cases, ...officeCases]; } catch (error) { if (error.code !== 'ERR_MODULE_NOT_FOUND') throw error; }
 try { const { docxCases } = await import('./docx-fixtures.mjs'); cases = [...cases, ...docxCases]; } catch (error) { if (error.code !== 'ERR_MODULE_NOT_FOUND') throw error; }
 try { const { unifiedCases } = await import('./unified-fixtures.mjs'); cases = [...cases, ...unifiedCases]; } catch (error) { if (error.code !== 'ERR_MODULE_NOT_FOUND') throw error; }
+try { const { batchOneCases } = await import('./batch-one-fixtures.mjs'); cases = [...cases, ...batchOneCases]; } catch (error) { if (error.code !== 'ERR_MODULE_NOT_FOUND') throw error; }
+try { const { batchTwoCases } = await import('./batch-two-fixtures.mjs'); cases = [...cases, ...batchTwoCases]; } catch (error) { if (error.code !== 'ERR_MODULE_NOT_FOUND') throw error; }
+try { const { batchTwoGeoCases } = await import('./batch-two-geo-fixtures.mjs'); cases = [...cases, ...batchTwoGeoCases]; } catch (error) { if (error.code !== 'ERR_MODULE_NOT_FOUND') throw error; }
+try { const { batchThreeCziWindowCases } = await import('./batch-three-czi-window-fixtures.mjs'); cases = [...cases, ...batchThreeCziWindowCases]; } catch (error) { if (error.code !== 'ERR_MODULE_NOT_FOUND') throw error; }
+try { const { batchThreeInstrumentCases } = await import('./batch-three-instrument-fixtures.mjs'); cases = [...cases, ...batchThreeInstrumentCases]; } catch (error) { if (error.code !== 'ERR_MODULE_NOT_FOUND') throw error; }
+try { const { batchThreeArrayCases } = await import('./batch-three-array-fixtures.mjs'); cases = [...cases, ...batchThreeArrayCases]; } catch (error) { if (error.code !== 'ERR_MODULE_NOT_FOUND') throw error; }
+try { const { batchThreeOmeCases } = await import('./batch-three-ome-fixtures.mjs'); cases = [...cases, ...batchThreeOmeCases]; } catch (error) { if (error.code !== 'ERR_MODULE_NOT_FOUND') throw error; }
+try { const { domainExpansionGraphCases } = await import('./domain-expansion-graph-fixtures.mjs'); cases = [...cases, ...domainExpansionGraphCases]; } catch (error) { if (error.code !== 'ERR_MODULE_NOT_FOUND') throw error; }
+try { const { domainExpansionNexusCases } = await import('./domain-expansion-nexus-fixtures.mjs'); cases = [...cases, ...domainExpansionNexusCases]; } catch (error) { if (error.code !== 'ERR_MODULE_NOT_FOUND') throw error; }
+try { const { domainExpansionColumnarCases } = await import('./domain-expansion-columnar-fixtures.mjs'); cases = [...cases, ...domainExpansionColumnarCases]; } catch (error) { if (error.code !== 'ERR_MODULE_NOT_FOUND') throw error; }
+try { const { domainExpansionPhylogenyCases } = await import('./domain-expansion-phylogeny-fixtures.mjs'); cases = [...cases, ...domainExpansionPhylogenyCases]; } catch (error) { if (error.code !== 'ERR_MODULE_NOT_FOUND') throw error; }
+try { const { domainExpansionGribCases } = await import('./domain-expansion-grib-fixtures.mjs'); cases = [...cases, ...domainExpansionGribCases]; } catch (error) { if (error.code !== 'ERR_MODULE_NOT_FOUND') throw error; }
+try { const { domainExpansionSeismicCases } = await import('./domain-expansion-seismic-fixtures.mjs'); cases = [...cases, ...domainExpansionSeismicCases]; } catch (error) { if (error.code !== 'ERR_MODULE_NOT_FOUND') throw error; }
+try { const { domainExpansionEnviCases } = await import('./domain-expansion-envi-fixtures.mjs'); cases = [...cases, ...domainExpansionEnviCases]; } catch (error) { if (error.code !== 'ERR_MODULE_NOT_FOUND') throw error; }
+try { const { massSpectrumCases } = await import('./mass-spectrum-fixtures.mjs'); cases = [...cases, ...massSpectrumCases]; } catch (error) { if (error.code !== 'ERR_MODULE_NOT_FOUND') throw error; }
+try { const { domainExpansionDiffractionCases } = await import('./domain-expansion-diffraction-fixtures.mjs'); cases = [...cases, ...domainExpansionDiffractionCases]; } catch (error) { if (error.code !== 'ERR_MODULE_NOT_FOUND') throw error; }
+try { const { domainExpansionRippleCases } = await import('./domain-expansion-ripple-fixtures.mjs'); cases = [...cases, ...domainExpansionRippleCases]; } catch (error) { if (error.code !== 'ERR_MODULE_NOT_FOUND') throw error; }
+try { const { domainExpansionFcsCases } = await import('./domain-expansion-fcs-fixtures.mjs'); cases = [...cases, ...domainExpansionFcsCases]; } catch (error) { if (error.code !== 'ERR_MODULE_NOT_FOUND') throw error; }
+try { const { domainExpansionDicomCases } = await import('./domain-expansion-dicom-fixtures.mjs'); cases = [...cases, ...domainExpansionDicomCases]; } catch (error) { if (error.code !== 'ERR_MODULE_NOT_FOUND') throw error; }
+try { const { domainExpansionSpatialCases } = await import('./domain-expansion-spatial-fixtures.mjs'); cases = [...cases, ...domainExpansionSpatialCases]; } catch (error) { if (error.code !== 'ERR_MODULE_NOT_FOUND') throw error; }
+try { const { pointCloudWindowCases } = await import('./pointcloud-window-fixtures.mjs'); cases = [...cases, ...pointCloudWindowCases]; } catch (error) { if (error.code !== 'ERR_MODULE_NOT_FOUND') throw error; }
+try { const { geometryCases } = await import('./geometry-fixtures.mjs'); cases = [...cases, ...geometryCases]; } catch (error) { if (error.code !== 'ERR_MODULE_NOT_FOUND') throw error; }
+try { const { domainExpansionRadarCases } = await import('./domain-expansion-radar-fixtures.mjs'); cases = [...cases, ...domainExpansionRadarCases]; } catch (error) { if (error.code !== 'ERR_MODULE_NOT_FOUND') throw error; }
+try { const { ugridWindowCases } = await import('./ugrid-window-fixtures.mjs'); cases = [...cases, ...ugridWindowCases]; } catch (error) { if (error.code !== 'ERR_MODULE_NOT_FOUND') throw error; }
+try { const { sqliteTableCases } = await import('./sqlite-table-fixtures.mjs'); cases = [...cases, ...sqliteTableCases]; } catch (error) { if (error.code !== 'ERR_MODULE_NOT_FOUND') throw error; }
+const { databaseTableCases } = await import('./database-table-fixtures.mjs'); cases = [...cases, ...databaseTableCases];
+const { databaseRecordsCases } = await import('./database-records-fixtures.mjs'); cases = [...cases, ...databaseRecordsCases];
+const { pgDumpCases } = await import('./pg-dump-fixtures.mjs'); cases = [...cases, ...pgDumpCases];
+const { sqlDumpCases } = await import('./sql-dump-fixtures.mjs'); cases = [...cases, ...sqlDumpCases];
 if (process.env.VISUALIZATION_BROWSER_CASES) cases = cases.filter((item) => process.env.VISUALIZATION_BROWSER_CASES.split(',').includes(item.name));
 if (!cases.length) throw new Error('No browser cases selected');
 const modules = [...new Set(cases.map((item) => item.component))];
@@ -103,7 +136,8 @@ try {
         if (pathname.endsWith('/visualization') && request.postDataJSON().operation === 'preview' && scenario.preview) {
           const options = request.postDataJSON(); const raw = typeof scenario.preview === 'function' ? await scenario.preview(options) : scenario.preview;
           const { contract_version: _contract, type: _type, reader: _reader, metadata = {}, warnings = [], sampled = false, kind: view_kind, ...payload } = raw;
-          const kind = payload.data_base64 ? 'media' : payload.sections ? 'report' : payload.array ? 'array' : payload.table ? 'table' : 'tree';
+          const mainKinds = { 'matrix-workbench': {tree:'tree',image:'array',series:'series'}, 'astronomy-workbench': {tree:'tree',image:'raster',table:'table',series:'series'}, 'alignment-browser': {tree:'tree',table:'table'}, 'sequence-browser': {tree:'tree',table:'table'}, 'genome-tracks': {tree:'tree',map:'features'}, 'blast-hits': {tree:'tree',table:'table'} };
+          const kind = mainKinds[_reader]?.[view_kind] ?? (view_kind === 'geometry' && ['spatial-window','pointcloud-window','gro-trajectory','simulation-mesh','ugrid-window'].includes(_reader) ? 'geometry' : payload.data_base64 ? 'media' : payload.sections ? 'report' : payload.series ? 'series' : payload.geojson ? 'features' : payload.graph ? 'graph' : payload.array ? 'array' : payload.table ? 'table' : 'tree');
           return route.fulfill({ contentType: 'application/json', body: JSON.stringify({ code: 0, msg: 'ok', data: { contract_version: 2, version: '1'.repeat(64), revision: '2'.repeat(64), plugin_id: `test-${scenario.name}`, kind, payload: { ...payload, view_kind }, metadata, warnings, sampled } }) });
         }
         record.unexpectedRequests.push(pathname); return route.abort();

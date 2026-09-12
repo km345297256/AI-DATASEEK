@@ -5,6 +5,7 @@ const CHECKPOINT_ID = /^[a-f0-9]{32}$/;
 const ISSUE_KINDS: Record<ArtifactIssueKind, string> = { image: '图表', table: '数据表', report: '报告', code: '代码', any: '结果文件' };
 
 export const ARTIFACT_ISSUE_REASON_LABELS: Record<ArtifactIssueReasonCode, string> = {
+  missing_artifact: '成果文件尚未生成。',
   invalid_content: '文件内容未通过校验。',
   unavailable_or_unsafe_path: '文件不可读取或不在允许的交付范围内。',
   unsupported_kind: '暂不支持校验此类文件。',

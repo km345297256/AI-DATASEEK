@@ -1,0 +1,33 @@
+{
+  "contract_version": 2,
+  "id": "viz-grib-window",
+  "version": "1.0.0",
+  "name": "GRIB 气象场",
+  "description": "按消息选择 GRIB2 规则经纬网的瞬时场；受限简单打包。保留参数、层次、时刻与原声明单位，不自动合并或重投影。",
+  "extensions": [
+    "grib",
+    "grb",
+    "grib2",
+    "grb2"
+  ],
+  "filenames": [],
+  "view_kind": "image",
+  "adapter": "grib-window",
+  "reader": "grib-window",
+  "default_enabled": true,
+  "priority": 30,
+  "permissions": [
+    "file:read"
+  ],
+  "limits": {
+    "max_input_bytes": 8388608,
+    "max_output_bytes": 2097152
+  },
+  "capabilities": {
+    "operations": [
+      "preview"
+    ],
+    "input_mode": "window",
+    "shared": false
+  }
+}

@@ -1,0 +1,30 @@
+{
+  "contract_version": 2,
+  "id": "viz-spatial-window",
+  "version": "1.0.0",
+  "name": "空间组学观测与表达",
+  "description": "AnnData H5AD 明确观测窗与特征原值；坐标无单位推断、不加载底图或患者标签。",
+  "extensions": [
+    "h5ad"
+  ],
+  "filenames": [],
+  "view_kind": "map",
+  "adapter": "spatial-window",
+  "reader": "spatial-window",
+  "capabilities": {
+    "operations": [
+      "preview"
+    ],
+    "input_mode": "window",
+    "shared": false
+  },
+  "default_enabled": true,
+  "priority": 40,
+  "permissions": [
+    "file:read"
+  ],
+  "limits": {
+    "max_input_bytes": 8388608,
+    "max_output_bytes": 2097152
+  }
+}

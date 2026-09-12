@@ -95,6 +95,44 @@ def read_managed_file(root: str, relative_path: str, offset: int = 0,
         raise DatasetPreviewReadError(_ERROR_MESSAGE) from None
 
 
+def _stat_fd_files(source, paths, *, prefix="/"):
+    """Inspect only an exact, bounded inventory; never recurse or read pixels."""
+    if (not isinstance(paths, list) or not 2 <= len(paths) <= 2048
+            or any(not isinstance(path, str) for path in paths) or len(set(paths)) != len(paths)):
+        raise ValueError("Invalid resource scope")
+    result = []
+    for path in paths:
+        _, metadata = _read_fd_file(source, path, 0, 0, prefix=prefix, max_bytes=1)
+        result.append(metadata)
+    return result
+
+
+def stat_managed_files(root, paths):
+    try:
+        return _stat_fd_files(str(root), paths)
+    except Exception:
+        raise DatasetPreviewReadError(_ERROR_MESSAGE) from None
+
+
+def stat_dataset_host_files(source, paths, *, configured_roots=None):
+    """One confined helper for a metadata snapshot, not N helper containers."""
+    if (not isinstance(paths, list) or not 2 <= len(paths) <= 2048
+            or any(not isinstance(path, str) for path in paths) or len(set(paths)) != len(paths)):
+        raise DatasetPreviewReadError(_ERROR_MESSAGE)
+    data, _ = read_dataset_host_file(source, paths[0] if paths else "invalid", offset=0,
+        length=None, configured_roots=configured_roots, max_bytes=1024**2, _scope_paths=paths)
+    try:
+        value = json.loads(data)
+        if (not isinstance(value, list) or len(value) != len(paths)
+                or any(not isinstance(item, dict) or set(item) != {"size", "mtime_ns", "ctime_ns", "inode", "device"}
+                       or any(type(v) is not int for v in item.values())
+                       or any(item[k] < 0 for k in ("size", "inode", "device")) for item in value)):
+            raise ValueError("Invalid resource metadata")
+        return value
+    except Exception:
+        raise DatasetPreviewReadError(_ERROR_MESSAGE) from None
+
+
 def _reader_program() -> str:
     # Send reviewed source, never user code, to the existing sandbox image. This
     # keeps managed and host reads identical without requiring an image rebuild
@@ -103,17 +141,28 @@ def _reader_program() -> str:
         "import os, stat, sys, json\nfrom pathlib import PurePosixPath\n"
         + f"MAX_READ_BYTES = {MAX_READ_BYTES}\n"
         + inspect.getsource(_read_fd_file)
+        + inspect.getsource(_stat_fd_files)
         + '''
 try:
-    raw = sys.stdin.buffer.readline(16385)
-    if len(raw) > 16384 or not raw.endswith(b"\\n") or sys.stdin.buffer.read(1):
+    raw = sys.stdin.buffer.readline(262145)
+    if len(raw) > 262144 or not raw.endswith(b"\\n") or sys.stdin.buffer.read(1):
         raise ValueError("Invalid request")
     request = json.loads(raw)
     source = PurePosixPath(request["source"])
     roots = [PurePosixPath(value) for value in request["roots"]]
     if not any(source == root or root in source.parents for root in roots):
         raise ValueError("Disallowed source")
-    data, metadata = _read_fd_file(request["source"], request["path"], request["offset"], request["length"], prefix="/host", max_bytes=request["max_bytes"])
+    if "scope_paths" in request:
+        if request["offset"] != 0 or request["length"] is not None or request["max_bytes"] != 1048576:
+            raise ValueError("Invalid scope request")
+        data = json.dumps(_stat_fd_files(request["source"], request["scope_paths"], prefix="/host"), separators=(",", ":")).encode()
+        if len(data) > 1048576:
+            raise ValueError("Resource metadata budget")
+        metadata = dict(size=len(data), mtime_ns=0, ctime_ns=0, inode=0, device=0)
+    else:
+        if len(raw) > 16384:
+            raise ValueError("Invalid file request")
+        data, metadata = _read_fd_file(request["source"], request["path"], request["offset"], request["length"], prefix="/host", max_bytes=request["max_bytes"])
     sys.stdout.buffer.write(json.dumps({"ok": True, "length": len(data), "stat": metadata}, separators=(",", ":")).encode() + b"\\n")
     sys.stdout.buffer.write(data)
 except Exception:
@@ -125,7 +174,7 @@ except Exception:
 def read_dataset_host_file(source: str, relative_path: str, offset: int = 0,
                            length: int | None = None, *, configured_roots=None,
                            image: str | None = None, docker_host: str | None = None,
-                           docker_client=None, max_bytes: int = MAX_READ_BYTES) -> tuple[bytes, dict]:
+                           docker_client=None, max_bytes: int = MAX_READ_BYTES, _scope_paths=None) -> tuple[bytes, dict]:
     """Read a registered host source with current allowlist enforcement.
 
     The caller must first authorize the dataset and match the exact inventory
@@ -157,9 +206,14 @@ def read_dataset_host_file(source: str, relative_path: str, offset: int = 0,
                 or type(offset) is not int or not 0 <= offset <= 2**63 - 1
                 or (length is not None and (type(length) is not int or not 0 <= length <= max_bytes))):
             raise DatasetPreviewReadError(_ERROR_MESSAGE)
+        if _scope_paths is not None and (not isinstance(_scope_paths, list) or not 2 <= len(_scope_paths) <= 2048
+                or any(not isinstance(p, str) for p in _scope_paths) or len(set(_scope_paths)) != len(_scope_paths)
+                or relative_path != _scope_paths[0] or offset != 0 or length is not None or max_bytes != 1024**2):
+            raise DatasetPreviewReadError(_ERROR_MESSAGE)
         request = json.dumps(dict(source=mapped_source, roots=candidates, path=relative_path,
-                                  offset=offset, length=length, max_bytes=max_bytes), ensure_ascii=True).encode() + b"\n"
-        if len(request) > 16384:
+                                  offset=offset, length=length, max_bytes=max_bytes,
+                                  **({"scope_paths": _scope_paths} if _scope_paths is not None else {})), ensure_ascii=True).encode() + b"\n"
+        if len(request) > (262144 if _scope_paths is not None else 16384):
             raise DatasetPreviewReadError(_ERROR_MESSAGE)
         helper_image = image or settings.sandbox_image
         if not helper_image:

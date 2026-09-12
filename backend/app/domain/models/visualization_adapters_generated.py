@@ -3,12 +3,40 @@ from typing import Literal
 import json
 
 VISUALIZATION_CONTRACT_VERSION = 2
-VisualizationAdapter = Literal["image", "tiff", "shapefile", "molecular", "obj", "html", "markdown", "text", "csv", "scientific-map", "scientific-series", "scientific-image", "scientific-quality", "plotly", "h5web", "vtk", "jsroot", "rdkit", "molstar", "nmrium", "openlayers", "maplibre", "cesium", "aladin", "metpy", "igv", "viv", "niivue", "fastqc", "pdfjs", "word", "excel", "powerpoint", "docx", "onlyoffice"]
-VisualizationReader = Literal["binary", "csv", "excel", "fastq", "fastqc", "fits", "hdf5", "jcamp", "metpy", "molecular", "netcdf", "office", "office-viewer", "rdkit", "root", "shapefile", "tabular", "text"]
+VisualizationAdapter = Literal["database-dump", "database-records", "image", "tiff", "shapefile", "molecular", "obj", "html", "markdown", "text", "csv", "scientific-map", "scientific-series", "scientific-image", "scientific-quality", "plotly", "h5web", "vtk", "jsroot", "rdkit", "molstar", "nmrium", "openlayers", "maplibre", "cesium", "aladin", "metpy", "igv", "viv", "structured-tree", "archive-directory", "archive-members", "signal-window", "array-window", "columnar-window", "nexus-window", "scientific-graph", "phylogeny", "mass-spectrum", "diffraction", "fcs-window", "ripple-window", "envi-window", "grib-window", "seismic-window", "czi-window", "instrument-image", "ome-zarr", "mca-spectrum", "geoscience-formats", "czi-image", "video-player", "audio-waveform", "niivue", "fastqc", "pdfjs", "word", "excel", "powerpoint", "docx", "onlyoffice", "dicom-window", "spatial-window", "pointcloud-window", "gro-trajectory", "database-table", "sqlite-table", "radar-window", "ugrid-window", "matrix-workbench", "astronomy-workbench", "alignment-browser", "sequence-browser", "genome-tracks", "blast-hits", "simulation-mesh"]
+VisualizationReader = Literal["alignment-browser", "archive", "archive-member", "array-window", "astronomy-workbench", "binary", "blast-hits", "bson", "columnar-window", "csv", "czi", "czi-window", "database-table", "dicom-window", "diffraction", "edf", "envi-window", "excel", "fastq", "fastqc", "fcs-window", "fits", "genome-tracks", "geoformat", "grib-window", "gro-trajectory", "hdf5", "instrument-window", "jcamp", "mass-spectrum", "matrix-workbench", "mca", "metpy", "molecular", "netcdf", "nexus-window", "office", "office-viewer", "ome-zarr", "pg-dump", "phylogeny", "pointcloud-window", "radar-window", "rdkit", "redis-rdb", "ripple-window", "root", "scientific-graph", "seismic-window", "sequence-browser", "shapefile", "simulation-mesh", "spatial-window", "sql-dump", "sqlite-table", "structure", "tabular", "text", "ugrid-window"]
 VisualizationOperation = Literal["bytes", "page", "preview", "prepare", "job"]
-VisualizationInputMode = Literal["whole", "page", "prefix"]
-VisualizationKind = Literal["image", "map", "series", "table", "text", "structure", "document"]
+VisualizationInputMode = Literal["whole", "page", "prefix", "window"]
+VisualizationKind = Literal["image", "map", "series", "table", "text", "structure", "document", "tree", "media", "graph"]
 ADAPTER_CONTRACTS = json.loads(r'''{
+  "database-dump": {
+    "readers": [
+      "sql-dump",
+      "pg-dump"
+    ],
+    "view_kind": "table",
+    "capabilities": {
+      "operations": [
+        "preview"
+      ],
+      "input_mode": "whole",
+      "shared": false
+    }
+  },
+  "database-records": {
+    "readers": [
+      "bson",
+      "redis-rdb"
+    ],
+    "view_kind": "tree",
+    "capabilities": {
+      "operations": [
+        "preview"
+      ],
+      "input_mode": "whole",
+      "shared": false
+    }
+  },
   "image": {
     "readers": [
       "binary"
@@ -29,7 +57,8 @@ ADAPTER_CONTRACTS = json.loads(r'''{
     "view_kind": "image",
     "capabilities": {
       "operations": [
-        "bytes"
+        "bytes",
+        "prepare"
       ],
       "input_mode": "whole",
       "shared": true
@@ -187,7 +216,8 @@ ADAPTER_CONTRACTS = json.loads(r'''{
     "view_kind": "series",
     "capabilities": {
       "operations": [
-        "preview"
+        "preview",
+        "prepare"
       ],
       "input_mode": "whole",
       "shared": false
@@ -200,7 +230,8 @@ ADAPTER_CONTRACTS = json.loads(r'''{
     "view_kind": "image",
     "capabilities": {
       "operations": [
-        "preview"
+        "preview",
+        "prepare"
       ],
       "input_mode": "whole",
       "shared": false
@@ -278,7 +309,8 @@ ADAPTER_CONTRACTS = json.loads(r'''{
     "view_kind": "map",
     "capabilities": {
       "operations": [
-        "bytes"
+        "bytes",
+        "prepare"
       ],
       "input_mode": "whole",
       "shared": false
@@ -354,6 +386,319 @@ ADAPTER_CONTRACTS = json.loads(r'''{
       "binary"
     ],
     "view_kind": "image",
+    "capabilities": {
+      "operations": [
+        "bytes",
+        "prepare"
+      ],
+      "input_mode": "whole",
+      "shared": false
+    }
+  },
+  "structured-tree": {
+    "readers": [
+      "structure"
+    ],
+    "view_kind": "tree",
+    "capabilities": {
+      "operations": [
+        "preview"
+      ],
+      "input_mode": "whole",
+      "shared": false
+    }
+  },
+  "archive-directory": {
+    "readers": [
+      "archive"
+    ],
+    "view_kind": "table",
+    "capabilities": {
+      "operations": [
+        "preview"
+      ],
+      "input_mode": "whole",
+      "shared": false
+    }
+  },
+  "archive-members": {
+    "readers": [
+      "archive-member"
+    ],
+    "view_kind": "text",
+    "capabilities": {
+      "operations": [
+        "preview"
+      ],
+      "input_mode": "whole",
+      "shared": false
+    }
+  },
+  "signal-window": {
+    "readers": [
+      "edf"
+    ],
+    "view_kind": "series",
+    "capabilities": {
+      "operations": [
+        "preview"
+      ],
+      "input_mode": "window",
+      "shared": false
+    }
+  },
+  "array-window": {
+    "readers": [
+      "array-window"
+    ],
+    "view_kind": "image",
+    "capabilities": {
+      "operations": [
+        "preview"
+      ],
+      "input_mode": "window",
+      "shared": false
+    }
+  },
+  "columnar-window": {
+    "readers": [
+      "columnar-window"
+    ],
+    "view_kind": "table",
+    "capabilities": {
+      "operations": [
+        "preview"
+      ],
+      "input_mode": "window",
+      "shared": false
+    }
+  },
+  "nexus-window": {
+    "readers": [
+      "nexus-window"
+    ],
+    "view_kind": "image",
+    "capabilities": {
+      "operations": [
+        "preview"
+      ],
+      "input_mode": "window",
+      "shared": false
+    }
+  },
+  "scientific-graph": {
+    "readers": [
+      "scientific-graph"
+    ],
+    "view_kind": "graph",
+    "capabilities": {
+      "operations": [
+        "preview"
+      ],
+      "input_mode": "whole",
+      "shared": false
+    }
+  },
+  "phylogeny": {
+    "readers": [
+      "phylogeny"
+    ],
+    "view_kind": "tree",
+    "capabilities": {
+      "operations": [
+        "preview"
+      ],
+      "input_mode": "whole",
+      "shared": false
+    }
+  },
+  "mass-spectrum": {
+    "readers": [
+      "mass-spectrum"
+    ],
+    "view_kind": "series",
+    "capabilities": {
+      "operations": [
+        "preview"
+      ],
+      "input_mode": "whole",
+      "shared": false
+    }
+  },
+  "diffraction": {
+    "readers": [
+      "diffraction"
+    ],
+    "view_kind": "series",
+    "capabilities": {
+      "operations": [
+        "preview"
+      ],
+      "input_mode": "whole",
+      "shared": false
+    }
+  },
+  "fcs-window": {
+    "readers": [
+      "fcs-window"
+    ],
+    "view_kind": "series",
+    "capabilities": {
+      "operations": [
+        "preview"
+      ],
+      "input_mode": "window",
+      "shared": false
+    }
+  },
+  "ripple-window": {
+    "readers": [
+      "ripple-window"
+    ],
+    "view_kind": "image",
+    "capabilities": {
+      "operations": [
+        "preview"
+      ],
+      "input_mode": "window",
+      "shared": false
+    }
+  },
+  "envi-window": {
+    "readers": [
+      "envi-window"
+    ],
+    "view_kind": "image",
+    "capabilities": {
+      "operations": [
+        "preview"
+      ],
+      "input_mode": "window",
+      "shared": false
+    }
+  },
+  "grib-window": {
+    "readers": [
+      "grib-window"
+    ],
+    "view_kind": "image",
+    "capabilities": {
+      "operations": [
+        "preview"
+      ],
+      "input_mode": "window",
+      "shared": false
+    }
+  },
+  "seismic-window": {
+    "readers": [
+      "seismic-window"
+    ],
+    "view_kind": "series",
+    "capabilities": {
+      "operations": [
+        "preview"
+      ],
+      "input_mode": "window",
+      "shared": false
+    }
+  },
+  "czi-window": {
+    "readers": [
+      "czi-window"
+    ],
+    "view_kind": "image",
+    "capabilities": {
+      "operations": [
+        "preview"
+      ],
+      "input_mode": "window",
+      "shared": false
+    }
+  },
+  "instrument-image": {
+    "readers": [
+      "instrument-window"
+    ],
+    "view_kind": "image",
+    "capabilities": {
+      "operations": [
+        "preview"
+      ],
+      "input_mode": "window",
+      "shared": false
+    }
+  },
+  "ome-zarr": {
+    "readers": [
+      "ome-zarr"
+    ],
+    "view_kind": "image",
+    "capabilities": {
+      "operations": [
+        "preview"
+      ],
+      "input_mode": "window",
+      "shared": false
+    }
+  },
+  "mca-spectrum": {
+    "readers": [
+      "mca"
+    ],
+    "view_kind": "series",
+    "capabilities": {
+      "operations": [
+        "preview"
+      ],
+      "input_mode": "whole",
+      "shared": false
+    }
+  },
+  "geoscience-formats": {
+    "readers": [
+      "geoformat"
+    ],
+    "view_kind": "map",
+    "capabilities": {
+      "operations": [
+        "preview"
+      ],
+      "input_mode": "whole",
+      "shared": false
+    }
+  },
+  "czi-image": {
+    "readers": [
+      "czi"
+    ],
+    "view_kind": "image",
+    "capabilities": {
+      "operations": [
+        "preview"
+      ],
+      "input_mode": "whole",
+      "shared": false
+    }
+  },
+  "video-player": {
+    "readers": [
+      "binary"
+    ],
+    "view_kind": "media",
+    "capabilities": {
+      "operations": [
+        "bytes"
+      ],
+      "input_mode": "whole",
+      "shared": false
+    }
+  },
+  "audio-waveform": {
+    "readers": [
+      "binary"
+    ],
+    "view_kind": "series",
     "capabilities": {
       "operations": [
         "bytes"
@@ -461,6 +806,201 @@ ADAPTER_CONTRACTS = json.loads(r'''{
     "capabilities": {
       "operations": [
         "prepare"
+      ],
+      "input_mode": "whole",
+      "shared": false
+    }
+  },
+  "dicom-window": {
+    "readers": [
+      "dicom-window"
+    ],
+    "view_kind": "image",
+    "capabilities": {
+      "operations": [
+        "preview"
+      ],
+      "input_mode": "window",
+      "shared": false
+    }
+  },
+  "spatial-window": {
+    "readers": [
+      "spatial-window"
+    ],
+    "view_kind": "map",
+    "capabilities": {
+      "operations": [
+        "preview"
+      ],
+      "input_mode": "window",
+      "shared": false
+    }
+  },
+  "pointcloud-window": {
+    "readers": [
+      "pointcloud-window"
+    ],
+    "view_kind": "structure",
+    "capabilities": {
+      "operations": [
+        "preview"
+      ],
+      "input_mode": "window",
+      "shared": false
+    }
+  },
+  "gro-trajectory": {
+    "readers": [
+      "gro-trajectory"
+    ],
+    "view_kind": "structure",
+    "capabilities": {
+      "operations": [
+        "preview"
+      ],
+      "input_mode": "whole",
+      "shared": false
+    }
+  },
+  "database-table": {
+    "readers": [
+      "database-table"
+    ],
+    "view_kind": "table",
+    "capabilities": {
+      "operations": [
+        "preview"
+      ],
+      "input_mode": "whole",
+      "shared": false
+    }
+  },
+  "sqlite-table": {
+    "readers": [
+      "sqlite-table"
+    ],
+    "view_kind": "table",
+    "capabilities": {
+      "operations": [
+        "preview"
+      ],
+      "input_mode": "whole",
+      "shared": false
+    }
+  },
+  "radar-window": {
+    "readers": [
+      "radar-window"
+    ],
+    "view_kind": "image",
+    "capabilities": {
+      "operations": [
+        "preview"
+      ],
+      "input_mode": "window",
+      "shared": false
+    }
+  },
+  "ugrid-window": {
+    "readers": [
+      "ugrid-window"
+    ],
+    "view_kind": "map",
+    "capabilities": {
+      "operations": [
+        "preview"
+      ],
+      "input_mode": "window",
+      "shared": false
+    }
+  },
+  "matrix-workbench": {
+    "readers": [
+      "matrix-workbench"
+    ],
+    "view_kind": "image",
+    "capabilities": {
+      "operations": [
+        "preview"
+      ],
+      "input_mode": "whole",
+      "shared": false
+    }
+  },
+  "astronomy-workbench": {
+    "readers": [
+      "astronomy-workbench"
+    ],
+    "view_kind": "image",
+    "capabilities": {
+      "operations": [
+        "preview"
+      ],
+      "input_mode": "whole",
+      "shared": false
+    }
+  },
+  "alignment-browser": {
+    "readers": [
+      "alignment-browser"
+    ],
+    "view_kind": "map",
+    "capabilities": {
+      "operations": [
+        "preview"
+      ],
+      "input_mode": "whole",
+      "shared": false
+    }
+  },
+  "sequence-browser": {
+    "readers": [
+      "sequence-browser"
+    ],
+    "view_kind": "series",
+    "capabilities": {
+      "operations": [
+        "preview"
+      ],
+      "input_mode": "whole",
+      "shared": false
+    }
+  },
+  "genome-tracks": {
+    "readers": [
+      "genome-tracks"
+    ],
+    "view_kind": "map",
+    "capabilities": {
+      "operations": [
+        "preview"
+      ],
+      "input_mode": "whole",
+      "shared": false
+    }
+  },
+  "blast-hits": {
+    "readers": [
+      "blast-hits"
+    ],
+    "view_kind": "series",
+    "capabilities": {
+      "operations": [
+        "preview"
+      ],
+      "input_mode": "whole",
+      "shared": false
+    }
+  },
+  "simulation-mesh": {
+    "readers": [
+      "simulation-mesh"
+    ],
+    "view_kind": "structure",
+    "capabilities": {
+      "operations": [
+        "preview"
       ],
       "input_mode": "whole",
       "shared": false

@@ -1,0 +1,33 @@
+{
+  "contract_version": 2,
+  "id": "viz-matrix-workbench",
+  "version": "1.0.0",
+  "name": "高维矩阵工作台",
+  "description": "NPY / NPZ、稀疏矩阵、MTX、MAT 多维切片、复数分量及已有结果曲线；有界离线读取。",
+  "extensions": [
+    "npy",
+    "npz",
+    "mtx",
+    "mat"
+  ],
+  "filenames": [],
+  "view_kind": "image",
+  "adapter": "matrix-workbench",
+  "reader": "matrix-workbench",
+  "capabilities": {
+    "operations": [
+      "preview"
+    ],
+    "input_mode": "whole",
+    "shared": false
+  },
+  "default_enabled": true,
+  "priority": -20,
+  "permissions": [
+    "file:read"
+  ],
+  "limits": {
+    "max_input_bytes": 134217728,
+    "max_output_bytes": 8388608
+  }
+}

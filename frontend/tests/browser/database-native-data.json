@@ -1,0 +1,837 @@
+{
+  "tree": {
+    "contract_version": 2,
+    "type": "database-table",
+    "reader": "database-table",
+    "kind": "tree",
+    "media_type": "application/json",
+    "choices": {
+      "tables": [
+        {
+          "id": "t-7134d536a65200904ca3cb2c",
+          "label": "Empty",
+          "columns": [
+            {
+              "id": 0,
+              "label": "label",
+              "data_type": "TEXT",
+              "nullable": true,
+              "primary_key": 0,
+              "previewable": true
+            }
+          ],
+          "ordering": "duckdb-rowid-ascending"
+        },
+        {
+          "id": "t-f9fb186e32d0ce6cb0233d35",
+          "label": "Measurements",
+          "columns": [
+            {
+              "id": 0,
+              "label": "id",
+              "data_type": "INTEGER",
+              "nullable": true,
+              "primary_key": 0,
+              "previewable": true
+            },
+            {
+              "id": 1,
+              "label": "amount",
+              "data_type": "DECIMAL",
+              "nullable": true,
+              "primary_key": 0,
+              "previewable": true
+            },
+            {
+              "id": 2,
+              "label": "signal",
+              "data_type": "REAL",
+              "nullable": true,
+              "primary_key": 0,
+              "previewable": true
+            },
+            {
+              "id": 3,
+              "label": "label",
+              "data_type": "TEXT",
+              "nullable": true,
+              "primary_key": 0,
+              "previewable": true
+            },
+            {
+              "id": 4,
+              "label": "optional",
+              "data_type": "TEXT",
+              "nullable": true,
+              "primary_key": 0,
+              "previewable": true
+            },
+            {
+              "id": 5,
+              "label": "payload",
+              "data_type": "BLOB",
+              "nullable": true,
+              "primary_key": 0,
+              "previewable": true
+            },
+            {
+              "id": 6,
+              "label": "nested",
+              "data_type": "UNSUPPORTED",
+              "nullable": true,
+              "primary_key": 0,
+              "previewable": false
+            }
+          ],
+          "ordering": "duckdb-rowid-ascending"
+        }
+      ]
+    },
+    "selected": {},
+    "metadata": {
+      "engine": "duckdb",
+      "format": "duckdb",
+      "container": "DuckDB",
+      "input_mode": "whole",
+      "source_bytes": 536576,
+      "table_count": 2,
+      "schema_bytes": 285,
+      "value_semantics": "Engine-native scalar values; exact integer and decimal text; no user SQL, views, macros, joins or type coercion",
+      "ordering": "duckdb-rowid-ascending",
+      "total_rows_known": false,
+      "rows_returned": 0,
+      "nonfinite_values": 0,
+      "omitted_texts": 0,
+      "blob_values": 0,
+      "limits": {
+        "max_tables": 32,
+        "max_schema_columns": 128,
+        "max_columns": 16,
+        "max_rows": 200,
+        "max_offset": 100000,
+        "max_cell_bytes": 512,
+        "max_schema_bytes": 65536
+      }
+    },
+    "warnings": [
+      "整文件只读预览（最多 16 MiB），不是大库分块查询；仅浏览实体表，不执行用户 SQL、视图或宏。整数及定点小数保留精确文本，BLOB 只显示长度；超长或不安全文本明确省略。分页顺序以各引擎标注为准，不等同于业务主键顺序。"
+    ],
+    "sampled": false,
+    "tree": [
+      {
+        "path": "/t-7134d536a65200904ca3cb2c",
+        "node_type": "table",
+        "attributes": {
+          "label": "Empty",
+          "columns": 1
+        }
+      },
+      {
+        "path": "/t-f9fb186e32d0ce6cb0233d35",
+        "node_type": "table",
+        "attributes": {
+          "label": "Measurements",
+          "columns": 7
+        }
+      }
+    ]
+  },
+  "first": {
+    "contract_version": 2,
+    "type": "database-table",
+    "reader": "database-table",
+    "kind": "table",
+    "media_type": "application/json",
+    "choices": {
+      "tables": [
+        {
+          "id": "t-7134d536a65200904ca3cb2c",
+          "label": "Empty",
+          "columns": [
+            {
+              "id": 0,
+              "label": "label",
+              "data_type": "TEXT",
+              "nullable": true,
+              "primary_key": 0,
+              "previewable": true
+            }
+          ],
+          "ordering": "duckdb-rowid-ascending"
+        },
+        {
+          "id": "t-f9fb186e32d0ce6cb0233d35",
+          "label": "Measurements",
+          "columns": [
+            {
+              "id": 0,
+              "label": "id",
+              "data_type": "INTEGER",
+              "nullable": true,
+              "primary_key": 0,
+              "previewable": true
+            },
+            {
+              "id": 1,
+              "label": "amount",
+              "data_type": "DECIMAL",
+              "nullable": true,
+              "primary_key": 0,
+              "previewable": true
+            },
+            {
+              "id": 2,
+              "label": "signal",
+              "data_type": "REAL",
+              "nullable": true,
+              "primary_key": 0,
+              "previewable": true
+            },
+            {
+              "id": 3,
+              "label": "label",
+              "data_type": "TEXT",
+              "nullable": true,
+              "primary_key": 0,
+              "previewable": true
+            },
+            {
+              "id": 4,
+              "label": "optional",
+              "data_type": "TEXT",
+              "nullable": true,
+              "primary_key": 0,
+              "previewable": true
+            },
+            {
+              "id": 5,
+              "label": "payload",
+              "data_type": "BLOB",
+              "nullable": true,
+              "primary_key": 0,
+              "previewable": true
+            },
+            {
+              "id": 6,
+              "label": "nested",
+              "data_type": "UNSUPPORTED",
+              "nullable": true,
+              "primary_key": 0,
+              "previewable": false
+            }
+          ],
+          "ordering": "duckdb-rowid-ascending"
+        }
+      ]
+    },
+    "selected": {
+      "table": "t-f9fb186e32d0ce6cb0233d35",
+      "columns": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "row_offset": 0,
+      "row_limit": 2
+    },
+    "metadata": {
+      "engine": "duckdb",
+      "format": "duckdb",
+      "container": "DuckDB",
+      "input_mode": "whole",
+      "source_bytes": 536576,
+      "table_count": 2,
+      "schema_bytes": 285,
+      "value_semantics": "Engine-native scalar values; exact integer and decimal text; no user SQL, views, macros, joins or type coercion",
+      "ordering": "duckdb-rowid-ascending",
+      "total_rows_known": false,
+      "rows_returned": 2,
+      "nonfinite_values": 0,
+      "omitted_texts": 0,
+      "blob_values": 1,
+      "limits": {
+        "max_tables": 32,
+        "max_schema_columns": 128,
+        "max_columns": 16,
+        "max_rows": 200,
+        "max_offset": 100000,
+        "max_cell_bytes": 512,
+        "max_schema_bytes": 65536
+      }
+    },
+    "warnings": [
+      "整文件只读预览（最多 16 MiB），不是大库分块查询；仅浏览实体表，不执行用户 SQL、视图或宏。整数及定点小数保留精确文本，BLOB 只显示长度；超长或不安全文本明确省略。分页顺序以各引擎标注为准，不等同于业务主键顺序。"
+    ],
+    "sampled": true,
+    "table": {
+      "columns": [
+        "id",
+        "amount",
+        "signal",
+        "label",
+        "optional",
+        "payload"
+      ],
+      "column_ids": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "rows": [
+        [
+          {
+            "type": "integer",
+            "value": "170141183460469231731687303715884105727"
+          },
+          {
+            "type": "decimal",
+            "value": "1.230000000000000001"
+          },
+          {
+            "type": "real",
+            "value": 7.5
+          },
+          {
+            "type": "text",
+            "value": "观测一"
+          },
+          {
+            "type": "null",
+            "value": null
+          },
+          {
+            "type": "blob",
+            "bytes": 2
+          }
+        ],
+        [
+          {
+            "type": "integer",
+            "value": "9007199254740993"
+          },
+          {
+            "type": "decimal",
+            "value": "-99999999999999999999.123456789012345678"
+          },
+          {
+            "type": "real",
+            "value": 9.0
+          },
+          {
+            "type": "text",
+            "value": "<img src=x onerror=alert(1)>"
+          },
+          {
+            "type": "text",
+            "value": ""
+          },
+          {
+            "type": "null",
+            "value": null
+          }
+        ]
+      ],
+      "row_ids": [
+        "0",
+        "1"
+      ],
+      "row_offset": 0,
+      "has_more": true,
+      "ordering": "duckdb-rowid-ascending"
+    }
+  },
+  "second": {
+    "contract_version": 2,
+    "type": "database-table",
+    "reader": "database-table",
+    "kind": "table",
+    "media_type": "application/json",
+    "choices": {
+      "tables": [
+        {
+          "id": "t-7134d536a65200904ca3cb2c",
+          "label": "Empty",
+          "columns": [
+            {
+              "id": 0,
+              "label": "label",
+              "data_type": "TEXT",
+              "nullable": true,
+              "primary_key": 0,
+              "previewable": true
+            }
+          ],
+          "ordering": "duckdb-rowid-ascending"
+        },
+        {
+          "id": "t-f9fb186e32d0ce6cb0233d35",
+          "label": "Measurements",
+          "columns": [
+            {
+              "id": 0,
+              "label": "id",
+              "data_type": "INTEGER",
+              "nullable": true,
+              "primary_key": 0,
+              "previewable": true
+            },
+            {
+              "id": 1,
+              "label": "amount",
+              "data_type": "DECIMAL",
+              "nullable": true,
+              "primary_key": 0,
+              "previewable": true
+            },
+            {
+              "id": 2,
+              "label": "signal",
+              "data_type": "REAL",
+              "nullable": true,
+              "primary_key": 0,
+              "previewable": true
+            },
+            {
+              "id": 3,
+              "label": "label",
+              "data_type": "TEXT",
+              "nullable": true,
+              "primary_key": 0,
+              "previewable": true
+            },
+            {
+              "id": 4,
+              "label": "optional",
+              "data_type": "TEXT",
+              "nullable": true,
+              "primary_key": 0,
+              "previewable": true
+            },
+            {
+              "id": 5,
+              "label": "payload",
+              "data_type": "BLOB",
+              "nullable": true,
+              "primary_key": 0,
+              "previewable": true
+            },
+            {
+              "id": 6,
+              "label": "nested",
+              "data_type": "UNSUPPORTED",
+              "nullable": true,
+              "primary_key": 0,
+              "previewable": false
+            }
+          ],
+          "ordering": "duckdb-rowid-ascending"
+        }
+      ]
+    },
+    "selected": {
+      "table": "t-f9fb186e32d0ce6cb0233d35",
+      "columns": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "row_offset": 2,
+      "row_limit": 2
+    },
+    "metadata": {
+      "engine": "duckdb",
+      "format": "duckdb",
+      "container": "DuckDB",
+      "input_mode": "whole",
+      "source_bytes": 536576,
+      "table_count": 2,
+      "schema_bytes": 285,
+      "value_semantics": "Engine-native scalar values; exact integer and decimal text; no user SQL, views, macros, joins or type coercion",
+      "ordering": "duckdb-rowid-ascending",
+      "total_rows_known": false,
+      "rows_returned": 1,
+      "nonfinite_values": 0,
+      "omitted_texts": 0,
+      "blob_values": 1,
+      "limits": {
+        "max_tables": 32,
+        "max_schema_columns": 128,
+        "max_columns": 16,
+        "max_rows": 200,
+        "max_offset": 100000,
+        "max_cell_bytes": 512,
+        "max_schema_bytes": 65536
+      }
+    },
+    "warnings": [
+      "整文件只读预览（最多 16 MiB），不是大库分块查询；仅浏览实体表，不执行用户 SQL、视图或宏。整数及定点小数保留精确文本，BLOB 只显示长度；超长或不安全文本明确省略。分页顺序以各引擎标注为准，不等同于业务主键顺序。"
+    ],
+    "sampled": true,
+    "table": {
+      "columns": [
+        "id",
+        "amount",
+        "signal",
+        "label",
+        "optional",
+        "payload"
+      ],
+      "column_ids": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "rows": [
+        [
+          {
+            "type": "integer",
+            "value": "3"
+          },
+          {
+            "type": "decimal",
+            "value": "0.000000000000000001"
+          },
+          {
+            "type": "real",
+            "value": 12.0
+          },
+          {
+            "type": "text",
+            "value": "观测三"
+          },
+          {
+            "type": "text",
+            "value": "完成"
+          },
+          {
+            "type": "blob",
+            "bytes": 0
+          }
+        ]
+      ],
+      "row_ids": [
+        "2"
+      ],
+      "row_offset": 2,
+      "has_more": false,
+      "ordering": "duckdb-rowid-ascending"
+    }
+  },
+  "empty": {
+    "contract_version": 2,
+    "type": "database-table",
+    "reader": "database-table",
+    "kind": "table",
+    "media_type": "application/json",
+    "choices": {
+      "tables": [
+        {
+          "id": "t-7134d536a65200904ca3cb2c",
+          "label": "Empty",
+          "columns": [
+            {
+              "id": 0,
+              "label": "label",
+              "data_type": "TEXT",
+              "nullable": true,
+              "primary_key": 0,
+              "previewable": true
+            }
+          ],
+          "ordering": "duckdb-rowid-ascending"
+        },
+        {
+          "id": "t-f9fb186e32d0ce6cb0233d35",
+          "label": "Measurements",
+          "columns": [
+            {
+              "id": 0,
+              "label": "id",
+              "data_type": "INTEGER",
+              "nullable": true,
+              "primary_key": 0,
+              "previewable": true
+            },
+            {
+              "id": 1,
+              "label": "amount",
+              "data_type": "DECIMAL",
+              "nullable": true,
+              "primary_key": 0,
+              "previewable": true
+            },
+            {
+              "id": 2,
+              "label": "signal",
+              "data_type": "REAL",
+              "nullable": true,
+              "primary_key": 0,
+              "previewable": true
+            },
+            {
+              "id": 3,
+              "label": "label",
+              "data_type": "TEXT",
+              "nullable": true,
+              "primary_key": 0,
+              "previewable": true
+            },
+            {
+              "id": 4,
+              "label": "optional",
+              "data_type": "TEXT",
+              "nullable": true,
+              "primary_key": 0,
+              "previewable": true
+            },
+            {
+              "id": 5,
+              "label": "payload",
+              "data_type": "BLOB",
+              "nullable": true,
+              "primary_key": 0,
+              "previewable": true
+            },
+            {
+              "id": 6,
+              "label": "nested",
+              "data_type": "UNSUPPORTED",
+              "nullable": true,
+              "primary_key": 0,
+              "previewable": false
+            }
+          ],
+          "ordering": "duckdb-rowid-ascending"
+        }
+      ]
+    },
+    "selected": {
+      "table": "t-7134d536a65200904ca3cb2c",
+      "columns": [
+        0
+      ],
+      "row_offset": 0,
+      "row_limit": 2
+    },
+    "metadata": {
+      "engine": "duckdb",
+      "format": "duckdb",
+      "container": "DuckDB",
+      "input_mode": "whole",
+      "source_bytes": 536576,
+      "table_count": 2,
+      "schema_bytes": 285,
+      "value_semantics": "Engine-native scalar values; exact integer and decimal text; no user SQL, views, macros, joins or type coercion",
+      "ordering": "duckdb-rowid-ascending",
+      "total_rows_known": false,
+      "rows_returned": 0,
+      "nonfinite_values": 0,
+      "omitted_texts": 0,
+      "blob_values": 0,
+      "limits": {
+        "max_tables": 32,
+        "max_schema_columns": 128,
+        "max_columns": 16,
+        "max_rows": 200,
+        "max_offset": 100000,
+        "max_cell_bytes": 512,
+        "max_schema_bytes": 65536
+      }
+    },
+    "warnings": [
+      "整文件只读预览（最多 16 MiB），不是大库分块查询；仅浏览实体表，不执行用户 SQL、视图或宏。整数及定点小数保留精确文本，BLOB 只显示长度；超长或不安全文本明确省略。分页顺序以各引擎标注为准，不等同于业务主键顺序。"
+    ],
+    "sampled": false,
+    "table": {
+      "columns": [
+        "label"
+      ],
+      "column_ids": [
+        0
+      ],
+      "rows": [],
+      "row_ids": [],
+      "row_offset": 0,
+      "has_more": false,
+      "ordering": "duckdb-rowid-ascending"
+    }
+  },
+  "columns": {
+    "contract_version": 2,
+    "type": "database-table",
+    "reader": "database-table",
+    "kind": "table",
+    "media_type": "application/json",
+    "choices": {
+      "tables": [
+        {
+          "id": "t-7134d536a65200904ca3cb2c",
+          "label": "Empty",
+          "columns": [
+            {
+              "id": 0,
+              "label": "label",
+              "data_type": "TEXT",
+              "nullable": true,
+              "primary_key": 0,
+              "previewable": true
+            }
+          ],
+          "ordering": "duckdb-rowid-ascending"
+        },
+        {
+          "id": "t-f9fb186e32d0ce6cb0233d35",
+          "label": "Measurements",
+          "columns": [
+            {
+              "id": 0,
+              "label": "id",
+              "data_type": "INTEGER",
+              "nullable": true,
+              "primary_key": 0,
+              "previewable": true
+            },
+            {
+              "id": 1,
+              "label": "amount",
+              "data_type": "DECIMAL",
+              "nullable": true,
+              "primary_key": 0,
+              "previewable": true
+            },
+            {
+              "id": 2,
+              "label": "signal",
+              "data_type": "REAL",
+              "nullable": true,
+              "primary_key": 0,
+              "previewable": true
+            },
+            {
+              "id": 3,
+              "label": "label",
+              "data_type": "TEXT",
+              "nullable": true,
+              "primary_key": 0,
+              "previewable": true
+            },
+            {
+              "id": 4,
+              "label": "optional",
+              "data_type": "TEXT",
+              "nullable": true,
+              "primary_key": 0,
+              "previewable": true
+            },
+            {
+              "id": 5,
+              "label": "payload",
+              "data_type": "BLOB",
+              "nullable": true,
+              "primary_key": 0,
+              "previewable": true
+            },
+            {
+              "id": 6,
+              "label": "nested",
+              "data_type": "UNSUPPORTED",
+              "nullable": true,
+              "primary_key": 0,
+              "previewable": false
+            }
+          ],
+          "ordering": "duckdb-rowid-ascending"
+        }
+      ]
+    },
+    "selected": {
+      "table": "t-f9fb186e32d0ce6cb0233d35",
+      "columns": [
+        0,
+        2
+      ],
+      "row_offset": 0,
+      "row_limit": 2
+    },
+    "metadata": {
+      "engine": "duckdb",
+      "format": "duckdb",
+      "container": "DuckDB",
+      "input_mode": "whole",
+      "source_bytes": 536576,
+      "table_count": 2,
+      "schema_bytes": 285,
+      "value_semantics": "Engine-native scalar values; exact integer and decimal text; no user SQL, views, macros, joins or type coercion",
+      "ordering": "duckdb-rowid-ascending",
+      "total_rows_known": false,
+      "rows_returned": 2,
+      "nonfinite_values": 0,
+      "omitted_texts": 0,
+      "blob_values": 0,
+      "limits": {
+        "max_tables": 32,
+        "max_schema_columns": 128,
+        "max_columns": 16,
+        "max_rows": 200,
+        "max_offset": 100000,
+        "max_cell_bytes": 512,
+        "max_schema_bytes": 65536
+      }
+    },
+    "warnings": [
+      "整文件只读预览（最多 16 MiB），不是大库分块查询；仅浏览实体表，不执行用户 SQL、视图或宏。整数及定点小数保留精确文本，BLOB 只显示长度；超长或不安全文本明确省略。分页顺序以各引擎标注为准，不等同于业务主键顺序。"
+    ],
+    "sampled": true,
+    "table": {
+      "columns": [
+        "id",
+        "signal"
+      ],
+      "column_ids": [
+        0,
+        2
+      ],
+      "rows": [
+        [
+          {
+            "type": "integer",
+            "value": "170141183460469231731687303715884105727"
+          },
+          {
+            "type": "real",
+            "value": 7.5
+          }
+        ],
+        [
+          {
+            "type": "integer",
+            "value": "9007199254740993"
+          },
+          {
+            "type": "real",
+            "value": 9.0
+          }
+        ]
+      ],
+      "row_ids": [
+        "0",
+        "1"
+      ],
+      "row_offset": 0,
+      "has_more": true,
+      "ordering": "duckdb-rowid-ascending"
+    }
+  }
+}

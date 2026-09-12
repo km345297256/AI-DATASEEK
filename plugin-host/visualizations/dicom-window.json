@@ -1,0 +1,31 @@
+{
+  "contract_version": 2,
+  "id": "viz-dicom-window",
+  "version": "1.0.0",
+  "name": "DICOM 灰度影像",
+  "description": "受限 Part10 灰度帧/区域预览；要求脱敏声明及用户确认，非诊断用途。",
+  "extensions": [
+    "dcm",
+    "dicom"
+  ],
+  "filenames": [],
+  "view_kind": "image",
+  "adapter": "dicom-window",
+  "reader": "dicom-window",
+  "capabilities": {
+    "operations": [
+      "preview"
+    ],
+    "input_mode": "window",
+    "shared": false
+  },
+  "default_enabled": true,
+  "priority": 40,
+  "permissions": [
+    "file:read"
+  ],
+  "limits": {
+    "max_input_bytes": 8388608,
+    "max_output_bytes": 2097152
+  }
+}

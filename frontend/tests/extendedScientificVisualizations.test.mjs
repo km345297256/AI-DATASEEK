@@ -143,7 +143,7 @@ test('Plotly abbreviates long legends without losing column identity or numeric 
 test('H5Web handles default-only React CommonJS imports and disposes the real root boundary', async () => {
   let mounted, cleaned = false;
   const adapter = mountScientific('H5WebPreview', {
-    '../runtime': { requestPreview: async () => ({ tree: [{ path: '/data', node_type: 'dataset', shape: [3] }], array: { shape: [3], values: [1, 3, 2] }, metadata: { strides: [2] } }) },
+    '../runtime': { requestPreview: async () => ({ version: 'a'.repeat(64), choices: { variables: ['/data'] }, tree: [{ path: '/data', node_type: 'dataset', shape: [3] }], array: { shape: [3], values: [1, 3, 2] }, metadata: { strides: [2] } }) },
     react: { default: { createElement: (component, props) => ({ component, props }) } },
     'react-dom/client': { default: { createRoot: () => ({ render(value) { mounted = value; }, unmount() { cleaned = true; } }) } },
     '@h5web/lib': { LineVis: 'line', HeatmapVis: 'heatmap' },

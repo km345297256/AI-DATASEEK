@@ -1,0 +1,17 @@
+{
+  "contract_version": 2,
+  "id": "viz-archive-directory",
+  "version": "1.0.0",
+  "name": "压缩包目录",
+  "description": "ZIP/TAR 安全目录分页；GZIP/TGZ 仅流头信息。不解包、不执行、不预览成员内容。",
+  "extensions": ["zip", "tar", "gz", "gzip", "tgz"],
+  "filenames": [],
+  "view_kind": "table",
+  "adapter": "archive-directory",
+  "reader": "archive",
+  "default_enabled": true,
+  "priority": 40,
+  "permissions": ["file:read"],
+  "limits": {"max_input_bytes": 67108864, "max_output_bytes": 1048576},
+  "capabilities": {"operations": ["preview"], "input_mode": "whole", "shared": false}
+}

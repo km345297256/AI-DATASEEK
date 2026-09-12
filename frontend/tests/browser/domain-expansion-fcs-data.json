@@ -1,0 +1,1542 @@
+{
+  "provenance": {
+    "generator": "sandbox/tests/fcs_window_browser_payloads.py",
+    "reference": "FlowIO 1.4.0",
+    "synthetic": true
+  },
+  "cases": {
+    "float": {
+      "tree": {
+        "contract_version": 2,
+        "type": "fcs-window",
+        "reader": "fcs-window",
+        "kind": "tree",
+        "media_type": "application/json",
+        "choices": {
+          "channels": [
+            {
+              "id": 0,
+              "name": "FSC-A",
+              "stain": "散射",
+              "bits": 32,
+              "range": 262144,
+              "exponent": [
+                0,
+                0
+              ],
+              "gain": 2,
+              "calibration": {
+                "factor": 3,
+                "unit": "MESF"
+              },
+              "display": null
+            },
+            {
+              "id": 1,
+              "name": "CD3-A",
+              "stain": "CD3 PE",
+              "bits": 32,
+              "range": 262144,
+              "exponent": [
+                0,
+                0
+              ],
+              "gain": 1,
+              "calibration": null,
+              "display": {
+                "scale": "Linear",
+                "values": [
+                  0,
+                  100
+                ]
+              }
+            }
+          ]
+        },
+        "selected": {},
+        "metadata": {
+          "format": "fcs",
+          "fcs_version": "3.1",
+          "datatype": "F",
+          "byte_order": "little",
+          "input_mode": "window",
+          "source_bytes": 686,
+          "read_bytes": 654,
+          "read_requests": 3,
+          "text_bytes": 398,
+          "total_events": 4,
+          "channel_count": 2,
+          "event_bytes": 8,
+          "scanned_event_bytes": 0,
+          "decoded_values": 0,
+          "decoded_bytes": 0,
+          "nonfinite_values": 0,
+          "plottable_events": 0,
+          "timestep": null,
+          "compensation": {
+            "declarations": [
+              "$SPILLOVER"
+            ],
+            "spillover": {
+              "channels": [
+                0,
+                1
+              ],
+              "matrix": [
+                [
+                  1,
+                  0.1
+                ],
+                [
+                  0.03,
+                  1
+                ]
+              ]
+            }
+          },
+          "value_semantics": "stored values; no bit mask, gain, antilog, calibration, timestep conversion, compensation, gating or sampling",
+          "read_semantics": "event-interleaved row window read; only selected channels decoded; not whole-file validation",
+          "limits": {
+            "max_text_bytes": 262144,
+            "max_channels": 128,
+            "max_events": 8192,
+            "max_values": 16384,
+            "max_decoded_bytes": 131072,
+            "max_histogram_bins": 128
+          }
+        },
+        "warnings": [
+          "仅显示明确选择的事件窗；不补偿、不门控、不抽样、不作对数或标定变换。",
+          "图中为存储原值；PnE、PnG、TIMESTEP、标定单位和补偿声明仅展示。直方图只统计当前窗口。"
+        ],
+        "sampled": false,
+        "tree": [
+          {
+            "path": "/channel-0",
+            "node_type": "channel",
+            "attributes": {
+              "name": "FSC-A",
+              "bits": 32
+            }
+          },
+          {
+            "path": "/channel-1",
+            "node_type": "channel",
+            "attributes": {
+              "name": "CD3-A",
+              "bits": 32
+            }
+          }
+        ]
+      },
+      "scatter": {
+        "contract_version": 2,
+        "type": "fcs-window",
+        "reader": "fcs-window",
+        "kind": "series",
+        "media_type": "application/json",
+        "choices": {
+          "channels": [
+            {
+              "id": 0,
+              "name": "FSC-A",
+              "stain": "散射",
+              "bits": 32,
+              "range": 262144,
+              "exponent": [
+                0,
+                0
+              ],
+              "gain": 2,
+              "calibration": {
+                "factor": 3,
+                "unit": "MESF"
+              },
+              "display": null
+            },
+            {
+              "id": 1,
+              "name": "CD3-A",
+              "stain": "CD3 PE",
+              "bits": 32,
+              "range": 262144,
+              "exponent": [
+                0,
+                0
+              ],
+              "gain": 1,
+              "calibration": null,
+              "display": {
+                "scale": "Linear",
+                "values": [
+                  0,
+                  100
+                ]
+              }
+            }
+          ]
+        },
+        "selected": {
+          "view": "scatter",
+          "channels": [
+            0,
+            1
+          ],
+          "event_offset": 0,
+          "event_count": 4
+        },
+        "metadata": {
+          "format": "fcs",
+          "fcs_version": "3.1",
+          "datatype": "F",
+          "byte_order": "little",
+          "input_mode": "window",
+          "source_bytes": 686,
+          "read_bytes": 686,
+          "read_requests": 4,
+          "text_bytes": 398,
+          "total_events": 4,
+          "channel_count": 2,
+          "event_bytes": 8,
+          "scanned_event_bytes": 32,
+          "decoded_values": 8,
+          "decoded_bytes": 32,
+          "nonfinite_values": 0,
+          "plottable_events": 4,
+          "timestep": null,
+          "compensation": {
+            "declarations": [
+              "$SPILLOVER"
+            ],
+            "spillover": {
+              "channels": [
+                0,
+                1
+              ],
+              "matrix": [
+                [
+                  1,
+                  0.1
+                ],
+                [
+                  0.03,
+                  1
+                ]
+              ]
+            }
+          },
+          "value_semantics": "stored values; no bit mask, gain, antilog, calibration, timestep conversion, compensation, gating or sampling",
+          "read_semantics": "event-interleaved row window read; only selected channels decoded; not whole-file validation",
+          "limits": {
+            "max_text_bytes": 262144,
+            "max_channels": 128,
+            "max_events": 8192,
+            "max_values": 16384,
+            "max_decoded_bytes": 131072,
+            "max_histogram_bins": 128
+          }
+        },
+        "warnings": [
+          "仅显示明确选择的事件窗；不补偿、不门控、不抽样、不作对数或标定变换。",
+          "图中为存储原值；PnE、PnG、TIMESTEP、标定单位和补偿声明仅展示。直方图只统计当前窗口。"
+        ],
+        "sampled": false,
+        "series": [
+          {
+            "channel": 0,
+            "label": "FSC-A",
+            "x": [
+              0,
+              1,
+              2,
+              3
+            ],
+            "y": [
+              1.25,
+              -2.5,
+              0,
+              4.75
+            ]
+          },
+          {
+            "channel": 1,
+            "label": "CD3-A",
+            "x": [
+              0,
+              1,
+              2,
+              3
+            ],
+            "y": [
+              10,
+              20,
+              30,
+              40
+            ]
+          }
+        ]
+      },
+      "histogram": {
+        "contract_version": 2,
+        "type": "fcs-window",
+        "reader": "fcs-window",
+        "kind": "series",
+        "media_type": "application/json",
+        "choices": {
+          "channels": [
+            {
+              "id": 0,
+              "name": "FSC-A",
+              "stain": "散射",
+              "bits": 32,
+              "range": 262144,
+              "exponent": [
+                0,
+                0
+              ],
+              "gain": 2,
+              "calibration": {
+                "factor": 3,
+                "unit": "MESF"
+              },
+              "display": null
+            },
+            {
+              "id": 1,
+              "name": "CD3-A",
+              "stain": "CD3 PE",
+              "bits": 32,
+              "range": 262144,
+              "exponent": [
+                0,
+                0
+              ],
+              "gain": 1,
+              "calibration": null,
+              "display": {
+                "scale": "Linear",
+                "values": [
+                  0,
+                  100
+                ]
+              }
+            }
+          ]
+        },
+        "selected": {
+          "view": "histogram",
+          "channels": [
+            0
+          ],
+          "event_offset": 0,
+          "event_count": 4,
+          "bins": 4
+        },
+        "metadata": {
+          "format": "fcs",
+          "fcs_version": "3.1",
+          "datatype": "F",
+          "byte_order": "little",
+          "input_mode": "window",
+          "source_bytes": 686,
+          "read_bytes": 686,
+          "read_requests": 4,
+          "text_bytes": 398,
+          "total_events": 4,
+          "channel_count": 2,
+          "event_bytes": 8,
+          "scanned_event_bytes": 32,
+          "decoded_values": 4,
+          "decoded_bytes": 16,
+          "nonfinite_values": 0,
+          "plottable_events": 4,
+          "timestep": null,
+          "compensation": {
+            "declarations": [
+              "$SPILLOVER"
+            ],
+            "spillover": {
+              "channels": [
+                0,
+                1
+              ],
+              "matrix": [
+                [
+                  1,
+                  0.1
+                ],
+                [
+                  0.03,
+                  1
+                ]
+              ]
+            }
+          },
+          "value_semantics": "stored values; no bit mask, gain, antilog, calibration, timestep conversion, compensation, gating or sampling",
+          "read_semantics": "event-interleaved row window read; only selected channels decoded; not whole-file validation",
+          "limits": {
+            "max_text_bytes": 262144,
+            "max_channels": 128,
+            "max_events": 8192,
+            "max_values": 16384,
+            "max_decoded_bytes": 131072,
+            "max_histogram_bins": 128
+          }
+        },
+        "warnings": [
+          "仅显示明确选择的事件窗；不补偿、不门控、不抽样、不作对数或标定变换。",
+          "图中为存储原值；PnE、PnG、TIMESTEP、标定单位和补偿声明仅展示。直方图只统计当前窗口。"
+        ],
+        "sampled": false,
+        "series": [
+          {
+            "channel": 0,
+            "label": "FSC-A",
+            "x": [
+              0,
+              1,
+              2,
+              3
+            ],
+            "y": [
+              1.25,
+              -2.5,
+              0,
+              4.75
+            ]
+          }
+        ]
+      },
+      "window": {
+        "contract_version": 2,
+        "type": "fcs-window",
+        "reader": "fcs-window",
+        "kind": "series",
+        "media_type": "application/json",
+        "choices": {
+          "channels": [
+            {
+              "id": 0,
+              "name": "FSC-A",
+              "stain": "散射",
+              "bits": 32,
+              "range": 262144,
+              "exponent": [
+                0,
+                0
+              ],
+              "gain": 2,
+              "calibration": {
+                "factor": 3,
+                "unit": "MESF"
+              },
+              "display": null
+            },
+            {
+              "id": 1,
+              "name": "CD3-A",
+              "stain": "CD3 PE",
+              "bits": 32,
+              "range": 262144,
+              "exponent": [
+                0,
+                0
+              ],
+              "gain": 1,
+              "calibration": null,
+              "display": {
+                "scale": "Linear",
+                "values": [
+                  0,
+                  100
+                ]
+              }
+            }
+          ]
+        },
+        "selected": {
+          "view": "scatter",
+          "channels": [
+            1,
+            0
+          ],
+          "event_offset": 1,
+          "event_count": 2
+        },
+        "metadata": {
+          "format": "fcs",
+          "fcs_version": "3.1",
+          "datatype": "F",
+          "byte_order": "little",
+          "input_mode": "window",
+          "source_bytes": 686,
+          "read_bytes": 670,
+          "read_requests": 4,
+          "text_bytes": 398,
+          "total_events": 4,
+          "channel_count": 2,
+          "event_bytes": 8,
+          "scanned_event_bytes": 16,
+          "decoded_values": 4,
+          "decoded_bytes": 16,
+          "nonfinite_values": 0,
+          "plottable_events": 2,
+          "timestep": null,
+          "compensation": {
+            "declarations": [
+              "$SPILLOVER"
+            ],
+            "spillover": {
+              "channels": [
+                0,
+                1
+              ],
+              "matrix": [
+                [
+                  1,
+                  0.1
+                ],
+                [
+                  0.03,
+                  1
+                ]
+              ]
+            }
+          },
+          "value_semantics": "stored values; no bit mask, gain, antilog, calibration, timestep conversion, compensation, gating or sampling",
+          "read_semantics": "event-interleaved row window read; only selected channels decoded; not whole-file validation",
+          "limits": {
+            "max_text_bytes": 262144,
+            "max_channels": 128,
+            "max_events": 8192,
+            "max_values": 16384,
+            "max_decoded_bytes": 131072,
+            "max_histogram_bins": 128
+          }
+        },
+        "warnings": [
+          "仅显示明确选择的事件窗；不补偿、不门控、不抽样、不作对数或标定变换。",
+          "图中为存储原值；PnE、PnG、TIMESTEP、标定单位和补偿声明仅展示。直方图只统计当前窗口。"
+        ],
+        "sampled": true,
+        "series": [
+          {
+            "channel": 1,
+            "label": "CD3-A",
+            "x": [
+              1,
+              2
+            ],
+            "y": [
+              20,
+              30
+            ]
+          },
+          {
+            "channel": 0,
+            "label": "FSC-A",
+            "x": [
+              1,
+              2
+            ],
+            "y": [
+              -2.5,
+              0
+            ]
+          }
+        ]
+      }
+    },
+    "integer": {
+      "tree": {
+        "contract_version": 2,
+        "type": "fcs-window",
+        "reader": "fcs-window",
+        "kind": "tree",
+        "media_type": "application/json",
+        "choices": {
+          "channels": [
+            {
+              "id": 0,
+              "name": "FSC-A",
+              "stain": null,
+              "bits": 32,
+              "range": 4294967296,
+              "exponent": [
+                0,
+                0
+              ],
+              "gain": null,
+              "calibration": null,
+              "display": null
+            },
+            {
+              "id": 1,
+              "name": "CD3-A",
+              "stain": null,
+              "bits": 32,
+              "range": 4294967296,
+              "exponent": [
+                0,
+                0
+              ],
+              "gain": null,
+              "calibration": null,
+              "display": null
+            }
+          ]
+        },
+        "selected": {},
+        "metadata": {
+          "format": "fcs",
+          "fcs_version": "3.1",
+          "datatype": "I",
+          "byte_order": "big",
+          "input_mode": "window",
+          "source_bytes": 540,
+          "read_bytes": 508,
+          "read_requests": 3,
+          "text_bytes": 252,
+          "total_events": 4,
+          "channel_count": 2,
+          "event_bytes": 8,
+          "scanned_event_bytes": 0,
+          "decoded_values": 0,
+          "decoded_bytes": 0,
+          "nonfinite_values": 0,
+          "plottable_events": 0,
+          "timestep": null,
+          "compensation": {
+            "declarations": [],
+            "spillover": null
+          },
+          "value_semantics": "stored values; no bit mask, gain, antilog, calibration, timestep conversion, compensation, gating or sampling",
+          "read_semantics": "event-interleaved row window read; only selected channels decoded; not whole-file validation",
+          "limits": {
+            "max_text_bytes": 262144,
+            "max_channels": 128,
+            "max_events": 8192,
+            "max_values": 16384,
+            "max_decoded_bytes": 131072,
+            "max_histogram_bins": 128
+          }
+        },
+        "warnings": [
+          "仅显示明确选择的事件窗；不补偿、不门控、不抽样、不作对数或标定变换。",
+          "图中为存储原值；PnE、PnG、TIMESTEP、标定单位和补偿声明仅展示。直方图只统计当前窗口。"
+        ],
+        "sampled": false,
+        "tree": [
+          {
+            "path": "/channel-0",
+            "node_type": "channel",
+            "attributes": {
+              "name": "FSC-A",
+              "bits": 32
+            }
+          },
+          {
+            "path": "/channel-1",
+            "node_type": "channel",
+            "attributes": {
+              "name": "CD3-A",
+              "bits": 32
+            }
+          }
+        ]
+      },
+      "scatter": {
+        "contract_version": 2,
+        "type": "fcs-window",
+        "reader": "fcs-window",
+        "kind": "series",
+        "media_type": "application/json",
+        "choices": {
+          "channels": [
+            {
+              "id": 0,
+              "name": "FSC-A",
+              "stain": null,
+              "bits": 32,
+              "range": 4294967296,
+              "exponent": [
+                0,
+                0
+              ],
+              "gain": null,
+              "calibration": null,
+              "display": null
+            },
+            {
+              "id": 1,
+              "name": "CD3-A",
+              "stain": null,
+              "bits": 32,
+              "range": 4294967296,
+              "exponent": [
+                0,
+                0
+              ],
+              "gain": null,
+              "calibration": null,
+              "display": null
+            }
+          ]
+        },
+        "selected": {
+          "view": "scatter",
+          "channels": [
+            0,
+            1
+          ],
+          "event_offset": 0,
+          "event_count": 4
+        },
+        "metadata": {
+          "format": "fcs",
+          "fcs_version": "3.1",
+          "datatype": "I",
+          "byte_order": "big",
+          "input_mode": "window",
+          "source_bytes": 540,
+          "read_bytes": 540,
+          "read_requests": 4,
+          "text_bytes": 252,
+          "total_events": 4,
+          "channel_count": 2,
+          "event_bytes": 8,
+          "scanned_event_bytes": 32,
+          "decoded_values": 8,
+          "decoded_bytes": 32,
+          "nonfinite_values": 0,
+          "plottable_events": 4,
+          "timestep": null,
+          "compensation": {
+            "declarations": [],
+            "spillover": null
+          },
+          "value_semantics": "stored values; no bit mask, gain, antilog, calibration, timestep conversion, compensation, gating or sampling",
+          "read_semantics": "event-interleaved row window read; only selected channels decoded; not whole-file validation",
+          "limits": {
+            "max_text_bytes": 262144,
+            "max_channels": 128,
+            "max_events": 8192,
+            "max_values": 16384,
+            "max_decoded_bytes": 131072,
+            "max_histogram_bins": 128
+          }
+        },
+        "warnings": [
+          "仅显示明确选择的事件窗；不补偿、不门控、不抽样、不作对数或标定变换。",
+          "图中为存储原值；PnE、PnG、TIMESTEP、标定单位和补偿声明仅展示。直方图只统计当前窗口。"
+        ],
+        "sampled": false,
+        "series": [
+          {
+            "channel": 0,
+            "label": "FSC-A",
+            "x": [
+              0,
+              1,
+              2,
+              3
+            ],
+            "y": [
+              0,
+              4294967295,
+              2147483648,
+              42
+            ]
+          },
+          {
+            "channel": 1,
+            "label": "CD3-A",
+            "x": [
+              0,
+              1,
+              2,
+              3
+            ],
+            "y": [
+              4294967295,
+              0,
+              2147483647,
+              3
+            ]
+          }
+        ]
+      },
+      "histogram": {
+        "contract_version": 2,
+        "type": "fcs-window",
+        "reader": "fcs-window",
+        "kind": "series",
+        "media_type": "application/json",
+        "choices": {
+          "channels": [
+            {
+              "id": 0,
+              "name": "FSC-A",
+              "stain": null,
+              "bits": 32,
+              "range": 4294967296,
+              "exponent": [
+                0,
+                0
+              ],
+              "gain": null,
+              "calibration": null,
+              "display": null
+            },
+            {
+              "id": 1,
+              "name": "CD3-A",
+              "stain": null,
+              "bits": 32,
+              "range": 4294967296,
+              "exponent": [
+                0,
+                0
+              ],
+              "gain": null,
+              "calibration": null,
+              "display": null
+            }
+          ]
+        },
+        "selected": {
+          "view": "histogram",
+          "channels": [
+            0
+          ],
+          "event_offset": 0,
+          "event_count": 4,
+          "bins": 4
+        },
+        "metadata": {
+          "format": "fcs",
+          "fcs_version": "3.1",
+          "datatype": "I",
+          "byte_order": "big",
+          "input_mode": "window",
+          "source_bytes": 540,
+          "read_bytes": 540,
+          "read_requests": 4,
+          "text_bytes": 252,
+          "total_events": 4,
+          "channel_count": 2,
+          "event_bytes": 8,
+          "scanned_event_bytes": 32,
+          "decoded_values": 4,
+          "decoded_bytes": 16,
+          "nonfinite_values": 0,
+          "plottable_events": 4,
+          "timestep": null,
+          "compensation": {
+            "declarations": [],
+            "spillover": null
+          },
+          "value_semantics": "stored values; no bit mask, gain, antilog, calibration, timestep conversion, compensation, gating or sampling",
+          "read_semantics": "event-interleaved row window read; only selected channels decoded; not whole-file validation",
+          "limits": {
+            "max_text_bytes": 262144,
+            "max_channels": 128,
+            "max_events": 8192,
+            "max_values": 16384,
+            "max_decoded_bytes": 131072,
+            "max_histogram_bins": 128
+          }
+        },
+        "warnings": [
+          "仅显示明确选择的事件窗；不补偿、不门控、不抽样、不作对数或标定变换。",
+          "图中为存储原值；PnE、PnG、TIMESTEP、标定单位和补偿声明仅展示。直方图只统计当前窗口。"
+        ],
+        "sampled": false,
+        "series": [
+          {
+            "channel": 0,
+            "label": "FSC-A",
+            "x": [
+              0,
+              1,
+              2,
+              3
+            ],
+            "y": [
+              0,
+              4294967295,
+              2147483648,
+              42
+            ]
+          }
+        ]
+      },
+      "window": {
+        "contract_version": 2,
+        "type": "fcs-window",
+        "reader": "fcs-window",
+        "kind": "series",
+        "media_type": "application/json",
+        "choices": {
+          "channels": [
+            {
+              "id": 0,
+              "name": "FSC-A",
+              "stain": null,
+              "bits": 32,
+              "range": 4294967296,
+              "exponent": [
+                0,
+                0
+              ],
+              "gain": null,
+              "calibration": null,
+              "display": null
+            },
+            {
+              "id": 1,
+              "name": "CD3-A",
+              "stain": null,
+              "bits": 32,
+              "range": 4294967296,
+              "exponent": [
+                0,
+                0
+              ],
+              "gain": null,
+              "calibration": null,
+              "display": null
+            }
+          ]
+        },
+        "selected": {
+          "view": "scatter",
+          "channels": [
+            1,
+            0
+          ],
+          "event_offset": 1,
+          "event_count": 2
+        },
+        "metadata": {
+          "format": "fcs",
+          "fcs_version": "3.1",
+          "datatype": "I",
+          "byte_order": "big",
+          "input_mode": "window",
+          "source_bytes": 540,
+          "read_bytes": 524,
+          "read_requests": 4,
+          "text_bytes": 252,
+          "total_events": 4,
+          "channel_count": 2,
+          "event_bytes": 8,
+          "scanned_event_bytes": 16,
+          "decoded_values": 4,
+          "decoded_bytes": 16,
+          "nonfinite_values": 0,
+          "plottable_events": 2,
+          "timestep": null,
+          "compensation": {
+            "declarations": [],
+            "spillover": null
+          },
+          "value_semantics": "stored values; no bit mask, gain, antilog, calibration, timestep conversion, compensation, gating or sampling",
+          "read_semantics": "event-interleaved row window read; only selected channels decoded; not whole-file validation",
+          "limits": {
+            "max_text_bytes": 262144,
+            "max_channels": 128,
+            "max_events": 8192,
+            "max_values": 16384,
+            "max_decoded_bytes": 131072,
+            "max_histogram_bins": 128
+          }
+        },
+        "warnings": [
+          "仅显示明确选择的事件窗；不补偿、不门控、不抽样、不作对数或标定变换。",
+          "图中为存储原值；PnE、PnG、TIMESTEP、标定单位和补偿声明仅展示。直方图只统计当前窗口。"
+        ],
+        "sampled": true,
+        "series": [
+          {
+            "channel": 1,
+            "label": "CD3-A",
+            "x": [
+              1,
+              2
+            ],
+            "y": [
+              0,
+              2147483647
+            ]
+          },
+          {
+            "channel": 0,
+            "label": "FSC-A",
+            "x": [
+              1,
+              2
+            ],
+            "y": [
+              4294967295,
+              2147483648
+            ]
+          }
+        ]
+      }
+    },
+    "double": {
+      "tree": {
+        "contract_version": 2,
+        "type": "fcs-window",
+        "reader": "fcs-window",
+        "kind": "tree",
+        "media_type": "application/json",
+        "choices": {
+          "channels": [
+            {
+              "id": 0,
+              "name": "FSC-A",
+              "stain": null,
+              "bits": 64,
+              "range": 262144,
+              "exponent": [
+                0,
+                0
+              ],
+              "gain": null,
+              "calibration": null,
+              "display": null
+            },
+            {
+              "id": 1,
+              "name": "CD3-A",
+              "stain": null,
+              "bits": 64,
+              "range": 262144,
+              "exponent": [
+                0,
+                0
+              ],
+              "gain": null,
+              "calibration": null,
+              "display": null
+            }
+          ]
+        },
+        "selected": {},
+        "metadata": {
+          "format": "fcs",
+          "fcs_version": "3.1",
+          "datatype": "D",
+          "byte_order": "little",
+          "input_mode": "window",
+          "source_bytes": 564,
+          "read_bytes": 500,
+          "read_requests": 3,
+          "text_bytes": 244,
+          "total_events": 4,
+          "channel_count": 2,
+          "event_bytes": 16,
+          "scanned_event_bytes": 0,
+          "decoded_values": 0,
+          "decoded_bytes": 0,
+          "nonfinite_values": 0,
+          "plottable_events": 0,
+          "timestep": null,
+          "compensation": {
+            "declarations": [],
+            "spillover": null
+          },
+          "value_semantics": "stored values; no bit mask, gain, antilog, calibration, timestep conversion, compensation, gating or sampling",
+          "read_semantics": "event-interleaved row window read; only selected channels decoded; not whole-file validation",
+          "limits": {
+            "max_text_bytes": 262144,
+            "max_channels": 128,
+            "max_events": 8192,
+            "max_values": 16384,
+            "max_decoded_bytes": 131072,
+            "max_histogram_bins": 128
+          }
+        },
+        "warnings": [
+          "仅显示明确选择的事件窗；不补偿、不门控、不抽样、不作对数或标定变换。",
+          "图中为存储原值；PnE、PnG、TIMESTEP、标定单位和补偿声明仅展示。直方图只统计当前窗口。"
+        ],
+        "sampled": false,
+        "tree": [
+          {
+            "path": "/channel-0",
+            "node_type": "channel",
+            "attributes": {
+              "name": "FSC-A",
+              "bits": 64
+            }
+          },
+          {
+            "path": "/channel-1",
+            "node_type": "channel",
+            "attributes": {
+              "name": "CD3-A",
+              "bits": 64
+            }
+          }
+        ]
+      },
+      "scatter": {
+        "contract_version": 2,
+        "type": "fcs-window",
+        "reader": "fcs-window",
+        "kind": "series",
+        "media_type": "application/json",
+        "choices": {
+          "channels": [
+            {
+              "id": 0,
+              "name": "FSC-A",
+              "stain": null,
+              "bits": 64,
+              "range": 262144,
+              "exponent": [
+                0,
+                0
+              ],
+              "gain": null,
+              "calibration": null,
+              "display": null
+            },
+            {
+              "id": 1,
+              "name": "CD3-A",
+              "stain": null,
+              "bits": 64,
+              "range": 262144,
+              "exponent": [
+                0,
+                0
+              ],
+              "gain": null,
+              "calibration": null,
+              "display": null
+            }
+          ]
+        },
+        "selected": {
+          "view": "scatter",
+          "channels": [
+            0,
+            1
+          ],
+          "event_offset": 0,
+          "event_count": 4
+        },
+        "metadata": {
+          "format": "fcs",
+          "fcs_version": "3.1",
+          "datatype": "D",
+          "byte_order": "little",
+          "input_mode": "window",
+          "source_bytes": 564,
+          "read_bytes": 564,
+          "read_requests": 4,
+          "text_bytes": 244,
+          "total_events": 4,
+          "channel_count": 2,
+          "event_bytes": 16,
+          "scanned_event_bytes": 64,
+          "decoded_values": 8,
+          "decoded_bytes": 64,
+          "nonfinite_values": 1,
+          "plottable_events": 3,
+          "timestep": null,
+          "compensation": {
+            "declarations": [],
+            "spillover": null
+          },
+          "value_semantics": "stored values; no bit mask, gain, antilog, calibration, timestep conversion, compensation, gating or sampling",
+          "read_semantics": "event-interleaved row window read; only selected channels decoded; not whole-file validation",
+          "limits": {
+            "max_text_bytes": 262144,
+            "max_channels": 128,
+            "max_events": 8192,
+            "max_values": 16384,
+            "max_decoded_bytes": 131072,
+            "max_histogram_bins": 128
+          }
+        },
+        "warnings": [
+          "仅显示明确选择的事件窗；不补偿、不门控、不抽样、不作对数或标定变换。",
+          "图中为存储原值；PnE、PnG、TIMESTEP、标定单位和补偿声明仅展示。直方图只统计当前窗口。"
+        ],
+        "sampled": false,
+        "series": [
+          {
+            "channel": 0,
+            "label": "FSC-A",
+            "x": [
+              0,
+              1,
+              2,
+              3
+            ],
+            "y": [
+              1e-20,
+              0.5,
+              100000,
+              1.5
+            ]
+          },
+          {
+            "channel": 1,
+            "label": "CD3-A",
+            "x": [
+              0,
+              1,
+              2,
+              3
+            ],
+            "y": [
+              2,
+              null,
+              4,
+              -3
+            ]
+          }
+        ]
+      },
+      "histogram": {
+        "contract_version": 2,
+        "type": "fcs-window",
+        "reader": "fcs-window",
+        "kind": "series",
+        "media_type": "application/json",
+        "choices": {
+          "channels": [
+            {
+              "id": 0,
+              "name": "FSC-A",
+              "stain": null,
+              "bits": 64,
+              "range": 262144,
+              "exponent": [
+                0,
+                0
+              ],
+              "gain": null,
+              "calibration": null,
+              "display": null
+            },
+            {
+              "id": 1,
+              "name": "CD3-A",
+              "stain": null,
+              "bits": 64,
+              "range": 262144,
+              "exponent": [
+                0,
+                0
+              ],
+              "gain": null,
+              "calibration": null,
+              "display": null
+            }
+          ]
+        },
+        "selected": {
+          "view": "histogram",
+          "channels": [
+            0
+          ],
+          "event_offset": 0,
+          "event_count": 4,
+          "bins": 4
+        },
+        "metadata": {
+          "format": "fcs",
+          "fcs_version": "3.1",
+          "datatype": "D",
+          "byte_order": "little",
+          "input_mode": "window",
+          "source_bytes": 564,
+          "read_bytes": 564,
+          "read_requests": 4,
+          "text_bytes": 244,
+          "total_events": 4,
+          "channel_count": 2,
+          "event_bytes": 16,
+          "scanned_event_bytes": 64,
+          "decoded_values": 4,
+          "decoded_bytes": 32,
+          "nonfinite_values": 0,
+          "plottable_events": 4,
+          "timestep": null,
+          "compensation": {
+            "declarations": [],
+            "spillover": null
+          },
+          "value_semantics": "stored values; no bit mask, gain, antilog, calibration, timestep conversion, compensation, gating or sampling",
+          "read_semantics": "event-interleaved row window read; only selected channels decoded; not whole-file validation",
+          "limits": {
+            "max_text_bytes": 262144,
+            "max_channels": 128,
+            "max_events": 8192,
+            "max_values": 16384,
+            "max_decoded_bytes": 131072,
+            "max_histogram_bins": 128
+          }
+        },
+        "warnings": [
+          "仅显示明确选择的事件窗；不补偿、不门控、不抽样、不作对数或标定变换。",
+          "图中为存储原值；PnE、PnG、TIMESTEP、标定单位和补偿声明仅展示。直方图只统计当前窗口。"
+        ],
+        "sampled": false,
+        "series": [
+          {
+            "channel": 0,
+            "label": "FSC-A",
+            "x": [
+              0,
+              1,
+              2,
+              3
+            ],
+            "y": [
+              1e-20,
+              0.5,
+              100000,
+              1.5
+            ]
+          }
+        ]
+      },
+      "window": {
+        "contract_version": 2,
+        "type": "fcs-window",
+        "reader": "fcs-window",
+        "kind": "series",
+        "media_type": "application/json",
+        "choices": {
+          "channels": [
+            {
+              "id": 0,
+              "name": "FSC-A",
+              "stain": null,
+              "bits": 64,
+              "range": 262144,
+              "exponent": [
+                0,
+                0
+              ],
+              "gain": null,
+              "calibration": null,
+              "display": null
+            },
+            {
+              "id": 1,
+              "name": "CD3-A",
+              "stain": null,
+              "bits": 64,
+              "range": 262144,
+              "exponent": [
+                0,
+                0
+              ],
+              "gain": null,
+              "calibration": null,
+              "display": null
+            }
+          ]
+        },
+        "selected": {
+          "view": "scatter",
+          "channels": [
+            1,
+            0
+          ],
+          "event_offset": 1,
+          "event_count": 2
+        },
+        "metadata": {
+          "format": "fcs",
+          "fcs_version": "3.1",
+          "datatype": "D",
+          "byte_order": "little",
+          "input_mode": "window",
+          "source_bytes": 564,
+          "read_bytes": 532,
+          "read_requests": 4,
+          "text_bytes": 244,
+          "total_events": 4,
+          "channel_count": 2,
+          "event_bytes": 16,
+          "scanned_event_bytes": 32,
+          "decoded_values": 4,
+          "decoded_bytes": 32,
+          "nonfinite_values": 1,
+          "plottable_events": 1,
+          "timestep": null,
+          "compensation": {
+            "declarations": [],
+            "spillover": null
+          },
+          "value_semantics": "stored values; no bit mask, gain, antilog, calibration, timestep conversion, compensation, gating or sampling",
+          "read_semantics": "event-interleaved row window read; only selected channels decoded; not whole-file validation",
+          "limits": {
+            "max_text_bytes": 262144,
+            "max_channels": 128,
+            "max_events": 8192,
+            "max_values": 16384,
+            "max_decoded_bytes": 131072,
+            "max_histogram_bins": 128
+          }
+        },
+        "warnings": [
+          "仅显示明确选择的事件窗；不补偿、不门控、不抽样、不作对数或标定变换。",
+          "图中为存储原值；PnE、PnG、TIMESTEP、标定单位和补偿声明仅展示。直方图只统计当前窗口。"
+        ],
+        "sampled": true,
+        "series": [
+          {
+            "channel": 1,
+            "label": "CD3-A",
+            "x": [
+              1,
+              2
+            ],
+            "y": [
+              null,
+              4
+            ]
+          },
+          {
+            "channel": 0,
+            "label": "FSC-A",
+            "x": [
+              1,
+              2
+            ],
+            "y": [
+              0.5,
+              100000
+            ]
+          }
+        ]
+      }
+    },
+    "large": {
+      "window": {
+        "contract_version": 2,
+        "type": "fcs-window",
+        "reader": "fcs-window",
+        "kind": "series",
+        "media_type": "application/json",
+        "choices": {
+          "channels": [
+            {
+              "id": 0,
+              "name": "FSC-A",
+              "stain": null,
+              "bits": 32,
+              "range": 262144,
+              "exponent": [
+                0,
+                0
+              ],
+              "gain": null,
+              "calibration": null,
+              "display": null
+            },
+            {
+              "id": 1,
+              "name": "CD3-A",
+              "stain": null,
+              "bits": 32,
+              "range": 262144,
+              "exponent": [
+                0,
+                0
+              ],
+              "gain": null,
+              "calibration": null,
+              "display": null
+            }
+          ]
+        },
+        "selected": {
+          "view": "scatter",
+          "channels": [
+            0,
+            1
+          ],
+          "event_offset": 199999998,
+          "event_count": 2
+        },
+        "metadata": {
+          "format": "fcs",
+          "fcs_version": "3.1",
+          "datatype": "F",
+          "byte_order": "little",
+          "input_mode": "window",
+          "source_bytes": 1600000508,
+          "read_bytes": 524,
+          "read_requests": 4,
+          "text_bytes": 252,
+          "total_events": 200000000,
+          "channel_count": 2,
+          "event_bytes": 8,
+          "scanned_event_bytes": 16,
+          "decoded_values": 4,
+          "decoded_bytes": 16,
+          "nonfinite_values": 0,
+          "plottable_events": 2,
+          "timestep": null,
+          "compensation": {
+            "declarations": [],
+            "spillover": null
+          },
+          "value_semantics": "stored values; no bit mask, gain, antilog, calibration, timestep conversion, compensation, gating or sampling",
+          "read_semantics": "event-interleaved row window read; only selected channels decoded; not whole-file validation",
+          "limits": {
+            "max_text_bytes": 262144,
+            "max_channels": 128,
+            "max_events": 8192,
+            "max_values": 16384,
+            "max_decoded_bytes": 131072,
+            "max_histogram_bins": 128
+          }
+        },
+        "warnings": [
+          "仅显示明确选择的事件窗；不补偿、不门控、不抽样、不作对数或标定变换。",
+          "图中为存储原值；PnE、PnG、TIMESTEP、标定单位和补偿声明仅展示。直方图只统计当前窗口。"
+        ],
+        "sampled": true,
+        "series": [
+          {
+            "channel": 0,
+            "label": "FSC-A",
+            "x": [
+              199999998,
+              199999999
+            ],
+            "y": [
+              0,
+              0
+            ]
+          },
+          {
+            "channel": 1,
+            "label": "CD3-A",
+            "x": [
+              199999998,
+              199999999
+            ],
+            "y": [
+              0,
+              0
+            ]
+          }
+        ]
+      }
+    }
+  }
+}

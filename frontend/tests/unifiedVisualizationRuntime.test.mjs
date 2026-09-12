@@ -51,6 +51,14 @@ test('the unified result envelope rejects unknown fields, malformed revisions an
   }
 });
 
+for (const reader of ['spatial-window','pointcloud-window','gro-trajectory','simulation-mesh','ugrid-window']) test(`additive geometry result approved only for ${reader}`, () => {
+  const value=result({kind:'geometry',payload:{}});
+  assert.equal(sdk().parseVisualizationResult(value,plugin({reader})).kind,'geometry');
+});
+for (const reader of ['csv','hdf5','netcdf','dicom-window','binary','scientific-graph']) test(`geometry does not widen ${reader} result capability`, () => {
+  assert.throws(()=>sdk().parseVisualizationResult(result({kind:'geometry',payload:{}}),plugin({reader})),/几何/);
+});
+
 test('page parser rejects unbounded shapes and non-progressing cursors', async t => {
   let payload; t.mock.method(globalThis, 'fetch', async () => response(result({ payload })));
   const runtime = sdk(), signal = new AbortController().signal;

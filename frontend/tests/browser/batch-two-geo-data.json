@@ -1,0 +1,410 @@
+{
+  "provenance": {
+    "generator": "sandbox/tests/geo_czi_browser_payloads.py",
+    "czi_sha256": "4d99e5ecc791af7f16b7cb395a3ab7c5c0b7960c1c4b5dfdc42c4ce728f706e2",
+    "czi_bytes": 4352,
+    "source_pixels": "uint16 arange(48).reshape(6,8,1)+C*100+Z*1000"
+  },
+  "asc": {
+    "contract_version": 2,
+    "type": "geoformat",
+    "reader": "geoformat",
+    "kind": "map",
+    "media_type": "application/json",
+    "array": {
+      "shape": [
+        3,
+        4
+      ],
+      "dimensions": [
+        "y",
+        "x"
+      ],
+      "values": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        null,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11
+      ]
+    },
+    "metadata": {
+      "format": "ESRI ASCII",
+      "crs": "unknown",
+      "extent": [
+        10,
+        20,
+        14,
+        23
+      ],
+      "source_extent": [
+        10,
+        20,
+        14,
+        23
+      ],
+      "source_shape": [
+        3,
+        4
+      ],
+      "nodata": -9999,
+      "registration": "cell-corner",
+      "row_order": "north-to-south",
+      "sampling": "nearest cell-centre sample; no aggregation",
+      "crs_source": "unspecified"
+    },
+    "sampled": false,
+    "warnings": [
+      "文件本身未声明坐标系；当前按原始坐标显示纯数值热图，不推测地理位置。"
+    ]
+  },
+  "asc_wgs84": {
+    "contract_version": 2,
+    "type": "geoformat",
+    "reader": "geoformat",
+    "kind": "map",
+    "media_type": "application/json",
+    "array": {
+      "shape": [
+        3,
+        4
+      ],
+      "dimensions": [
+        "y",
+        "x"
+      ],
+      "values": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        null,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11
+      ]
+    },
+    "metadata": {
+      "format": "ESRI ASCII",
+      "crs": "EPSG:4326",
+      "extent": [
+        10,
+        20,
+        14,
+        23
+      ],
+      "source_extent": [
+        10,
+        20,
+        14,
+        23
+      ],
+      "source_shape": [
+        3,
+        4
+      ],
+      "nodata": -9999,
+      "registration": "cell-corner",
+      "row_order": "north-to-south",
+      "sampling": "nearest cell-centre sample; no aggregation",
+      "crs_source": "user"
+    },
+    "sampled": false,
+    "warnings": []
+  },
+  "grd": {
+    "contract_version": 2,
+    "type": "geoformat",
+    "reader": "geoformat",
+    "kind": "map",
+    "media_type": "application/json",
+    "array": {
+      "shape": [
+        3,
+        4
+      ],
+      "dimensions": [
+        "y",
+        "x"
+      ],
+      "values": [
+        8,
+        9,
+        10,
+        11,
+        4,
+        null,
+        6,
+        7,
+        0,
+        1,
+        2,
+        3
+      ]
+    },
+    "metadata": {
+      "format": "Surfer DSAA",
+      "crs": "unknown",
+      "extent": [
+        9.5,
+        19.5,
+        13.5,
+        22.5
+      ],
+      "source_extent": [
+        10,
+        20,
+        13,
+        22
+      ],
+      "source_shape": [
+        3,
+        4
+      ],
+      "nodata": 1.70141e+38,
+      "registration": "node",
+      "row_order": "north-to-south",
+      "sampling": "nearest cell-centre sample; no aggregation",
+      "crs_source": "unspecified"
+    },
+    "sampled": false,
+    "warnings": [
+      "文件本身未声明坐标系；当前按原始坐标显示纯数值热图，不推测地理位置。"
+    ]
+  },
+  "kml": {
+    "contract_version": 2,
+    "type": "geoformat",
+    "reader": "geoformat",
+    "kind": "map",
+    "media_type": "application/json",
+    "geojson": {
+      "type": "FeatureCollection",
+      "features": [
+        {
+          "type": "Feature",
+          "properties": {
+            "name": "Synthetic point"
+          },
+          "geometry": {
+            "type": "Point",
+            "coordinates": [
+              10,
+              20
+            ]
+          }
+        },
+        {
+          "type": "Feature",
+          "properties": {
+            "name": ""
+          },
+          "geometry": {
+            "type": "LineString",
+            "coordinates": [
+              [
+                10,
+                20
+              ],
+              [
+                11,
+                21
+              ],
+              [
+                12,
+                20
+              ]
+            ]
+          }
+        },
+        {
+          "type": "Feature",
+          "properties": {
+            "name": ""
+          },
+          "geometry": {
+            "type": "Polygon",
+            "coordinates": [
+              [
+                [
+                  12,
+                  20
+                ],
+                [
+                  13,
+                  20
+                ],
+                [
+                  13,
+                  21
+                ],
+                [
+                  12,
+                  20
+                ]
+              ]
+            ]
+          }
+        }
+      ]
+    },
+    "metadata": {
+      "format": "KML 2.2",
+      "crs": "EPSG:4326",
+      "crs_source": "format",
+      "feature_count": 3,
+      "coordinate_count": 8
+    },
+    "warnings": [
+      "二维几何预览；高度、地形、样式、说明 HTML 和动态行为不渲染；无在线底图。"
+    ],
+    "sampled": false
+  },
+  "czi_tree": {
+    "contract_version": 2,
+    "type": "czi",
+    "reader": "czi",
+    "kind": "tree",
+    "media_type": "application/json",
+    "metadata": {
+      "format": "CZI",
+      "engine": "pylibCZIrw 6.1.0",
+      "scene": 0,
+      "scene_shape": [
+        6,
+        8
+      ],
+      "dimension_sizes": {
+        "C": 2,
+        "Z": 2,
+        "T": 1
+      },
+      "pixel_types": [
+        "Gray16",
+        "Gray16"
+      ],
+      "input_mode": "whole",
+      "input_bytes": 4352,
+      "subblocks": 4,
+      "decoded_block_budget": 16777216,
+      "selection_mode": "explicit C/Z/T and pixel ROI"
+    },
+    "choices": {
+      "channels": [
+        0,
+        1
+      ],
+      "z_count": 2,
+      "time_count": 1,
+      "max_roi_size": 1024
+    },
+    "selected": {
+      "indices": [
+        0,
+        0,
+        0
+      ],
+      "roi": [
+        0,
+        0,
+        8,
+        6
+      ]
+    },
+    "sampled": false,
+    "warnings": [
+      "按授权整文件读取（最多 64 MiB），不是远程 range；只解码所选 C/Z/T 的有界 ROI，原始文件不变。",
+      "仅作图像浏览；切片内未覆盖区域按库默认背景显示为零，不据此判断缺失值或执行定量分析。"
+    ],
+    "tree": [
+      {
+        "path": "/0",
+        "node_type": "object",
+        "attributes": {
+          "label": "Single-scene CZI",
+          "children_count": 0
+        }
+      }
+    ]
+  },
+  "czi_image": {
+    "contract_version": 2,
+    "type": "czi",
+    "reader": "czi",
+    "kind": "image",
+    "media_type": "image/png",
+    "metadata": {
+      "format": "CZI",
+      "engine": "pylibCZIrw 6.1.0",
+      "scene": 0,
+      "scene_shape": [
+        6,
+        8
+      ],
+      "dimension_sizes": {
+        "C": 2,
+        "Z": 2,
+        "T": 1
+      },
+      "pixel_types": [
+        "Gray16",
+        "Gray16"
+      ],
+      "input_mode": "whole",
+      "input_bytes": 4352,
+      "subblocks": 4,
+      "decoded_block_budget": 16777216,
+      "selection_mode": "explicit C/Z/T and pixel ROI",
+      "output_shape": [
+        2,
+        3
+      ],
+      "roi_origin": "scene top-left; x right, y down",
+      "display_range": [
+        1110,
+        1120
+      ],
+      "normalization": "ROI min-max to uint8 grayscale; original data unchanged",
+      "invalid_pixels": 0
+    },
+    "choices": {
+      "channels": [
+        0,
+        1
+      ],
+      "z_count": 2,
+      "time_count": 1,
+      "max_roi_size": 1024
+    },
+    "selected": {
+      "indices": [
+        1,
+        1,
+        0
+      ],
+      "roi": [
+        2,
+        1,
+        3,
+        2
+      ]
+    },
+    "sampled": true,
+    "warnings": [
+      "按授权整文件读取（最多 64 MiB），不是远程 range；只解码所选 C/Z/T 的有界 ROI，原始文件不变。",
+      "仅作图像浏览；切片内未覆盖区域按库默认背景显示为零，不据此判断缺失值或执行定量分析。"
+    ],
+    "data_base64": "iVBORw0KGgoAAAANSUhEUgAAAAMAAAACCAYAAACddGYaAAAAIklEQVR4nAXBAQEAMAzCsF7G8C8HHdjokweYhLuDtm5T9QNl+Ayqs5EWagAAAABJRU5ErkJggg=="
+  }
+}

@@ -1,0 +1,31 @@
+{
+  "contract_version": 2,
+  "id": "viz-diffraction",
+  "version": "1.0.0",
+  "name": "衍射与散射曲线",
+  "description": "受限 XRDML / canSAS1d 的显式单扫描曲线及声明误差，不猜测单位、不拟合或归一化。",
+  "extensions": [
+    "xrdml",
+    "xml"
+  ],
+  "filenames": [],
+  "view_kind": "series",
+  "adapter": "diffraction",
+  "reader": "diffraction",
+  "default_enabled": true,
+  "priority": 90,
+  "permissions": [
+    "file:read"
+  ],
+  "limits": {
+    "max_input_bytes": 16777216,
+    "max_output_bytes": 2097152
+  },
+  "capabilities": {
+    "operations": [
+      "preview"
+    ],
+    "input_mode": "whole",
+    "shared": false
+  }
+}

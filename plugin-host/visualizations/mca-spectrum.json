@@ -1,0 +1,17 @@
+{
+  "contract_version": 2,
+  "id": "viz-mca-spectrum",
+  "version": "1.0.0",
+  "name": "MCA 仪器谱",
+  "description": "经内容判型的受限 ASCII MCA 谱；无标定时显示道数—计数，明确能量标定时才使用能量轴。不运行仪器程序、不默认拟合。",
+  "extensions": ["mca"],
+  "filenames": [],
+  "view_kind": "series",
+  "adapter": "mca-spectrum",
+  "reader": "mca",
+  "default_enabled": true,
+  "priority": 40,
+  "permissions": ["file:read"],
+  "limits": {"max_input_bytes": 4194304, "max_output_bytes": 2097152},
+  "capabilities": {"operations": ["preview"], "input_mode": "whole", "shared": false}
+}

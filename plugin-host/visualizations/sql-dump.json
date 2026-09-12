@@ -1,0 +1,30 @@
+{
+  "contract_version": 2,
+  "id": "viz-sql-dump",
+  "version": "1.0.0",
+  "name": "SQL 转储字面量",
+  "description": "明确选择 PostgreSQL、MySQL 或 SQLite 方言后，只读显示受支持建表、INSERT VALUES 和 COPY 字面量；不执行 SQL，不冒充恢复后的数据库状态。",
+  "extensions": [
+    "sql"
+  ],
+  "filenames": [],
+  "view_kind": "table",
+  "adapter": "database-dump",
+  "reader": "sql-dump",
+  "capabilities": {
+    "operations": [
+      "preview"
+    ],
+    "input_mode": "whole",
+    "shared": false
+  },
+  "default_enabled": true,
+  "priority": -20,
+  "permissions": [
+    "file:read"
+  ],
+  "limits": {
+    "max_input_bytes": 16777216,
+    "max_output_bytes": 2097152
+  }
+}

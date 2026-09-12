@@ -43,7 +43,7 @@ test('history without issue metadata remains compatible and is never rewritten',
 
 test('all supported issue reasons have controlled Chinese labels', () => {
   const reasons = Object.keys(presentation.ARTIFACT_ISSUE_REASON_LABELS);
-  assert.equal(reasons.length, 33);
+  assert.equal(reasons.length, 34);
   for (const reason_code of reasons) {
     const parsed = read({ issues: [issue({ reason_code })] });
     assert.equal(parsed.issues[0].reason_code, reason_code);

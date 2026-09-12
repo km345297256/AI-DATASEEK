@@ -1,0 +1,34 @@
+import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+import {test} from 'node:test';
+import * as vue from 'vue';
+import {compileScript,parse} from '@vue/compiler-sfc';
+import ts from 'typescript';
+import * as data from '../src/visualizations/extended/matrixWorkbenchData.ts';
+import {usePreviewLoad} from '../src/composables/usePreviewLoad.ts';
+import * as identity from '../src/visualizations/previewIdentity.ts';
+const fixtures=JSON.parse(readFileSync(new URL('./browser/main-matrix-data.json',import.meta.url),'utf8'));
+const version='a'.repeat(64),revision='b'.repeat(64);
+function envelope(kind='tree',options={}){
+ const f=kind==='image'&&options.max_points===32?fixtures.orthogonal.find(x=>JSON.stringify(x.selected.axes)===JSON.stringify(options.axes)):fixtures[kind];
+ const {type,reader,contract_version,kind:view_kind,metadata,warnings,sampled,...payload}=structuredClone(f);
+ return {contract_version,kind:kind==='image'?'array':kind,version,revision,metadata,warnings,sampled,payload:{...payload,view_kind},plugin_id:'viz-matrix-workbench'};
+}
+const options=fixtures.image.selected;
+for(const kind of ['tree','image','series'])test(`matrix real-reader fixture ${kind}`,()=>{const value=data.parseMatrixData(envelope(kind),kind,kind==='image'?options:{},884,'synthetic.npz');assert.equal(value.arrays.length,4);if(kind==='image')assert.deepEqual(value.plane.values,[[0,1,2,3],[4,5,6,7],[8,9,10,11]]);if(kind==='series')assert.equal(value.curves.length,4);});
+for(const [name,mutate] of Object.entries({version:r=>r.version='',revision:r=>r.revision='',plugin:r=>r.plugin_id='other',kind:r=>r.kind='raster',file:r=>r.metadata.source_bytes++,format:r=>r.metadata.format='npy',limits:r=>r.metadata.limits.max_values++,metadata:r=>r.metadata.path='/private/path',payload:r=>r.payload.url='https://invalid',selected:r=>r.payload.selected.component='imaginary',array:r=>r.payload.matrix.arrays[0].shape=[3,4],label:r=>r.payload.matrix.arrays[0].name='/Users/secret',values:r=>r.payload.matrix.plane.values[0].push(4),range:r=>r.payload.matrix.plane.row_range=[1,3],step:r=>r.payload.matrix.plane.row_step=2,sampled:r=>r.sampled=true,minimum:r=>r.payload.matrix.plane.minimum=-1,nonfinite:r=>r.payload.matrix.plane.non_finite=1,profile:r=>r.payload.matrix.plane.row_profile=[1],count:r=>r.payload.matrix.plane.count=262145,nan:r=>r.payload.matrix.plane.values[0][0]=NaN}))test(`matrix rejects ${name}`,()=>{const r=envelope('image');mutate(r);assert.throws(()=>data.parseMatrixData(r,'image',options,884,'synthetic.npz'));});
+test('matrix profile preserves null gaps and huge finite scale',()=>{assert.equal(data.matrixProfileSegments([1,null,2,3]).length,2);assert.deepEqual(data.matrixProfileSegments([null,null]),[]);assert.ok(data.matrixProfileSegments([-1e308,1e308]).every(x=>!x.includes('NaN')&&!x.includes('Infinity')));assert.ok(data.matrixScatterPoints([-1e308,1e308],[1e308,-1e308]).flat().every(Number.isFinite));});
+for(const [name,replace] of Object.entries({axes:[0,0],indices:[0,0],component:'execute',max_points:513,structure:1,row_range:[0,4]}))test(`matrix request rejects ${name}`,()=>assert.throws(()=>data.matrixSelection(fixtures.tree.matrix.arrays[0],{...options,[name]:replace})));
+const flush=async()=>{for(let i=0;i<100;i++)await Promise.resolve();await vue.nextTick();};
+const pending=()=>{let resolve;return {promise:new Promise(r=>resolve=r),resolve:v=>resolve(v)};};
+function mount(t,request=(o)=>envelope(o.kind,o)){
+ const seen=[],modules={vue,'../../composables/usePreviewLoad':{usePreviewLoad},'../previewIdentity':identity,'../runtime':{requestVisualization:async(f,p,op,o,signal)=>{seen.push({o,signal});return request(o,signal);}},'./domains/lifecycle':{displayError:e=>e.message},'./matrixWorkbenchData':data};
+ const source=readFileSync(new URL('../src/visualizations/extended/MatrixWorkbenchPreview.vue',import.meta.url),'utf8'),compiled=compileScript(parse(source).descriptor,{id:'matrix'}).content;
+ const module={exports:{}};new Function('require','module','exports',ts.transpileModule(compiled,{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText)(name=>{assert.ok(name in modules,name);return modules[name];},module,module.exports);
+ const scope=vue.effectScope(),props=vue.reactive({file:{file_id:'opaque',filename:'synthetic.npz',size:884},plugin:{id:'viz-matrix-workbench',enabled:true,version:'1.0.0',capabilities:{operations:['preview'],shared:false,input_mode:'whole'}}});
+ const state=scope.run(()=>module.exports.default.setup(props,{expose(){}}));t.after(()=>scope.stop());return {scope,props,state,seen};
+}
+test('matrix directory only, explicit pinned main+orthogonal slices, local repaint, stable identities',async t=>{const v=mount(t);await flush();assert.equal(v.seen.length,1);assert.equal(v.state.plane.value,null);await v.state.render();assert.equal(v.state.error.value,'');assert.equal(v.seen.length,5);assert.equal(v.state.orthogonalPlanes.value.length,3);assert.deepEqual(v.seen[1].o,{kind:'image',version,...options});v.props.file=structuredClone(vue.toRaw(v.props.file));v.props.plugin=structuredClone(vue.toRaw(v.props.plugin));v.state.palette.value='gray';v.state.logScale.value=true;v.state.zoom.value=2;await flush();assert.equal(v.seen.length,5);await v.state.readCurves();assert.equal(v.seen.length,6);assert.equal(v.state.preparation.value.curves.length,4);assert.deepEqual(v.seen[5].o,{kind:'series',version});});
+for(const action of ['unmount','disable','file','selection'])test(`matrix ${action} cancels image and late response`,async t=>{const delayed=pending(),v=mount(t,o=>o.kind==='image'?delayed.promise:envelope(o.kind));await flush();const task=v.state.render();await flush();const req=v.seen.at(-1);if(action==='unmount')v.scope.stop();if(action==='disable')v.props.plugin.enabled=false;if(action==='file')v.props.file.file_id='other';if(action==='selection'){v.state.component.value='phase';v.state.scheduleRender();}await flush();assert.equal(req.signal.aborted,true);delayed.resolve(envelope('image'));await task;assert.equal(v.state.plane.value,null);assert.deepEqual(v.state.orthogonalPlanes.value,[]);});
+for(const change of ['version','catalog','selection'])test(`matrix rejects changed ${change}`,async t=>{const v=mount(t,o=>{const r=envelope(o.kind,o);if(o.kind==='image'){if(change==='version')r.version='c'.repeat(64);if(change==='catalog')r.payload.matrix.arrays[1].name='changed';if(change==='selection')r.payload.selected.component='phase';}return r;});await flush();await v.state.render();assert.ok(v.state.error.value);assert.equal(v.state.plane.value,null);});
+test('matrix slice playback timer is stopped on scope disposal',async t=>{const v=mount(t);await flush();v.state.togglePlay();assert.equal(v.state.playing.value,true);v.scope.stop();assert.equal(v.state.playing.value,false);assert.equal(v.state.preparation.value,null);});

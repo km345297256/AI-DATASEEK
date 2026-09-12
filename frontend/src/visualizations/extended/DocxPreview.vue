@@ -23,7 +23,7 @@ const scope = usePreviewLoad(), target = ref<HTMLDivElement>(), loading = ref(fa
 let frame: HTMLIFrameElement | undefined, channel = '';
 const post = (data: Record<string, unknown>, transfer: Transferable[] = []) => frame?.contentWindow?.postMessage({ ...data, channel }, '*', transfer);
 watch(zoom, value => post({ type: 'zoom', zoom: value }));
-watch(() => [props.file.file_id, props.plugin.id], async () => {
+watch([() => props.file.file_id, () => props.plugin.id], async () => {
   const load = scope.begin(); loading.value = true; error.value = ''; pages.value = 0;
   try {
     const [bytes, library] = await Promise.all([

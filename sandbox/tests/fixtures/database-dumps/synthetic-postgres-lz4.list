@@ -1,0 +1,19 @@
+;
+; Archive created at 2026-09-11 03:37:01 UTC
+;     dbname: postgres
+;     TOC Entries: 8
+;     Compression: lz4
+;     Dump Version: 1.16-0
+;     Format: CUSTOM
+;     Integer: 4 bytes
+;     Offset: 8 bytes
+;     Dumped from database version: 18.6 (Debian 18.6-1.pgdg13+2)
+;     Dumped by pg_dump version: 18.6 (Debian 18.6-1.pgdg13+2)
+;
+;
+; Selected TOC Entries:
+;
+220; 1259 16389 TABLE public empty postgres
+219; 1259 16384 TABLE public measurements postgres
+3440; 0 16389 TABLE DATA public empty postgres
+3439; 0 16384 TABLE DATA public measurements postgres

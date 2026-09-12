@@ -19,7 +19,7 @@ import zipfile
 from pathlib import Path
 from typing import Any
 
-from app.services.artifact_manifest import ARTIFACT_ROOT, _identity, _open_output
+from app.services.artifact_manifest import ARTIFACT_ROOT, MissingArtifact, _identity, _open_output
 
 MAX_ITEMS = 32
 MAX_FILE_BYTES = 32 * 1024 * 1024
@@ -108,8 +108,13 @@ def _read_stable_output(path: str, root: Path, cancelled: threading.Event,
             remaining -= len(chunk)
         after = os.fstat(stream.fileno())
         # Re-traverse the root so a swapped parent cannot validate an old FD.
-        with _open_output(path, root) as current_stream:
-            current = os.fstat(current_stream.fileno())
+        try:
+            with _open_output(path, root) as current_stream:
+                current = os.fstat(current_stream.fileno())
+        except (OSError, ValueError):
+            # Once bytes have been read, disappearance or path replacement is
+            # a changed artifact, never permission to recreate a missing one.
+            raise _InvalidArtifact("changed_during_read") from None
         content = b"".join(chunks)
         if (_identity(before) != _identity(after) or _identity(after) != _identity(current)
                 or len(content) != before.st_size):
@@ -316,7 +321,16 @@ def validate_artifacts(items: list[dict[str, str]], *, root: Path = ARTIFACT_ROO
                 raise _InvalidArtifact("unsupported_format")
             if kind != expected_kind:
                 raise _InvalidArtifact("kind_mismatch")
-            content = _read_stable_output(path, root, cancelled, deadline, byte_budget)
+            try:
+                content = _read_stable_output(path, root, cancelled, deadline, byte_budget)
+            except MissingArtifact:
+                raise _InvalidArtifact("missing_artifact") from None
+            except (OSError, ValueError):
+                # ELOOP/ENOTDIR and path validation failures are unsafe paths,
+                # not malformed file contents eligible for local repair.
+                # Keep this catch around reading only: image parsers may also
+                # raise OSError when genuine output bytes are malformed.
+                raise _InvalidArtifact("unavailable_or_unsafe_path") from None
             receipt["size"] = len(content)
             receipt["sha256"] = hashlib.sha256(content).hexdigest()
             metadata = _validate_content(content, Path(path).suffix.casefold(), kind, cancelled, deadline)

@@ -1,3 +1,24 @@
+FROM docker.1ms.run/ubuntu:22.04 AS database-reader-build
+
+# A narrow libmdb adapter, not the MDB Tools SQL engine, GUI or exporters.
+# Keep build dependencies out of the existing analysis runtime. The public
+# source archive is pinned; the library remains dynamically replaceable.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential pkg-config curl ca-certificates libglib2.0-dev && \
+    apt-get clean && rm -rf /var/lib/apt/lists/*
+WORKDIR /opt/mdbtools-build
+RUN curl --fail --location --retry 3 \
+    https://github.com/mdbtools/mdbtools/releases/download/v1.0.1/mdbtools-1.0.1.tar.gz \
+    -o /tmp/mdbtools-1.0.1.tar.gz && \
+    echo 'ff9c425a88bc20bf9318a332eec50b17e77896eef65a0e69415ccb4e396d1812  /tmp/mdbtools-1.0.1.tar.gz' | sha256sum -c - && \
+    tar -xzf /tmp/mdbtools-1.0.1.tar.gz --strip-components=1 && \
+    ./configure --prefix=/opt/dataseek-database --disable-static --enable-shared --disable-man && \
+    make -C src/libmdb -j2 && make -C src/libmdb install
+COPY sandbox/app/services/access_table_native.c /opt/mdbtools-build/dataseek-access-reader.c
+RUN cc -O2 -Wall -Wextra -Iinclude dataseek-access-reader.c \
+    $(pkg-config --cflags --libs glib-2.0) -L/opt/dataseek-database/lib \
+    -Wl,-rpath,/opt/dataseek-database/lib -lmdb -lm -o /opt/dataseek-access-reader
+
 FROM docker.1ms.run/ubuntu:22.04
 
 ARG TARGETARCH
@@ -160,6 +181,17 @@ RUN if [ "$TARGETARCH" = "arm64" ]; then \
         UV_INDEX_URL=https://pypi.org/simple/ \
         uv sync --frozen --no-dev --no-install-project --no-cache; \
     fi
+
+# Verify the sandbox-only SQLite wrapper exposes the public resource controls.
+RUN /app/.venv/bin/python -c "import apsw; assert apsw.apswversion() == '3.53.4.0'; c=apsw.Connection(':memory:'); c.limit(apsw.SQLITE_LIMIT_ATTACHED,0); assert c.limit(apsw.SQLITE_LIMIT_ATTACHED)==0; assert hasattr(c,'set_authorizer') and hasattr(c,'set_progress_handler'); c.close()"
+
+COPY --from=database-reader-build /opt/dataseek-access-reader /usr/local/bin/dataseek-access-reader
+COPY --from=database-reader-build /opt/dataseek-database/lib/libmdb.so* /opt/dataseek-database/lib/
+COPY --from=database-reader-build /opt/mdbtools-build/COPYING.LIB /opt/dataseek-database/licenses/COPYING.LIB
+RUN /app/.venv/bin/python -c "import duckdb,dbfread; assert duckdb.__version__=='1.5.5'; assert dbfread.__version__=='2.0.7'" && \
+    test -x /usr/local/bin/dataseek-access-reader && \
+    ldd /usr/local/bin/dataseek-access-reader && \
+    ! ldd /usr/local/bin/dataseek-access-reader | grep -q 'not found'
 
 # Optional visualization executables must not invalidate the base browser/desktop layers.
 RUN apt-get update && apt-get install -y --no-install-recommends fastqc default-jre-headless && \

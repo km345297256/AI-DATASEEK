@@ -1,0 +1,17 @@
+{
+  "contract_version": 2,
+  "id": "viz-duckdb-table",
+  "version": "1.0.0",
+  "name": "DuckDB 只读数据库",
+  "description": "隔离浏览自包含 DuckDB 普通表结构、选列分页及当前页数值图表；不执行用户 SQL、视图或扩展，不连接外部数据库。",
+  "extensions": ["duckdb", "ddb"],
+  "filenames": [],
+  "view_kind": "table",
+  "adapter": "database-table",
+  "reader": "database-table",
+  "capabilities": {"operations": ["preview"], "input_mode": "whole", "shared": false},
+  "default_enabled": true,
+  "priority": 40,
+  "permissions": ["file:read"],
+  "limits": {"max_input_bytes": 16777216, "max_output_bytes": 2097152}
+}

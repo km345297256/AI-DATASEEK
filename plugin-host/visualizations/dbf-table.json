@@ -1,0 +1,17 @@
+{
+  "contract_version": 2,
+  "id": "viz-dbf-table",
+  "version": "1.0.0",
+  "name": "DBF 只读数据表",
+  "description": "浏览受支持的 dBASE 数据表字段、选列分页及当前页数值图表；不加载 Memo 附件或索引，不替代 Shapefile 地图。",
+  "extensions": ["dbf"],
+  "filenames": [],
+  "view_kind": "table",
+  "adapter": "database-table",
+  "reader": "database-table",
+  "capabilities": {"operations": ["preview"], "input_mode": "whole", "shared": false},
+  "default_enabled": true,
+  "priority": 40,
+  "permissions": ["file:read"],
+  "limits": {"max_input_bytes": 16777216, "max_output_bytes": 2097152}
+}

@@ -19,13 +19,13 @@ async function directory(t, manifest = fixture) {
   return path
 }
 
-test('all 36 visualization plugins use one capability contract as real Cordis registrations', async () => {
+test('all visualization plugins use one capability contract as real Cordis registrations', async () => {
   const context = await buildVisualizationContext(productionDirectory)
   try {
     assert.equal(context.snapshot.engine, 'cordis')
-    assert.equal(context.pluginFibers.length, 36)
-    assert.equal(context.catalog.snapshot().plugins.length, 36)
-    assert.equal(context.snapshot.plugins.filter(item => item.contract_version === 2).length, 36)
+    assert.equal(context.pluginFibers.length, 81)
+    assert.equal(context.catalog.snapshot().plugins.length, 81)
+    assert.equal(context.snapshot.plugins.filter(item => item.contract_version === 2).length, 81)
     assert.ok(context.snapshot.plugins.every(item => !item.adapter.startsWith('v2-') && !('data_kind' in item)))
     assert.equal(context.snapshot.plugins.filter(item => item.capabilities.shared).length, 9)
     assert.match(context.snapshot.revision, /^[a-f0-9]{64}$/)
@@ -45,6 +45,22 @@ test('disposing one visualization Cordis fiber removes only its registration', a
     assert.equal(context.catalog.snapshot().plugins.length, 0)
   } finally { await context.context.fiber.dispose() }
 })
+
+for (const id of ['viz-columnar-window', 'viz-nexus-window', 'viz-scientific-graph', 'viz-phylogeny', 'viz-envi-window', 'viz-grib-window', 'viz-seismic-window', 'viz-mass-spectrum', 'viz-diffraction', 'viz-fcs-window', 'viz-ripple-window', 'viz-dicom-window', 'viz-spatial-window', 'viz-pointcloud-window', 'viz-gro-trajectory', 'viz-simulation-mesh', 'viz-sqlite-table', 'viz-radar-window', 'viz-ugrid-window', 'viz-duckdb-table', 'viz-dbf-table', 'viz-access-table', 'viz-sql-dump', 'viz-postgres-dump', 'viz-bson', 'viz-redis-rdb']) {
+  test(`new domain plugin ${id} is owned by its own real Cordis fiber`, async () => {
+    const context = await buildVisualizationContext(productionDirectory)
+    try {
+      const before = context.catalog.snapshot()
+      const index = before.plugins.findIndex(plugin => plugin.id === id)
+      assert.ok(index >= 0)
+      await context.pluginFibers[index].dispose()
+      const after = context.catalog.snapshot()
+      assert.deepEqual(after.plugins.map(plugin => plugin.id), before.plugins.filter(plugin => plugin.id !== id).map(plugin => plugin.id))
+      assert.notEqual(after.revision, before.revision)
+      assert.equal(after.plugins.filter(plugin => plugin.reader === 'netcdf').length, 2)
+    } finally { await context.context.fiber.dispose() }
+  })
+}
 
 test('visualization migration retains every former builtin file suffix and special filename', async () => {
   const plugins = await loadVisualizationManifests(productionDirectory)

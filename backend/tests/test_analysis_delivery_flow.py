@@ -52,8 +52,10 @@ async def test_saved_script_cannot_complete_visualization(model_success):
     assert step.status == ExecutionStatus.FAILED and step.success is False
     assert step.outcome.status == "partial" and step.outcome.missing[0].kind == "image"
     assert step.outcome.can_resume is False  # no source snapshot
-    assert step.result.startswith("分析说明（完成状态以成果检查结果为准）：")
-    assert findings in step.result  # Preserve actual findings without promoting a script to a chart.
+    assert step.result.startswith("本次分析部分完成。")
+    # The script is verified, not the draft's measurement claims.
+    assert findings not in step.result
+    assert "分析说明尚未通过完整核验" in step.result
     assert not step.result.startswith("本次分析已完成")
     assert files == [pair[1]]  # actual script retained, never described as a plot
 
@@ -109,8 +111,8 @@ async def test_runner_never_repeats_success_prose_after_failed_delivery_contract
     answers = [event for event in events if isinstance(event, MessageEvent)]
     assert len(answers) == 1
     assert answers[0].metadata["analysis_outcome"]["status"] == "partial"
-    assert answers[0].message.startswith("分析说明（完成状态以成果检查结果为准）：")
-    assert findings in answers[0].message
+    assert answers[0].message.startswith("本次分析部分完成。")
+    assert findings not in answers[0].message
     assert "已全部完成，所有图表已交付。" not in answers[0].message
     assert answers[0].metadata["analysis_outcome"]["missing"][0]["kind"] == "image"
     assert answers[0].attachments == [pair[1]]

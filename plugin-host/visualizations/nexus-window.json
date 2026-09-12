@@ -1,0 +1,17 @@
+{
+  "contract_version": 2,
+  "id": "viz-nexus-window",
+  "version": "1.0.0",
+  "name": "NeXus 科学坐标与误差",
+  "description": "识别受限 NXdata 一维/二维信号、明确的坐标、单位和误差；按选区读取原始值，不做标定或拟合。首版限定小型固定字符串元信息与同文件资源；原 H5Web / 原始数组视图仍可独立使用。",
+  "extensions": ["nxs", "nx", "h5", "hdf5", "hdf"],
+  "filenames": [],
+  "view_kind": "image",
+  "adapter": "nexus-window",
+  "reader": "nexus-window",
+  "default_enabled": true,
+  "priority": 5,
+  "permissions": ["file:read"],
+  "limits": {"max_input_bytes": 8388608, "max_output_bytes": 2097152},
+  "capabilities": {"operations": ["preview"], "input_mode": "window", "shared": false}
+}

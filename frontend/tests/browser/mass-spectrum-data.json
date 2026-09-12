@@ -1,0 +1,1678 @@
+{
+  "mgf_tree": {
+    "contract_version": 2,
+    "type": "mass-spectrum",
+    "reader": "mass-spectrum",
+    "kind": "tree",
+    "media_type": "application/json",
+    "choices": {
+      "spectra": [
+        {
+          "id": "s-000000",
+          "index": 0,
+          "points": 3,
+          "representation": "centroid",
+          "mz_unit": null,
+          "intensity_unit": null,
+          "retention_time": 12.5,
+          "time_unit": "s",
+          "precursor_mz": 445.25,
+          "ms_level": 2,
+          "selectable": true,
+          "reason": "supported"
+        },
+        {
+          "id": "s-000001",
+          "index": 1,
+          "points": 3,
+          "representation": "centroid",
+          "mz_unit": null,
+          "intensity_unit": null,
+          "retention_time": 12.5,
+          "time_unit": "s",
+          "precursor_mz": 445.25,
+          "ms_level": 2,
+          "selectable": true,
+          "reason": "supported"
+        }
+      ]
+    },
+    "selected": {
+      "offset": 0
+    },
+    "warnings": [
+      "仅显示显式选择的单条质谱；保留原始 m/z、强度和声明单位，不归一化、扣背景、寻峰、插值或静默抽样。"
+    ],
+    "sampled": false,
+    "metadata": {
+      "format": "mgf",
+      "dialect": "mgf-ions-2column",
+      "input_mode": "whole",
+      "source_bytes": 225,
+      "total_spectra": 2,
+      "offset": 0,
+      "next_offset": null,
+      "decoded_bytes": 0,
+      "output_points": 0
+    },
+    "tree": [
+      {
+        "path": "/s-000000",
+        "node_type": "array",
+        "attributes": {
+          "label": "Spectrum 1"
+        }
+      },
+      {
+        "path": "/s-000001",
+        "node_type": "array",
+        "attributes": {
+          "label": "Spectrum 2"
+        }
+      }
+    ]
+  },
+  "mgf_series": {
+    "contract_version": 2,
+    "type": "mass-spectrum",
+    "reader": "mass-spectrum",
+    "kind": "series",
+    "media_type": "application/json",
+    "choices": {
+      "spectra": [
+        {
+          "id": "s-000000",
+          "index": 0,
+          "points": 3,
+          "representation": "centroid",
+          "mz_unit": null,
+          "intensity_unit": null,
+          "retention_time": 12.5,
+          "time_unit": "s",
+          "precursor_mz": 445.25,
+          "ms_level": 2,
+          "selectable": true,
+          "reason": "supported"
+        }
+      ]
+    },
+    "selected": {
+      "spectrum": "s-000000"
+    },
+    "warnings": [
+      "仅显示显式选择的单条质谱；保留原始 m/z、强度和声明单位，不归一化、扣背景、寻峰、插值或静默抽样。"
+    ],
+    "sampled": false,
+    "metadata": {
+      "format": "mgf",
+      "dialect": "mgf-ions-2column",
+      "input_mode": "whole",
+      "source_bytes": 225,
+      "total_spectra": 2,
+      "offset": 0,
+      "next_offset": null,
+      "decoded_bytes": 0,
+      "output_points": 3
+    },
+    "array": {
+      "shape": [
+        3,
+        2
+      ],
+      "dimensions": [
+        "m/z",
+        "intensity"
+      ],
+      "values": [
+        150.5,
+        10,
+        100.25,
+        25,
+        200.75,
+        5
+      ]
+    }
+  },
+  "mzml_tree": {
+    "contract_version": 2,
+    "type": "mass-spectrum",
+    "reader": "mass-spectrum",
+    "kind": "tree",
+    "media_type": "application/json",
+    "choices": {
+      "spectra": [
+        {
+          "id": "s-000000",
+          "index": 0,
+          "points": 4,
+          "representation": "profile",
+          "mz_unit": "MS:1000040",
+          "intensity_unit": "MS:1000131",
+          "retention_time": 2.5,
+          "time_unit": "min",
+          "precursor_mz": null,
+          "ms_level": 1,
+          "selectable": true,
+          "reason": "supported"
+        }
+      ]
+    },
+    "selected": {
+      "offset": 0
+    },
+    "warnings": [
+      "仅显示显式选择的单条质谱；保留原始 m/z、强度和声明单位，不归一化、扣背景、寻峰、插值或静默抽样。"
+    ],
+    "sampled": false,
+    "metadata": {
+      "format": "mzml",
+      "dialect": "mzml-1.1-inline-float",
+      "input_mode": "whole",
+      "source_bytes": 1599,
+      "total_spectra": 1,
+      "offset": 0,
+      "next_offset": null,
+      "decoded_bytes": 0,
+      "output_points": 0
+    },
+    "tree": [
+      {
+        "path": "/s-000000",
+        "node_type": "array",
+        "attributes": {
+          "label": "Spectrum 1"
+        }
+      }
+    ]
+  },
+  "mzml_series": {
+    "contract_version": 2,
+    "type": "mass-spectrum",
+    "reader": "mass-spectrum",
+    "kind": "series",
+    "media_type": "application/json",
+    "choices": {
+      "spectra": [
+        {
+          "id": "s-000000",
+          "index": 0,
+          "points": 4,
+          "representation": "profile",
+          "mz_unit": "MS:1000040",
+          "intensity_unit": "MS:1000131",
+          "retention_time": 2.5,
+          "time_unit": "min",
+          "precursor_mz": null,
+          "ms_level": 1,
+          "selectable": true,
+          "reason": "supported"
+        }
+      ]
+    },
+    "selected": {
+      "spectrum": "s-000000"
+    },
+    "warnings": [
+      "仅显示显式选择的单条质谱；保留原始 m/z、强度和声明单位，不归一化、扣背景、寻峰、插值或静默抽样。"
+    ],
+    "sampled": false,
+    "metadata": {
+      "format": "mzml",
+      "dialect": "mzml-1.1-inline-float",
+      "input_mode": "whole",
+      "source_bytes": 1599,
+      "total_spectra": 1,
+      "offset": 0,
+      "next_offset": null,
+      "decoded_bytes": 32,
+      "output_points": 4
+    },
+    "array": {
+      "shape": [
+        4,
+        2
+      ],
+      "dimensions": [
+        "m/z",
+        "intensity"
+      ],
+      "values": [
+        100,
+        -1,
+        100.25,
+        3,
+        100.5,
+        7,
+        100.75,
+        2
+      ]
+    }
+  },
+  "page_first": {
+    "contract_version": 2,
+    "type": "mass-spectrum",
+    "reader": "mass-spectrum",
+    "kind": "tree",
+    "media_type": "application/json",
+    "choices": {
+      "spectra": [
+        {
+          "id": "s-000000",
+          "index": 0,
+          "points": 3,
+          "representation": "centroid",
+          "mz_unit": null,
+          "intensity_unit": null,
+          "retention_time": 12.5,
+          "time_unit": "s",
+          "precursor_mz": 445.25,
+          "ms_level": 2,
+          "selectable": true,
+          "reason": "supported"
+        },
+        {
+          "id": "s-000001",
+          "index": 1,
+          "points": 3,
+          "representation": "centroid",
+          "mz_unit": null,
+          "intensity_unit": null,
+          "retention_time": 12.5,
+          "time_unit": "s",
+          "precursor_mz": 445.25,
+          "ms_level": 2,
+          "selectable": true,
+          "reason": "supported"
+        },
+        {
+          "id": "s-000002",
+          "index": 2,
+          "points": 3,
+          "representation": "centroid",
+          "mz_unit": null,
+          "intensity_unit": null,
+          "retention_time": 12.5,
+          "time_unit": "s",
+          "precursor_mz": 445.25,
+          "ms_level": 2,
+          "selectable": true,
+          "reason": "supported"
+        },
+        {
+          "id": "s-000003",
+          "index": 3,
+          "points": 3,
+          "representation": "centroid",
+          "mz_unit": null,
+          "intensity_unit": null,
+          "retention_time": 12.5,
+          "time_unit": "s",
+          "precursor_mz": 445.25,
+          "ms_level": 2,
+          "selectable": true,
+          "reason": "supported"
+        },
+        {
+          "id": "s-000004",
+          "index": 4,
+          "points": 3,
+          "representation": "centroid",
+          "mz_unit": null,
+          "intensity_unit": null,
+          "retention_time": 12.5,
+          "time_unit": "s",
+          "precursor_mz": 445.25,
+          "ms_level": 2,
+          "selectable": true,
+          "reason": "supported"
+        },
+        {
+          "id": "s-000005",
+          "index": 5,
+          "points": 3,
+          "representation": "centroid",
+          "mz_unit": null,
+          "intensity_unit": null,
+          "retention_time": 12.5,
+          "time_unit": "s",
+          "precursor_mz": 445.25,
+          "ms_level": 2,
+          "selectable": true,
+          "reason": "supported"
+        },
+        {
+          "id": "s-000006",
+          "index": 6,
+          "points": 3,
+          "representation": "centroid",
+          "mz_unit": null,
+          "intensity_unit": null,
+          "retention_time": 12.5,
+          "time_unit": "s",
+          "precursor_mz": 445.25,
+          "ms_level": 2,
+          "selectable": true,
+          "reason": "supported"
+        },
+        {
+          "id": "s-000007",
+          "index": 7,
+          "points": 3,
+          "representation": "centroid",
+          "mz_unit": null,
+          "intensity_unit": null,
+          "retention_time": 12.5,
+          "time_unit": "s",
+          "precursor_mz": 445.25,
+          "ms_level": 2,
+          "selectable": true,
+          "reason": "supported"
+        },
+        {
+          "id": "s-000008",
+          "index": 8,
+          "points": 3,
+          "representation": "centroid",
+          "mz_unit": null,
+          "intensity_unit": null,
+          "retention_time": 12.5,
+          "time_unit": "s",
+          "precursor_mz": 445.25,
+          "ms_level": 2,
+          "selectable": true,
+          "reason": "supported"
+        },
+        {
+          "id": "s-000009",
+          "index": 9,
+          "points": 3,
+          "representation": "centroid",
+          "mz_unit": null,
+          "intensity_unit": null,
+          "retention_time": 12.5,
+          "time_unit": "s",
+          "precursor_mz": 445.25,
+          "ms_level": 2,
+          "selectable": true,
+          "reason": "supported"
+        },
+        {
+          "id": "s-000010",
+          "index": 10,
+          "points": 3,
+          "representation": "centroid",
+          "mz_unit": null,
+          "intensity_unit": null,
+          "retention_time": 12.5,
+          "time_unit": "s",
+          "precursor_mz": 445.25,
+          "ms_level": 2,
+          "selectable": true,
+          "reason": "supported"
+        },
+        {
+          "id": "s-000011",
+          "index": 11,
+          "points": 3,
+          "representation": "centroid",
+          "mz_unit": null,
+          "intensity_unit": null,
+          "retention_time": 12.5,
+          "time_unit": "s",
+          "precursor_mz": 445.25,
+          "ms_level": 2,
+          "selectable": true,
+          "reason": "supported"
+        },
+        {
+          "id": "s-000012",
+          "index": 12,
+          "points": 3,
+          "representation": "centroid",
+          "mz_unit": null,
+          "intensity_unit": null,
+          "retention_time": 12.5,
+          "time_unit": "s",
+          "precursor_mz": 445.25,
+          "ms_level": 2,
+          "selectable": true,
+          "reason": "supported"
+        },
+        {
+          "id": "s-000013",
+          "index": 13,
+          "points": 3,
+          "representation": "centroid",
+          "mz_unit": null,
+          "intensity_unit": null,
+          "retention_time": 12.5,
+          "time_unit": "s",
+          "precursor_mz": 445.25,
+          "ms_level": 2,
+          "selectable": true,
+          "reason": "supported"
+        },
+        {
+          "id": "s-000014",
+          "index": 14,
+          "points": 3,
+          "representation": "centroid",
+          "mz_unit": null,
+          "intensity_unit": null,
+          "retention_time": 12.5,
+          "time_unit": "s",
+          "precursor_mz": 445.25,
+          "ms_level": 2,
+          "selectable": true,
+          "reason": "supported"
+        },
+        {
+          "id": "s-000015",
+          "index": 15,
+          "points": 3,
+          "representation": "centroid",
+          "mz_unit": null,
+          "intensity_unit": null,
+          "retention_time": 12.5,
+          "time_unit": "s",
+          "precursor_mz": 445.25,
+          "ms_level": 2,
+          "selectable": true,
+          "reason": "supported"
+        },
+        {
+          "id": "s-000016",
+          "index": 16,
+          "points": 3,
+          "representation": "centroid",
+          "mz_unit": null,
+          "intensity_unit": null,
+          "retention_time": 12.5,
+          "time_unit": "s",
+          "precursor_mz": 445.25,
+          "ms_level": 2,
+          "selectable": true,
+          "reason": "supported"
+        },
+        {
+          "id": "s-000017",
+          "index": 17,
+          "points": 3,
+          "representation": "centroid",
+          "mz_unit": null,
+          "intensity_unit": null,
+          "retention_time": 12.5,
+          "time_unit": "s",
+          "precursor_mz": 445.25,
+          "ms_level": 2,
+          "selectable": true,
+          "reason": "supported"
+        },
+        {
+          "id": "s-000018",
+          "index": 18,
+          "points": 3,
+          "representation": "centroid",
+          "mz_unit": null,
+          "intensity_unit": null,
+          "retention_time": 12.5,
+          "time_unit": "s",
+          "precursor_mz": 445.25,
+          "ms_level": 2,
+          "selectable": true,
+          "reason": "supported"
+        },
+        {
+          "id": "s-000019",
+          "index": 19,
+          "points": 3,
+          "representation": "centroid",
+          "mz_unit": null,
+          "intensity_unit": null,
+          "retention_time": 12.5,
+          "time_unit": "s",
+          "precursor_mz": 445.25,
+          "ms_level": 2,
+          "selectable": true,
+          "reason": "supported"
+        },
+        {
+          "id": "s-000020",
+          "index": 20,
+          "points": 3,
+          "representation": "centroid",
+          "mz_unit": null,
+          "intensity_unit": null,
+          "retention_time": 12.5,
+          "time_unit": "s",
+          "precursor_mz": 445.25,
+          "ms_level": 2,
+          "selectable": true,
+          "reason": "supported"
+        },
+        {
+          "id": "s-000021",
+          "index": 21,
+          "points": 3,
+          "representation": "centroid",
+          "mz_unit": null,
+          "intensity_unit": null,
+          "retention_time": 12.5,
+          "time_unit": "s",
+          "precursor_mz": 445.25,
+          "ms_level": 2,
+          "selectable": true,
+          "reason": "supported"
+        },
+        {
+          "id": "s-000022",
+          "index": 22,
+          "points": 3,
+          "representation": "centroid",
+          "mz_unit": null,
+          "intensity_unit": null,
+          "retention_time": 12.5,
+          "time_unit": "s",
+          "precursor_mz": 445.25,
+          "ms_level": 2,
+          "selectable": true,
+          "reason": "supported"
+        },
+        {
+          "id": "s-000023",
+          "index": 23,
+          "points": 3,
+          "representation": "centroid",
+          "mz_unit": null,
+          "intensity_unit": null,
+          "retention_time": 12.5,
+          "time_unit": "s",
+          "precursor_mz": 445.25,
+          "ms_level": 2,
+          "selectable": true,
+          "reason": "supported"
+        },
+        {
+          "id": "s-000024",
+          "index": 24,
+          "points": 3,
+          "representation": "centroid",
+          "mz_unit": null,
+          "intensity_unit": null,
+          "retention_time": 12.5,
+          "time_unit": "s",
+          "precursor_mz": 445.25,
+          "ms_level": 2,
+          "selectable": true,
+          "reason": "supported"
+        },
+        {
+          "id": "s-000025",
+          "index": 25,
+          "points": 3,
+          "representation": "centroid",
+          "mz_unit": null,
+          "intensity_unit": null,
+          "retention_time": 12.5,
+          "time_unit": "s",
+          "precursor_mz": 445.25,
+          "ms_level": 2,
+          "selectable": true,
+          "reason": "supported"
+        },
+        {
+          "id": "s-000026",
+          "index": 26,
+          "points": 3,
+          "representation": "centroid",
+          "mz_unit": null,
+          "intensity_unit": null,
+          "retention_time": 12.5,
+          "time_unit": "s",
+          "precursor_mz": 445.25,
+          "ms_level": 2,
+          "selectable": true,
+          "reason": "supported"
+        },
+        {
+          "id": "s-000027",
+          "index": 27,
+          "points": 3,
+          "representation": "centroid",
+          "mz_unit": null,
+          "intensity_unit": null,
+          "retention_time": 12.5,
+          "time_unit": "s",
+          "precursor_mz": 445.25,
+          "ms_level": 2,
+          "selectable": true,
+          "reason": "supported"
+        },
+        {
+          "id": "s-000028",
+          "index": 28,
+          "points": 3,
+          "representation": "centroid",
+          "mz_unit": null,
+          "intensity_unit": null,
+          "retention_time": 12.5,
+          "time_unit": "s",
+          "precursor_mz": 445.25,
+          "ms_level": 2,
+          "selectable": true,
+          "reason": "supported"
+        },
+        {
+          "id": "s-000029",
+          "index": 29,
+          "points": 3,
+          "representation": "centroid",
+          "mz_unit": null,
+          "intensity_unit": null,
+          "retention_time": 12.5,
+          "time_unit": "s",
+          "precursor_mz": 445.25,
+          "ms_level": 2,
+          "selectable": true,
+          "reason": "supported"
+        },
+        {
+          "id": "s-000030",
+          "index": 30,
+          "points": 3,
+          "representation": "centroid",
+          "mz_unit": null,
+          "intensity_unit": null,
+          "retention_time": 12.5,
+          "time_unit": "s",
+          "precursor_mz": 445.25,
+          "ms_level": 2,
+          "selectable": true,
+          "reason": "supported"
+        },
+        {
+          "id": "s-000031",
+          "index": 31,
+          "points": 3,
+          "representation": "centroid",
+          "mz_unit": null,
+          "intensity_unit": null,
+          "retention_time": 12.5,
+          "time_unit": "s",
+          "precursor_mz": 445.25,
+          "ms_level": 2,
+          "selectable": true,
+          "reason": "supported"
+        },
+        {
+          "id": "s-000032",
+          "index": 32,
+          "points": 3,
+          "representation": "centroid",
+          "mz_unit": null,
+          "intensity_unit": null,
+          "retention_time": 12.5,
+          "time_unit": "s",
+          "precursor_mz": 445.25,
+          "ms_level": 2,
+          "selectable": true,
+          "reason": "supported"
+        },
+        {
+          "id": "s-000033",
+          "index": 33,
+          "points": 3,
+          "representation": "centroid",
+          "mz_unit": null,
+          "intensity_unit": null,
+          "retention_time": 12.5,
+          "time_unit": "s",
+          "precursor_mz": 445.25,
+          "ms_level": 2,
+          "selectable": true,
+          "reason": "supported"
+        },
+        {
+          "id": "s-000034",
+          "index": 34,
+          "points": 3,
+          "representation": "centroid",
+          "mz_unit": null,
+          "intensity_unit": null,
+          "retention_time": 12.5,
+          "time_unit": "s",
+          "precursor_mz": 445.25,
+          "ms_level": 2,
+          "selectable": true,
+          "reason": "supported"
+        },
+        {
+          "id": "s-000035",
+          "index": 35,
+          "points": 3,
+          "representation": "centroid",
+          "mz_unit": null,
+          "intensity_unit": null,
+          "retention_time": 12.5,
+          "time_unit": "s",
+          "precursor_mz": 445.25,
+          "ms_level": 2,
+          "selectable": true,
+          "reason": "supported"
+        },
+        {
+          "id": "s-000036",
+          "index": 36,
+          "points": 3,
+          "representation": "centroid",
+          "mz_unit": null,
+          "intensity_unit": null,
+          "retention_time": 12.5,
+          "time_unit": "s",
+          "precursor_mz": 445.25,
+          "ms_level": 2,
+          "selectable": true,
+          "reason": "supported"
+        },
+        {
+          "id": "s-000037",
+          "index": 37,
+          "points": 3,
+          "representation": "centroid",
+          "mz_unit": null,
+          "intensity_unit": null,
+          "retention_time": 12.5,
+          "time_unit": "s",
+          "precursor_mz": 445.25,
+          "ms_level": 2,
+          "selectable": true,
+          "reason": "supported"
+        },
+        {
+          "id": "s-000038",
+          "index": 38,
+          "points": 3,
+          "representation": "centroid",
+          "mz_unit": null,
+          "intensity_unit": null,
+          "retention_time": 12.5,
+          "time_unit": "s",
+          "precursor_mz": 445.25,
+          "ms_level": 2,
+          "selectable": true,
+          "reason": "supported"
+        },
+        {
+          "id": "s-000039",
+          "index": 39,
+          "points": 3,
+          "representation": "centroid",
+          "mz_unit": null,
+          "intensity_unit": null,
+          "retention_time": 12.5,
+          "time_unit": "s",
+          "precursor_mz": 445.25,
+          "ms_level": 2,
+          "selectable": true,
+          "reason": "supported"
+        },
+        {
+          "id": "s-000040",
+          "index": 40,
+          "points": 3,
+          "representation": "centroid",
+          "mz_unit": null,
+          "intensity_unit": null,
+          "retention_time": 12.5,
+          "time_unit": "s",
+          "precursor_mz": 445.25,
+          "ms_level": 2,
+          "selectable": true,
+          "reason": "supported"
+        },
+        {
+          "id": "s-000041",
+          "index": 41,
+          "points": 3,
+          "representation": "centroid",
+          "mz_unit": null,
+          "intensity_unit": null,
+          "retention_time": 12.5,
+          "time_unit": "s",
+          "precursor_mz": 445.25,
+          "ms_level": 2,
+          "selectable": true,
+          "reason": "supported"
+        },
+        {
+          "id": "s-000042",
+          "index": 42,
+          "points": 3,
+          "representation": "centroid",
+          "mz_unit": null,
+          "intensity_unit": null,
+          "retention_time": 12.5,
+          "time_unit": "s",
+          "precursor_mz": 445.25,
+          "ms_level": 2,
+          "selectable": true,
+          "reason": "supported"
+        },
+        {
+          "id": "s-000043",
+          "index": 43,
+          "points": 3,
+          "representation": "centroid",
+          "mz_unit": null,
+          "intensity_unit": null,
+          "retention_time": 12.5,
+          "time_unit": "s",
+          "precursor_mz": 445.25,
+          "ms_level": 2,
+          "selectable": true,
+          "reason": "supported"
+        },
+        {
+          "id": "s-000044",
+          "index": 44,
+          "points": 3,
+          "representation": "centroid",
+          "mz_unit": null,
+          "intensity_unit": null,
+          "retention_time": 12.5,
+          "time_unit": "s",
+          "precursor_mz": 445.25,
+          "ms_level": 2,
+          "selectable": true,
+          "reason": "supported"
+        },
+        {
+          "id": "s-000045",
+          "index": 45,
+          "points": 3,
+          "representation": "centroid",
+          "mz_unit": null,
+          "intensity_unit": null,
+          "retention_time": 12.5,
+          "time_unit": "s",
+          "precursor_mz": 445.25,
+          "ms_level": 2,
+          "selectable": true,
+          "reason": "supported"
+        },
+        {
+          "id": "s-000046",
+          "index": 46,
+          "points": 3,
+          "representation": "centroid",
+          "mz_unit": null,
+          "intensity_unit": null,
+          "retention_time": 12.5,
+          "time_unit": "s",
+          "precursor_mz": 445.25,
+          "ms_level": 2,
+          "selectable": true,
+          "reason": "supported"
+        },
+        {
+          "id": "s-000047",
+          "index": 47,
+          "points": 3,
+          "representation": "centroid",
+          "mz_unit": null,
+          "intensity_unit": null,
+          "retention_time": 12.5,
+          "time_unit": "s",
+          "precursor_mz": 445.25,
+          "ms_level": 2,
+          "selectable": true,
+          "reason": "supported"
+        },
+        {
+          "id": "s-000048",
+          "index": 48,
+          "points": 3,
+          "representation": "centroid",
+          "mz_unit": null,
+          "intensity_unit": null,
+          "retention_time": 12.5,
+          "time_unit": "s",
+          "precursor_mz": 445.25,
+          "ms_level": 2,
+          "selectable": true,
+          "reason": "supported"
+        },
+        {
+          "id": "s-000049",
+          "index": 49,
+          "points": 3,
+          "representation": "centroid",
+          "mz_unit": null,
+          "intensity_unit": null,
+          "retention_time": 12.5,
+          "time_unit": "s",
+          "precursor_mz": 445.25,
+          "ms_level": 2,
+          "selectable": true,
+          "reason": "supported"
+        },
+        {
+          "id": "s-000050",
+          "index": 50,
+          "points": 3,
+          "representation": "centroid",
+          "mz_unit": null,
+          "intensity_unit": null,
+          "retention_time": 12.5,
+          "time_unit": "s",
+          "precursor_mz": 445.25,
+          "ms_level": 2,
+          "selectable": true,
+          "reason": "supported"
+        },
+        {
+          "id": "s-000051",
+          "index": 51,
+          "points": 3,
+          "representation": "centroid",
+          "mz_unit": null,
+          "intensity_unit": null,
+          "retention_time": 12.5,
+          "time_unit": "s",
+          "precursor_mz": 445.25,
+          "ms_level": 2,
+          "selectable": true,
+          "reason": "supported"
+        },
+        {
+          "id": "s-000052",
+          "index": 52,
+          "points": 3,
+          "representation": "centroid",
+          "mz_unit": null,
+          "intensity_unit": null,
+          "retention_time": 12.5,
+          "time_unit": "s",
+          "precursor_mz": 445.25,
+          "ms_level": 2,
+          "selectable": true,
+          "reason": "supported"
+        },
+        {
+          "id": "s-000053",
+          "index": 53,
+          "points": 3,
+          "representation": "centroid",
+          "mz_unit": null,
+          "intensity_unit": null,
+          "retention_time": 12.5,
+          "time_unit": "s",
+          "precursor_mz": 445.25,
+          "ms_level": 2,
+          "selectable": true,
+          "reason": "supported"
+        },
+        {
+          "id": "s-000054",
+          "index": 54,
+          "points": 3,
+          "representation": "centroid",
+          "mz_unit": null,
+          "intensity_unit": null,
+          "retention_time": 12.5,
+          "time_unit": "s",
+          "precursor_mz": 445.25,
+          "ms_level": 2,
+          "selectable": true,
+          "reason": "supported"
+        },
+        {
+          "id": "s-000055",
+          "index": 55,
+          "points": 3,
+          "representation": "centroid",
+          "mz_unit": null,
+          "intensity_unit": null,
+          "retention_time": 12.5,
+          "time_unit": "s",
+          "precursor_mz": 445.25,
+          "ms_level": 2,
+          "selectable": true,
+          "reason": "supported"
+        },
+        {
+          "id": "s-000056",
+          "index": 56,
+          "points": 3,
+          "representation": "centroid",
+          "mz_unit": null,
+          "intensity_unit": null,
+          "retention_time": 12.5,
+          "time_unit": "s",
+          "precursor_mz": 445.25,
+          "ms_level": 2,
+          "selectable": true,
+          "reason": "supported"
+        },
+        {
+          "id": "s-000057",
+          "index": 57,
+          "points": 3,
+          "representation": "centroid",
+          "mz_unit": null,
+          "intensity_unit": null,
+          "retention_time": 12.5,
+          "time_unit": "s",
+          "precursor_mz": 445.25,
+          "ms_level": 2,
+          "selectable": true,
+          "reason": "supported"
+        },
+        {
+          "id": "s-000058",
+          "index": 58,
+          "points": 3,
+          "representation": "centroid",
+          "mz_unit": null,
+          "intensity_unit": null,
+          "retention_time": 12.5,
+          "time_unit": "s",
+          "precursor_mz": 445.25,
+          "ms_level": 2,
+          "selectable": true,
+          "reason": "supported"
+        },
+        {
+          "id": "s-000059",
+          "index": 59,
+          "points": 3,
+          "representation": "centroid",
+          "mz_unit": null,
+          "intensity_unit": null,
+          "retention_time": 12.5,
+          "time_unit": "s",
+          "precursor_mz": 445.25,
+          "ms_level": 2,
+          "selectable": true,
+          "reason": "supported"
+        },
+        {
+          "id": "s-000060",
+          "index": 60,
+          "points": 3,
+          "representation": "centroid",
+          "mz_unit": null,
+          "intensity_unit": null,
+          "retention_time": 12.5,
+          "time_unit": "s",
+          "precursor_mz": 445.25,
+          "ms_level": 2,
+          "selectable": true,
+          "reason": "supported"
+        },
+        {
+          "id": "s-000061",
+          "index": 61,
+          "points": 3,
+          "representation": "centroid",
+          "mz_unit": null,
+          "intensity_unit": null,
+          "retention_time": 12.5,
+          "time_unit": "s",
+          "precursor_mz": 445.25,
+          "ms_level": 2,
+          "selectable": true,
+          "reason": "supported"
+        },
+        {
+          "id": "s-000062",
+          "index": 62,
+          "points": 3,
+          "representation": "centroid",
+          "mz_unit": null,
+          "intensity_unit": null,
+          "retention_time": 12.5,
+          "time_unit": "s",
+          "precursor_mz": 445.25,
+          "ms_level": 2,
+          "selectable": true,
+          "reason": "supported"
+        },
+        {
+          "id": "s-000063",
+          "index": 63,
+          "points": 3,
+          "representation": "centroid",
+          "mz_unit": null,
+          "intensity_unit": null,
+          "retention_time": 12.5,
+          "time_unit": "s",
+          "precursor_mz": 445.25,
+          "ms_level": 2,
+          "selectable": true,
+          "reason": "supported"
+        }
+      ]
+    },
+    "selected": {
+      "offset": 0
+    },
+    "warnings": [
+      "仅显示显式选择的单条质谱；保留原始 m/z、强度和声明单位，不归一化、扣背景、寻峰、插值或静默抽样。"
+    ],
+    "sampled": false,
+    "metadata": {
+      "format": "mgf",
+      "dialect": "mgf-ions-2column",
+      "input_mode": "whole",
+      "source_bytes": 6832,
+      "total_spectra": 65,
+      "offset": 0,
+      "next_offset": 64,
+      "decoded_bytes": 0,
+      "output_points": 0
+    },
+    "tree": [
+      {
+        "path": "/s-000000",
+        "node_type": "array",
+        "attributes": {
+          "label": "Spectrum 1"
+        }
+      },
+      {
+        "path": "/s-000001",
+        "node_type": "array",
+        "attributes": {
+          "label": "Spectrum 2"
+        }
+      },
+      {
+        "path": "/s-000002",
+        "node_type": "array",
+        "attributes": {
+          "label": "Spectrum 3"
+        }
+      },
+      {
+        "path": "/s-000003",
+        "node_type": "array",
+        "attributes": {
+          "label": "Spectrum 4"
+        }
+      },
+      {
+        "path": "/s-000004",
+        "node_type": "array",
+        "attributes": {
+          "label": "Spectrum 5"
+        }
+      },
+      {
+        "path": "/s-000005",
+        "node_type": "array",
+        "attributes": {
+          "label": "Spectrum 6"
+        }
+      },
+      {
+        "path": "/s-000006",
+        "node_type": "array",
+        "attributes": {
+          "label": "Spectrum 7"
+        }
+      },
+      {
+        "path": "/s-000007",
+        "node_type": "array",
+        "attributes": {
+          "label": "Spectrum 8"
+        }
+      },
+      {
+        "path": "/s-000008",
+        "node_type": "array",
+        "attributes": {
+          "label": "Spectrum 9"
+        }
+      },
+      {
+        "path": "/s-000009",
+        "node_type": "array",
+        "attributes": {
+          "label": "Spectrum 10"
+        }
+      },
+      {
+        "path": "/s-000010",
+        "node_type": "array",
+        "attributes": {
+          "label": "Spectrum 11"
+        }
+      },
+      {
+        "path": "/s-000011",
+        "node_type": "array",
+        "attributes": {
+          "label": "Spectrum 12"
+        }
+      },
+      {
+        "path": "/s-000012",
+        "node_type": "array",
+        "attributes": {
+          "label": "Spectrum 13"
+        }
+      },
+      {
+        "path": "/s-000013",
+        "node_type": "array",
+        "attributes": {
+          "label": "Spectrum 14"
+        }
+      },
+      {
+        "path": "/s-000014",
+        "node_type": "array",
+        "attributes": {
+          "label": "Spectrum 15"
+        }
+      },
+      {
+        "path": "/s-000015",
+        "node_type": "array",
+        "attributes": {
+          "label": "Spectrum 16"
+        }
+      },
+      {
+        "path": "/s-000016",
+        "node_type": "array",
+        "attributes": {
+          "label": "Spectrum 17"
+        }
+      },
+      {
+        "path": "/s-000017",
+        "node_type": "array",
+        "attributes": {
+          "label": "Spectrum 18"
+        }
+      },
+      {
+        "path": "/s-000018",
+        "node_type": "array",
+        "attributes": {
+          "label": "Spectrum 19"
+        }
+      },
+      {
+        "path": "/s-000019",
+        "node_type": "array",
+        "attributes": {
+          "label": "Spectrum 20"
+        }
+      },
+      {
+        "path": "/s-000020",
+        "node_type": "array",
+        "attributes": {
+          "label": "Spectrum 21"
+        }
+      },
+      {
+        "path": "/s-000021",
+        "node_type": "array",
+        "attributes": {
+          "label": "Spectrum 22"
+        }
+      },
+      {
+        "path": "/s-000022",
+        "node_type": "array",
+        "attributes": {
+          "label": "Spectrum 23"
+        }
+      },
+      {
+        "path": "/s-000023",
+        "node_type": "array",
+        "attributes": {
+          "label": "Spectrum 24"
+        }
+      },
+      {
+        "path": "/s-000024",
+        "node_type": "array",
+        "attributes": {
+          "label": "Spectrum 25"
+        }
+      },
+      {
+        "path": "/s-000025",
+        "node_type": "array",
+        "attributes": {
+          "label": "Spectrum 26"
+        }
+      },
+      {
+        "path": "/s-000026",
+        "node_type": "array",
+        "attributes": {
+          "label": "Spectrum 27"
+        }
+      },
+      {
+        "path": "/s-000027",
+        "node_type": "array",
+        "attributes": {
+          "label": "Spectrum 28"
+        }
+      },
+      {
+        "path": "/s-000028",
+        "node_type": "array",
+        "attributes": {
+          "label": "Spectrum 29"
+        }
+      },
+      {
+        "path": "/s-000029",
+        "node_type": "array",
+        "attributes": {
+          "label": "Spectrum 30"
+        }
+      },
+      {
+        "path": "/s-000030",
+        "node_type": "array",
+        "attributes": {
+          "label": "Spectrum 31"
+        }
+      },
+      {
+        "path": "/s-000031",
+        "node_type": "array",
+        "attributes": {
+          "label": "Spectrum 32"
+        }
+      },
+      {
+        "path": "/s-000032",
+        "node_type": "array",
+        "attributes": {
+          "label": "Spectrum 33"
+        }
+      },
+      {
+        "path": "/s-000033",
+        "node_type": "array",
+        "attributes": {
+          "label": "Spectrum 34"
+        }
+      },
+      {
+        "path": "/s-000034",
+        "node_type": "array",
+        "attributes": {
+          "label": "Spectrum 35"
+        }
+      },
+      {
+        "path": "/s-000035",
+        "node_type": "array",
+        "attributes": {
+          "label": "Spectrum 36"
+        }
+      },
+      {
+        "path": "/s-000036",
+        "node_type": "array",
+        "attributes": {
+          "label": "Spectrum 37"
+        }
+      },
+      {
+        "path": "/s-000037",
+        "node_type": "array",
+        "attributes": {
+          "label": "Spectrum 38"
+        }
+      },
+      {
+        "path": "/s-000038",
+        "node_type": "array",
+        "attributes": {
+          "label": "Spectrum 39"
+        }
+      },
+      {
+        "path": "/s-000039",
+        "node_type": "array",
+        "attributes": {
+          "label": "Spectrum 40"
+        }
+      },
+      {
+        "path": "/s-000040",
+        "node_type": "array",
+        "attributes": {
+          "label": "Spectrum 41"
+        }
+      },
+      {
+        "path": "/s-000041",
+        "node_type": "array",
+        "attributes": {
+          "label": "Spectrum 42"
+        }
+      },
+      {
+        "path": "/s-000042",
+        "node_type": "array",
+        "attributes": {
+          "label": "Spectrum 43"
+        }
+      },
+      {
+        "path": "/s-000043",
+        "node_type": "array",
+        "attributes": {
+          "label": "Spectrum 44"
+        }
+      },
+      {
+        "path": "/s-000044",
+        "node_type": "array",
+        "attributes": {
+          "label": "Spectrum 45"
+        }
+      },
+      {
+        "path": "/s-000045",
+        "node_type": "array",
+        "attributes": {
+          "label": "Spectrum 46"
+        }
+      },
+      {
+        "path": "/s-000046",
+        "node_type": "array",
+        "attributes": {
+          "label": "Spectrum 47"
+        }
+      },
+      {
+        "path": "/s-000047",
+        "node_type": "array",
+        "attributes": {
+          "label": "Spectrum 48"
+        }
+      },
+      {
+        "path": "/s-000048",
+        "node_type": "array",
+        "attributes": {
+          "label": "Spectrum 49"
+        }
+      },
+      {
+        "path": "/s-000049",
+        "node_type": "array",
+        "attributes": {
+          "label": "Spectrum 50"
+        }
+      },
+      {
+        "path": "/s-000050",
+        "node_type": "array",
+        "attributes": {
+          "label": "Spectrum 51"
+        }
+      },
+      {
+        "path": "/s-000051",
+        "node_type": "array",
+        "attributes": {
+          "label": "Spectrum 52"
+        }
+      },
+      {
+        "path": "/s-000052",
+        "node_type": "array",
+        "attributes": {
+          "label": "Spectrum 53"
+        }
+      },
+      {
+        "path": "/s-000053",
+        "node_type": "array",
+        "attributes": {
+          "label": "Spectrum 54"
+        }
+      },
+      {
+        "path": "/s-000054",
+        "node_type": "array",
+        "attributes": {
+          "label": "Spectrum 55"
+        }
+      },
+      {
+        "path": "/s-000055",
+        "node_type": "array",
+        "attributes": {
+          "label": "Spectrum 56"
+        }
+      },
+      {
+        "path": "/s-000056",
+        "node_type": "array",
+        "attributes": {
+          "label": "Spectrum 57"
+        }
+      },
+      {
+        "path": "/s-000057",
+        "node_type": "array",
+        "attributes": {
+          "label": "Spectrum 58"
+        }
+      },
+      {
+        "path": "/s-000058",
+        "node_type": "array",
+        "attributes": {
+          "label": "Spectrum 59"
+        }
+      },
+      {
+        "path": "/s-000059",
+        "node_type": "array",
+        "attributes": {
+          "label": "Spectrum 60"
+        }
+      },
+      {
+        "path": "/s-000060",
+        "node_type": "array",
+        "attributes": {
+          "label": "Spectrum 61"
+        }
+      },
+      {
+        "path": "/s-000061",
+        "node_type": "array",
+        "attributes": {
+          "label": "Spectrum 62"
+        }
+      },
+      {
+        "path": "/s-000062",
+        "node_type": "array",
+        "attributes": {
+          "label": "Spectrum 63"
+        }
+      },
+      {
+        "path": "/s-000063",
+        "node_type": "array",
+        "attributes": {
+          "label": "Spectrum 64"
+        }
+      }
+    ]
+  },
+  "page_second": {
+    "contract_version": 2,
+    "type": "mass-spectrum",
+    "reader": "mass-spectrum",
+    "kind": "tree",
+    "media_type": "application/json",
+    "choices": {
+      "spectra": [
+        {
+          "id": "s-000064",
+          "index": 64,
+          "points": 3,
+          "representation": "centroid",
+          "mz_unit": null,
+          "intensity_unit": null,
+          "retention_time": 12.5,
+          "time_unit": "s",
+          "precursor_mz": 445.25,
+          "ms_level": 2,
+          "selectable": true,
+          "reason": "supported"
+        }
+      ]
+    },
+    "selected": {
+      "offset": 64
+    },
+    "warnings": [
+      "仅显示显式选择的单条质谱；保留原始 m/z、强度和声明单位，不归一化、扣背景、寻峰、插值或静默抽样。"
+    ],
+    "sampled": false,
+    "metadata": {
+      "format": "mgf",
+      "dialect": "mgf-ions-2column",
+      "input_mode": "whole",
+      "source_bytes": 6832,
+      "total_spectra": 65,
+      "offset": 64,
+      "next_offset": null,
+      "decoded_bytes": 0,
+      "output_points": 0
+    },
+    "tree": [
+      {
+        "path": "/s-000064",
+        "node_type": "array",
+        "attributes": {
+          "label": "Spectrum 65"
+        }
+      }
+    ]
+  }
+}

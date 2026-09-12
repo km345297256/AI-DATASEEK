@@ -1,0 +1,392 @@
+{
+  "treeCustom": {
+    "type": "pg-dump",
+    "reader": "pg-dump",
+    "kind": "tree",
+    "contract_version": 2,
+    "media_type": "application/json",
+    "tree": [
+      {
+        "path": "/o-8a3f1ce4ce15e725cb031ad0",
+        "node_type": "group",
+        "attributes": {
+          "object_type": "ENCODING",
+          "schema": "无命名空间",
+          "name": "ENCODING"
+        }
+      },
+      {
+        "path": "/o-a12aef4eff3c25ece8c4bacb",
+        "node_type": "group",
+        "attributes": {
+          "object_type": "STDSTRINGS",
+          "schema": "无命名空间",
+          "name": "STDSTRINGS"
+        }
+      },
+      {
+        "path": "/o-f8b48e01fa773d7d8559b0f6",
+        "node_type": "group",
+        "attributes": {
+          "object_type": "SEARCHPATH",
+          "schema": "无命名空间",
+          "name": "SEARCHPATH"
+        }
+      },
+      {
+        "path": "/o-82aa71dbc1c7bf925a780730",
+        "node_type": "group",
+        "attributes": {
+          "object_type": "DATABASE",
+          "schema": "无命名空间",
+          "name": "名称已隐藏"
+        }
+      },
+      {
+        "path": "/o-1cc0f872e99faa1f8c5b2f04",
+        "node_type": "group",
+        "attributes": {
+          "object_type": "TABLE",
+          "schema": "public",
+          "name": "empty"
+        }
+      },
+      {
+        "path": "/o-3015e2da3e615ce0c4e81397",
+        "node_type": "group",
+        "attributes": {
+          "object_type": "TABLE",
+          "schema": "public",
+          "name": "measurements"
+        }
+      },
+      {
+        "path": "/o-897b7b0bbefe23eb41fb9098",
+        "node_type": "group",
+        "attributes": {
+          "object_type": "TABLE DATA",
+          "schema": "public",
+          "name": "empty"
+        }
+      },
+      {
+        "path": "/o-0c38e9ae545ec0c86217c6a3",
+        "node_type": "group",
+        "attributes": {
+          "object_type": "TABLE DATA",
+          "schema": "public",
+          "name": "measurements"
+        }
+      }
+    ],
+    "metadata": {
+      "engine": "pg-dump",
+      "format": "dump",
+      "container": "PostgreSQL custom archive",
+      "archive_version": "1.16.0",
+      "source_bytes": 1974,
+      "input_mode": "whole",
+      "objects_returned": 8,
+      "objects_total": 8,
+      "data_verified": false,
+      "limits": {
+        "max_input_bytes": 16777216,
+        "max_toc_bytes": 8388608,
+        "max_objects": 1024,
+        "max_field_bytes": 1048576,
+        "max_dependencies_per_object": 256,
+        "max_dependencies_total": 16384,
+        "max_tar_members": 4096,
+        "max_label_chars": 128,
+        "max_label_bytes": 512
+      }
+    },
+    "warnings": [
+      "仅完成归档目录读取；未解压、校验或恢复数据段。"
+    ],
+    "sampled": false,
+    "choices": {},
+    "selected": {}
+  },
+  "treeTar": {
+    "type": "pg-dump",
+    "reader": "pg-dump",
+    "kind": "tree",
+    "contract_version": 2,
+    "media_type": "application/json",
+    "tree": [
+      {
+        "path": "/o-61a43e3fddfebe66fdecdf6f",
+        "node_type": "group",
+        "attributes": {
+          "object_type": "ENCODING",
+          "schema": "无命名空间",
+          "name": "ENCODING"
+        }
+      },
+      {
+        "path": "/o-ea762bf385c98485a9f40612",
+        "node_type": "group",
+        "attributes": {
+          "object_type": "STDSTRINGS",
+          "schema": "无命名空间",
+          "name": "STDSTRINGS"
+        }
+      },
+      {
+        "path": "/o-88e7c37a0c982e2c560b8dc9",
+        "node_type": "group",
+        "attributes": {
+          "object_type": "SEARCHPATH",
+          "schema": "无命名空间",
+          "name": "SEARCHPATH"
+        }
+      },
+      {
+        "path": "/o-db5985673b5713fdce0af137",
+        "node_type": "group",
+        "attributes": {
+          "object_type": "DATABASE",
+          "schema": "无命名空间",
+          "name": "名称已隐藏"
+        }
+      },
+      {
+        "path": "/o-cadc542349dba1f37cd7c4b1",
+        "node_type": "group",
+        "attributes": {
+          "object_type": "TABLE",
+          "schema": "public",
+          "name": "empty"
+        }
+      },
+      {
+        "path": "/o-e4f908cefffd70aec9e2e094",
+        "node_type": "group",
+        "attributes": {
+          "object_type": "TABLE",
+          "schema": "public",
+          "name": "measurements"
+        }
+      },
+      {
+        "path": "/o-4c57b89e25cb6d868c757d31",
+        "node_type": "group",
+        "attributes": {
+          "object_type": "TABLE DATA",
+          "schema": "public",
+          "name": "empty"
+        }
+      },
+      {
+        "path": "/o-53cf8263060a2296f815e1bf",
+        "node_type": "group",
+        "attributes": {
+          "object_type": "TABLE DATA",
+          "schema": "public",
+          "name": "measurements"
+        }
+      }
+    ],
+    "metadata": {
+      "engine": "pg-dump",
+      "format": "tar",
+      "container": "PostgreSQL tar archive",
+      "archive_version": "1.16.0",
+      "source_bytes": 8704,
+      "input_mode": "whole",
+      "objects_returned": 8,
+      "objects_total": 8,
+      "data_verified": false,
+      "limits": {
+        "max_input_bytes": 16777216,
+        "max_toc_bytes": 8388608,
+        "max_objects": 1024,
+        "max_field_bytes": 1048576,
+        "max_dependencies_per_object": 256,
+        "max_dependencies_total": 16384,
+        "max_tar_members": 4096,
+        "max_label_chars": 128,
+        "max_label_bytes": 512
+      }
+    },
+    "warnings": [
+      "仅完成归档目录读取；未解压、校验或恢复数据段。"
+    ],
+    "sampled": false,
+    "choices": {},
+    "selected": {}
+  },
+  "treeIdentifiers": {
+    "type": "pg-dump",
+    "reader": "pg-dump",
+    "kind": "tree",
+    "contract_version": 2,
+    "media_type": "application/json",
+    "tree": [
+      {
+        "path": "/o-4ca7905024571f74cfbc211b",
+        "node_type": "group",
+        "attributes": {
+          "object_type": "ENCODING",
+          "schema": "无命名空间",
+          "name": "ENCODING"
+        }
+      },
+      {
+        "path": "/o-9b2b1b9b818e671b15a91fa3",
+        "node_type": "group",
+        "attributes": {
+          "object_type": "STDSTRINGS",
+          "schema": "无命名空间",
+          "name": "STDSTRINGS"
+        }
+      },
+      {
+        "path": "/o-3564900a7a81f2831af7e955",
+        "node_type": "group",
+        "attributes": {
+          "object_type": "SEARCHPATH",
+          "schema": "无命名空间",
+          "name": "SEARCHPATH"
+        }
+      },
+      {
+        "path": "/o-209c21968fd0cc251664658e",
+        "node_type": "group",
+        "attributes": {
+          "object_type": "DATABASE",
+          "schema": "无命名空间",
+          "name": "名称已隐藏"
+        }
+      },
+      {
+        "path": "/o-f3964f4c661be662610536b1",
+        "node_type": "group",
+        "attributes": {
+          "object_type": "COMMENT",
+          "schema": "无命名空间",
+          "name": "名称已隐藏"
+        }
+      },
+      {
+        "path": "/o-60f12f2a99f53db535351d47",
+        "node_type": "group",
+        "attributes": {
+          "object_type": "SCHEMA",
+          "schema": "无命名空间",
+          "name": "science lab"
+        }
+      },
+      {
+        "path": "/o-7ef7b4fd023c24e4bc8039a4",
+        "node_type": "group",
+        "attributes": {
+          "object_type": "TABLE",
+          "schema": "public",
+          "name": "empty"
+        }
+      },
+      {
+        "path": "/o-81f5e343173a30ff61c70d66",
+        "node_type": "group",
+        "attributes": {
+          "object_type": "TABLE",
+          "schema": "public",
+          "name": "measurements"
+        }
+      },
+      {
+        "path": "/o-1d9dae5895e653499a0eb780",
+        "node_type": "group",
+        "attributes": {
+          "object_type": "COMMENT",
+          "schema": "无命名空间",
+          "name": "名称已隐藏"
+        }
+      },
+      {
+        "path": "/o-c09dc6a6d116fbb2a6c505d7",
+        "node_type": "group",
+        "attributes": {
+          "object_type": "TABLE",
+          "schema": "science lab",
+          "name": "名称已隐藏"
+        }
+      },
+      {
+        "path": "/o-0615c4211f84d092711f99c5",
+        "node_type": "group",
+        "attributes": {
+          "object_type": "TABLE",
+          "schema": "science lab",
+          "name": "测量 data"
+        }
+      },
+      {
+        "path": "/o-22396848db5e7aa39b12b691",
+        "node_type": "group",
+        "attributes": {
+          "object_type": "TABLE DATA",
+          "schema": "public",
+          "name": "empty"
+        }
+      },
+      {
+        "path": "/o-d4f3459863f3df75104f8ae2",
+        "node_type": "group",
+        "attributes": {
+          "object_type": "TABLE DATA",
+          "schema": "public",
+          "name": "measurements"
+        }
+      },
+      {
+        "path": "/o-26cd0598fbd88dfc94068805",
+        "node_type": "group",
+        "attributes": {
+          "object_type": "TABLE DATA",
+          "schema": "science lab",
+          "name": "名称已隐藏"
+        }
+      },
+      {
+        "path": "/o-5ebc63599e87897a463c1bd7",
+        "node_type": "group",
+        "attributes": {
+          "object_type": "TABLE DATA",
+          "schema": "science lab",
+          "name": "测量 data"
+        }
+      }
+    ],
+    "metadata": {
+      "engine": "pg-dump",
+      "format": "backup",
+      "container": "PostgreSQL custom archive",
+      "archive_version": "1.16.0",
+      "source_bytes": 3642,
+      "input_mode": "whole",
+      "objects_returned": 15,
+      "objects_total": 15,
+      "data_verified": false,
+      "limits": {
+        "max_input_bytes": 16777216,
+        "max_toc_bytes": 8388608,
+        "max_objects": 1024,
+        "max_field_bytes": 1048576,
+        "max_dependencies_per_object": 256,
+        "max_dependencies_total": 16384,
+        "max_tar_members": 4096,
+        "max_label_chars": 128,
+        "max_label_bytes": 512
+      }
+    },
+    "warnings": [
+      "仅完成归档目录读取；未解压、校验或恢复数据段。"
+    ],
+    "sampled": false,
+    "choices": {},
+    "selected": {}
+  }
+}

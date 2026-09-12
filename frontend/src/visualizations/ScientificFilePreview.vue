@@ -195,7 +195,7 @@ function draw() {
   context.save(); context.translate(18, top + height / 2); context.rotate(-Math.PI / 2); context.fillText(result.y_label || '纵轴', 0, 0); context.restore();
 }
 watch(showBasemap, draw);
-watch(() => [props.file.file_id, props.plugin.id], () => {
+watch([() => props.file.file_id, () => props.plugin.id], () => {
   variable.value = ''; variables.value = []; indices.value = {}; xDimension.value = ''; hdu.value = undefined; hdus.value = []; version.value = undefined;
   void load(true);
 }, { immediate: true });

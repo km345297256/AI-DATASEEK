@@ -1,0 +1,30 @@
+{
+  "contract_version": 2,
+  "id": "viz-pointcloud-window",
+  "version": "1.0.0",
+  "name": "LAS 点云窗口",
+  "description": "未压缩 LAS 的显式点记录窗口，原始整数/缩放/偏移；本地相对原点三维显示。",
+  "extensions": [
+    "las"
+  ],
+  "filenames": [],
+  "view_kind": "structure",
+  "adapter": "pointcloud-window",
+  "reader": "pointcloud-window",
+  "capabilities": {
+    "operations": [
+      "preview"
+    ],
+    "input_mode": "window",
+    "shared": false
+  },
+  "default_enabled": true,
+  "priority": 40,
+  "permissions": [
+    "file:read"
+  ],
+  "limits": {
+    "max_input_bytes": 8388608,
+    "max_output_bytes": 2097152
+  }
+}

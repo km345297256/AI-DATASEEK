@@ -1,0 +1,31 @@
+{
+  "contract_version": 2,
+  "id": "viz-radar-window",
+  "version": "1.0.0",
+  "name": "ODIM 天气雷达窗口",
+  "description": "ODIM_H5 2.4 极坐标射线与距离门热图；区分缺测与未探测，不推断投影或叠加地图。",
+  "extensions": [
+    "h5",
+    "hdf5"
+  ],
+  "filenames": [],
+  "view_kind": "image",
+  "adapter": "radar-window",
+  "reader": "radar-window",
+  "capabilities": {
+    "operations": [
+      "preview"
+    ],
+    "input_mode": "window",
+    "shared": false
+  },
+  "default_enabled": true,
+  "priority": 40,
+  "permissions": [
+    "file:read"
+  ],
+  "limits": {
+    "max_input_bytes": 8388608,
+    "max_output_bytes": 2097152
+  }
+}

@@ -32,6 +32,8 @@ REASONS = {
     "finalization_timeout": "结果整理超时。",
     "finalization_failed": "结果整理失败。",
     "invalid_final_result": "结果格式未通过验证。",
+    "invalid_execution_result": "模型未返回可验证的执行结果。",
+    "tool_protocol_error": "模型未能发起有效的工具调用，相关操作未执行。",
     "execution_failed": "分析尚未完成。",
 }
 
@@ -259,7 +261,7 @@ def assess_delivery(requirements, records: list[dict], delivered: list[Any], *,
         reason = stop_code
     elif any(reason in UNAVAILABLE_REASONS for reason in blocking):
         reason = "validation_unavailable"
-    elif any(reason != "delivery_failed" for reason in blocking):
+    elif any(reason not in {"delivery_failed", "missing_artifact"} for reason in blocking):
         reason = "artifact_validation_failed"
     elif "delivery_failed" in blocking:
         reason = "delivery_failed"

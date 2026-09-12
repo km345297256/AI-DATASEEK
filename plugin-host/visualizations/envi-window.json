@@ -1,0 +1,30 @@
+{
+  "contract_version": 2,
+  "id": "viz-envi-window",
+  "version": "1.0.0",
+  "name": "ENVI 波段与像元光谱",
+  "description": "从数据集内 .hdr 与唯一配对原始数据打开；受限 ENVI Standard BSQ/BIL/BIP。按波段区域或像元读取，不做反射率缩放、校正或地图投影。",
+  "extensions": [
+    "hdr"
+  ],
+  "filenames": [],
+  "view_kind": "image",
+  "adapter": "envi-window",
+  "reader": "envi-window",
+  "default_enabled": true,
+  "priority": 10,
+  "permissions": [
+    "file:read"
+  ],
+  "limits": {
+    "max_input_bytes": 8388608,
+    "max_output_bytes": 2097152
+  },
+  "capabilities": {
+    "operations": [
+      "preview"
+    ],
+    "input_mode": "window",
+    "shared": false
+  }
+}

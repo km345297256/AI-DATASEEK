@@ -1,0 +1,17 @@
+{
+  "contract_version": 2,
+  "id": "viz-czi",
+  "version": "1.0.0",
+  "name": "CZI 显微切片",
+  "description": "官方 pylibCZIrw 有界单场景 CZI 只读预览。先检查维度，再明确选择 C/Z/T 和最多 1024×1024 ROI；不读取外链、身份元数据或进行多场景拼接。",
+  "extensions": ["czi"],
+  "filenames": [],
+  "view_kind": "image",
+  "adapter": "czi-image",
+  "reader": "czi",
+  "default_enabled": true,
+  "priority": 40,
+  "permissions": ["file:read"],
+  "limits": {"max_input_bytes": 67108864, "max_output_bytes": 8388608},
+  "capabilities": {"operations": ["preview"], "input_mode": "whole", "shared": false}
+}

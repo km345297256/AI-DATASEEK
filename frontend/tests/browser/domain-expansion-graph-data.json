@@ -1,0 +1,62 @@
+{
+  "contract_version": 2,
+  "type": "scientific-graph",
+  "reader": "scientific-graph",
+  "kind": "graph",
+  "media_type": "application/json",
+  "graph": {
+    "directed": true,
+    "nodes": [
+      {
+        "id": "n0",
+        "key": "TP53",
+        "label": "TP53",
+        "group": "regulator"
+      },
+      {
+        "id": "n1",
+        "key": "MDM2",
+        "label": "MDM2",
+        "group": null
+      },
+      {
+        "id": "n2",
+        "key": "CDKN1A",
+        "label": "CDKN1A",
+        "group": null
+      }
+    ],
+    "edges": [
+      {
+        "id": "e0",
+        "key": "e1",
+        "source": "n0",
+        "target": "n1",
+        "label": "interaction",
+        "weight": 0.75
+      },
+      {
+        "id": "e1",
+        "key": "e2",
+        "source": "n0",
+        "target": "n2",
+        "label": "regulation",
+        "weight": 1.0
+      }
+    ]
+  },
+  "metadata": {
+    "format": "json",
+    "dialect": "dataseek-graph-json-v1",
+    "input_mode": "whole",
+    "source_bytes": 345,
+    "node_count": 3,
+    "edge_count": 2,
+    "simple": true
+  },
+  "warnings": [
+    "仅支持有界静态简单图；不支持自环、平行边、层级、动态图、外部资源或可执行样式。",
+    "布局仅用于展示；不推断生物学关系，不把边权重解释为距离或因果强度。"
+  ],
+  "sampled": false
+}

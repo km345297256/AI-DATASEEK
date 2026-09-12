@@ -1,0 +1,31 @@
+{
+  "contract_version": 2,
+  "id": "viz-instrument-images",
+  "version": "1.0.0",
+  "name": "ESRF EDF / SPE 2.x 探测器图像",
+  "description": "二维未压缩内联 ESRF EDF 与 Princeton SPE 2.x 固定头格式；显式帧和 ROI 范围读取，保留原值说明，不校准拟合。与生理信号 EDF 是两个独立插件。",
+  "extensions": [
+    "edf",
+    "spe"
+  ],
+  "filenames": [],
+  "view_kind": "image",
+  "adapter": "instrument-image",
+  "reader": "instrument-window",
+  "default_enabled": true,
+  "priority": 30,
+  "permissions": [
+    "file:read"
+  ],
+  "limits": {
+    "max_input_bytes": 33554432,
+    "max_output_bytes": 8388608
+  },
+  "capabilities": {
+    "operations": [
+      "preview"
+    ],
+    "input_mode": "window",
+    "shared": false
+  }
+}

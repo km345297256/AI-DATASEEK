@@ -1,0 +1,577 @@
+{
+  "provenance": "Independent NumPy Ripple vector raw EDS_TEM fixture; no real data",
+  "tree": {
+    "contract_version": 2,
+    "type": "ripple-window",
+    "reader": "ripple-window",
+    "kind": "tree",
+    "media_type": "application/json",
+    "choices": {
+      "cube": {
+        "width": 4,
+        "height": 3,
+        "depth": 8,
+        "dtype": "float32",
+        "byte_order": "little-endian",
+        "data_offset": 8,
+        "signal_type": "EDS_TEM",
+        "axes": [
+          {
+            "label": "height",
+            "unit": "nm",
+            "origin": 20,
+            "scale": -3,
+            "calibration": "declared",
+            "origin_defaulted": false
+          },
+          {
+            "label": "width",
+            "unit": "nm",
+            "origin": 10,
+            "scale": 2,
+            "calibration": "declared",
+            "origin_defaulted": false
+          },
+          {
+            "label": "depth",
+            "unit": "eV",
+            "origin": 100,
+            "scale": 5,
+            "calibration": "declared",
+            "origin_defaulted": false
+          }
+        ]
+      }
+    },
+    "selected": {},
+    "warnings": [
+      "只显示单通道原始图像或单像元谱线；坐标仅按文件声明展开，不做能量校准、背景扣除、元素识别或定量。"
+    ],
+    "sampled": false,
+    "tree": [
+      {
+        "path": "/cube",
+        "node_type": "array",
+        "shape": [
+          3,
+          4,
+          8
+        ],
+        "dtype": "float32"
+      }
+    ],
+    "metadata": {
+      "format": "rpl",
+      "input_mode": "window",
+      "source_bytes": 663,
+      "header_bytes": 271,
+      "data_bytes": 392,
+      "read_bytes": 271,
+      "read_requests": 1,
+      "null_values": 0,
+      "limits": {
+        "max_values": 16384,
+        "max_depth": 1048576,
+        "max_spectrum_channels": 16384
+      },
+      "record_by": "vector",
+      "value_semantics": "raw-storage"
+    }
+  },
+  "image": {
+    "contract_version": 2,
+    "type": "ripple-window",
+    "reader": "ripple-window",
+    "kind": "image",
+    "media_type": "application/json",
+    "choices": {
+      "cube": {
+        "width": 4,
+        "height": 3,
+        "depth": 8,
+        "dtype": "float32",
+        "byte_order": "little-endian",
+        "data_offset": 8,
+        "signal_type": "EDS_TEM",
+        "axes": [
+          {
+            "label": "height",
+            "unit": "nm",
+            "origin": 20,
+            "scale": -3,
+            "calibration": "declared",
+            "origin_defaulted": false
+          },
+          {
+            "label": "width",
+            "unit": "nm",
+            "origin": 10,
+            "scale": 2,
+            "calibration": "declared",
+            "origin_defaulted": false
+          },
+          {
+            "label": "depth",
+            "unit": "eV",
+            "origin": 100,
+            "scale": 5,
+            "calibration": "declared",
+            "origin_defaulted": false
+          }
+        ]
+      }
+    },
+    "selected": {
+      "channel": 3,
+      "x": 1,
+      "y": 1,
+      "width": 3,
+      "height": 2
+    },
+    "warnings": [
+      "只显示单通道原始图像或单像元谱线；坐标仅按文件声明展开，不做能量校准、背景扣除、元素识别或定量。"
+    ],
+    "sampled": false,
+    "array": {
+      "shape": [
+        2,
+        3
+      ],
+      "dimensions": [
+        "height",
+        "width"
+      ],
+      "dtype": "float32",
+      "values": [
+        113,
+        123,
+        133,
+        213,
+        223,
+        233
+      ]
+    },
+    "axes": [
+      {
+        "label": "height",
+        "unit": "nm",
+        "values": [
+          17,
+          14
+        ]
+      },
+      {
+        "label": "width",
+        "unit": "nm",
+        "values": [
+          12,
+          14,
+          16
+        ]
+      }
+    ],
+    "metadata": {
+      "format": "rpl",
+      "input_mode": "window",
+      "source_bytes": 663,
+      "header_bytes": 271,
+      "data_bytes": 392,
+      "read_bytes": 467,
+      "read_requests": 2,
+      "null_values": 0,
+      "limits": {
+        "max_values": 16384,
+        "max_depth": 1048576,
+        "max_spectrum_channels": 16384
+      },
+      "record_by": "vector",
+      "value_semantics": "raw-storage"
+    }
+  },
+  "series": {
+    "contract_version": 2,
+    "type": "ripple-window",
+    "reader": "ripple-window",
+    "kind": "series",
+    "media_type": "application/json",
+    "choices": {
+      "cube": {
+        "width": 4,
+        "height": 3,
+        "depth": 8,
+        "dtype": "float32",
+        "byte_order": "little-endian",
+        "data_offset": 8,
+        "signal_type": "EDS_TEM",
+        "axes": [
+          {
+            "label": "height",
+            "unit": "nm",
+            "origin": 20,
+            "scale": -3,
+            "calibration": "declared",
+            "origin_defaulted": false
+          },
+          {
+            "label": "width",
+            "unit": "nm",
+            "origin": 10,
+            "scale": 2,
+            "calibration": "declared",
+            "origin_defaulted": false
+          },
+          {
+            "label": "depth",
+            "unit": "eV",
+            "origin": 100,
+            "scale": 5,
+            "calibration": "declared",
+            "origin_defaulted": false
+          }
+        ]
+      }
+    },
+    "selected": {
+      "x": 2,
+      "y": 1,
+      "channel_start": 1,
+      "channel_count": 4
+    },
+    "warnings": [
+      "只显示单通道原始图像或单像元谱线；坐标仅按文件声明展开，不做能量校准、背景扣除、元素识别或定量。"
+    ],
+    "sampled": false,
+    "array": {
+      "shape": [
+        4
+      ],
+      "dimensions": [
+        "depth"
+      ],
+      "dtype": "float32",
+      "values": [
+        121,
+        122,
+        123,
+        124
+      ]
+    },
+    "axes": [
+      {
+        "label": "depth",
+        "unit": "eV",
+        "values": [
+          105,
+          110,
+          115,
+          120
+        ]
+      }
+    ],
+    "metadata": {
+      "format": "rpl",
+      "input_mode": "window",
+      "source_bytes": 663,
+      "header_bytes": 271,
+      "data_bytes": 392,
+      "read_bytes": 287,
+      "read_requests": 2,
+      "null_values": 0,
+      "limits": {
+        "max_values": 16384,
+        "max_depth": 1048576,
+        "max_spectrum_channels": 16384
+      },
+      "record_by": "vector",
+      "value_semantics": "raw-storage"
+    }
+  },
+  "index": {
+    "tree": {
+      "contract_version": 2,
+      "type": "ripple-window",
+      "reader": "ripple-window",
+      "kind": "tree",
+      "media_type": "application/json",
+      "choices": {
+        "cube": {
+          "width": 4,
+          "height": 3,
+          "depth": 8,
+          "dtype": "float32",
+          "byte_order": "little-endian",
+          "data_offset": 8,
+          "signal_type": "EDS_TEM",
+          "axes": [
+            {
+              "label": "height",
+              "unit": null,
+              "origin": 0,
+              "scale": 1,
+              "calibration": "index",
+              "origin_defaulted": true
+            },
+            {
+              "label": "width",
+              "unit": null,
+              "origin": 0,
+              "scale": 1,
+              "calibration": "index",
+              "origin_defaulted": true
+            },
+            {
+              "label": "depth",
+              "unit": null,
+              "origin": 0,
+              "scale": 1,
+              "calibration": "index",
+              "origin_defaulted": true
+            }
+          ]
+        }
+      },
+      "selected": {},
+      "warnings": [
+        "只显示单通道原始图像或单像元谱线；坐标仅按文件声明展开，不做能量校准、背景扣除、元素识别或定量。"
+      ],
+      "sampled": false,
+      "tree": [
+        {
+          "path": "/cube",
+          "node_type": "array",
+          "shape": [
+            3,
+            4,
+            8
+          ],
+          "dtype": "float32"
+        }
+      ],
+      "metadata": {
+        "format": "rpl",
+        "input_mode": "window",
+        "source_bytes": 523,
+        "header_bytes": 131,
+        "data_bytes": 392,
+        "read_bytes": 131,
+        "read_requests": 1,
+        "null_values": 0,
+        "limits": {
+          "max_values": 16384,
+          "max_depth": 1048576,
+          "max_spectrum_channels": 16384
+        },
+        "record_by": "vector",
+        "value_semantics": "raw-storage"
+      }
+    },
+    "image": {
+      "contract_version": 2,
+      "type": "ripple-window",
+      "reader": "ripple-window",
+      "kind": "image",
+      "media_type": "application/json",
+      "choices": {
+        "cube": {
+          "width": 4,
+          "height": 3,
+          "depth": 8,
+          "dtype": "float32",
+          "byte_order": "little-endian",
+          "data_offset": 8,
+          "signal_type": "EDS_TEM",
+          "axes": [
+            {
+              "label": "height",
+              "unit": null,
+              "origin": 0,
+              "scale": 1,
+              "calibration": "index",
+              "origin_defaulted": true
+            },
+            {
+              "label": "width",
+              "unit": null,
+              "origin": 0,
+              "scale": 1,
+              "calibration": "index",
+              "origin_defaulted": true
+            },
+            {
+              "label": "depth",
+              "unit": null,
+              "origin": 0,
+              "scale": 1,
+              "calibration": "index",
+              "origin_defaulted": true
+            }
+          ]
+        }
+      },
+      "selected": {
+        "channel": 3,
+        "x": 1,
+        "y": 1,
+        "width": 3,
+        "height": 2
+      },
+      "warnings": [
+        "只显示单通道原始图像或单像元谱线；坐标仅按文件声明展开，不做能量校准、背景扣除、元素识别或定量。"
+      ],
+      "sampled": false,
+      "array": {
+        "shape": [
+          2,
+          3
+        ],
+        "dimensions": [
+          "height",
+          "width"
+        ],
+        "dtype": "float32",
+        "values": [
+          113,
+          123,
+          133,
+          213,
+          223,
+          233
+        ]
+      },
+      "axes": [
+        {
+          "label": "height",
+          "unit": null,
+          "values": [
+            1,
+            2
+          ]
+        },
+        {
+          "label": "width",
+          "unit": null,
+          "values": [
+            1,
+            2,
+            3
+          ]
+        }
+      ],
+      "metadata": {
+        "format": "rpl",
+        "input_mode": "window",
+        "source_bytes": 523,
+        "header_bytes": 131,
+        "data_bytes": 392,
+        "read_bytes": 327,
+        "read_requests": 2,
+        "null_values": 0,
+        "limits": {
+          "max_values": 16384,
+          "max_depth": 1048576,
+          "max_spectrum_channels": 16384
+        },
+        "record_by": "vector",
+        "value_semantics": "raw-storage"
+      }
+    },
+    "series": {
+      "contract_version": 2,
+      "type": "ripple-window",
+      "reader": "ripple-window",
+      "kind": "series",
+      "media_type": "application/json",
+      "choices": {
+        "cube": {
+          "width": 4,
+          "height": 3,
+          "depth": 8,
+          "dtype": "float32",
+          "byte_order": "little-endian",
+          "data_offset": 8,
+          "signal_type": "EDS_TEM",
+          "axes": [
+            {
+              "label": "height",
+              "unit": null,
+              "origin": 0,
+              "scale": 1,
+              "calibration": "index",
+              "origin_defaulted": true
+            },
+            {
+              "label": "width",
+              "unit": null,
+              "origin": 0,
+              "scale": 1,
+              "calibration": "index",
+              "origin_defaulted": true
+            },
+            {
+              "label": "depth",
+              "unit": null,
+              "origin": 0,
+              "scale": 1,
+              "calibration": "index",
+              "origin_defaulted": true
+            }
+          ]
+        }
+      },
+      "selected": {
+        "x": 2,
+        "y": 1,
+        "channel_start": 1,
+        "channel_count": 4
+      },
+      "warnings": [
+        "只显示单通道原始图像或单像元谱线；坐标仅按文件声明展开，不做能量校准、背景扣除、元素识别或定量。"
+      ],
+      "sampled": false,
+      "array": {
+        "shape": [
+          4
+        ],
+        "dimensions": [
+          "depth"
+        ],
+        "dtype": "float32",
+        "values": [
+          121,
+          122,
+          123,
+          124
+        ]
+      },
+      "axes": [
+        {
+          "label": "depth",
+          "unit": null,
+          "values": [
+            1,
+            2,
+            3,
+            4
+          ]
+        }
+      ],
+      "metadata": {
+        "format": "rpl",
+        "input_mode": "window",
+        "source_bytes": 523,
+        "header_bytes": 131,
+        "data_bytes": 392,
+        "read_bytes": 147,
+        "read_requests": 2,
+        "null_values": 0,
+        "limits": {
+          "max_values": 16384,
+          "max_depth": 1048576,
+          "max_spectrum_channels": 16384
+        },
+        "record_by": "vector",
+        "value_semantics": "raw-storage"
+      }
+    }
+  }
+}

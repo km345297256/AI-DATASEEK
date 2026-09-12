@@ -1961,6 +1961,12 @@ class AgentTaskRunner(TaskRunner):
         step.status = ExecutionStatus.COMPLETED if step.success else ExecutionStatus.FAILED
         event.status = StepStatus.COMPLETED if step.success else StepStatus.FAILED
         if not step.success:
+            had_unverified_draft = bool(step.result)
+            if not repair_pending:
+                # Clear before saving a continuation: its plan/progress must
+                # not label an unverified draft as evidence for a later turn.
+                # Local repair already received the draft privately above.
+                step.result = None
             # An uncertain side-effecting call must not be offered as an
             # automatically replayable script. Only explicit safe checkpoints.
             safe = not execution.get("has_unconfirmed_tool_execution", False)
@@ -2008,10 +2014,14 @@ class AgentTaskRunner(TaskRunner):
                     logger.warning("Analysis checkpoint unavailable error_type=%s", type(error).__name__)
             if not step.result:
                 step.result = outcome_message(outcome, delivered_files=checked_files)
-            elif not repair_pending and not step.result.startswith("分析说明（完成状态以成果检查结果为准）："):
-                # Preserve evidence/explanation, but distinguish model-authored
-                # prose from the authoritative verified completion state.
-                step.result = "分析说明（完成状态以成果检查结果为准）：\n\n" + step.result
+            if had_unverified_draft and not repair_pending:
+                # A disclaimer cannot turn an unexecuted draft into evidence.
+                # Keep the original draft in the private execution memory and
+                # repair feedback, not in a final answer beside failed receipts.
+                # Already verified uploads and other successful steps survive.
+                step.result += (
+                    "\n\n本步骤的分析说明尚未通过完整核验，未作为已确认结论发布。"
+                )
             step.error = outcome.reason_code
         logger.info("analysis_outcome status=%s reason=%s missing=%d delivered=%d resumable=%s",
                     outcome.status, outcome.reason_code, len(outcome.missing), len(checked_files), outcome.can_resume)
@@ -2048,6 +2058,8 @@ class AgentTaskRunner(TaskRunner):
             if step.success:
                 continue
             step.outcome = None
+            step.result = None
+            step.attachments = []
             step.status = ExecutionStatus.RUNNING
             yield StepEvent(status=StepStatus.STARTED, step=step)
             step.attachments = list(checkpoint.get("progress", {}).get("verified_files", []))
@@ -2362,7 +2374,8 @@ class AgentTaskRunner(TaskRunner):
         delivered_file_keys: set[str] = set()
         completed_step_count = 0
         early_artifact_delivery_count = 0
-        skip_next_step_result: Optional[str] = None
+        skip_next_step_results: set[str] = set()
+        withheld_step_outcomes = {}
         # Completion advice only needs the current turn.  Keeping this compact
         # also avoids loading and serializing the full session at Done time.
         turn_events: List[BaseEvent] = [
@@ -2438,6 +2451,7 @@ class AgentTaskRunner(TaskRunner):
                     discovered_files = []
 
                 if event.status in {StepStatus.COMPLETED, StepStatus.FAILED}:
+                    original_step_result = (event.step.result or "").strip()
                     terminal_files = self._unique_files(explicit_files + discovered_files + self._generated_files)
                     terminal_files = await self._finalize_analysis_step(
                         event, message, terminal_files, source_seq=trigger_event_seq)
@@ -2446,13 +2460,17 @@ class AgentTaskRunner(TaskRunner):
                     if event.step.outcome:
                         self._generated_files = terminal_files
                     if event.step.id in self._flow._artifact_repair_requests:
-                        skip_next_step_result = (event.step.result or "").strip() or None
+                        skip_next_step_results = {original_step_result, (event.step.result or "").strip()} - {""}
                         yield MessageEvent(message="", metadata={"analysis_progress": {"stage": "completing_results"}})
                         # The matching terminal/prose pair is internal until
                         # required outputs are repaired or further work stalls.
                         continue
                     completed_step_count += 1
                     last_analysis_outcome = event.step.outcome
+                    if last_analysis_outcome and last_analysis_outcome.status != "succeeded":
+                        withheld_step_outcomes[event.step.id] = last_analysis_outcome
+                    else:
+                        withheld_step_outcomes.pop(event.step.id, None)
                     new_files = [
                         file_info
                         for file_info in terminal_files
@@ -2481,7 +2499,7 @@ class AgentTaskRunner(TaskRunner):
                             # StepEvent.  The delivery event above is that same
                             # answer with its files attached, so discard the
                             # following attachment-free duplicate.
-                            skip_next_step_result = result_message
+                            skip_next_step_results = {original_step_result, result_message} - {""}
             elif isinstance(event, MessageEvent):
                 if (event.metadata or {}).get("analysis_progress"):
                     # Progress is a transient running message, not a terminal
@@ -2496,16 +2514,21 @@ class AgentTaskRunner(TaskRunner):
                 normalized_message = (event.message or "").strip()
                 if is_summary and last_analysis_outcome and last_analysis_outcome.status != "succeeded":
                     event.metadata = {**(event.metadata or {}), "analysis_outcome": last_analysis_outcome.model_dump(exclude_none=True)}
+                if is_summary and withheld_step_outcomes:
+                    # A later summarizer has no new execution evidence and must
+                    # not resurrect a withheld draft, including when a later
+                    # step succeeded after an earlier one failed.
+                    event.message = "部分步骤尚未完成核验；已确认的分析与文件请以上方各步骤的交付结果为准。"
                 if (
-                    skip_next_step_result is not None
+                    skip_next_step_results
                     and not is_summary
                     and not event.attachments
-                    and normalized_message == skip_next_step_result
+                    and normalized_message in skip_next_step_results
                 ):
                     suppress_event = True
-                    skip_next_step_result = None
-                elif skip_next_step_result is not None and not is_summary:
-                    skip_next_step_result = None
+                    skip_next_step_results.clear()
+                elif skip_next_step_results and not is_summary:
+                    skip_next_step_results.clear()
 
                 if not suppress_event and is_summary and artifact_discovery_dirty:
                     summary_discovered_files = await self._sync_discovered_artifacts_to_storage()

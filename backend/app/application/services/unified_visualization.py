@@ -29,6 +29,7 @@ _BYTE_SLOTS = asyncio.Semaphore(2)
 _CHUNK_BYTES = 1024 * 1024
 _READ_CHUNK_BYTES = 8 * 1024 * 1024
 _SCIENCE_READERS = {"netcdf", "fits", "fastq"}
+_PROFILE_ADAPTERS = {"tiff", "plotly", "h5web", "viv", "openlayers"}
 _MOLECULAR_FORMATS = {"cif": "cif", "pdb": "pdb", "ent": "pdb", "mol": "sdf", "sdf": "sdf", "xyz": "xyz", "mol2": "mol2", "vasp": "vasp"}
 
 
@@ -36,7 +37,7 @@ class VisualizationJobRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     plugin_id: str = Field(pattern=r"^[a-z][a-z0-9-]{0,63}$")
     version: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
-    kind: Literal["table", "series", "heatmap", "tree", "image", "pdf", "report", "map", "quality"] | None = None
+    kind: Literal["table", "series", "heatmap", "tree", "image", "pdf", "report", "map", "quality", "graph", "geometry"] | None = None
     options: dict[str, Any] = Field(default_factory=dict, max_length=10)
 
 
@@ -50,7 +51,7 @@ class VisualizationResult(BaseModel):
     plugin_id: str
     version: str
     revision: str
-    kind: Literal["page", "series", "raster", "table", "array", "tree", "media", "report", "molecule", "resources"]
+    kind: Literal["page", "series", "raster", "table", "array", "tree", "media", "report", "molecule", "resources", "features", "graph", "geometry"]
     payload: dict[str, Any]
     metadata: dict[str, Any] = Field(default_factory=dict)
     warnings: list[str] = Field(default_factory=list)
@@ -102,8 +103,29 @@ def normalize_result(result) -> VisualizationResult:
     data.pop("type", None)
     view_kind = data.pop("kind")
     data["view_kind"] = view_kind
-    if reader in _SCIENCE_READERS:
+    from app.application.services.main_migration_visualization import KINDS as WORKBENCH_KINDS
+    if reader in WORKBENCH_KINDS:
+        if view_kind not in WORKBENCH_KINDS[reader]:
+            raise VisualizationWorkerError("工作台结果不符合已声明的视图。")
+        field = {"matrix-workbench":"matrix", "astronomy-workbench":"workbench", "alignment-browser":"alignment", "sequence-browser":"sequence", "genome-tracks":"tracks", "blast-hits":"hits"}[reader]
+        if view_kind != "tree" and not isinstance(data.get(field), list if reader == "genome-tracks" else dict):
+            raise VisualizationWorkerError("工作台结果缺少已声明的数据结构。")
+        kind = "tree" if view_kind == "tree" else "array" if reader == "matrix-workbench" and view_kind == "image" else "raster" if reader == "astronomy-workbench" and view_kind == "image" else "features" if reader == "genome-tracks" else view_kind
+    elif reader in {"spatial-window", "pointcloud-window", "gro-trajectory", "simulation-mesh", "ugrid-window"} and view_kind == "geometry":
+        field = {"spatial-window":"spatial", "pointcloud-window":"array", "gro-trajectory":"trajectory", "simulation-mesh":"mesh", "ugrid-window":"ugrid"}[reader]
+        if not isinstance(data.get(field), dict):
+            raise VisualizationWorkerError("几何结果缺少已声明的结构。")
+        kind = "geometry"
+    elif reader in _SCIENCE_READERS:
         kind = "series" if view_kind in {"quality", "series"} else "raster"
+    elif reader in {"edf", "seismic-window", "fcs-window", "diffraction"} and isinstance(data.get("series"), list):
+        kind = "series"
+    elif reader == "phylogeny" and isinstance(data.get("phylogeny"), dict):
+        kind = "tree"
+    elif reader == "geoformat" and isinstance(data.get("geojson"), dict):
+        kind = "features"
+    elif reader == "scientific-graph" and isinstance(data.get("graph"), dict):
+        kind = "graph"
     elif isinstance(data.get("data_base64"), str):
         kind = "media"
     elif isinstance(data.get("sections"), list):
@@ -191,6 +213,9 @@ async def _bytes(file_service, catalog, file_id, user_id, plugin, revision, info
         raise ScientificPreviewRejected("文件超过此插件的读取上限，请下载文件或使用分析工具。")
     if plugin.reader == "molecular" and info.size > 50 * 1024 * 1024:
         raise ScientificPreviewRejected("分子结构超过 50 MB 预览上限。")
+    media_limit = {"video-player": 64 * 1024 * 1024, "audio-waveform": 16 * 1024 * 1024}.get(plugin.adapter)
+    if media_limit is not None and info.size > media_limit:
+        raise ScientificPreviewRejected("媒体文件超过此交互式预览的硬限制。")
     read = getattr(file_service._file_storage, "download_file_range", None)
     if not callable(read):
         raise NotImplementedError("Bounded storage required")
@@ -250,12 +275,42 @@ async def unified_visualization(file_service, catalog, image, file_id, user_id,
     revision = (await catalog.list_for_user(user_id)).revision
     if request.operation not in plugin.capabilities.operations:
         raise ScientificPreviewRejected("此插件未声明该操作能力。")
+    if plugin.reader == "ome-zarr":
+        from app.application.services.ome_zarr_scope import ome_zarr_visualization
+        result = normalize_result(await ome_zarr_visualization(file_service, catalog, image, file_id, user_id, request))
+        check_output_budget(result, plugin)
+        return result
+    if plugin.reader == "envi-window":
+        from app.application.services.envi_scope import envi_visualization
+        result = normalize_result(await envi_visualization(file_service, catalog, image, file_id, user_id, request))
+        check_output_budget(result, plugin)
+        return result
+    if plugin.reader == "ripple-window":
+        from app.application.services.ripple_scope import ripple_visualization
+        result = normalize_result(await ripple_visualization(file_service, catalog, image, file_id, user_id, request))
+        check_output_budget(result, plugin)
+        return result
     info = await _file(file_service, file_id, user_id)
     if not plugin.matches_filename(info.filename or ""):
         raise ScientificPreviewRejected("此插件不支持当前文件格式。")
     version = preview_version(info)
     if request.version and request.version != version:
         raise PreviewVersionChanged()
+    from app.application.services.main_migration_visualization import KINDS as WORKBENCH_KINDS
+    if plugin.reader in WORKBENCH_KINDS and request.kind not in {None, "tree"} and request.version is None:
+        raise ScientificPreviewRejected("请先读取目录，再携带同一文件版本明确选择工作台数据。")
+    if plugin.reader == "archive-member" and "member_id" in request.options and request.version is None:
+        raise ScientificPreviewRejected("读取归档成员必须携带首次目录返回的文件版本。")
+    if plugin.reader == "czi" and request.kind == "image" and request.version is None:
+        raise ScientificPreviewRejected("请先读取 CZI 目录，再携带同一文件版本选择像素区域。")
+    if plugin.reader in {"sqlite-table", "database-table", "sql-dump", "pg-dump", "bson", "redis-rdb"} and request.kind == "table" and request.version is None:
+        raise ScientificPreviewRejected("请先读取目录，再携带文件版本选择数据表。")
+    if plugin.reader in {"dicom-window", "spatial-window", "pointcloud-window", "gro-trajectory", "simulation-mesh", "radar-window", "ugrid-window"} and request.kind in {"geometry", "image"} and request.version is None:
+        raise ScientificPreviewRejected("请先读取目录，再携带同一文件版本明确选择影像或几何数据。")
+    if plugin.reader in {"array-window", "czi-window", "instrument-window", "nexus-window", "columnar-window", "seismic-window", "grib-window", "fcs-window", "mass-spectrum", "diffraction"} and request.kind in {"image", "series", "table"} and request.version is None:
+        raise ScientificPreviewRejected("请先读取结构，再携带同一文件版本明确选择数据窗口。")
+    if request.kind in {None, "tree"} and request.version is None and ((plugin.reader == "seismic-window" and request.options) or (plugin.reader in {"grib-window", "mass-spectrum"} and request.options.get("offset", 0) != 0)):
+        raise ScientificPreviewRejected("目录分页必须携带首次目录的文件版本。")
     if request.operation == "bytes":
         if set(request.options) - {"resource_id"} or request.kind is not None:
             raise ScientificPreviewRejected("原始数据读取不接受额外参数。")
@@ -296,6 +351,20 @@ async def unified_visualization(file_service, catalog, image, file_id, user_id,
         result = VisualizationResult(plugin_id=plugin.id, version=version, revision=revision,
             kind="page", payload=page.model_dump(exclude={"version"}), sampled=page.next_offset is not None)
     elif request.operation == "prepare":
+        if plugin.adapter in _PROFILE_ADAPTERS:
+            if request.options or request.kind is not None:
+                raise ScientificPreviewRejected("内容识别不接受路径、读取器或额外参数。")
+            from app.application.services.visualization_probe import probe_visualization_file, VisualizationProbeRejected
+            try:
+                profile = await probe_visualization_file(file_service, catalog, file_id, user_id, plugin.id, version=version)
+            except VisualizationProbeRejected:
+                raise ScientificPreviewRejected("无法安全识别此文件头；可选择已有视图验证，或下载后分析。") from None
+            result = VisualizationResult(plugin_id=plugin.id, version=version, revision=revision, kind="resources",
+                payload={"profile": profile.model_dump(exclude={"plugin_id", "version", "revision"})},
+                metadata={"purpose": "content-profile", "read_only": True}, sampled=profile.truncated)
+            check_output_budget(result, plugin)
+            await _fence(file_service, catalog, file_id, user_id, plugin, revision, version)
+            return result
         if plugin.reader == "office-viewer":
             if request.options or request.kind is not None:
                 raise ScientificPreviewRejected("办公查看器不接受额外地址或执行参数。")
@@ -311,6 +380,10 @@ async def unified_visualization(file_service, catalog, image, file_id, user_id,
         result = VisualizationResult(plugin_id=plugin.id, version=version, revision=revision, kind="molecule",
             payload={"source_name": name, "source_format": format, "content_type": info.content_type,
                 "size_bytes": info.size, "periodic": periodic, "supports_unit_cell": periodic})
+    elif plugin.capabilities.input_mode == "window":
+        from app.application.services.window_visualization import window_visualization
+        internal = ExtendedPreviewRequest(plugin_id=plugin.id, version=version, kind=request.kind, options=request.options)
+        result = normalize_result(await window_visualization(file_service, catalog, image, file_id, user_id, internal))
     elif plugin.reader in _SCIENCE_READERS:
         kind = "quality" if plugin.reader == "fastq" else plugin.view_kind
         if request.kind not in {None, kind}:

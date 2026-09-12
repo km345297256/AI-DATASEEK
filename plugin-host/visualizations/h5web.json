@@ -1,16 +1,17 @@
 {
   "contract_version": 2,
   "id": "viz-h5web",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "name": "H5Web 层级与切片",
-  "description": "HDF5/NeXus 内部树与有界数值切片；不支持经典 NetCDF3。",
+  "description": "HDF5/NeXus、MATLAB v7.3 内部树与有界数值切片；内容识别，不支持经典 NetCDF3。",
   "extensions": [
     "h5",
     "hdf5",
     "nxs",
     "nx",
     "nc4",
-    "nc"
+    "nc",
+    "mat"
   ],
   "filenames": [],
   "view_kind": "image",
@@ -27,7 +28,8 @@
   },
   "capabilities": {
     "operations": [
-      "preview"
+      "preview",
+      "prepare"
     ],
     "input_mode": "whole",
     "shared": false

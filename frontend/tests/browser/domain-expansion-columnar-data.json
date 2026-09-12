@@ -1,0 +1,1145 @@
+{
+  "provenance": {
+    "generator": "sandbox/tests/columnar_window_browser_payloads.py",
+    "engine": "pyarrow 25.0.1",
+    "synthetic": true,
+    "virtual_padding_bytes": 134217728,
+    "logical_rows": 4
+  },
+  "cases": {
+    "parquet": {
+      "tree": {
+        "contract_version": 2,
+        "type": "columnar-window",
+        "reader": "columnar-window",
+        "kind": "tree",
+        "media_type": "application/json",
+        "choices": {
+          "columns": [
+            {
+              "id": 0,
+              "label": "identity",
+              "type": "int64",
+              "nullable": true,
+              "precision": null,
+              "scale": null
+            },
+            {
+              "id": 1,
+              "label": "decimal",
+              "type": "decimal128",
+              "nullable": true,
+              "precision": 20,
+              "scale": 4
+            },
+            {
+              "id": 2,
+              "label": "label",
+              "type": "string",
+              "nullable": true,
+              "precision": null,
+              "scale": null
+            }
+          ]
+        },
+        "selected": {},
+        "metadata": {
+          "format": "parquet",
+          "container": "Parquet",
+          "input_mode": "window",
+          "value_semantics": "source order; integers and decimals are exact strings; nonfinite floats are null; no SQL or aggregation",
+          "source_bytes": 134219689,
+          "read_bytes": 1126,
+          "read_requests": 3,
+          "total_rows": 4,
+          "total_columns": 3,
+          "total_groups": 2,
+          "metadata_bytes": 1114,
+          "groups_read": 0,
+          "scan_rows": 0,
+          "decoded_bytes": 0,
+          "blocks_checked": 0,
+          "nonfinite_values": 0,
+          "limits": {
+            "max_rows": 200,
+            "max_columns": 32,
+            "max_schema_columns": 128,
+            "max_metadata_bytes": 1048576,
+            "max_block_bytes": 4194304,
+            "max_decoded_bytes": 16777216,
+            "max_scan_rows": 262144
+          }
+        },
+        "warnings": [
+          "仅显示所选列和行窗口，不排序、不聚合；整数和小数以精确文本保留，非有限浮点值显示为空。"
+        ],
+        "sampled": false,
+        "tree": [
+          {
+            "path": "/column-0",
+            "node_type": "column",
+            "attributes": {
+              "label": "identity",
+              "type": "int64"
+            }
+          },
+          {
+            "path": "/column-1",
+            "node_type": "column",
+            "attributes": {
+              "label": "decimal",
+              "type": "decimal128"
+            }
+          },
+          {
+            "path": "/column-2",
+            "node_type": "column",
+            "attributes": {
+              "label": "label",
+              "type": "string"
+            }
+          }
+        ]
+      },
+      "first": {
+        "contract_version": 2,
+        "type": "columnar-window",
+        "reader": "columnar-window",
+        "kind": "table",
+        "media_type": "application/json",
+        "choices": {
+          "columns": [
+            {
+              "id": 0,
+              "label": "identity",
+              "type": "int64",
+              "nullable": true,
+              "precision": null,
+              "scale": null
+            },
+            {
+              "id": 1,
+              "label": "decimal",
+              "type": "decimal128",
+              "nullable": true,
+              "precision": 20,
+              "scale": 4
+            },
+            {
+              "id": 2,
+              "label": "label",
+              "type": "string",
+              "nullable": true,
+              "precision": null,
+              "scale": null
+            }
+          ]
+        },
+        "selected": {
+          "columns": [
+            0,
+            1,
+            2
+          ],
+          "row_offset": 0,
+          "row_limit": 2
+        },
+        "metadata": {
+          "format": "parquet",
+          "container": "Parquet",
+          "input_mode": "window",
+          "value_semantics": "source order; integers and decimals are exact strings; nonfinite floats are null; no SQL or aggregation",
+          "source_bytes": 134219689,
+          "read_bytes": 1561,
+          "read_requests": 6,
+          "total_rows": 4,
+          "total_columns": 3,
+          "total_groups": 2,
+          "metadata_bytes": 1114,
+          "groups_read": 1,
+          "scan_rows": 2,
+          "decoded_bytes": 329,
+          "blocks_checked": 3,
+          "nonfinite_values": 0,
+          "limits": {
+            "max_rows": 200,
+            "max_columns": 32,
+            "max_schema_columns": 128,
+            "max_metadata_bytes": 1048576,
+            "max_block_bytes": 4194304,
+            "max_decoded_bytes": 16777216,
+            "max_scan_rows": 262144
+          }
+        },
+        "warnings": [
+          "仅显示所选列和行窗口，不排序、不聚合；整数和小数以精确文本保留，非有限浮点值显示为空。"
+        ],
+        "sampled": true,
+        "table": {
+          "columns": [
+            "identity",
+            "decimal",
+            "label"
+          ],
+          "rows": [
+            [
+              "9223372036854775807",
+              "1234567890123456.1200",
+              "科学 <data>"
+            ],
+            [
+              "-9223372036854775808",
+              "-0.0100",
+              ""
+            ]
+          ],
+          "row_offset": 0,
+          "total_rows": 4,
+          "total_columns": 3
+        }
+      },
+      "next": {
+        "contract_version": 2,
+        "type": "columnar-window",
+        "reader": "columnar-window",
+        "kind": "table",
+        "media_type": "application/json",
+        "choices": {
+          "columns": [
+            {
+              "id": 0,
+              "label": "identity",
+              "type": "int64",
+              "nullable": true,
+              "precision": null,
+              "scale": null
+            },
+            {
+              "id": 1,
+              "label": "decimal",
+              "type": "decimal128",
+              "nullable": true,
+              "precision": 20,
+              "scale": 4
+            },
+            {
+              "id": 2,
+              "label": "label",
+              "type": "string",
+              "nullable": true,
+              "precision": null,
+              "scale": null
+            }
+          ]
+        },
+        "selected": {
+          "columns": [
+            0,
+            1,
+            2
+          ],
+          "row_offset": 2,
+          "row_limit": 2
+        },
+        "metadata": {
+          "format": "parquet",
+          "container": "Parquet",
+          "input_mode": "window",
+          "value_semantics": "source order; integers and decimals are exact strings; nonfinite floats are null; no SQL or aggregation",
+          "source_bytes": 134219689,
+          "read_bytes": 1526,
+          "read_requests": 6,
+          "total_rows": 4,
+          "total_columns": 3,
+          "total_groups": 2,
+          "metadata_bytes": 1114,
+          "groups_read": 1,
+          "scan_rows": 2,
+          "decoded_bytes": 291,
+          "blocks_checked": 3,
+          "nonfinite_values": 0,
+          "limits": {
+            "max_rows": 200,
+            "max_columns": 32,
+            "max_schema_columns": 128,
+            "max_metadata_bytes": 1048576,
+            "max_block_bytes": 4194304,
+            "max_decoded_bytes": 16777216,
+            "max_scan_rows": 262144
+          }
+        },
+        "warnings": [
+          "仅显示所选列和行窗口，不排序、不聚合；整数和小数以精确文本保留，非有限浮点值显示为空。"
+        ],
+        "sampled": true,
+        "table": {
+          "columns": [
+            "identity",
+            "decimal",
+            "label"
+          ],
+          "rows": [
+            [
+              null,
+              null,
+              null
+            ],
+            [
+              "42",
+              "0.0000",
+              "last"
+            ]
+          ],
+          "row_offset": 2,
+          "total_rows": 4,
+          "total_columns": 3
+        }
+      },
+      "column": {
+        "contract_version": 2,
+        "type": "columnar-window",
+        "reader": "columnar-window",
+        "kind": "table",
+        "media_type": "application/json",
+        "choices": {
+          "columns": [
+            {
+              "id": 0,
+              "label": "identity",
+              "type": "int64",
+              "nullable": true,
+              "precision": null,
+              "scale": null
+            },
+            {
+              "id": 1,
+              "label": "decimal",
+              "type": "decimal128",
+              "nullable": true,
+              "precision": 20,
+              "scale": 4
+            },
+            {
+              "id": 2,
+              "label": "label",
+              "type": "string",
+              "nullable": true,
+              "precision": null,
+              "scale": null
+            }
+          ]
+        },
+        "selected": {
+          "columns": [
+            1
+          ],
+          "row_offset": 0,
+          "row_limit": 2
+        },
+        "metadata": {
+          "format": "parquet",
+          "container": "Parquet",
+          "input_mode": "window",
+          "value_semantics": "source order; integers and decimals are exact strings; nonfinite floats are null; no SQL or aggregation",
+          "source_bytes": 134219689,
+          "read_bytes": 1280,
+          "read_requests": 4,
+          "total_rows": 4,
+          "total_columns": 3,
+          "total_groups": 2,
+          "metadata_bytes": 1114,
+          "groups_read": 1,
+          "scan_rows": 2,
+          "decoded_bytes": 119,
+          "blocks_checked": 1,
+          "nonfinite_values": 0,
+          "limits": {
+            "max_rows": 200,
+            "max_columns": 32,
+            "max_schema_columns": 128,
+            "max_metadata_bytes": 1048576,
+            "max_block_bytes": 4194304,
+            "max_decoded_bytes": 16777216,
+            "max_scan_rows": 262144
+          }
+        },
+        "warnings": [
+          "仅显示所选列和行窗口，不排序、不聚合；整数和小数以精确文本保留，非有限浮点值显示为空。"
+        ],
+        "sampled": true,
+        "table": {
+          "columns": [
+            "decimal"
+          ],
+          "rows": [
+            [
+              "1234567890123456.1200"
+            ],
+            [
+              "-0.0100"
+            ]
+          ],
+          "row_offset": 0,
+          "total_rows": 4,
+          "total_columns": 3
+        }
+      }
+    },
+    "arrow": {
+      "tree": {
+        "contract_version": 2,
+        "type": "columnar-window",
+        "reader": "columnar-window",
+        "kind": "tree",
+        "media_type": "application/json",
+        "choices": {
+          "columns": [
+            {
+              "id": 0,
+              "label": "identity",
+              "type": "int64",
+              "nullable": true,
+              "precision": null,
+              "scale": null
+            },
+            {
+              "id": 1,
+              "label": "decimal",
+              "type": "decimal128",
+              "nullable": true,
+              "precision": 20,
+              "scale": 4
+            },
+            {
+              "id": 2,
+              "label": "label",
+              "type": "string",
+              "nullable": true,
+              "precision": null,
+              "scale": null
+            }
+          ]
+        },
+        "selected": {},
+        "metadata": {
+          "format": "arrow",
+          "container": "Arrow IPC file",
+          "input_mode": "window",
+          "value_semantics": "source order; integers and decimals are exact strings; nonfinite floats are null; no SQL or aggregation",
+          "source_bytes": 134219218,
+          "read_bytes": 882,
+          "read_requests": 5,
+          "total_rows": 4,
+          "total_columns": 3,
+          "total_groups": 2,
+          "metadata_bytes": 864,
+          "groups_read": 0,
+          "scan_rows": 0,
+          "decoded_bytes": 0,
+          "blocks_checked": 0,
+          "nonfinite_values": 0,
+          "limits": {
+            "max_rows": 200,
+            "max_columns": 32,
+            "max_schema_columns": 128,
+            "max_metadata_bytes": 1048576,
+            "max_block_bytes": 4194304,
+            "max_decoded_bytes": 16777216,
+            "max_scan_rows": 262144
+          }
+        },
+        "warnings": [
+          "仅显示所选列和行窗口，不排序、不聚合；整数和小数以精确文本保留，非有限浮点值显示为空。"
+        ],
+        "sampled": false,
+        "tree": [
+          {
+            "path": "/column-0",
+            "node_type": "column",
+            "attributes": {
+              "label": "identity",
+              "type": "int64"
+            }
+          },
+          {
+            "path": "/column-1",
+            "node_type": "column",
+            "attributes": {
+              "label": "decimal",
+              "type": "decimal128"
+            }
+          },
+          {
+            "path": "/column-2",
+            "node_type": "column",
+            "attributes": {
+              "label": "label",
+              "type": "string"
+            }
+          }
+        ]
+      },
+      "first": {
+        "contract_version": 2,
+        "type": "columnar-window",
+        "reader": "columnar-window",
+        "kind": "table",
+        "media_type": "application/json",
+        "choices": {
+          "columns": [
+            {
+              "id": 0,
+              "label": "identity",
+              "type": "int64",
+              "nullable": true,
+              "precision": null,
+              "scale": null
+            },
+            {
+              "id": 1,
+              "label": "decimal",
+              "type": "decimal128",
+              "nullable": true,
+              "precision": 20,
+              "scale": 4
+            },
+            {
+              "id": 2,
+              "label": "label",
+              "type": "string",
+              "nullable": true,
+              "precision": null,
+              "scale": null
+            }
+          ]
+        },
+        "selected": {
+          "columns": [
+            0,
+            1,
+            2
+          ],
+          "row_offset": 0,
+          "row_limit": 2
+        },
+        "metadata": {
+          "format": "arrow",
+          "container": "Arrow IPC file",
+          "input_mode": "window",
+          "value_semantics": "source order; integers and decimals are exact strings; nonfinite floats are null; no SQL or aggregation",
+          "source_bytes": 134219218,
+          "read_bytes": 1466,
+          "read_requests": 7,
+          "total_rows": 4,
+          "total_columns": 3,
+          "total_groups": 2,
+          "metadata_bytes": 864,
+          "groups_read": 1,
+          "scan_rows": 2,
+          "decoded_bytes": 125,
+          "blocks_checked": 7,
+          "nonfinite_values": 0,
+          "limits": {
+            "max_rows": 200,
+            "max_columns": 32,
+            "max_schema_columns": 128,
+            "max_metadata_bytes": 1048576,
+            "max_block_bytes": 4194304,
+            "max_decoded_bytes": 16777216,
+            "max_scan_rows": 262144
+          }
+        },
+        "warnings": [
+          "仅显示所选列和行窗口，不排序、不聚合；整数和小数以精确文本保留，非有限浮点值显示为空。"
+        ],
+        "sampled": true,
+        "table": {
+          "columns": [
+            "identity",
+            "decimal",
+            "label"
+          ],
+          "rows": [
+            [
+              "9223372036854775807",
+              "1234567890123456.1200",
+              "科学 <data>"
+            ],
+            [
+              "-9223372036854775808",
+              "-0.0100",
+              ""
+            ]
+          ],
+          "row_offset": 0,
+          "total_rows": 4,
+          "total_columns": 3
+        }
+      },
+      "next": {
+        "contract_version": 2,
+        "type": "columnar-window",
+        "reader": "columnar-window",
+        "kind": "table",
+        "media_type": "application/json",
+        "choices": {
+          "columns": [
+            {
+              "id": 0,
+              "label": "identity",
+              "type": "int64",
+              "nullable": true,
+              "precision": null,
+              "scale": null
+            },
+            {
+              "id": 1,
+              "label": "decimal",
+              "type": "decimal128",
+              "nullable": true,
+              "precision": 20,
+              "scale": 4
+            },
+            {
+              "id": 2,
+              "label": "label",
+              "type": "string",
+              "nullable": true,
+              "precision": null,
+              "scale": null
+            }
+          ]
+        },
+        "selected": {
+          "columns": [
+            0,
+            1,
+            2
+          ],
+          "row_offset": 2,
+          "row_limit": 2
+        },
+        "metadata": {
+          "format": "arrow",
+          "container": "Arrow IPC file",
+          "input_mode": "window",
+          "value_semantics": "source order; integers and decimals are exact strings; nonfinite floats are null; no SQL or aggregation",
+          "source_bytes": 134219218,
+          "read_bytes": 1562,
+          "read_requests": 7,
+          "total_rows": 4,
+          "total_columns": 3,
+          "total_groups": 2,
+          "metadata_bytes": 864,
+          "groups_read": 1,
+          "scan_rows": 2,
+          "decoded_bytes": 67,
+          "blocks_checked": 7,
+          "nonfinite_values": 0,
+          "limits": {
+            "max_rows": 200,
+            "max_columns": 32,
+            "max_schema_columns": 128,
+            "max_metadata_bytes": 1048576,
+            "max_block_bytes": 4194304,
+            "max_decoded_bytes": 16777216,
+            "max_scan_rows": 262144
+          }
+        },
+        "warnings": [
+          "仅显示所选列和行窗口，不排序、不聚合；整数和小数以精确文本保留，非有限浮点值显示为空。"
+        ],
+        "sampled": true,
+        "table": {
+          "columns": [
+            "identity",
+            "decimal",
+            "label"
+          ],
+          "rows": [
+            [
+              null,
+              null,
+              null
+            ],
+            [
+              "42",
+              "0.0000",
+              "last"
+            ]
+          ],
+          "row_offset": 2,
+          "total_rows": 4,
+          "total_columns": 3
+        }
+      },
+      "column": {
+        "contract_version": 2,
+        "type": "columnar-window",
+        "reader": "columnar-window",
+        "kind": "table",
+        "media_type": "application/json",
+        "choices": {
+          "columns": [
+            {
+              "id": 0,
+              "label": "identity",
+              "type": "int64",
+              "nullable": true,
+              "precision": null,
+              "scale": null
+            },
+            {
+              "id": 1,
+              "label": "decimal",
+              "type": "decimal128",
+              "nullable": true,
+              "precision": 20,
+              "scale": 4
+            },
+            {
+              "id": 2,
+              "label": "label",
+              "type": "string",
+              "nullable": true,
+              "precision": null,
+              "scale": null
+            }
+          ]
+        },
+        "selected": {
+          "columns": [
+            1
+          ],
+          "row_offset": 0,
+          "row_limit": 2
+        },
+        "metadata": {
+          "format": "arrow",
+          "container": "Arrow IPC file",
+          "input_mode": "window",
+          "value_semantics": "source order; integers and decimals are exact strings; nonfinite floats are null; no SQL or aggregation",
+          "source_bytes": 134219218,
+          "read_bytes": 1466,
+          "read_requests": 7,
+          "total_rows": 4,
+          "total_columns": 3,
+          "total_groups": 2,
+          "metadata_bytes": 864,
+          "groups_read": 1,
+          "scan_rows": 2,
+          "decoded_bytes": 125,
+          "blocks_checked": 7,
+          "nonfinite_values": 0,
+          "limits": {
+            "max_rows": 200,
+            "max_columns": 32,
+            "max_schema_columns": 128,
+            "max_metadata_bytes": 1048576,
+            "max_block_bytes": 4194304,
+            "max_decoded_bytes": 16777216,
+            "max_scan_rows": 262144
+          }
+        },
+        "warnings": [
+          "仅显示所选列和行窗口，不排序、不聚合；整数和小数以精确文本保留，非有限浮点值显示为空。"
+        ],
+        "sampled": true,
+        "table": {
+          "columns": [
+            "decimal"
+          ],
+          "rows": [
+            [
+              "1234567890123456.1200"
+            ],
+            [
+              "-0.0100"
+            ]
+          ],
+          "row_offset": 0,
+          "total_rows": 4,
+          "total_columns": 3
+        }
+      }
+    },
+    "feather": {
+      "tree": {
+        "contract_version": 2,
+        "type": "columnar-window",
+        "reader": "columnar-window",
+        "kind": "tree",
+        "media_type": "application/json",
+        "choices": {
+          "columns": [
+            {
+              "id": 0,
+              "label": "identity",
+              "type": "int64",
+              "nullable": true,
+              "precision": null,
+              "scale": null
+            },
+            {
+              "id": 1,
+              "label": "decimal",
+              "type": "decimal128",
+              "nullable": true,
+              "precision": 20,
+              "scale": 4
+            },
+            {
+              "id": 2,
+              "label": "label",
+              "type": "string",
+              "nullable": true,
+              "precision": null,
+              "scale": null
+            }
+          ]
+        },
+        "selected": {},
+        "metadata": {
+          "format": "feather",
+          "container": "Arrow IPC file",
+          "input_mode": "window",
+          "value_semantics": "source order; integers and decimals are exact strings; nonfinite floats are null; no SQL or aggregation",
+          "source_bytes": 134219258,
+          "read_bytes": 866,
+          "read_requests": 5,
+          "total_rows": 4,
+          "total_columns": 3,
+          "total_groups": 2,
+          "metadata_bytes": 848,
+          "groups_read": 0,
+          "scan_rows": 0,
+          "decoded_bytes": 0,
+          "blocks_checked": 0,
+          "nonfinite_values": 0,
+          "limits": {
+            "max_rows": 200,
+            "max_columns": 32,
+            "max_schema_columns": 128,
+            "max_metadata_bytes": 1048576,
+            "max_block_bytes": 4194304,
+            "max_decoded_bytes": 16777216,
+            "max_scan_rows": 262144
+          }
+        },
+        "warnings": [
+          "仅显示所选列和行窗口，不排序、不聚合；整数和小数以精确文本保留，非有限浮点值显示为空。"
+        ],
+        "sampled": false,
+        "tree": [
+          {
+            "path": "/column-0",
+            "node_type": "column",
+            "attributes": {
+              "label": "identity",
+              "type": "int64"
+            }
+          },
+          {
+            "path": "/column-1",
+            "node_type": "column",
+            "attributes": {
+              "label": "decimal",
+              "type": "decimal128"
+            }
+          },
+          {
+            "path": "/column-2",
+            "node_type": "column",
+            "attributes": {
+              "label": "label",
+              "type": "string"
+            }
+          }
+        ]
+      },
+      "first": {
+        "contract_version": 2,
+        "type": "columnar-window",
+        "reader": "columnar-window",
+        "kind": "table",
+        "media_type": "application/json",
+        "choices": {
+          "columns": [
+            {
+              "id": 0,
+              "label": "identity",
+              "type": "int64",
+              "nullable": true,
+              "precision": null,
+              "scale": null
+            },
+            {
+              "id": 1,
+              "label": "decimal",
+              "type": "decimal128",
+              "nullable": true,
+              "precision": 20,
+              "scale": 4
+            },
+            {
+              "id": 2,
+              "label": "label",
+              "type": "string",
+              "nullable": true,
+              "precision": null,
+              "scale": null
+            }
+          ]
+        },
+        "selected": {
+          "columns": [
+            0,
+            1,
+            2
+          ],
+          "row_offset": 0,
+          "row_limit": 2
+        },
+        "metadata": {
+          "format": "feather",
+          "container": "Arrow IPC file",
+          "input_mode": "window",
+          "value_semantics": "source order; integers and decimals are exact strings; nonfinite floats are null; no SQL or aggregation",
+          "source_bytes": 134219258,
+          "read_bytes": 1506,
+          "read_requests": 7,
+          "total_rows": 4,
+          "total_columns": 3,
+          "total_groups": 2,
+          "metadata_bytes": 848,
+          "groups_read": 1,
+          "scan_rows": 2,
+          "decoded_bytes": 125,
+          "blocks_checked": 7,
+          "nonfinite_values": 0,
+          "limits": {
+            "max_rows": 200,
+            "max_columns": 32,
+            "max_schema_columns": 128,
+            "max_metadata_bytes": 1048576,
+            "max_block_bytes": 4194304,
+            "max_decoded_bytes": 16777216,
+            "max_scan_rows": 262144
+          }
+        },
+        "warnings": [
+          "仅显示所选列和行窗口，不排序、不聚合；整数和小数以精确文本保留，非有限浮点值显示为空。"
+        ],
+        "sampled": true,
+        "table": {
+          "columns": [
+            "identity",
+            "decimal",
+            "label"
+          ],
+          "rows": [
+            [
+              "9223372036854775807",
+              "1234567890123456.1200",
+              "科学 <data>"
+            ],
+            [
+              "-9223372036854775808",
+              "-0.0100",
+              ""
+            ]
+          ],
+          "row_offset": 0,
+          "total_rows": 4,
+          "total_columns": 3
+        }
+      },
+      "next": {
+        "contract_version": 2,
+        "type": "columnar-window",
+        "reader": "columnar-window",
+        "kind": "table",
+        "media_type": "application/json",
+        "choices": {
+          "columns": [
+            {
+              "id": 0,
+              "label": "identity",
+              "type": "int64",
+              "nullable": true,
+              "precision": null,
+              "scale": null
+            },
+            {
+              "id": 1,
+              "label": "decimal",
+              "type": "decimal128",
+              "nullable": true,
+              "precision": 20,
+              "scale": 4
+            },
+            {
+              "id": 2,
+              "label": "label",
+              "type": "string",
+              "nullable": true,
+              "precision": null,
+              "scale": null
+            }
+          ]
+        },
+        "selected": {
+          "columns": [
+            0,
+            1,
+            2
+          ],
+          "row_offset": 2,
+          "row_limit": 2
+        },
+        "metadata": {
+          "format": "feather",
+          "container": "Arrow IPC file",
+          "input_mode": "window",
+          "value_semantics": "source order; integers and decimals are exact strings; nonfinite floats are null; no SQL or aggregation",
+          "source_bytes": 134219258,
+          "read_bytes": 1586,
+          "read_requests": 7,
+          "total_rows": 4,
+          "total_columns": 3,
+          "total_groups": 2,
+          "metadata_bytes": 848,
+          "groups_read": 1,
+          "scan_rows": 2,
+          "decoded_bytes": 67,
+          "blocks_checked": 7,
+          "nonfinite_values": 0,
+          "limits": {
+            "max_rows": 200,
+            "max_columns": 32,
+            "max_schema_columns": 128,
+            "max_metadata_bytes": 1048576,
+            "max_block_bytes": 4194304,
+            "max_decoded_bytes": 16777216,
+            "max_scan_rows": 262144
+          }
+        },
+        "warnings": [
+          "仅显示所选列和行窗口，不排序、不聚合；整数和小数以精确文本保留，非有限浮点值显示为空。"
+        ],
+        "sampled": true,
+        "table": {
+          "columns": [
+            "identity",
+            "decimal",
+            "label"
+          ],
+          "rows": [
+            [
+              null,
+              null,
+              null
+            ],
+            [
+              "42",
+              "0.0000",
+              "last"
+            ]
+          ],
+          "row_offset": 2,
+          "total_rows": 4,
+          "total_columns": 3
+        }
+      },
+      "column": {
+        "contract_version": 2,
+        "type": "columnar-window",
+        "reader": "columnar-window",
+        "kind": "table",
+        "media_type": "application/json",
+        "choices": {
+          "columns": [
+            {
+              "id": 0,
+              "label": "identity",
+              "type": "int64",
+              "nullable": true,
+              "precision": null,
+              "scale": null
+            },
+            {
+              "id": 1,
+              "label": "decimal",
+              "type": "decimal128",
+              "nullable": true,
+              "precision": 20,
+              "scale": 4
+            },
+            {
+              "id": 2,
+              "label": "label",
+              "type": "string",
+              "nullable": true,
+              "precision": null,
+              "scale": null
+            }
+          ]
+        },
+        "selected": {
+          "columns": [
+            1
+          ],
+          "row_offset": 0,
+          "row_limit": 2
+        },
+        "metadata": {
+          "format": "feather",
+          "container": "Arrow IPC file",
+          "input_mode": "window",
+          "value_semantics": "source order; integers and decimals are exact strings; nonfinite floats are null; no SQL or aggregation",
+          "source_bytes": 134219258,
+          "read_bytes": 1506,
+          "read_requests": 7,
+          "total_rows": 4,
+          "total_columns": 3,
+          "total_groups": 2,
+          "metadata_bytes": 848,
+          "groups_read": 1,
+          "scan_rows": 2,
+          "decoded_bytes": 125,
+          "blocks_checked": 7,
+          "nonfinite_values": 0,
+          "limits": {
+            "max_rows": 200,
+            "max_columns": 32,
+            "max_schema_columns": 128,
+            "max_metadata_bytes": 1048576,
+            "max_block_bytes": 4194304,
+            "max_decoded_bytes": 16777216,
+            "max_scan_rows": 262144
+          }
+        },
+        "warnings": [
+          "仅显示所选列和行窗口，不排序、不聚合；整数和小数以精确文本保留，非有限浮点值显示为空。"
+        ],
+        "sampled": true,
+        "table": {
+          "columns": [
+            "decimal"
+          ],
+          "rows": [
+            [
+              "1234567890123456.1200"
+            ],
+            [
+              "-0.0100"
+            ]
+          ],
+          "row_offset": 0,
+          "total_rows": 4,
+          "total_columns": 3
+        }
+      }
+    }
+  }
+}
