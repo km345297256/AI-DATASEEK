@@ -13,6 +13,7 @@ from app.domain.models.visualization import VisualizationPlugin
 from test_unified_visualization import environment, invoke
 
 CASES = [("viz-sql-dump", "sample.sql", {"dialect": "postgres"}),
+         ("viz-mysql-sdi", "sample.ibd", {}), ("viz-sst-records", "sample.sst", {}), ("viz-sst-records", "sample.ldb", {}),
          ("viz-postgres-dump", "sample.pgdump", {}), ("viz-postgres-dump", "sample.dump", {}),
          ("viz-postgres-dump", "sample.backup", {}), ("viz-postgres-dump", "sample.tar", {}),
          ("viz-bson", "sample.bson", {}), ("viz-redis-rdb", "sample.rdb", {})]

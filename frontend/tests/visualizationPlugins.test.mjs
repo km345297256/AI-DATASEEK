@@ -52,8 +52,11 @@ test('every checked-in Cordis manifest is accepted by the frontend contract with
     const plugin = JSON.parse(readFileSync(new URL(name, directory), 'utf8'));
     return { ...plugin, enabled: plugin.default_enabled };
   });
-  assert.equal(plugins.length, 81);
-  assert.equal(plugins.filter(plugin => plugin.contract_version === 2).length, 81);
+  assert.equal(plugins.length, 83);
+  for (const [filename,id] of [['sample.ibd','viz-mysql-sdi'],['sample.sst','viz-sst-records'],['sample.ldb','viz-sst-records']]) {
+    assert.equal(selectVisualization(plugins, filename)?.id, id);
+  }
+  assert.equal(plugins.filter(plugin => plugin.contract_version === 2).length, 83);
   assert.ok(plugins.every(plugin => !Object.hasOwn(plugin, 'data_kind') && !plugin.adapter.startsWith('v2-')));
   assert.deepEqual(parseVisualizationCatalog(catalogOf(...plugins)).plugins, plugins);
 });

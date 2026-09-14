@@ -1,0 +1,158 @@
+{
+  "mysql-sdi": {
+    "type": "mysql-sdi",
+    "reader": "mysql-sdi",
+    "kind": "tree",
+    "contract_version": 2,
+    "media_type": "application/json",
+    "choices": {},
+    "selected": {},
+    "warnings": [
+      "仅预览未提交的 SDI 结构；未读取表行、redo 或 undo，不代表事务一致或可恢复。"
+    ],
+    "sampled": false,
+    "table": {
+      "columns": [
+        "category",
+        "table",
+        "name",
+        "definition"
+      ],
+      "rows": [
+        [
+          "table",
+          "-",
+          "measurements",
+          "InnoDB"
+        ],
+        [
+          "column",
+          "measurements",
+          "id",
+          "type=bigint;nullable=false;ordinal=1;hidden=1"
+        ],
+        [
+          "column",
+          "measurements",
+          "label",
+          "type=varchar(40);nullable=false;ordinal=2;hidden=1"
+        ],
+        [
+          "column",
+          "measurements",
+          "reading",
+          "type=decimal(20,4);nullable=true;ordinal=3;hidden=1"
+        ],
+        [
+          "column",
+          "measurements",
+          "DB_TRX_ID",
+          "type=mysql_type_10;nullable=false;ordinal=4;hidden=2"
+        ],
+        [
+          "column",
+          "measurements",
+          "DB_ROLL_PTR",
+          "type=mysql_type_9;nullable=false;ordinal=5;hidden=2"
+        ],
+        [
+          "index",
+          "measurements",
+          "PRIMARY",
+          "type=1;columns=0,3,4,1,2"
+        ],
+        [
+          "index",
+          "measurements",
+          "by_label",
+          "type=3;columns=1,0"
+        ]
+      ]
+    },
+    "metadata": {
+      "engine": "mysql-sdi",
+      "format": "ibd",
+      "source_bytes": 131072,
+      "input_mode": "whole",
+      "tool_version": "8.0.46",
+      "rows_returned": 8,
+      "logical_state_verified": false,
+      "limits": {
+        "max_input_bytes": 16777216,
+        "max_output_bytes": 2097152,
+        "max_rows": 1024,
+        "max_key_bytes": 128,
+        "max_value_bytes": 512
+      }
+    }
+  },
+  "sst-records": {
+    "type": "sst-records",
+    "reader": "sst-records",
+    "kind": "tree",
+    "contract_version": 2,
+    "media_type": "application/json",
+    "choices": {},
+    "selected": {},
+    "warnings": [
+      "仅预览单文件的点记录；不合并其他 SST、WAL 或删除范围，不代表数据库最新逻辑状态。"
+    ],
+    "sampled": false,
+    "table": {
+      "columns": [
+        "key_hex",
+        "key_bytes",
+        "sequence",
+        "record_type",
+        "value_hex",
+        "value_bytes",
+        "omitted"
+      ],
+      "rows": [
+        [
+          "61",
+          "1",
+          "0",
+          "value",
+          "39303037313939323534373430393933",
+          "16",
+          "none"
+        ],
+        [
+          "62",
+          "1",
+          "0",
+          "deletion",
+          "",
+          "0",
+          "none"
+        ],
+        [
+          "63",
+          "1",
+          "0",
+          "value",
+          "610062",
+          "3",
+          "none"
+        ]
+      ]
+    },
+    "metadata": {
+      "engine": "sst-records",
+      "format": "sst",
+      "source_bytes": 855,
+      "input_mode": "whole",
+      "tool_version": "6.11.4",
+      "rows_returned": 3,
+      "logical_state_verified": false,
+      "limits": {
+        "max_input_bytes": 16777216,
+        "max_output_bytes": 2097152,
+        "max_rows": 1024,
+        "max_key_bytes": 128,
+        "max_value_bytes": 512
+      }
+    }
+  }
+}

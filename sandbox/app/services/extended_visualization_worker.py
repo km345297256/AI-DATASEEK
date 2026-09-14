@@ -48,6 +48,7 @@ OFFICE_PDF_SETTINGS = {
     "ExportFormFields": False,
 }
 FORMATS = {
+    "mysql-sdi": {"ibd"}, "sst-records": {"sst", "ldb"},
     "database-table": {"duckdb", "ddb", "dbf", "mdb", "accdb"},
     "sql-dump": {"sql"}, "pg-dump": {"pgdump", "dump", "backup", "tar"},
     "bson": {"bson"}, "redis-rdb": {"rdb"},
@@ -69,6 +70,7 @@ FORMATS = {
     "geoformat": {"asc", "grd", "kml"}, "mca": {"mca"}, "czi": {"czi"},
 }
 KINDS = {
+    "mysql-sdi": {"tree"}, "sst-records": {"tree"},
     "database-table": {"tree", "table"},
     "sql-dump": {"tree", "table"}, "pg-dump": {"tree"},
     "bson": {"tree", "table"}, "redis-rdb": {"tree", "table"},
@@ -86,6 +88,7 @@ KINDS = {
     "geoformat": {"map"}, "mca": {"series"}, "czi": {"tree", "image"},
 }
 OPTIONS = {
+    "mysql-sdi": set(), "sst-records": set(),
     "database-table": {"table", "columns", "row_offset", "row_limit"},
     "sql-dump": {"dialect", "table", "columns", "row_offset", "row_limit"}, "pg-dump": set(),
     "bson": {"group_id", "offset", "limit"}, "redis-rdb": {"group_id", "offset", "limit"},
@@ -126,7 +129,7 @@ def _integer(value, maximum):
 
 
 def _options(reader, value):
-    if reader in {"sql-dump", "pg-dump", "bson", "redis-rdb"}:
+    if reader in {"sql-dump", "pg-dump", "bson", "redis-rdb", "mysql-sdi", "sst-records"}:
         if not isinstance(value, dict):
             raise PreviewError("数据库文件参数必须是已声明的对象。")
         return value  # The reader's exact schema runs before parsing any bytes.
@@ -1069,13 +1072,16 @@ def preview_bytes(data, reader, kind, options=None, *, format=None, truncated=Fa
         raise PreviewError("此扩展读取器需要完整的有界文件。")
     if not isinstance(data, bytes) or not 0 < len(data) <= migration.input_limit(reader):
         raise PreviewError("文件为空或超出此读取器的独立预算。")
-    if reader in {"sql-dump", "pg-dump", "bson", "redis-rdb"}:
+    if reader in {"sql-dump", "pg-dump", "bson", "redis-rdb", "mysql-sdi", "sst-records"}:
         if len(data) > 16 * 1024 * 1024:
             raise PreviewError("数据库文件超过独立只读预算。")
         try:
             if reader == "sql-dump":
                 from app.services.sql_dump_reader import sql_dump_preview
                 return sql_dump_preview(data, format, kind, options)
+            if reader in {"mysql-sdi", "sst-records"}:
+                from app.services.physical_database_reader import physical_database_preview
+                return physical_database_preview(data, reader, format, kind, options)
             if reader == "pg-dump":
                 from app.services.pg_dump_reader import pg_dump_preview
                 return pg_dump_preview(data, format, kind, options)

@@ -2,7 +2,11 @@
 
 核验日期：2026-09-11。本文是本轮 SQL 转储、PostgreSQL 归档、BSON、Redis RDB 扩展的安全设计与后续候选清单，不表示下表全部工具已经部署。当前完成状态以对应集成验收记录为准。
 
+2026-09-13 补充：MySQL SDI、RocksDB SST 和严格 LevelDB 单表子集的第二批实现、限制及验收状态见[物理数据库文件集成](physical-database-integration.md)。以下“后续”列是首批设计时的记录，不代替最新状态。
+
 ## 支持层次
+
+2026-09-14：SQL Server、Oracle、WiredTiger、LMDB 改为按[主流版本目标](database-mainstream-version-plan.md)研发，不再等待用户提供版本。该记录也说明本机 ARM／厂商服务限制以及 LMDB 滚动文档与实际发布包的接口差异。
 
 “识别文件”“解析目录”“读取物理记录”“恢复后的逻辑数据”是不同能力，界面和插件说明必须明确区分。仅检测后缀或 magic 不能标为已支持数据预览。
 

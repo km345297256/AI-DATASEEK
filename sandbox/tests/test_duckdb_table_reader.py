@@ -170,7 +170,10 @@ def test_corrupt_database_native_failure_is_fixed_diagnostic():
 def test_elapsed_deadline_discards_result_and_cleans_snapshot(monkeypatch, tmp_path):
     data = duckdb_bytes(); original = reader._catalog
     ticks = iter([0, 0, 16])
-    monkeypatch.setattr(reader.time, "monotonic", lambda: next(ticks))
+    # Do not replace the process-wide clock: the in-process HTTP server and
+    # its event loop run concurrently with this unit test.
+    from types import SimpleNamespace
+    monkeypatch.setattr(reader, "time", SimpleNamespace(monotonic=lambda: next(ticks)))
     # Keep this deterministic: the real timer is cancelled and joined before
     # its 15-second deadline, while the post-query clock already exceeded it.
     with pytest.raises(DatabaseTableError): reader.duckdb_table_preview(data, "duckdb")

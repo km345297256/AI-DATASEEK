@@ -57,6 +57,7 @@ const { databaseTableCases } = await import('./database-table-fixtures.mjs'); ca
 const { databaseRecordsCases } = await import('./database-records-fixtures.mjs'); cases = [...cases, ...databaseRecordsCases];
 const { pgDumpCases } = await import('./pg-dump-fixtures.mjs'); cases = [...cases, ...pgDumpCases];
 const { sqlDumpCases } = await import('./sql-dump-fixtures.mjs'); cases = [...cases, ...sqlDumpCases];
+const { physicalDatabaseCases } = await import('./physical-database-fixtures.mjs'); cases = [...cases, ...physicalDatabaseCases];
 if (process.env.VISUALIZATION_BROWSER_CASES) cases = cases.filter((item) => process.env.VISUALIZATION_BROWSER_CASES.split(',').includes(item.name));
 if (!cases.length) throw new Error('No browser cases selected');
 const modules = [...new Set(cases.map((item) => item.component))];

@@ -10,7 +10,7 @@
 
 AgentLoop、PlanActFlow、工具调度和 SSE 消息结构没有替换；可视化读取不会向模型发起请求。数据集只读挂载、主机路径白名单和浏览器不接收真实主机路径的边界保留。
 
-2026-09-09 高清阅读扩展另增 `viz-docx` 与 `viz-onlyoffice`，当时总目录为 36 个插件；2026-09-10 [第一批格式增强](./changes-2026-09-10-visualization-batch-one.md)再增结构树、压缩包目录、视频与音频 4 项，达到 40 个插件。[第二批](./changes-2026-09-10-visualization-batch-two.md)增加受控信号窗口、MCA、地理格式、CZI 与归档文本成员，达到 45 个；[第三批](./changes-2026-09-10-visualization-batch-three.md)再增 HDF5/NetCDF4 分块、本地 OME-Zarr、大型未压缩 CZI 与仪器图像，当时为 **49 个插件**。随后领域扩展第五批增至 68 个插件、67 个批准适配器，范围见[SQLite、天气雷达与海洋网格](changes-2026-09-11-domain-visualization-batch-five.md)。main 迁移另增六个独立 Cordis 插件，当时合并目录为 **74 个插件、73 个批准适配器**，见[main 可视化迁移记录](changes-2026-09-11-main-visualization-migration.md)；[数据库文件集成](database-visualization-integration.md)再增加三个独立插件，共用一个新适配器，当时为 **77 个插件、74 个批准适配器**；本轮[SQL／PG／BSON／Redis 扩展](database-dump-records-integration.md)新增四个独立插件和两个适配器，当前为 **81 个插件、76 个批准适配器**。上文 34 个为原 21 组集成基线，所有新增项继续使用相同 `contract_version: 2`，不改变原插件默认优先级。详见 [PDF / Office 清晰阅读改造](./pdf-office-preview-quality.md) 与 [ONLYOFFICE 本机服务](./onlyoffice-local-viewer.md)。
+2026-09-09 高清阅读扩展另增 `viz-docx` 与 `viz-onlyoffice`，当时总目录为 36 个插件；2026-09-10 [第一批格式增强](./changes-2026-09-10-visualization-batch-one.md)再增结构树、压缩包目录、视频与音频 4 项，达到 40 个插件。[第二批](./changes-2026-09-10-visualization-batch-two.md)增加受控信号窗口、MCA、地理格式、CZI 与归档文本成员，达到 45 个；[第三批](./changes-2026-09-10-visualization-batch-three.md)再增 HDF5/NetCDF4 分块、本地 OME-Zarr、大型未压缩 CZI 与仪器图像，当时为 **49 个插件**。随后领域扩展第五批增至 68 个插件、67 个批准适配器，范围见[SQLite、天气雷达与海洋网格](changes-2026-09-11-domain-visualization-batch-five.md)。main 迁移另增六个独立 Cordis 插件，当时合并目录为 **74 个插件、73 个批准适配器**，见[main 可视化迁移记录](changes-2026-09-11-main-visualization-migration.md)；[数据库文件集成](database-visualization-integration.md)再增加三个独立插件，共用一个新适配器，当时为 **77 个插件、74 个批准适配器**；[SQL／PG／BSON／Redis 扩展](database-dump-records-integration.md)新增四个独立插件和两个适配器，当时为 **81 个插件、76 个批准适配器**；2026-09-13 [物理数据库扩展](physical-database-integration.md)新增 MySQL SDI 和 SST 点记录插件，当前为 **83 个插件、77 个批准适配器**。上文 34 个为原 21 组集成基线，所有新增项继续使用相同 `contract_version: 2`，不改变原插件默认优先级。详见 [PDF / Office 清晰阅读改造](./pdf-office-preview-quality.md) 与 [ONLYOFFICE 本机服务](./onlyoffice-local-viewer.md)。
 
 ## 21 组能力与明确边界
 
@@ -42,7 +42,7 @@ AgentLoop、PlanActFlow、工具调度和 SSE 消息结构没有替换；可视�
 
 ## 统一能力协议
 
-- `GET /api/v1/visualizations` 返回当前合并目录的完整 81 个描述符及启停状态（含 DuckDB／DBF／Access、SQL／PG／BSON／Redis），不再按客户端版本拆分两个目录。描述符 `contract_version` 只能为严格整数 2；插件自身的 `version` 仍独立表示发布版本。本文上方的 21 组是当时的集成批次，不是当前目录总量；后续范围读取及领域插件见[统一插件协议](visualization-plugin-contract.md)、[数据库文件集成](database-visualization-integration.md)与[领域扩展路线](domain-visualization-expansion-roadmap.md)。
+- `GET /api/v1/visualizations` 返回当前合并目录的完整 83 个描述符及启停状态（含 DuckDB／DBF／Access、SQL／PG／BSON／Redis、MySQL SDI／SST），不再按客户端版本拆分两个目录。描述符 `contract_version` 只能为严格整数 2；插件自身的 `version` 仍独立表示发布版本。本文上方的 21 组是当时的集成批次，不是当前目录总量；后续范围读取及领域插件见[统一插件协议](visualization-plugin-contract.md)、[数据库文件集成](database-visualization-integration.md)与[领域扩展路线](domain-visualization-expansion-roadmap.md)。
 - 所有插件统一声明 `capabilities: {operations, input_mode, shared}`。操作为 `bytes/page/preview/prepare/job`；输入粒度为 `whole/page/prefix/window`，不能通过能力声明绕过批准组合或读取预算。
 - `POST /api/v1/files/{opaque_id}/visualization`：`{plugin_id, operation, version?, kind?, options:{...}}`。普通字节、分页、科学切片和分子只读准备使用同一个授权入口；完整 QC 通过统一命名的作业资源显式启动。
 - 非字节响应使用统一 `VisualizationResult`：`{contract_version:2, plugin_id, version, revision, kind, payload, metadata, warnings, sampled}`，外层保持 `APIResponse`。类型包括 page、series、raster、table、array、tree、media、report、molecule、resources、features、graph；表格、数组、树、清洗后的地理要素/关系网络、PNG/PDF 和 QC 数据在 `payload` 中，按批准读取器校验。

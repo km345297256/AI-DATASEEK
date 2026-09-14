@@ -68,7 +68,7 @@ async def test_catalog_has_one_protocol_without_version_negotiation(environment)
     app.dependency_overrides[get_visualization_catalog] = lambda: environment[0]
     with TestClient(app) as client:
         plugins = client.get('/visualizations').json()['data']['plugins']
-        assert len(plugins) == 81 and all(p['contract_version'] == 2 for p in plugins)
+        assert len(plugins) == 83 and all(p['contract_version'] == 2 for p in plugins)
         states = {plugin['id']: plugin['enabled'] for plugin in plugins}
         assert states['viz-docx'] is True
         assert states['viz-onlyoffice'] is False

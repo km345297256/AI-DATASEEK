@@ -108,7 +108,7 @@ class PreferenceClient(CleanupClient):
         return {"engine": "cordis", "plugins": [
             *[{"id": p, "enabled": self.states[p], "reader": r, "adapter": a, "contract_version": 2,
                "capabilities": {"operations": ["preview"], "shared": False}} for p, (r, a) in self.plugins.items()],
-            *[{"id": "unchanged-" + str(i), "enabled": True} for i in range(77)]]}
+            *[{"id": "unchanged-" + str(i), "enabled": True} for i in range(79)]]}
 
     async def request(self, method, path, **kwargs):
         if method == "GET": return Response(self.catalog())

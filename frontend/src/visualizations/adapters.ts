@@ -71,6 +71,7 @@ const trustedAdapters: Record<VisualizationAdapter, Component> = {
   'sqlite-table': markRaw(defineAsyncComponent(() => import('./extended/SqliteTablePreview.vue'))),
   'database-table': markRaw(defineAsyncComponent(() => import('./extended/DatabaseTablePreview.vue'))),
   'database-dump': markRaw(defineAsyncComponent(() => import('./extended/DatabaseDumpPreview.vue'))),
+  'physical-database': markRaw(defineAsyncComponent(() => import('./extended/PhysicalDatabasePreview.vue'))),
   'database-records': markRaw(defineAsyncComponent(() => import('./extended/DatabaseRecordsPreview.vue'))),
   'radar-window': markRaw(defineAsyncComponent(() => import('./extended/RadarWindowPreview.vue'))),
   'ugrid-window': markRaw(defineAsyncComponent(() => import('./extended/UgridWindowPreview.vue'))),

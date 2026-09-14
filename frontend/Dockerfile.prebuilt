@@ -1,0 +1,9 @@
+# Optional offline packaging of a freshly verified `npm run build` output.
+# Same runtime/configuration as Dockerfile; selected only via FRONTEND_DOCKERFILE.
+FROM docker.1ms.run/nginx:stable-alpine AS production-stage
+COPY dist /usr/share/nginx/html
+COPY nginx.conf /etc/nginx/nginx.conf.template
+COPY docker-entrypoint.sh /docker-entrypoint.sh
+RUN test -s /usr/share/nginx/html/index.html && chmod +x /docker-entrypoint.sh
+EXPOSE 80
+CMD ["/docker-entrypoint.sh"]

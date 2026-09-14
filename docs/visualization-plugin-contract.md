@@ -1,6 +1,6 @@
 # Cordis 统一可视化插件协议
 
-当前公有协议版本为严格整数 **2**，当前合并目录的 **81 个插件**使用同一描述结构、能力声明、调用入口与结果封装。版本用于契约兼容检查，不再区分基础插件、科学插件或办公插件；清单不再接受 `data_kind`，适配器键不再使用 `v2-` 前缀。本次不维护旧版可视化接口兼容分支。
+当前公有协议版本为严格整数 **2**，当前合并目录的 **83 个插件**使用同一描述结构、能力声明、调用入口与结果封装。版本用于契约兼容检查，不再区分基础插件、科学插件或办公插件；清单不再接受 `data_kind`，适配器键不再使用 `v2-` 前缀。本次不维护旧版可视化接口兼容分支。
 
 完整工具范围、上游许可和实际格式限制见[21 组工具集成说明](scientific-visualization-integration.md)及[第一批格式增强](changes-2026-09-10-visualization-batch-one.md)。已有插件的稳定 ID、默认开关、优先级、权限及资源预算保持不变，已保存的个人启停选择继续生效；新增能力的插件正常递增自身发布版本并扩展经过验证的格式匹配。
 
@@ -32,7 +32,7 @@ Shapefile ZIP/RAR 解压导入是现有的**显式文件导入工作流**，可�
 
 ## 一份批准规范、三个构建副本
 
-唯一受版本控制的适配器规范是 `contracts/visualization-adapters.json`，它描述批准的 `adapter → readers / view_kind / capabilities` 组合。当前共有 76 个批准适配器键、81 个插件注册。NetCDF/FITS 曲线共用一个适配器，DuckDB／DBF／Access 共用 `database-table`，SQL／PG 目录共用 `database-dump`，BSON／Redis 共用 `database-records`；插件均独立启停，各读取器保留严格、独立的数据语义。第五批为 68 个插件／67 个适配器；[main 迁移](changes-2026-09-11-main-visualization-migration.md)增加六个插件，[数据库文件集成](database-visualization-integration.md)再增加三个，本轮[转储与记录扩展](database-dump-records-integration.md)增加四个。所有数据库文件插件只提供有界只读预览，不提供 SQL 执行、恢复或远程连接。其他新增能力与方言限制见[第二批](changes-2026-09-10-visualization-batch-two.md)、[第三批](changes-2026-09-10-visualization-batch-three.md)、[实验数据领域](changes-2026-09-10-domain-visualization-batch-three.md)和[领域扩展路线](domain-visualization-expansion-roadmap.md)。
+唯一受版本控制的适配器规范是 `contracts/visualization-adapters.json`，它描述批准的 `adapter → readers / view_kind / capabilities` 组合。当前共有 77 个批准适配器键、83 个插件注册。NetCDF/FITS 曲线共用一个适配器，DuckDB／DBF／Access 共用 `database-table`，SQL／PG 目录共用 `database-dump`，BSON／Redis 共用 `database-records`，MySQL SDI／SST 共用 `physical-database`；插件均独立启停，各读取器保留严格、独立的数据语义。第五批为 68 个插件／67 个适配器；[main 迁移](changes-2026-09-11-main-visualization-migration.md)增加六个插件，[数据库文件集成](database-visualization-integration.md)再增加三个，[转储与记录扩展](database-dump-records-integration.md)增加四个，本轮[物理文件扩展](physical-database-integration.md)增加两个。所有数据库文件插件只提供有界只读预览，不提供 SQL 执行、恢复或远程连接。其他新增能力与方言限制见[第二批](changes-2026-09-10-visualization-batch-two.md)、[第三批](changes-2026-09-10-visualization-batch-three.md)、[实验数据领域](changes-2026-09-10-domain-visualization-batch-three.md)和[领域扩展路线](domain-visualization-expansion-roadmap.md)。
 
 运行：
 
@@ -159,7 +159,7 @@ interface VisualizationResult {
 
 | 方法 / 路径（均以 `/api/v1` 开头） | 行为 |
 | --- | --- |
-| GET `/visualizations` | 返回当前合并目录的完整 81 个统一描述符及 enabled，不再协商两个目录 |
+| GET `/visualizations` | 返回当前合并目录的完整 83 个统一描述符及 enabled，不再协商两个目录 |
 | PATCH `/visualizations/{id}/state` | 仅接受严格布尔 `{"enabled":false}` 或 true |
 | POST `/files/{id}/visualization/jobs` | 显式启动声明 job 的任务；当前为 FastQC，options 需明确 confirm |
 | GET `/files/{id}/visualization/jobs` | 当前文件作用域作业列表 |
@@ -189,7 +189,7 @@ interface VisualizationResult {
 | 音视频 | 视频整文件最多 64 MiB，音频最多 16 MiB；原生播放取决于浏览器编码支持；仅未压缩受限 WAV 提供逐声道波形 |
 | EDF/BDF `window` | 源 ≤8 GiB；每次累计读取 ≤8 MiB、单次范围 ≤1 MiB、≤128 次范围请求；≤8 通道、60 秒、总计 16,384 样本，不重采样 |
 | ZIP/TAR 文本成员 | 归档 ≤64 MiB，成员展开 ≤256 KiB；每页 200 行、每行 1,024 字符；stored/deflate ZIP 或未压缩 TAR；明确 member_id + 文件 version，不落盘、不递归 |
-| ASC/GRD/KML | ≤16 MiB；源网格 ≤1,048,576 单元、输出 ≤128×128；KML ≤512 要素、16,384 坐标；派生结果 ≤2 MiB |
+| ASC/GRD/KML | ≤16 MiB；源网格 ≤1,048,577 单元、输出 ≤128×128；KML ≤512 要素、16,384 坐标；派生结果 ≤2 MiB |
 | MCA | ASCII 单谱 ≤4 MiB、8,192 通道；只保留安全整数原始计数及明确的双点线性标定；派生结果 ≤2 MiB |
 | CZI | 单文件单场景 ≤64 MiB；每次 ROI ≤1024×1024、单子块解码预算 ≤16 MiB；C/Z/T 显式选择；PNG ≤5 MiB、统一结果 ≤8 MiB |
 | HDF5 / NetCDF4 window | 源 ≤8 GiB、累计读取 ≤8 MiB /128 次；单块解码 ≤4 MiB、所选块合计 ≤16 MiB、输出 ≤16,384 数值；原始索引与存储值 |
@@ -199,18 +199,18 @@ interface VisualizationResult {
 | Parquet / Arrow window | 源 ≤8 GiB、累计读取 ≤8 MiB /128 次；单文件、128 列目录、200×32 输出；元信息 ≤1 MiB、块 ≤4 MiB、声明与实际解码量均校验 |
 | NeXus NXdata window | 源 ≤8 GiB、累计读取 ≤8 MiB /128 次；明确 1D/2D 信号、固定长度元信息、同文件轴/误差；值与坐标/误差合计 ≤16,384 |
 | Newick 系统树 | 整文件 ≤4 MiB，输出 ≤1 MiB；单树 ≤1,000 节点／64 层，缺失枝长不补零 |
-| MGF / mzML 质谱 | 整文件 ≤16 MiB，每谱 ≤16,384 对值（仅此读取器允许 32,768 标量），目录每页 64 / 总计 1024 谱；输出 ≤2 MiB |
+| MGF / mzML 质谱 | 整文件 ≤16 MiB，每谱 ≤16,384 对值（仅此读取器允许 32,778 标量），目录每页 64 / 总计 1024 谱；输出 ≤2 MiB |
 | XRDML / canSAS1d | 整文件 ≤16 MiB /32 扫描 /65,536 点，每扫描 ≤16,384 点；输出 ≤2 MiB |
-| FCS 事件 window | 源 ≤8 GiB、累计 ≤8 MiB /128 次；≤8192 事件、≤16,384 输出值，按实际完整行读取 |
+| FCS 事件 window | 源 ≤8 GiB、累计 ≤8 MiB /128 次；≤8392 事件、≤16,384 输出值，按实际完整行读取 |
 | Ripple 谱像 window | 精确双文件 ≤8 GiB、累计 ≤8 MiB /256 次；头 ≤64 KiB；图像 ≤128²、能谱 ≤16,384 通道；输出 ≤2 MiB |
 | ENVI 双文件 window | 精确头文件/数据配对合计 ≤8 GiB、累计读取 ≤8 MiB /256 次；头 ≤64 KiB；图像 ≤128²，光谱 ≤128 波段；两文件共同版本 |
 | GRIB 气象 window | 源 ≤8 GiB、累计读取 ≤8 MiB /128 次；每页 ≤8 消息，单消息 ≤1 MiB，完整解码网格 ≤16,384 点；仅批准的 GRIB2 规则网格简单打包 |
 | MiniSEED / SAC window | 源 ≤8 GiB、累计读取 ≤8 MiB /128 次；每页 ≤16 记录，显式单记录窗口 ≤16,384 样本；不拼接、不校准 |
 | 科学关系网络 | 输入 ≤4 MiB、输出 ≤1 MiB；静态简单图 ≤1,000 节点/3,000 边；有界本地布局，不读外部网络资源 |
 | DICOM window | 未压缩小端单文件；源 ≤8 GiB、累计 ≤8 MiB /128 次；ROI ≤128²，源脱敏声明与用户确认是像素准入条件，不作诊断 |
-| AnnData spatial window | H5AD dense/CSR/CSC，源 ≤8 GiB、累计 ≤8 MiB /128 次；坐标及显式选定特征，≤8192 点，解码块另有 4/16 MiB 上限 |
+| AnnData spatial window | H5AD dense/CSR/CSC，源 ≤8 GiB、累计 ≤8 MiB /128 次；坐标及显式选定特征，≤8392 点，解码块另有 4/16 MiB 上限 |
 | LAS pointcloud window | LAS 1.2/1.4 批准点格式；源 ≤8 GiB、累计 ≤8 MiB /128 次；≤16384 连续点，非空间抽样；不支持 LAZ/COPC |
-| GRO trajectory | 整文件 ≤16 MiB；≤64 帧、8192 原子/帧、全文件 ≤131072 原子记录；保留 nm、nm/ps，不推断化学键 |
+| GRO trajectory | 整文件 ≤16 MiB；≤64 帧、8392 原子/帧、全文件 ≤131072 原子记录；保留 nm、nm/ps，不推断化学键 |
 | VTU simulation mesh | 单 Piece ASCII 整文件 ≤16 MiB；4096 节点/2048 单元/32 场/9 分量；显式节点或单元场分量，非有限场值为 null |
 
 第四个领域批次新增受限的 `geometry` 请求/结果类型：仅 `spatial-window / pointcloud-window / gro-trajectory / simulation-mesh` 可使用，各自的 `spatial / array+point_attributes / trajectory / mesh` 负载需通过专用结构及请求绑定校验。DICOM 使用已有 image 请求及数组结果。五类均要求先 tree、后携带客户端 version 明确选择，不允许隐式主机版本替代。详细边界见[重型格式受限首版](changes-2026-09-10-domain-visualization-batch-four.md)。新预算不扩大旧通用数组/曲线限制。

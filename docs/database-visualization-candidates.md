@@ -4,6 +4,8 @@
 
 ## 清单与取舍
 
+2026-09-13 新增 MySQL SDI 与 SST 两个独立插件的实现；LevelDB 仅支持经过原生对照的严格单表子集。当前代码目录为 83 个插件，发布／验收状态与未支持的服务器格式见[物理数据库文件集成](physical-database-integration.md)。
+
 | 数据类别 | 文件 | 当前方案 | 本轮处理 |
 | --- | --- | --- | --- |
 | SQLite 单文件数据库 | `.sqlite`、`.sqlite3`、`.db` | 既有 `viz-sqlite-table`，APSW 3.53.4.0 | 保留既有 ID、行为、开关、预算；不另装 SQLite 桌面浏览器 |

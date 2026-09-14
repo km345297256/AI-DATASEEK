@@ -1,0 +1,6 @@
+**
+!dist/
+!dist/**
+!nginx.conf
+!docker-entrypoint.sh
+!Dockerfile.prebuilt

@@ -1,0 +1,42 @@
+Process FIXTURE/rocksdb-range.sst
+Sst file format: block-based
+from [] to []
+'61' seq:0, type:1 => 39303037313939323534373430393933
+'62' seq:0, type:0 => 
+'63' seq:0, type:1 => 610062
+Table Properties:
+------------------------------
+  # data blocks: 1
+  # entries: 4
+  # deletions: 2
+  # merge operands: 0
+  # range deletions: 1
+  raw key size: 36
+  raw average key size: 9.000000
+  raw value size: 20
+  raw average value size: 5.000000
+  data block size: 68
+  index block size (user-key? 1, delta-value? 1): 18
+  filter block size: 0
+  (estimated) table size: 86
+  filter policy name: N/A
+  prefix extractor name: nullptr
+  column family ID: N/A
+  column family name: N/A
+  comparator name: leveldb.BytewiseComparator
+  merge operator name: nullptr
+  property collectors names: []
+  SST file compression algo: NoCompression
+  SST file compression options: window_bits=-14; level=32767; strategy=0; max_dict_bytes=0; zstd_max_train_bytes=0; enabled=0; 
+  creation time: 0
+  time stamp of earliest key: 0
+  file creation time: 0
+  Raw user collected properties
+------------------------------
+  # rocksdb.block.based.table.index.type: 0x00000000
+  # rocksdb.block.based.table.prefix.filtering: 0x30
+  # rocksdb.block.based.table.whole.key.filtering: 0x31
+  # rocksdb.deleted.keys: 0x02
+  # rocksdb.external_sst_file.global_seqno: 0x0000000000000000
+  # rocksdb.external_sst_file.version: 0x02000000
+  # rocksdb.merge.operands: 0x00

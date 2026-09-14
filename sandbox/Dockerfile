@@ -19,6 +19,17 @@ RUN cc -O2 -Wall -Wextra -Iinclude dataseek-access-reader.c \
     $(pkg-config --cflags --libs glib-2.0) -L/opt/dataseek-database/lib \
     -Wl,-rpath,/opt/dataseek-database/lib -lmdb -lm -o /opt/dataseek-access-reader
 
+FROM docker.1ms.run/ubuntu:22.04 AS physical-reader-build
+# Extract only the two offline utilities; no database daemon/client is shipped.
+# Ubuntu archive signatures authenticate packages; exact versions fail closed.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    mysql-server-core-8.0=8.0.46-0ubuntu0.22.04.4 rocksdb-tools=6.11.4-3 && \
+    mkdir -p /opt/dataseek-physical/bin /opt/dataseek-physical/licenses && \
+    cp /usr/bin/ibd2sdi /usr/bin/sst_dump /opt/dataseek-physical/bin/ && \
+    cp /usr/share/doc/mysql-server-core-8.0/copyright /opt/dataseek-physical/licenses/mysql-copyright && \
+    cp /usr/share/doc/rocksdb-tools/copyright /opt/dataseek-physical/licenses/rocksdb-copyright && \
+    ibd2sdi --version | grep -F '8.0.46'
+
 FROM docker.1ms.run/ubuntu:22.04
 
 ARG TARGETARCH
@@ -287,6 +298,8 @@ EXPOSE 8080 9222 5900 5901
 
 ENV UVI_ARGS=""
 ENV CHROME_ARGS=""
+
+COPY --from=physical-reader-build /opt/dataseek-physical /opt/dataseek-physical
 
 # Use supervisor to start all services
 CMD ["supervisord", "-n", "-c", "/app/supervisord.conf"] 

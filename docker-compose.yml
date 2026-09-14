@@ -5,7 +5,7 @@ services:
     image: ${FRONTEND_IMAGE:-ai-dataseek-frontend:${IMAGE_TAG:-latest}}
     build:
       context: ./frontend
-      dockerfile: Dockerfile
+      dockerfile: ${FRONTEND_DOCKERFILE:-Dockerfile}
       target: production-stage
     ports:
       - "${FRONTEND_BIND_HOST:-0.0.0.0}:${FRONTEND_PORT:-7000}:80"
@@ -87,6 +87,31 @@ services:
     restart: "no"
     networks:
       - ai-dataseek-network
+
+  # Opt-in experiment only: no user input, data volumes, app network or ports.
+  # This is a readiness gate, not a registered preview plugin. Runs to completion.
+  sqlserver-reader-probe:
+    profiles: [database-readers]
+    image: ai-dataseek-sqlserver-reader:2022-cu26
+    platform: linux/amd64
+    build:
+      context: ./deploy/sqlserver-reader
+    network_mode: none
+    read_only: true
+    user: "10001:0"
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    mem_limit: 4g
+    memswap_limit: 4g
+    cpus: 2
+    pids_limit: 256
+    tmpfs:
+      - /var/opt/mssql:rw,nosuid,nodev,noexec,size=3g,uid=10001,gid=0,mode=0700
+      - /tmp:rw,nosuid,nodev,noexec,size=128m,uid=10001,gid=0,mode=0700
+    logging:
+      driver: json-file
+      options: {max-size: 1m, max-file: "1"}
+    restart: "no"
 
   mongodb:
     image: ${MONGODB_IMAGE:-mongo:7.0}

@@ -1,0 +1,17 @@
+{
+  "contract_version": 2,
+  "id": "viz-sst-records",
+  "version": "1.0.0",
+  "name": "SST 物理点记录",
+  "description": "离线读取受支持的 RocksDB block-based SST 点记录；兼容无压缩、无过滤块、平坦索引的 LevelDB 1.23 单表子集（最多 4 MiB）。保留序号和删除标记，不合并逻辑状态，拒绝范围删除与自定义比较器。",
+  "extensions": ["sst", "ldb"],
+  "filenames": [],
+  "view_kind": "table",
+  "adapter": "physical-database",
+  "reader": "sst-records",
+  "capabilities": {"operations": ["preview"], "input_mode": "whole", "shared": false},
+  "default_enabled": true,
+  "priority": 40,
+  "permissions": ["file:read"],
+  "limits": {"max_input_bytes": 16777216, "max_output_bytes": 2097152}
+}

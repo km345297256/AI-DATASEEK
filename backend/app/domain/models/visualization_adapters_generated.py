@@ -3,12 +3,26 @@ from typing import Literal
 import json
 
 VISUALIZATION_CONTRACT_VERSION = 2
-VisualizationAdapter = Literal["database-dump", "database-records", "image", "tiff", "shapefile", "molecular", "obj", "html", "markdown", "text", "csv", "scientific-map", "scientific-series", "scientific-image", "scientific-quality", "plotly", "h5web", "vtk", "jsroot", "rdkit", "molstar", "nmrium", "openlayers", "maplibre", "cesium", "aladin", "metpy", "igv", "viv", "structured-tree", "archive-directory", "archive-members", "signal-window", "array-window", "columnar-window", "nexus-window", "scientific-graph", "phylogeny", "mass-spectrum", "diffraction", "fcs-window", "ripple-window", "envi-window", "grib-window", "seismic-window", "czi-window", "instrument-image", "ome-zarr", "mca-spectrum", "geoscience-formats", "czi-image", "video-player", "audio-waveform", "niivue", "fastqc", "pdfjs", "word", "excel", "powerpoint", "docx", "onlyoffice", "dicom-window", "spatial-window", "pointcloud-window", "gro-trajectory", "database-table", "sqlite-table", "radar-window", "ugrid-window", "matrix-workbench", "astronomy-workbench", "alignment-browser", "sequence-browser", "genome-tracks", "blast-hits", "simulation-mesh"]
-VisualizationReader = Literal["alignment-browser", "archive", "archive-member", "array-window", "astronomy-workbench", "binary", "blast-hits", "bson", "columnar-window", "csv", "czi", "czi-window", "database-table", "dicom-window", "diffraction", "edf", "envi-window", "excel", "fastq", "fastqc", "fcs-window", "fits", "genome-tracks", "geoformat", "grib-window", "gro-trajectory", "hdf5", "instrument-window", "jcamp", "mass-spectrum", "matrix-workbench", "mca", "metpy", "molecular", "netcdf", "nexus-window", "office", "office-viewer", "ome-zarr", "pg-dump", "phylogeny", "pointcloud-window", "radar-window", "rdkit", "redis-rdb", "ripple-window", "root", "scientific-graph", "seismic-window", "sequence-browser", "shapefile", "simulation-mesh", "spatial-window", "sql-dump", "sqlite-table", "structure", "tabular", "text", "ugrid-window"]
+VisualizationAdapter = Literal["physical-database", "database-dump", "database-records", "image", "tiff", "shapefile", "molecular", "obj", "html", "markdown", "text", "csv", "scientific-map", "scientific-series", "scientific-image", "scientific-quality", "plotly", "h5web", "vtk", "jsroot", "rdkit", "molstar", "nmrium", "openlayers", "maplibre", "cesium", "aladin", "metpy", "igv", "viv", "structured-tree", "archive-directory", "archive-members", "signal-window", "array-window", "columnar-window", "nexus-window", "scientific-graph", "phylogeny", "mass-spectrum", "diffraction", "fcs-window", "ripple-window", "envi-window", "grib-window", "seismic-window", "czi-window", "instrument-image", "ome-zarr", "mca-spectrum", "geoscience-formats", "czi-image", "video-player", "audio-waveform", "niivue", "fastqc", "pdfjs", "word", "excel", "powerpoint", "docx", "onlyoffice", "dicom-window", "spatial-window", "pointcloud-window", "gro-trajectory", "database-table", "sqlite-table", "radar-window", "ugrid-window", "matrix-workbench", "astronomy-workbench", "alignment-browser", "sequence-browser", "genome-tracks", "blast-hits", "simulation-mesh"]
+VisualizationReader = Literal["alignment-browser", "archive", "archive-member", "array-window", "astronomy-workbench", "binary", "blast-hits", "bson", "columnar-window", "csv", "czi", "czi-window", "database-table", "dicom-window", "diffraction", "edf", "envi-window", "excel", "fastq", "fastqc", "fcs-window", "fits", "genome-tracks", "geoformat", "grib-window", "gro-trajectory", "hdf5", "instrument-window", "jcamp", "mass-spectrum", "matrix-workbench", "mca", "metpy", "molecular", "mysql-sdi", "netcdf", "nexus-window", "office", "office-viewer", "ome-zarr", "pg-dump", "phylogeny", "pointcloud-window", "radar-window", "rdkit", "redis-rdb", "ripple-window", "root", "scientific-graph", "seismic-window", "sequence-browser", "shapefile", "simulation-mesh", "spatial-window", "sql-dump", "sqlite-table", "sst-records", "structure", "tabular", "text", "ugrid-window"]
 VisualizationOperation = Literal["bytes", "page", "preview", "prepare", "job"]
 VisualizationInputMode = Literal["whole", "page", "prefix", "window"]
 VisualizationKind = Literal["image", "map", "series", "table", "text", "structure", "document", "tree", "media", "graph"]
 ADAPTER_CONTRACTS = json.loads(r'''{
+  "physical-database": {
+    "readers": [
+      "mysql-sdi",
+      "sst-records"
+    ],
+    "view_kind": "table",
+    "capabilities": {
+      "operations": [
+        "preview"
+      ],
+      "input_mode": "whole",
+      "shared": false
+    }
+  },
   "database-dump": {
     "readers": [
       "sql-dump",

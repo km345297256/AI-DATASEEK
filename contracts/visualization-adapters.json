@@ -1,6 +1,11 @@
 {
   "contract_version": 2,
   "adapters": {
+    "physical-database": {
+      "readers": ["mysql-sdi", "sst-records"],
+      "view_kind": "table",
+      "capabilities": {"operations": ["preview"], "input_mode": "whole", "shared": false}
+    },
     "database-dump": {
         "readers": [
             "sql-dump",

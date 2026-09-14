@@ -1,0 +1,9 @@
+{
+  "leveldb-1.23.ldb": "e08b32b8bbc7fcd02d0574ef43a9d041098b5ef49810295830ead19ef646ee99",
+  "mysql-8.0.46.ibd": "ef03c988c5e6ddf489c80be3d903b783ad15cb6777bb877ff18f360b5e13f954",
+  "mysql-sdi-oracle.json": "6246e852ff4fb45d55c96802ff03f6ab98adbfaf15b9960a441edf4f8f73cdb1",
+  "rocksdb-6.11.4.sst": "f02d53fc206bbdc4026e7be71cfc1597bd20bfa1a466127d3acb7f06ba61b6fd",
+  "rocksdb-6.11.4.sst.oracle.txt": "3789588b07299737b0b7510801acd1a490cc4ed107451a670d227a46f110ce6f",
+  "rocksdb-range.sst": "623b9a851a16925f628658537f78ffdfb2fd0723f4c1d441c9b9924c01893d00",
+  "rocksdb-range.sst.oracle.txt": "9d76b457f1fa41e9c3703fbdc1bcc4bd4368e6b7530473e4c554329ebd8b2466"
+}

@@ -227,8 +227,8 @@ async def run_acceptance(database, client, data, versions, user_id, run):
 
     try:
         catalog = await request("GET", "/api/v1/visualizations")
-        assert catalog["engine"] == "cordis" and len(catalog["plugins"]) == 81
-        by_id = {p["id"]: p for p in catalog["plugins"]}; assert len(by_id) == 81
+        assert catalog["engine"] == "cordis" and len(catalog["plugins"]) == 83
+        by_id = {p["id"]: p for p in catalog["plugins"]}; assert len(by_id) == 83
         for plugin in PLUGINS:
             item = by_id[plugin]
             assert item["reader"] == item["adapter"] == "database-table" and item["contract_version"] == 2

@@ -23,9 +23,9 @@ test('all visualization plugins use one capability contract as real Cordis regis
   const context = await buildVisualizationContext(productionDirectory)
   try {
     assert.equal(context.snapshot.engine, 'cordis')
-    assert.equal(context.pluginFibers.length, 81)
-    assert.equal(context.catalog.snapshot().plugins.length, 81)
-    assert.equal(context.snapshot.plugins.filter(item => item.contract_version === 2).length, 81)
+    assert.equal(context.pluginFibers.length, 83)
+    assert.equal(context.catalog.snapshot().plugins.length, 83)
+    assert.equal(context.snapshot.plugins.filter(item => item.contract_version === 2).length, 83)
     assert.ok(context.snapshot.plugins.every(item => !item.adapter.startsWith('v2-') && !('data_kind' in item)))
     assert.equal(context.snapshot.plugins.filter(item => item.capabilities.shared).length, 9)
     assert.match(context.snapshot.revision, /^[a-f0-9]{64}$/)
@@ -46,7 +46,7 @@ test('disposing one visualization Cordis fiber removes only its registration', a
   } finally { await context.context.fiber.dispose() }
 })
 
-for (const id of ['viz-columnar-window', 'viz-nexus-window', 'viz-scientific-graph', 'viz-phylogeny', 'viz-envi-window', 'viz-grib-window', 'viz-seismic-window', 'viz-mass-spectrum', 'viz-diffraction', 'viz-fcs-window', 'viz-ripple-window', 'viz-dicom-window', 'viz-spatial-window', 'viz-pointcloud-window', 'viz-gro-trajectory', 'viz-simulation-mesh', 'viz-sqlite-table', 'viz-radar-window', 'viz-ugrid-window', 'viz-duckdb-table', 'viz-dbf-table', 'viz-access-table', 'viz-sql-dump', 'viz-postgres-dump', 'viz-bson', 'viz-redis-rdb']) {
+for (const id of ['viz-mysql-sdi', 'viz-sst-records', 'viz-columnar-window', 'viz-nexus-window', 'viz-scientific-graph', 'viz-phylogeny', 'viz-envi-window', 'viz-grib-window', 'viz-seismic-window', 'viz-mass-spectrum', 'viz-diffraction', 'viz-fcs-window', 'viz-ripple-window', 'viz-dicom-window', 'viz-spatial-window', 'viz-pointcloud-window', 'viz-gro-trajectory', 'viz-simulation-mesh', 'viz-sqlite-table', 'viz-radar-window', 'viz-ugrid-window', 'viz-duckdb-table', 'viz-dbf-table', 'viz-access-table', 'viz-sql-dump', 'viz-postgres-dump', 'viz-bson', 'viz-redis-rdb']) {
   test(`new domain plugin ${id} is owned by its own real Cordis fiber`, async () => {
     const context = await buildVisualizationContext(productionDirectory)
     try {

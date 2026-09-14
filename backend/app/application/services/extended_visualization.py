@@ -26,6 +26,7 @@ MAX_INPUT = 64 * 1024 * 1024
 MAX_OUTPUT = 8 * 1024 * 1024
 _SLOTS = asyncio.Semaphore(2)
 _KINDS = {
+    "mysql-sdi": {"tree"}, "sst-records": {"tree"},
     "sql-dump": {"tree", "table"}, "pg-dump": {"tree"},
     "bson": {"tree", "table"}, "redis-rdb": {"tree", "table"},
     "database-table": {"tree", "table"},
@@ -42,6 +43,7 @@ _KINDS = {
     "geoformat": {"map"}, "czi": {"tree", "image"}, "mca": {"series"},
 }
 _OPTIONS = {
+    "mysql-sdi": set(), "sst-records": set(),
     "sql-dump": {"dialect", "table", "columns", "row_offset", "row_limit"}, "pg-dump": set(),
     "bson": {"group_id", "offset", "limit"}, "redis-rdb": {"group_id", "offset", "limit"},
     "database-table": {"table", "columns", "row_offset", "row_limit"},
@@ -63,6 +65,7 @@ _DEFAULT_KIND.update({"geoformat": "map", "czi": "tree", "mca": "series", "scien
 _DEFAULT_KIND["phylogeny"] = "tree"
 _DEFAULT_KIND["sqlite-table"] = "tree"
 _DEFAULT_KIND["database-table"] = "tree"
+_DEFAULT_KIND.update({"mysql-sdi": "tree", "sst-records": "tree"})
 _DEFAULT_KIND.update({reader: "tree" for reader in ("sql-dump", "pg-dump", "bson", "redis-rdb")})
 _DEFAULT_KIND.update({"mass-spectrum": "tree", "diffraction": "tree"})
 _DEFAULT_KIND.update({"gro-trajectory": "tree", "simulation-mesh": "tree"})
@@ -79,7 +82,7 @@ class ExtendedPreviewRequest(BaseModel):
 
 
 def validate_options(reader: str, options: dict) -> None:
-    if reader in {"sql-dump", "pg-dump", "bson", "redis-rdb"}:
+    if reader in {"sql-dump", "pg-dump", "bson", "redis-rdb", "mysql-sdi", "sst-records"}:
         return  # Exact private contract is checked before source lookup below.
     if reader in migration.KINDS:
         return  # Explicit reader/kind validator runs before source IO below.
@@ -147,7 +150,7 @@ def validate_options(reader: str, options: dict) -> None:
 
 
 def validate_payload(payload: Any, reader: str, kind: str, limit: int) -> dict:
-    if reader in {"sql-dump", "pg-dump", "bson", "redis-rdb"}:
+    if reader in {"sql-dump", "pg-dump", "bson", "redis-rdb", "mysql-sdi", "sst-records"}:
         from app.application.services.database_file_visualization import validate_payload as validate_database_file
         return validate_database_file(payload, reader, kind, limit=limit)
     if reader == "database-table":
@@ -317,7 +320,7 @@ def validate_payload(payload: Any, reader: str, kind: str, limit: int) -> dict:
 def validate_requested_selection(result: dict, reader: str, kind: str, options: dict, format: str, size: int):
     """A well-formed result must still belong to the requested resource/window."""
     meta = result["metadata"]
-    if reader in {"sql-dump", "pg-dump", "bson", "redis-rdb"}:
+    if reader in {"sql-dump", "pg-dump", "bson", "redis-rdb", "mysql-sdi", "sst-records"}:
         from app.application.services.database_file_visualization import validate_payload as validate_database_file
         validate_database_file(result, reader, kind, options=options, fmt=format, size=size)
         return
@@ -386,7 +389,7 @@ async def extended_visualization(file_service, catalog, image: str | None, file_
         raise ScientificPreviewRejected("完整质控必须通过明确启动的 AnalysisJob 执行。")
     validate_options(reader, request.options)
     kind = request.kind or _DEFAULT_KIND.get(reader)
-    if reader in {"sql-dump", "pg-dump", "bson", "redis-rdb"}:
+    if reader in {"sql-dump", "pg-dump", "bson", "redis-rdb", "mysql-sdi", "sst-records"}:
         from app.application.services.database_file_visualization import validate_options as validate_database_file_options
         try:
             validate_database_file_options(reader, kind, request.options)
@@ -457,7 +460,7 @@ async def extended_visualization(file_service, catalog, image: str | None, file_
     if not plugin.matches_filename(info.filename or ""):
         raise ScientificPreviewRejected("此插件不支持当前格式。")
     reader_limit = {"gro-trajectory": 16 * 1024 * 1024, "simulation-mesh": 16 * 1024 * 1024, "mass-spectrum": 16 * 1024 * 1024, "diffraction": 16 * 1024 * 1024, "structure": 4 * 1024 * 1024, "phylogeny": 4 * 1024 * 1024, "mca": 4 * 1024 * 1024, "scientific-graph": 4 * 1024 * 1024, "geoformat": 16 * 1024 * 1024}.get(reader, MAX_INPUT)
-    if reader in {"sqlite-table", "database-table", "sql-dump", "pg-dump", "bson", "redis-rdb"}:
+    if reader in {"sqlite-table", "database-table", "sql-dump", "pg-dump", "bson", "redis-rdb", "mysql-sdi", "sst-records"}:
         reader_limit = 16 * 1024 * 1024
     if reader in migration.INPUT_LIMITS:
         reader_limit = migration.INPUT_LIMITS[reader]
