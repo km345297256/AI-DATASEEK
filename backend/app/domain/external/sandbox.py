@@ -149,7 +149,7 @@ class Sandbox(Protocol):
         """
         ...
 
-    async def file_download(self, path: str) -> BinaryIO:
+    async def file_download(self, path: str, *, max_bytes: int | None = None) -> BinaryIO:
         """Download a Sandbox file as a binary stream."""
         ...
     
@@ -272,7 +272,9 @@ class Sandbox(Protocol):
     
     async def file_download(
         self,
-        path: str
+        path: str,
+        *,
+        max_bytes: int | None = None,
     ) -> BinaryIO:
         """Download file from sandbox
         

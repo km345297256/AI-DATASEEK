@@ -18,9 +18,10 @@ from uuid import uuid4
 
 from app.core.config import get_settings
 from app.domain.models.execution_environment import safe_public_identifier
-from app.domain.models.model_trace import MemoryChange, ModelTraceRecord
+from app.domain.models.model_trace import MemoryChange, ModelTraceRecord, ScheduledModelRetry
 from app.domain.services.context_budget import ContextBudgetExceeded, prepare_context
 from app.domain.services.execution_identity import private_identity_hmac
+from app.domain.services.model_input_policy import ImageInputError, request_image_estimator, resolve_model_capability
 from app.domain.services.token_usage_service import TokenUsageService
 
 logger = logging.getLogger(__name__)
@@ -81,6 +82,15 @@ class ModelExecutionScope:
     pending_changes: list[MemoryChange] = field(default_factory=list)
     flush_lock: asyncio.Lock = field(default_factory=asyncio.Lock)
     durable_budget: Any = None
+
+
+@dataclass(frozen=True)
+class _FailedModelAttempt:
+    scope: ModelExecutionScope
+    trace: ModelTraceRecord
+
+
+_FAILED_ATTEMPT_ATTRIBUTE = "_dataseek_failed_model_attempt"
 
 
 _SCOPE: ContextVar[ModelExecutionScope | None] = ContextVar("model_execution_scope", default=None)
@@ -191,6 +201,29 @@ async def _store(scope, record) -> None:
         raise ModelBudgetStopped("trace_store_unavailable") from None
 
 
+async def record_model_retry(error: Exception, schedule: ScheduledModelRetry) -> bool:
+    """Amend the exact failed physical request before waiting to retry it.
+
+    Non-driver compatibility calls may have no trace. A driver-owned trace
+    must stay in its original live scope and persist successfully; otherwise
+    fail closed rather than issuing another unrecorded physical request.
+    """
+    failed = getattr(error, _FAILED_ATTEMPT_ATTRIBUTE, None)
+    if not isinstance(failed, _FailedModelAttempt):
+        return False
+    scope = _SCOPE.get()
+    trace = failed.trace
+    if (scope is None or scope is not failed.scope or scope.ledger.closed
+            or scope.ledger.stopped_code
+            or (trace.user_id, trace.session_id, trace.task_id) != (scope.user_id, scope.session_id, scope.task_id)
+            or trace.kind != "model_request" or trace.status != "failed"
+            or trace.error_code != "provider_error"):
+        raise ModelBudgetStopped("runtime_closed")
+    updated = trace.model_copy(update={"scheduled_retry": schedule}, deep=True)
+    await _store(scope, updated)
+    return True
+
+
 async def flush_memory_changes() -> None:
     scope = _SCOPE.get()
     if scope is None:
@@ -222,6 +255,9 @@ async def invoke_model_request(*, messages, tool_schemas=(), response_format=Non
                                provider: str, model_name: str, driver_version: str = "langchain-driver/v1",
                                invoke: Callable[[list, int], Awaitable[Any]]):
     settings = get_settings()
+    capability = resolve_model_capability(settings, provider, model_name)
+    if capability.max_output_tokens is not None:
+        max_output_tokens = min(max_output_tokens, capability.max_output_tokens)
     scope = _SCOPE.get()
     durable_budget = current_analysis_budget()
     durable_reservation_id = None
@@ -238,8 +274,10 @@ async def invoke_model_request(*, messages, tool_schemas=(), response_format=Non
     try:
         phase_started = time.perf_counter()
         try:
+            image_estimator = request_image_estimator(messages, settings=settings, capability=capability)
             prepared = prepare_context(messages, tool_schemas=tool_schemas, response_format=response_format,
-                capacity_tokens=settings.model_context_capacity_tokens, max_output_tokens=max_output_tokens,
+                capacity_tokens=min(settings.model_context_capacity_tokens, capability.context_tokens or settings.model_context_capacity_tokens),
+                max_output_tokens=max_output_tokens, image_tokens=capability.image_tokens, image_estimator=image_estimator,
                 safety_tokens=settings.model_context_safety_tokens)
         finally:
             trace.timings.context_prepare_ms = (time.perf_counter() - phase_started) * 1000
@@ -249,6 +287,7 @@ async def invoke_model_request(*, messages, tool_schemas=(), response_format=Non
         trace.input_limit = prepared.input_limit
         trace.compactions = list(prepared.records)
         trace.estimator_version = prepared.estimator_version
+        trace.estimator_version += f"+image_{capability.image_token_strategy}_v1"
         if scope is not None:
             phase_started = time.perf_counter()
             trace.request_hmac_before = _request_hmac(messages, tool_schemas, response_format)
@@ -270,12 +309,12 @@ async def invoke_model_request(*, messages, tool_schemas=(), response_format=Non
                 code = admission.reason if admission.reason in {"task_call_budget_exceeded", "task_token_budget_exceeded", "analysis_budget_deadline_exceeded"} else "trace_store_unavailable"
                 raise ModelBudgetStopped(code)
             durable_reservation_id = admission.reservation_id
-    except (ContextBudgetExceeded, ModelBudgetStopped) as error:
+    except (ContextBudgetExceeded, ModelBudgetStopped, ImageInputError) as error:
         trace.status = "budget_exceeded"
         trace.error_code = getattr(error, "code", "context_budget_exceeded")
         trace.finished_at = datetime.now(UTC)
         await _store(scope, trace)
-        if scope is not None:
+        if scope is not None and not isinstance(error, ImageInputError):
             raise ModelBudgetStopped(trace.error_code) from None
         raise
     phase_started = time.perf_counter()
@@ -307,6 +346,16 @@ async def invoke_model_request(*, messages, tool_schemas=(), response_format=Non
         trace.usage_source = "reservation"
         trace.finished_at = datetime.now(UTC)
         await _store(scope, trace)
+        if (isinstance(error, Exception) and scope is not None and scope.store is not None
+                and trace.error_code == "provider_error"):
+            # Exceptions never cross the API boundary here. Only a typed
+            # internal marker may authorize a later same-owner trace update.
+            try:
+                setattr(error, _FAILED_ATTEMPT_ATTRIBUTE, _FailedModelAttempt(scope, trace))
+            except (AttributeError, TypeError):
+                # Preserve immutable third-party exceptions; compatibility
+                # retries without an attachable marker still emit safe logs.
+                logger.warning("Model failure does not support retry trace binding error_type=%s", type(error).__name__)
         raise
     trace.timings.provider_call_ms = (time.perf_counter() - phase_started) * 1000
     phase_started = time.perf_counter()

@@ -137,6 +137,9 @@ async def test_unavailable_resumed_sandbox_is_retired_before_replacement():
         async def save(self, _session):
             return None
 
+        async def compare_and_set_task_id(self, _session_id, **_kwargs):
+            return True
+
     service = AgentDomainService(
         agent_repository=object(),
         session_repository=FakeRepository(),
@@ -308,6 +311,9 @@ async def test_missing_sandbox_is_idempotently_replaced_for_dataset_remount():
     class FakeRepository:
         async def save(self, _session):
             return None
+
+        async def compare_and_set_task_id(self, _session_id, **_kwargs):
+            return True
 
     service = AgentDomainService(
         agent_repository=object(),

@@ -507,18 +507,26 @@ def test_upload_file_to_storage_wraps_bytes():
 def test_vision_agent_builds_image_block_from_storage(monkeypatch):
     import asyncio
     import io
+    from PIL import Image
 
     monkeypatch.setenv("API_KEY", "default-key")
 
+    payload = io.BytesIO()
+    Image.new("RGB", (8, 8), "red").save(payload, format="PNG")
+
     class FakeStorage:
-        async def download_file(self, file_id, user_id=None):
+        async def get_file_info(self, file_id, user_id=None):
             assert file_id == "file-1"
             assert user_id == "user-1"
-            return io.BytesIO(b"image-bytes"), FileInfo(
+            return FileInfo(
                 file_id=file_id,
                 filename="image.png",
                 content_type="image/png",
+                size=len(payload.getvalue()),
             )
+
+        async def download_file_range(self, file_id, user_id, *, offset, length):
+            return payload.getvalue()[offset:offset + length], await self.get_file_info(file_id, user_id)
 
     agent = VisionAgent(
         agent_id="agent",

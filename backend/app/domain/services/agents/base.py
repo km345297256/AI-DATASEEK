@@ -49,33 +49,17 @@ from app.domain.services.token_usage_service import TokenUsageService
 from app.domain.services.execution_identity import private_identity_hmac
 from app.domain.services.analysis_progress import AnalysisProgressGuard
 from app.domain.services.analysis_recovery import current_analysis_recovery
+from app.domain.utils.message_text import NON_SUBSTANTIVE_MESSAGE_PATTERN, is_non_substantive_message_text
 from app.domain.services.execution_evidence import ToolExecutionLedger, tool_execution_scope
 from app.domain.services.model_runtime import (
     USAGE_RECORDED_KEY, flush_memory_changes, memory_checkpoint, model_call_role,
-    note_memory_change, current_analysis_budget,
+    note_memory_change, current_analysis_budget, record_model_retry,
 )
+from app.domain.models.model_trace import ScheduledModelRetry
+from app.domain.services.model_retry import model_retry_decision
 
 
 logger = logging.getLogger(__name__)
-
-NON_SUBSTANTIVE_MESSAGE_PATTERN = re.compile(
-    r"^(?:placeholder|tbd|todo|n/?a|待补充|占位(?:符|文本)?|暂无(?:内容|结果)?)"
-    r"(?:\s*[-_:—–]*\s*(?:"
-    r"do[-_ ]+not[-_ ]+(?:send|use|display)|"
-    r"not[-_ ]+(?:used|for[-_ ]+(?:sending|display))|"
-    r"ignore(?:[-_ ]+this)?|不要发送|请勿发送|无需发送"
-    r"))?[.!。]?$",
-    re.IGNORECASE,
-)
-
-
-def is_non_substantive_message_text(value: Any) -> bool:
-    """Recognize only blank or standalone internal placeholder messages."""
-    if not isinstance(value, str):
-        return True
-    text = value.strip()
-    return not text or bool(NON_SUBSTANTIVE_MESSAGE_PATTERN.fullmatch(text))
-
 
 class LLMServiceUnavailableError(RuntimeError):
     """Stable user-facing error after transient provider retries are exhausted."""
@@ -1367,13 +1351,28 @@ class BaseAgent(ABC):
                     0.0,
                     getattr(self, "_llm_retry_max_seconds", 8.0),
                 )
-                delay = min(base_delay * (2 ** (transient_attempt - 1)), max_delay)
+                decision = model_retry_decision(
+                    e, attempt=transient_attempt, base_seconds=base_delay, max_seconds=max_delay,
+                )
+                if decision.delay_seconds is None:
+                    logger.warning(
+                        "model_retry_stopped failed_attempt=%d maximum_attempts=%d reason=%s error_type=%s",
+                        transient_attempt, retry_attempts, decision.reason, type(e).__name__,
+                    )
+                    raise LLMServiceUnavailableError(
+                        "模型服务要求等待较长时间，系统未提前重复请求。"
+                        "请稍后重新提交任务，或切换可用的模型服务。"
+                    ) from e
+                delay = decision.delay_seconds
+                recorded = await record_model_retry(e, ScheduledModelRetry(
+                    failed_attempt=transient_attempt, next_attempt=transient_attempt + 1,
+                    maximum_attempts=retry_attempts, delay_seconds=delay, reason=decision.reason,
+                ))
                 logger.warning(
-                    "Attempt %d/%d: transient LLM failure (%s), retrying in %.1fs",
-                    transient_attempt,
-                    retry_attempts,
-                    type(e).__name__,
-                    delay,
+                    "model_retry_scheduled failed_attempt=%d next_attempt=%d maximum_attempts=%d "
+                    "reason=%s delay_seconds=%.3f error_type=%s trace_recorded=%s",
+                    transient_attempt, transient_attempt + 1, retry_attempts,
+                    decision.reason, delay, type(e).__name__, recorded,
                 )
                 if delay:
                     await asyncio.sleep(delay)

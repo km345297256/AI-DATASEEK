@@ -27,6 +27,7 @@ dependencies = [
     "openai>=2.8.0",
     "browser-use>=0.12.1",
     "playwright>=1.42.0",
+    "pillow>=11,<13",
     "pypdf>=5.0.0",
     "pydantic>=2.12.4",
     "pydantic-settings>=2.12.0",

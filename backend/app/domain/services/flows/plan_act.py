@@ -7,6 +7,7 @@ from datetime import datetime, UTC
 from pathlib import PurePosixPath
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from app.domain.services.flows.base import BaseFlow
+from app.domain.services.execution_history import ExecutionHistory
 from app.domain.models.message import Message
 from typing import Any, AsyncGenerator, Optional
 from enum import Enum
@@ -778,7 +779,8 @@ class PlanActFlow(BaseFlow):
         events = getattr(message, "_session_events_snapshot", None)
         if events is None:
             events = await self._session_repository.get_events(self._session_id)
-        last_plan_event = next((e for e in reversed(events) if isinstance(e, PlanEvent)), None)
+        last_plan_event = (events.latest_plan if isinstance(events, ExecutionHistory)
+                           else next((e for e in reversed(events) if isinstance(e, PlanEvent)), None))
         self.plan = last_plan_event.plan if last_plan_event else None
         if message._resume_checkpoint:
             self.plan = Plan.model_validate(message._resume_checkpoint["plan"])
@@ -2188,10 +2190,13 @@ class PlanActFlow(BaseFlow):
 
     def _render_session_context(
         self,
-        events: list[BaseEvent],
+        events: list[BaseEvent] | ExecutionHistory,
         *,
         current_user_message: str | None = None,
     ) -> str:
+        projection = events if isinstance(events, ExecutionHistory) else None
+        if projection is not None:
+            events = []
         current_event_index: int | None = None
         if current_user_message:
             # The current user event is persisted before the flow starts. Exclude
@@ -2253,6 +2258,11 @@ class PlanActFlow(BaseFlow):
                 seen_analysis_results.add(key)
                 analysis_results.append(key)
 
+        if projection is not None:
+            conversation = projection.context_conversation(current_user_message)
+            vision_results = projection.vision_results
+            analysis_results = projection.analysis_results
+            spill_references = projection.spill_references
         conversation = conversation[-self.MAX_SESSION_CONTEXT_MESSAGES:]
         rendered_messages_reversed: list[dict[str, str]] = []
         remaining_bytes = self.MAX_SESSION_CONTEXT_BYTES

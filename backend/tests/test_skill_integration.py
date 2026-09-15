@@ -991,6 +991,16 @@ async def test_chat_recreates_missing_running_task(monkeypatch):
         async def save(self, session):
             self.session = session
 
+        async def compare_and_set_task_id(
+            self, _session_id, *, expected_task_id, task_id, dataset_ids=None,
+        ):
+            if self.session.task_id != expected_task_id:
+                return False
+            self.session.task_id = task_id
+            if dataset_ids is not None:
+                self.session.dataset_ids = list(dataset_ids)
+            return True
+
         async def update_latest_message(self, session_id, message, timestamp):
             self.session.latest_message = message
 
@@ -1392,6 +1402,9 @@ async def test_agent_domain_service_resumes_paused_session_sandbox_before_reuse(
         async def save(self, session):
             self.saved.append(session.task_id)
 
+        async def compare_and_set_task_id(self, _session_id, **_kwargs):
+            return True
+
     sandbox = FakeSandbox()
     runtime = FakeRuntime(sandbox)
     service = AgentDomainService(
@@ -1459,6 +1472,9 @@ async def test_agent_domain_service_hydrates_replacement_sandbox_from_session_fi
     class FakeSessionRepository:
         async def save(self, session):
             return None
+
+        async def compare_and_set_task_id(self, _session_id, **_kwargs):
+            return True
 
     class FakeFileStorage:
         async def download_file(self, file_id, user_id=None):

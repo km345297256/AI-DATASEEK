@@ -1,4 +1,5 @@
 import asyncio
+import copy
 import hashlib
 import os
 import logging
@@ -6,21 +7,53 @@ import re
 from typing import Dict, Any, List, Mapping, Optional, Tuple
 from contextlib import AsyncExitStack
 
-from mcp import ClientSession, StdioServerParameters
+from jsonschema.validators import validator_for
+from referencing import Registry
+
+from mcp import ClientSession as _SDKClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
 from mcp.client.sse import sse_client
 from mcp.client.streamable_http import streamablehttp_client
-from mcp.types import Tool as MCPToolkit
+from mcp.types import (
+    CallToolRequest,
+    CallToolRequestParams,
+    CallToolResult,
+    ClientRequest,
+    Tool as MCPToolkit,
+)
 
 from langchain.messages import ToolMessage
 from langchain.tools import tool
 
 from app.domain.services.tools.base import BaseToolkit
 from app.domain.services.tools.pipeline import opaque_log_identifier, summarize_argument_keys
+from app.domain.services.tools.spill_projection import (
+    sanitize_spill_public_data,
+    sanitize_spill_public_text,
+)
 from app.domain.models.tool_result import ToolResult
 from app.domain.models.mcp_config import MCPConfig, MCPServerConfig
 
 logger = logging.getLogger(__name__)
+
+
+class ClientSession(_SDKClientSession):
+    """One wire invocation; output policy belongs to our pinned tool catalog.
+
+    SDK 1.26's convenience call_tool refreshes discovery on a new connection
+    and validates with a default JSON Schema resolver. That can change a live
+    task's contract and retrieve untrusted external schema URLs. Use the SDK's
+    public typed request API instead; MCPClientManager validates exactly once
+    with its discovery snapshot and a non-fetching registry.
+    """
+
+    async def call_tool(self, name: str, arguments: Dict[str, Any]) -> CallToolResult:
+        return await self.send_request(
+            ClientRequest(CallToolRequest(params=CallToolRequestParams(
+                name=name, arguments=arguments,
+            ))),
+            CallToolResult,
+        )
 
 
 # Stdio MCP servers run as children of the backend process.  Only inherit the
@@ -66,6 +99,94 @@ _STDIO_INHERITED_ENV_KEYS = frozenset({
 })
 
 _MODEL_TOOL_NAME_RE = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
+_MAX_TOOL_DISCOVERY_PAGES = 100
+_MAX_SERVER_TOOLS = 4096
+_MAX_RESULT_DEPTH = 64
+_MAX_RESULT_NODES = 1_000_000
+
+
+def _sanitize_mcp_data(value: Any, server_config: MCPServerConfig) -> Any:
+    """Quarantine secrets/host paths without truncating normal spill payloads.
+
+    Reuse the public projection's string/key policy, but not its small preview
+    node budget: complete structured results must still reach the spill layer.
+    The MCP wire payload remains data, never trusted execution metadata.
+    """
+    def secret_key(key: str) -> bool:
+        # Match the shared projection policy, including common environment
+        # names such as SERVICE_KEY. Runtime flags/paths are not credentials:
+        # globally replacing an env value like TIMEOUT=1 corrupts numeric data.
+        return (
+            next(iter(sanitize_spill_public_data({key: None}).values())) == "[redacted credential]"
+            or re.sub(r"[^a-z0-9]", "", key.lower()).endswith("key")
+        )
+
+    secrets = {value for key, value in (server_config.env or {}).items() if secret_key(key)}
+    public_headers = {"accept", "content-type", "user-agent", "mcp-protocol-version"}
+    secrets.update(value for key, value in (server_config.headers or {}).items()
+                   if key.lower() not in public_headers)
+    # An Authorization header may be echoed with or without its auth scheme.
+    secrets.update(value.split(" ", 1)[1] for value in tuple(secrets)
+                   if value.lower().startswith(("bearer ", "basic ")))
+    secrets = sorted((value for value in secrets if value), key=len, reverse=True)
+    remaining = _MAX_RESULT_NODES
+
+    def text(value: str) -> str:
+        for secret in secrets:
+            value = value.replace(secret, "[redacted credential]")
+        return sanitize_spill_public_text(value)
+
+    def visit(item: Any, depth: int) -> Any:
+        nonlocal remaining
+        remaining -= 1
+        if depth > _MAX_RESULT_DEPTH or remaining < 0:
+            raise ValueError("MCP result exceeded structural limits")
+        if isinstance(item, dict):
+            result = {}
+            for key, child in item.items():
+                if not isinstance(key, str):
+                    raise ValueError("MCP object keys must be strings")
+                # A one-key projection reuses the credential-key rules without
+                # treating the entire output as a bounded public preview.
+                key_projection = sanitize_spill_public_data({key: None})
+                is_secret = next(iter(key_projection.values())) == "[redacted credential]"
+                safe_key = text(key)
+                if safe_key in result:
+                    raise ValueError("MCP result keys collide after redaction")
+                result[safe_key] = "[redacted credential]" if is_secret else visit(child, depth + 1)
+            return result
+        if isinstance(item, list):
+            return [visit(child, depth + 1) for child in item]
+        if isinstance(item, str):
+            return text(item)
+        if item is None or isinstance(item, (bool, int, float)):
+            return item
+        raise ValueError("MCP result must contain JSON values")
+
+    return visit(value, 0)
+
+
+def _project_mcp_content(content: Any) -> list[dict[str, Any]]:
+    """Retain text, explicitly mark unsupported binary blocks, never fetch URIs.
+
+    Arbitrary SDK object reprs may include raw base64, annotations or local
+    resource locations. Only the documented data fields below may cross into
+    the existing ToolResult/spill channel.
+    """
+    projected = []
+    for item in content or []:
+        kind = getattr(item, "type", "text" if hasattr(item, "text") else "unknown")
+        if kind == "text" and isinstance(getattr(item, "text", None), str):
+            projected.append({"type": "text", "text": item.text})
+        elif kind == "resource" and isinstance(getattr(getattr(item, "resource", None), "text", None), str):
+            projected.append({"type": "resource", "text": item.resource.text})
+        else:
+            projected.append({
+                "type": kind if kind in {"image", "audio", "resource", "resource_link"} else "unsupported",
+                "omitted": True,
+                "reason": "MCP non-text content is not exposed through this text adapter",
+            })
+    return projected
 
 
 def _model_tool_name(server_name: str, tool_name: str) -> str:
@@ -115,6 +236,7 @@ class MCPClientManager:
         self._exit_stack = AsyncExitStack()
         self._tools_cache: Dict[str, List[MCPToolkit]] = {}
         self._tool_routes: Dict[str, Tuple[str, str]] = {}
+        self._output_validators: Dict[str, Any] = {}
         self._initialized = False
         self._config = config
     
@@ -239,7 +361,9 @@ class MCPClientManager:
         try:
             # 临时连接仅用于获取工具列表，call_tool 时会按需重连
             async with AsyncExitStack() as stack:
-                sse_transport = await stack.enter_async_context(sse_client(url))
+                sse_transport = await stack.enter_async_context(
+                    sse_client(url, headers=server_config.headers or {})
+                )
                 read_stream, write_stream = sse_transport
                 session = await stack.enter_async_context(
                     ClientSession(read_stream, write_stream)
@@ -297,10 +421,33 @@ class MCPClientManager:
             raise
     
     async def _cache_server_tools(self, server_name: str, session: ClientSession):
-        """缓存服务器工具列表"""
+        """Atomically cache a complete, bounded catalog; never publish a prefix."""
         try:
-            tools_response = await session.list_tools()
-            tools = tools_response.tools if tools_response else []
+            tools = []
+            names = set()
+            seen_cursors = set()
+            cursor = None
+            for _ in range(_MAX_TOOL_DISCOVERY_PAGES):
+                tools_response = (await session.list_tools() if cursor is None
+                                  else await session.list_tools(cursor=cursor))
+                if tools_response is None:
+                    raise ValueError("MCP tool discovery returned no response")
+                page = tools_response.tools
+                if len(tools) + len(page) > _MAX_SERVER_TOOLS:
+                    raise ValueError("MCP tool discovery exceeded the tool limit")
+                for item in page:
+                    if item.name in names:
+                        raise ValueError("MCP tool discovery returned a duplicate name")
+                    names.add(item.name)
+                    tools.append(copy.deepcopy(item))
+                cursor = getattr(tools_response, "nextCursor", None)
+                if cursor is None:
+                    break
+                if not isinstance(cursor, str) or not cursor or cursor in seen_cursors:
+                    raise ValueError("MCP tool discovery returned an invalid or repeated cursor")
+                seen_cursors.add(cursor)
+            else:
+                raise ValueError("MCP tool discovery exceeded the page limit")
             self._tools_cache[server_name] = tools
             logger.info(
                 "MCP server_ref=%s exposes tool_count=%d",
@@ -314,12 +461,14 @@ class MCPClientManager:
                 _server_log_ref(server_name),
                 type(error).__name__,
             )
-            self._tools_cache[server_name] = []
+            # Keep a previously complete generation intact if a refresh fails.
+            self._tools_cache.setdefault(server_name, [])
     
     async def get_all_tools(self) -> List[Dict[str, Any]]:
         """获取所有 MCP 工具"""
         all_tools = []
         tool_routes: Dict[str, Tuple[str, str]] = {}
+        output_validators: Dict[str, Any] = {}
         
         for server_name, tools in self._tools_cache.items():
             for tool in tools:
@@ -335,6 +484,17 @@ class MCPClientManager:
                         f"{server_name}/{tool.name}"
                     )
                 tool_routes[tool_name] = route
+
+                output_schema = getattr(tool, "outputSchema", None)
+                if output_schema is not None:
+                    # Pin the discovery-time contract; reconnecting for one
+                    # invocation must not silently change a running task's schema.
+                    output_schema = copy.deepcopy(output_schema)
+                    validator_class = validator_for(output_schema)
+                    validator_class.check_schema(output_schema)
+                    output_validators[tool_name] = validator_class(
+                        output_schema, registry=Registry(),
+                    )
                 
                 # 转换为标准工具格式
                 tool_schema = {
@@ -342,7 +502,7 @@ class MCPClientManager:
                     "function": {
                         "name": tool_name,
                         "description": f"[{server_name}] {tool.description or tool.name}",
-                        "parameters": tool.inputSchema
+                        "parameters": copy.deepcopy(tool.inputSchema)
                     }
                 }
                 all_tools.append(tool_schema)
@@ -350,6 +510,7 @@ class MCPClientManager:
         # Publish the routing table only after the complete catalog validates,
         # so callers can never observe a partially discovered generation.
         self._tool_routes = tool_routes
+        self._output_validators = output_validators
         return all_tools
 
     def get_tool_route(self, tool_name: str) -> Optional[Tuple[str, str]]:
@@ -377,13 +538,15 @@ class MCPClientManager:
                 # stdio 保持持久连接，进程重建代价高
                 session = self._clients.get(server_name)
                 if not session:
-                    return ToolResult(success=False, message=f"MCP 服务器 {server_name} 未连接")
+                    return ToolResult(success=False, message="MCP 服务器未连接")
                 result = await session.call_tool(original_tool_name, arguments)
             elif transport_type in ('http', 'sse'):
                 # SSE 每次调用建立新连接，避免长连接被 idle timeout 断掉
                 url = server_config.url
                 async with AsyncExitStack() as stack:
-                    sse_transport = await stack.enter_async_context(sse_client(url))
+                    sse_transport = await stack.enter_async_context(
+                        sse_client(url, headers=server_config.headers or {})
+                    )
                     read_stream, write_stream = sse_transport
                     session = await stack.enter_async_context(
                         ClientSession(read_stream, write_stream)
@@ -412,19 +575,41 @@ class MCPClientManager:
             else:
                 return ToolResult(success=False, message=f"不支持的传输类型: {transport_type}")
 
-            if result:
-                content = []
-                if hasattr(result, 'content') and result.content:
-                    for item in result.content:
-                        if hasattr(item, 'text'):
-                            content.append(item.text)
-                        else:
-                            content.append(str(item))
-                return ToolResult(
-                    success=True,
-                    data='\n'.join(content) if content else "工具执行成功"
+            if result is None:
+                raise ValueError("MCP tool returned no result")
+            is_error = getattr(result, "isError", False)
+            if not isinstance(is_error, bool):
+                raise ValueError("MCP tool returned an invalid error status")
+            structured = getattr(result, "structuredContent", None)
+            if structured is not None and not isinstance(structured, dict):
+                raise ValueError("MCP structured content must be an object")
+            validator = self._output_validators.get(tool_name)
+            if not is_error and validator is not None:
+                try:
+                    if structured is None or not validator.is_valid(structured):
+                        raise ValueError("MCP output contract mismatch")
+                except Exception:
+                    # Invalid/unresolvable output stays quarantined. Never echo
+                    # validator messages or retry a potentially completed write.
+                    return ToolResult(
+                        success=False,
+                        message="MCP 工具输出不符合声明的契约",
+                        data={"error": "mcp_tool_output_invalid"},
+                    )
+            content = _project_mcp_content(getattr(result, "content", None))
+            if structured is None and all(item["type"] == "text" for item in content):
+                data = "\n".join(item["text"] for item in content) or (
+                    "MCP 工具执行失败" if is_error else "工具执行成功"
                 )
-            return ToolResult(success=True, data="工具执行成功")
+            else:
+                data = {"content": content}
+                if structured is not None:
+                    data["structuredContent"] = structured
+            return ToolResult(
+                success=not is_error,
+                message="MCP 工具执行失败" if is_error else None,
+                data=_sanitize_mcp_data(data, server_config),
+            )
 
         except asyncio.CancelledError:
             raise
@@ -447,6 +632,7 @@ class MCPClientManager:
             self._clients.clear()
             self._tools_cache.clear()
             self._tool_routes.clear()
+            self._output_validators.clear()
             self._initialized = False
             logger.info("MCP 客户端管理器已清理")
             

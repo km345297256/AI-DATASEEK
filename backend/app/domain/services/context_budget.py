@@ -5,7 +5,7 @@ import math
 import re
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Literal, Mapping, Sequence
+from typing import Any, Callable, Literal, Mapping, Sequence
 
 from langchain.messages import AIMessage, AnyMessage
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -133,13 +133,13 @@ def _estimate_unknown_block(value: Any) -> int:
 def _image_metadata(block: Mapping[str, Any]) -> dict[str, Any]:
     metadata: dict[str, Any] = {}
     for key, value in block.items():
-        if key in {"data", "image", "image_url", "source", "url"}:
+        if key in {"data", "base64", "image", "image_url", "source", "url"}:
             continue
         metadata[str(key)] = value
     return metadata
 
 
-def _estimate_content(content: Any, *, image_tokens: int) -> int:
+def _estimate_content(content: Any, *, image_tokens: int, image_estimator: Callable | None = None) -> int:
     if isinstance(content, str):
         return _utf8_tokens(content)
     if content is None:
@@ -168,7 +168,7 @@ def _estimate_content(content: Any, *, image_tokens: int) -> int:
         if block_type in _IMAGE_BLOCK_TYPES:
             # Image payload bytes and URLs are not text-tokenized. Each image has
             # its own conservative reservation, plus only its small metadata.
-            total += image_tokens + 8
+            total += _require_positive_int(image_estimator(block) if image_estimator else image_tokens, "image_tokens") + 8
             total += _ceil_div3(len(_canonical_json_bytes(_image_metadata(block))))
             continue
         total += _estimate_unknown_block(block)
@@ -193,10 +193,10 @@ def _tool_calls(message: Any) -> tuple[Mapping[str, Any], ...]:
     return tuple(calls)
 
 
-def _estimate_message(message: Any, *, image_tokens: int) -> int:
+def _estimate_message(message: Any, *, image_tokens: int, image_estimator: Callable | None = None) -> int:
     message_type = _message_type(message)
     total = _MESSAGE_OVERHEAD_TOKENS + _utf8_tokens(message_type)
-    total += _estimate_content(getattr(message, "content", None), image_tokens=image_tokens)
+    total += _estimate_content(getattr(message, "content", None), image_tokens=image_tokens, image_estimator=image_estimator)
 
     name = getattr(message, "name", None)
     if isinstance(name, str):
@@ -276,13 +276,14 @@ def estimate_context_tokens(
     tool_schemas: Sequence[Any] = (),
     response_format: Any = None,
     image_tokens: int = 1_024,
+    image_estimator: Callable | None = None,
 ) -> tuple[int, int]:
     """Return ``(total_input_estimate, tool_schema_estimate)`` locally."""
 
     _require_positive_int(image_tokens, "image_tokens")
     tool_tokens = estimate_tool_tokens(tool_schemas)
     message_tokens = 3 + sum(
-        _estimate_message(message, image_tokens=image_tokens) for message in messages
+        _estimate_message(message, image_tokens=image_tokens, image_estimator=image_estimator) for message in messages
     )
     return message_tokens + tool_tokens + _estimate_response_format(response_format), tool_tokens
 
@@ -469,6 +470,7 @@ def prepare_context(
     max_output_tokens: int = 8_192,
     safety_tokens: int = 2_048,
     image_tokens: int = 1_024,
+    image_estimator: Callable | None = None,
     max_tool_text_tokens: int = 2_048,
 ) -> PreparedContext:
     """Prepare a paired, provider-ready context without mutating its source.
@@ -501,7 +503,7 @@ def prepare_context(
     # catalog revisions must never reuse stale estimates across requests.
     tool_tokens = estimate_tool_tokens(schemas)
     message_tokens = [
-        _estimate_message(message, image_tokens=image_tokens)
+        _estimate_message(message, image_tokens=image_tokens, image_estimator=image_estimator)
         for message in copied_messages
     ]
     input_tokens_before = (
@@ -543,7 +545,7 @@ def prepare_context(
             update={"content": compacted},
             deep=True,
         )
-        candidate_tokens = _estimate_message(candidate_message, image_tokens=image_tokens)
+        candidate_tokens = _estimate_message(candidate_message, image_tokens=image_tokens, image_estimator=image_estimator)
         current_tokens += candidate_tokens - message_tokens[original_index]
         if current_tokens >= before:
             # A pathological marker/reference set must not make context larger.
@@ -586,7 +588,7 @@ def prepare_context(
         marker = _omission_marker(exchange, digest)
         candidate_tokens = (
             current_tokens - sum(message_tokens[exchange.start:exchange.end])
-            + _estimate_message(marker, image_tokens=image_tokens)
+            + _estimate_message(marker, image_tokens=image_tokens, image_estimator=image_estimator)
         )
         if candidate_tokens >= current_tokens:
             continue

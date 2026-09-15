@@ -28,6 +28,17 @@ class SessionRepository(Protocol):
         """Save or update a session"""
         ...
 
+    async def compare_and_set_task_id(
+        self, session_id: str, *, expected_task_id: str | None,
+        task_id: str | None, dataset_ids: list[str] | None = None,
+    ) -> bool:
+        """Publish/rollback only the task pointer still owned by the caller.
+
+        Publication may also persist the effective dataset selection. Rollback
+        leaves all other session fields, including that selection, untouched.
+        """
+        ...
+
     async def find_by_id(self, session_id: str) -> Optional[Session]:
         """Find a session by its ID"""
         ...
@@ -94,6 +105,10 @@ class SessionRepository(Protocol):
 
     async def get_events(self, session_id: str) -> List[AgentEvent]:
         """Get all events for a session"""
+        ...
+
+    async def get_execution_history(self, session_id: str, *, before_seq: int):
+        """Private rebuildable execution projection strictly before an input."""
         ...
 
     async def add_execution_snapshot(

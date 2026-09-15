@@ -3,10 +3,25 @@ import json
 import logging
 from pydantic_settings import BaseSettings
 from functools import lru_cache
-from pydantic import Field
+from pydantic import BaseModel, ConfigDict, Field
 from typing import Literal
 
 logger = logging.getLogger(__name__)
+
+
+class ModelRequestCapability(BaseModel):
+    """Operator-verified capability for one exact provider/model identity.
+
+    This is request sizing, never a cumulative task quota. No capacity or
+    image support is inferred from a model name or compatible API endpoint.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+    context_tokens: int | None = Field(default=None, ge=4096, le=2_000_000)
+    max_output_tokens: int | None = Field(default=None, ge=1, le=2_000_000)
+    vision: bool | None = None
+    image_token_strategy: Literal["reserve", "deepseek_v41"] = "reserve"
+    image_tokens: int = Field(default=4096, ge=1, le=131_072)
 
 
 def _parse_extra_headers() -> dict | None:
@@ -38,6 +53,10 @@ class Settings(BaseSettings):
     # provider capacities. Offline token estimates include tool definitions.
     model_context_capacity_tokens: int = Field(default=131_072, ge=4096, le=2_000_000)
     model_context_safety_tokens: int = Field(default=2048, ge=256, le=65_536)
+    # JSON mapping: {"provider": {"exact-model-name": {"context_tokens": ...}}}.
+    # Unlisted identities retain the global engineering ceiling. An explicit
+    # capability can only narrow that ceiling, not silently enlarge it.
+    model_request_capabilities: dict[str, dict[str, ModelRequestCapability]] = Field(default_factory=dict)
     # Analysis has no total tool/call/token/time quota. The removed MODEL_TASK_*
     # and ANALYSIS_BUDGET_* environment values intentionally have no effect.
     model_trace_store_timeout_seconds: float = Field(default=3.0, ge=0.1, le=30)
@@ -86,6 +105,12 @@ class Settings(BaseSettings):
     vision_model_api_key: str | None = None
     vision_temperature: float | None = None
     vision_max_tokens: int | None = None
+    vision_max_images: int = Field(default=16, ge=1, le=64)
+    vision_max_source_bytes: int = Field(default=32 * 1024 * 1024, ge=1024, le=128 * 1024 * 1024)
+    vision_max_source_pixels: int = Field(default=40_000_000, ge=1024, le=100_000_000)
+    vision_max_image_edge: int = Field(default=2048, ge=256, le=8192)
+    # Base64 data-URL bytes across one physical model request, not raw bytes.
+    vision_max_request_bytes: int = Field(default=20 * 1024 * 1024, ge=1024, le=128 * 1024 * 1024)
     
     # MongoDB configuration
     mongodb_uri: str = "mongodb://mongodb:27017"

@@ -337,13 +337,82 @@ class AgentDomainService:
         )
 
         task = self._task_cls.create(task_runner)
-        session.task_id = task.id
-        await self._session_repository.save(session)
+        return await self._finish_task_preparation(session, task, sandbox=sandbox)
 
-        # Update record with task_id now that we have it
-        await sandbox_runtime.assign(sandbox, session, task.id)
+    async def _finish_task_preparation(
+        self, session: Session, task: Task, *, sandbox: Sandbox | None = None,
+    ) -> Task:
+        """Own a registered, unstarted task until all preparation has settled.
 
-        return task
+        Cancellation must not let an in-flight database write publish the task
+        *after* rollback. Shield preparation, then await it before rolling back.
+        The task never starts here; the dispatcher owns enqueue/run after this
+        method returns successfully.
+        """
+        previous_task_id = session.task_id
+
+        async def prepare() -> None:
+            published = await self._session_repository.compare_and_set_task_id(
+                session.id, expected_task_id=previous_task_id, task_id=task.id,
+                dataset_ids=session.dataset_ids,
+            )
+            if not published:
+                raise TaskInputClosedError("Session task changed during preparation")
+            session.task_id = task.id
+            if sandbox is not None:
+                if not getattr(task, "accepting_input", True):
+                    raise TaskInputClosedError("Task closed during preparation")
+                await self._sandbox_runtime.assign(sandbox, session, task.id)
+
+        preparation = asyncio.create_task(prepare())
+        try:
+            await asyncio.shield(preparation)
+            return task
+        except BaseException:
+            # Synchronous cancel immediately removes unstarted Redis tasks
+            # from their registry and closes input admission.
+            task.cancel()
+
+            async def rollback() -> None:
+                try:
+                    await preparation
+                except BaseException:
+                    # Preserve the original preparation/cancellation failure.
+                    pass
+                wait_closed = getattr(task, "wait_closed", None)
+                if callable(wait_closed):
+                    await wait_closed()
+                try:
+                    await self._session_repository.compare_and_set_task_id(
+                        session.id, expected_task_id=task.id, task_id=previous_task_id,
+                    )
+                except Exception as exc:
+                    logger.warning(
+                        "Could not roll back prepared task pointer session=%s task=%s error_type=%s",
+                        opaque_log_identifier(session.id, namespace="session"),
+                        opaque_log_identifier(task.id, namespace="task"),
+                        type(exc).__name__,
+                    )
+                finally:
+                    if session.task_id == task.id:
+                        session.task_id = previous_task_id
+                # Do not call runner.destroy/on_done: they destroy or pause
+                # the session-owned sandbox and close existing browser pages.
+                # No runner resources have been started yet. Sandbox assign
+                # is a non-authoritative observability link, not execution
+                # ownership; without a task-scoped CAS unassign, clearing it
+                # could undo another task's association. The next assignment
+                # replaces it while the reusable sandbox/artifacts survive.
+
+            cleanup = asyncio.create_task(rollback())
+            while not cleanup.done():
+                try:
+                    await asyncio.shield(cleanup)
+                except asyncio.CancelledError:
+                    # Repeated caller cancellation must not detach cleanup.
+                    continue
+            cleanup.result()
+            raise
 
     async def _ensure_plugin_runtime_ready(self) -> None:
         """Recover a crashed Cordis child before capturing a task snapshot.
@@ -373,8 +442,7 @@ class AgentDomainService:
             input_delivery=self._input_delivery,
         )
         task = self._task_cls.create(runner)
-        session.task_id = task.id
-        await self._session_repository.save(session)
+        await self._finish_task_preparation(session, task)
         logger.info(
             "Selected execution without sandbox allocation session=%s mode=%s",
             opaque_log_identifier(session.id, namespace="session"),
@@ -1182,7 +1250,18 @@ class AgentDomainService:
             event = record.event
             metadata = event.metadata or {}
             ids = list(metadata.get("dataset_ids") or [])
-            history = await self._session_repository.get_events(record.session_id)
+            # Continuation admission retains its full canonical-history checks.
+            # Ordinary inputs use the private incremental view; this is not an
+            # authorization source and must never include later queued inputs.
+            from app.domain.services.execution_history import ExecutionHistory
+            history_getter = getattr(self._session_repository, "get_execution_history", None)
+            projection = None
+            if not metadata.get("resume_from") and callable(history_getter) and type(event.seq) is int:
+                candidate = await history_getter(record.session_id, before_seq=event.seq)
+                if isinstance(candidate, ExecutionHistory):
+                    projection = candidate
+            history = (projection.resolver_events() if projection is not None
+                       else await self._session_repository.get_events(record.session_id))
             checkpoint = None
             if metadata.get("resume_from"):
                 checkpoint = await self._resume_checkpoint(
@@ -1196,12 +1275,16 @@ class AgentDomainService:
                         or event.attachments):
                     raise ContinuationRejected("续作请求的数据范围或执行配置已变化。")
             # The newly accepted input is not prior conversational context.
-            snapshot = [item for item in history if item.seq is None or item.seq <= event.seq]
-            history = [item for item in snapshot if item.seq is None or item.seq < event.seq]
+            if projection is not None:
+                snapshot = projection.with_event(event)
+            else:
+                snapshot = [item for item in history if item.seq is None or item.seq <= event.seq]
+                history = [item for item in snapshot if item.seq is None or item.seq < event.seq]
             if not ids and checkpoint is None:
-                ids = next((list(dict.fromkeys((item.metadata or {}).get("dataset_ids", [])))
-                            for item in reversed(history) if isinstance(item, MessageEvent)
-                            and (item.metadata or {}).get("dataset_ids")), [])
+                ids = (list(projection.latest_dataset_ids) if projection is not None else
+                       next((list(dict.fromkeys((item.metadata or {}).get("dataset_ids", [])))
+                             for item in reversed(history) if isinstance(item, MessageEvent)
+                             and (item.metadata or {}).get("dataset_ids")), []))
             try:
                 datasets = [await self._dataset_service.get_dataset(item, user_id=record.admission.actor_user_id) for item in ids]
             except Exception as exc:

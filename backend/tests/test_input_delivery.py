@@ -413,7 +413,8 @@ async def test_stop_generation_fences_input_accepted_after_remote_stop_and_allow
 
 
 @pytest.mark.asyncio
-async def test_durable_dispatch_restores_legacy_datasets_from_one_strict_history_snapshot():
+@pytest.mark.parametrize("incremental", [False, True])
+async def test_durable_dispatch_restores_legacy_datasets_from_one_strict_history_snapshot(incremental):
     from app.application.services.dataset_request_resolver import FrontControllerResolution, RequestDecision, ExecutionDecision
     from app.domain.models.safety import SafetyReview
     from unittest.mock import AsyncMock
@@ -427,6 +428,12 @@ async def test_durable_dispatch_restores_legacy_datasets_from_one_strict_history
                                                                       metadata={"dataset_ids": []}))
     repository.events.append(MessageEvent(seq=record.event.seq + 1, role="user", message="future",
                                          metadata={"dataset_ids": ["future"]}))
+    if incremental:
+        from app.domain.services.execution_history import ExecutionHistory
+        view = ExecutionHistory()
+        for item in repository.events[:2]:
+            view.fold(item)
+        repository.get_execution_history = AsyncMock(return_value=view)
     service = AgentDomainService(agent_repository=object(), session_repository=repository, sandbox_cls=object,
         task_cls=SimpleNamespace(get=lambda _: None), file_storage=object(), mcp_repository=object(),
         sandbox_runtime=object(), input_repository=repository)
@@ -441,10 +448,17 @@ async def test_durable_dispatch_restores_legacy_datasets_from_one_strict_history
     claimed = await service._input_delivery.claim(record)
     assert await service._dispatch_claimed_input(claimed) is task
     service._dataset_service.get_dataset.assert_awaited_once_with("retained", user_id="user")
-    assert repository.history_reads == 1
+    assert repository.history_reads == (0 if incremental else 1)
     assert service._dataset_request_resolver.resolve.await_args.kwargs["events"] == repository.events[:2]
     assert service._create_task.await_args.args[1] == ["retained"]
-    assert service._create_task.await_args.kwargs["session_events_snapshot"] == repository.events[:3]
+    snapshot = service._create_task.await_args.kwargs["session_events_snapshot"]
+    if incremental:
+        repository.get_execution_history.assert_awaited_once_with("session", before_seq=record.event.seq)
+        assert snapshot.seq == record.event.seq
+        assert snapshot.conversation == repository.events[:3]
+        assert view.seq == 2  # task-local inclusion never mutates the cached view
+    else:
+        assert snapshot == repository.events[:3]
     # The derived sandbox binding must not alter the already accepted payload.
     assert (await repository.get("session", record.key)).event.metadata == {"dataset_ids": []}
     assert MessageEvent.model_validate_json(task.enqueue_input.await_args.args[0]).metadata == {"dataset_ids": []}

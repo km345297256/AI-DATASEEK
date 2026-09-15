@@ -2,8 +2,13 @@
 from __future__ import annotations
 
 import copy
+import hashlib
 import json
 import re
+import types
+import weakref
+from collections import OrderedDict
+from dataclasses import dataclass
 from typing import Any
 
 from itertools import islice
@@ -13,6 +18,160 @@ from referencing import Registry
 from langchain.messages import ToolMessage
 
 from app.domain.models.tool_result import ToolResult
+
+
+_CONTRACT_CACHE_ATTRIBUTE = "_dataseek_prepared_contracts"
+_CONTRACT_CACHE_MAX_ENTRIES = 128
+_CONTRACT_CACHE_MAX_BYTES = 1024 * 1024
+_CONTRACT_CACHE_MAX_SCHEMA_BYTES = 64 * 1024
+
+
+@dataclass(frozen=True, slots=True)
+class _PreparedContract:
+    validator: Any
+    closed_validator: Any
+    source_bytes: int
+
+
+class _ContractCache:
+    """Bounded preparation-only cache owned by a task's execution pipeline.
+
+    No arguments, validation errors or results are retained. Source-byte and
+    entry ceilings bound retained schemas (validators also hold their copied
+    original/closed schemas). Entries disappear with their owning pipeline.
+    """
+
+    def __init__(self) -> None:
+        self.entries: OrderedDict[Any, _PreparedContract] = OrderedDict()
+        self.source_bytes = 0
+
+    def get(self, key: Any) -> _PreparedContract | None:
+        prepared = self.entries.get(key)
+        if prepared is not None:
+            self.entries.move_to_end(key)
+        return prepared
+
+    def put(self, key: Any, prepared: _PreparedContract) -> None:
+        if prepared.source_bytes > min(_CONTRACT_CACHE_MAX_SCHEMA_BYTES, _CONTRACT_CACHE_MAX_BYTES):
+            return
+        previous = self.entries.pop(key, None)
+        if previous is not None:
+            self.source_bytes -= previous.source_bytes
+        self.entries[key] = prepared
+        self.source_bytes += prepared.source_bytes
+        while (len(self.entries) > _CONTRACT_CACHE_MAX_ENTRIES
+               or self.source_bytes > _CONTRACT_CACHE_MAX_BYTES):
+            _, removed = self.entries.popitem(last=False)
+            self.source_bytes -= removed.source_bytes
+
+
+def _contract_cache(tool: Any) -> _ContractCache | None:
+    toolkit = getattr(tool, "toolkit", None)
+    # Tool wrappers may be rebuilt for every lookup. The task-owned pipeline
+    # outlives those wrappers but does not become a global model-class cache.
+    owner = getattr(toolkit, "tool_execution_pipeline", None) if toolkit is not None else None
+    if owner is None:
+        owner = tool
+    try:
+        cache = getattr(owner, _CONTRACT_CACHE_ATTRIBUTE, None)
+        if type(cache) is not _ContractCache:
+            cache = _ContractCache()
+            setattr(owner, _CONTRACT_CACHE_ATTRIBUTE, cache)
+        return cache
+    except (AttributeError, TypeError, ValueError):
+        # Immutable/slot-only compatibility adapters still validate normally.
+        return None
+
+
+def _schema_fingerprint(value: Any, *, core_schema: bool = False) -> tuple[str, int] | None:
+    """Bounded, type-sensitive key; unsupported/dynamic schemas bypass caching.
+
+    Keep object order and distinguish tuples/bools from JSON arrays/integers.
+    For Pydantic core schemas, ordinary validator identities are stable inputs,
+    but dynamic JSON-schema hooks/serializers are deliberately not cached.
+    """
+    digest = hashlib.sha256()
+    size = 0
+    nodes = 0
+
+    def feed(text: str) -> None:
+        nonlocal size
+        if len(text) > _CONTRACT_CACHE_MAX_SCHEMA_BYTES:
+            raise ValueError("large schema")
+        encoded = text.encode("utf-8")
+        size += len(encoded)
+        if size > _CONTRACT_CACHE_MAX_SCHEMA_BYTES:
+            raise ValueError("large schema")
+        digest.update(encoded)
+
+    def visit(item: Any, depth: int) -> None:
+        nonlocal nodes
+        nodes += 1
+        if depth > 64 or nodes > 10_000:
+            raise ValueError("complex schema")
+        if type(item) is dict:
+            if core_schema:
+                for key in ("pydantic_js_functions", "pydantic_js_annotation_functions"):
+                    hooks = item.get(key, [])
+                    if any(getattr(hook, "__func__", None) is not BaseModel.__get_pydantic_json_schema__.__func__
+                           for hook in hooks):
+                        raise ValueError("dynamic schema hook")
+                if callable(item.get("pydantic_js_extra")) or callable(item.get("json_schema_extra")):
+                    raise ValueError("dynamic schema extra")
+                if "serialization" in item:
+                    raise ValueError("custom serialization")
+            feed("{")
+            for key, child in item.items():
+                if type(key) is not str:
+                    raise ValueError("non-JSON object key")
+                if len(key) > _CONTRACT_CACHE_MAX_SCHEMA_BYTES:
+                    raise ValueError("large schema key")
+                feed(json.dumps(key, ensure_ascii=False))
+                feed(":")
+                visit(child, depth + 1)
+                feed(",")
+            feed("}")
+        elif type(item) is list:
+            feed("[")
+            for child in item:
+                visit(child, depth + 1)
+                feed(",")
+            feed("]")
+        elif item is None or type(item) in (str, bool, int, float):
+            if type(item) is str and len(item) > _CONTRACT_CACHE_MAX_SCHEMA_BYTES:
+                raise ValueError("large schema string")
+            feed(json.dumps(item, ensure_ascii=False, allow_nan=False))
+        elif core_schema and isinstance(item, type) and issubclass(item, BaseModel):
+            if (item.model_json_schema.__func__ is not BaseModel.model_json_schema.__func__
+                    or item.__get_pydantic_json_schema__.__func__ is not BaseModel.__get_pydantic_json_schema__.__func__):
+                raise ValueError("custom model schema")
+            feed(f"model:{id(item)}:")
+            visit(item.model_config, depth + 1)
+        elif core_schema and isinstance(item, (types.FunctionType, types.BuiltinFunctionType)):
+            feed(f"function:{id(item)}")
+        elif core_schema and isinstance(item, types.MethodType):
+            feed(f"method:{id(item.__func__)}:{id(item.__self__)}")
+        else:
+            raise ValueError("unsupported schema value")
+
+    try:
+        visit(value, 0)
+    except (AttributeError, TypeError, ValueError, RecursionError):
+        return None
+    return digest.hexdigest(), size
+
+
+def _model_cache_key(model: type[BaseModel]) -> Any:
+    if not getattr(model, "__pydantic_complete__", False):
+        return None
+    core = model.__pydantic_core_schema__
+    fingerprint = _schema_fingerprint(core, core_schema=True)
+    if fingerprint is None:
+        return None
+    # Weak identities cannot accidentally match a new same-named class after
+    # GC. model_rebuild replaces the core schema/validator; in-place metadata
+    # and nested model config mutations are detected by the content fingerprint.
+    return ("model", weakref.ref(model), id(core), id(model.__pydantic_validator__), fingerprint[0])
 
 
 class ToolContractError(ValueError):
@@ -113,6 +272,51 @@ def _closed_objects(schema: Any, *, shared_instance: bool = False, legacy_refs: 
     return result
 
 
+def _prepared_tool_contract(tool: Any, model: Any, definition: Any) -> _PreparedContract | None:
+    cache = _contract_cache(tool)
+    model_key = None
+    if isinstance(model, type) and issubclass(model, BaseModel):
+        model_key = _model_cache_key(model) if cache is not None else None
+        if model_key is not None:
+            prepared = cache.get(model_key)
+            if prepared is not None:
+                return prepared
+        schema = model.model_json_schema()
+    elif isinstance(model, dict):
+        schema = model
+    elif isinstance(getattr(tool, "input_schema", None), dict):
+        schema = tool.input_schema
+    elif isinstance(definition, dict):
+        schema = definition.get("parameters")
+    else:
+        schema = None
+    if schema is None:
+        return None
+
+    fingerprint = _schema_fingerprint(schema) if cache is not None else None
+    schema_key = ("json-schema", fingerprint[0]) if fingerprint is not None else None
+    prepared = cache.get(schema_key) if schema_key is not None else None
+    if prepared is None:
+        # The cached validators must never retain a caller-owned mutable schema.
+        snapshot = copy.deepcopy(schema) if schema_key is not None else schema
+        validator_class = validator_for(snapshot)
+        validator_class.check_schema(snapshot)
+        validator = validator_class(snapshot, registry=Registry())
+        closed = _closed_objects(snapshot)
+        prepared = _PreparedContract(
+            validator=validator,
+            closed_validator=Draft202012Validator(closed, registry=Registry()),
+            source_bytes=fingerprint[1] if fingerprint is not None else 0,
+        )
+        if schema_key is not None:
+            cache.put(schema_key, prepared)
+    # Never cache a failed preparation or oversized/dynamic model schema key.
+    # Dynamic model hooks may still share a prepared *content*-keyed schema.
+    if model_key is not None and schema_key is not None:
+        cache.put(model_key, prepared)
+    return prepared
+
+
 def validate_tool_arguments(tool: Any, tool_call: Any) -> Any:
     """Validate before policy admission/jobs; preserve caller-owned arguments.
 
@@ -125,28 +329,14 @@ def validate_tool_arguments(tool: Any, tool_call: Any) -> Any:
     args = tool_call.get("args", {})
     model = getattr(tool, "args_schema", None)
     definition = getattr(tool, "definition", None)
-    if isinstance(model, type) and issubclass(model, BaseModel):
-        schema = model.model_json_schema()
-    elif isinstance(model, dict):
-        schema = model
-    elif isinstance(getattr(tool, "input_schema", None), dict):
-        schema = tool.input_schema
-    elif isinstance(definition, dict):
-        schema = definition.get("parameters")
-    else:
-        schema = None
-    # Compatibility for trusted in-process adapters with no declared schema.
-    # Production core/plugin tools always publish their real schema here.
-    if schema is None:
-        return tool_call
     try:
-        validator_class = validator_for(schema)
-        validator_class.check_schema(schema)
-        validator = validator_class(schema, registry=Registry())
-        errors = list(islice(validator.iter_errors(args), 8))
+        prepared = _prepared_tool_contract(tool, model, definition)
+        # Compatibility for trusted in-process adapters with no declared schema.
+        if prepared is None:
+            return tool_call
+        errors = list(islice(prepared.validator.iter_errors(args), 8))
         if not errors:
-            closed = _closed_objects(schema)
-            errors = list(islice(Draft202012Validator(closed, registry=Registry()).iter_errors(args), 8))
+            errors = list(islice(prepared.closed_validator.iter_errors(args), 8))
     except Exception:
         raise ToolContractError([], code="tool_schema_unavailable") from None
     if errors:

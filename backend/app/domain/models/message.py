@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Any
 from pydantic import BaseModel, PrivateAttr
 from app.domain.models.file import FileInfo
 from app.domain.models.dataset import MountedDataset
@@ -6,7 +6,7 @@ from app.domain.models.analysis_outcome import DeliverableRequirement
 
 class Message(BaseModel):
     # Request-local history; never part of Redis, SSE, URLs, or persisted input.
-    _session_events_snapshot: list | None = PrivateAttr(default=None)
+    _session_events_snapshot: Any | None = PrivateAttr(default=None)
     _resume_checkpoint: dict | None = PrivateAttr(default=None)
     _accepted_event_seq: int | None = PrivateAttr(default=None)
     _budget_lineage_id: str | None = PrivateAttr(default=None)

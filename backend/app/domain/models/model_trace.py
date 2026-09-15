@@ -71,9 +71,26 @@ class ModelTraceView(BaseModel):
     timings: ModelRequestTimings = Field(default_factory=ModelRequestTimings)
 
 
+class ScheduledModelRetry(BaseModel):
+    """Private timing decision, with no raw headers, endpoints or error text."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True, allow_inf_nan=False)
+    failed_attempt: int = Field(ge=1)
+    next_attempt: int = Field(ge=2)
+    maximum_attempts: int = Field(ge=2)
+    delay_seconds: float = Field(ge=0)
+    reason: Literal[
+        "retry_after_seconds", "retry_after_date", "exponential_jitter",
+        "invalid_retry_after_jitter", "expired_retry_after_jitter",
+    ]
+    scheduled_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+
+
 class ModelTraceRecord(ModelTraceView):
     user_id: str
     session_id: str
+    # Private audit metadata only; adding this must not expand the public API.
+    scheduled_retry: ScheduledModelRetry | None = None
 
     def public_view(self) -> ModelTraceView:
-        return ModelTraceView.model_validate(self.model_dump(exclude={"user_id", "session_id"}))
+        return ModelTraceView.model_validate(self.model_dump(exclude={"user_id", "session_id", "scheduled_retry"}))

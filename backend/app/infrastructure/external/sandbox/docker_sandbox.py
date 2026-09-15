@@ -861,7 +861,7 @@ class DockerSandbox(Sandbox):
         )
         return ToolResult(**response.json())
 
-    async def file_download(self, path: str) -> BinaryIO:
+    async def file_download(self, path: str, *, max_bytes: int | None = None) -> BinaryIO:
         """Download file from sandbox
         
         Args:
@@ -870,6 +870,20 @@ class DockerSandbox(Sandbox):
         Returns:
             File content as binary stream
         """
+        if max_bytes is not None:
+            if isinstance(max_bytes, bool) or not isinstance(max_bytes, int) or max_bytes < 1:
+                raise ValueError("max_bytes must be a positive integer")
+            output = io.BytesIO()
+            # Enforce the limit on decoded bytes too; Content-Length can be
+            # absent, compressed, stale, or controlled by the remote response.
+            async with self.client.stream("GET", f"{self.base_url}/api/v1/file/download", params={"path": path}) as response:
+                response.raise_for_status()
+                async for chunk in response.aiter_bytes(chunk_size=min(64 * 1024, max_bytes + 1)):
+                    if output.tell() + len(chunk) > max_bytes:
+                        raise ValueError("Sandbox file exceeds the download size limit")
+                    output.write(chunk)
+            output.seek(0)
+            return output
         response = await self.client.get(
             f"{self.base_url}/api/v1/file/download",
             params={"path": path}
