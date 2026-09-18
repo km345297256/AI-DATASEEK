@@ -1,0 +1,90 @@
+{
+  "dataset_id": "viz-noaa-global-methane",
+  "external_id": "10.15138/P8XG-AA10",
+  "data_center_id": "reviewed-open-science-catalog",
+  "data_center_name": "开放科学可视化样例",
+  "name": "可视化样例·数值曲线：NOAA 全球海洋表面大气甲烷月均曲线（1983—2026）",
+  "description": "NOAA 全球海洋表面站观测形成的甲烷干空气摩尔分数月均值及去季节趋势，单位 ppb（nmol/mol），保存 1983-07 至 2026-05 的完整 515 条月记录。Plotly 请把横轴选 decimal，纵轴选 average（月均 CH4）或 trend，勿将默认 year 当作甲烷；现有预览只显示前 200 行窗口，完整文件仍可用于分析。最新年度可能修订。",
+  "domain": "geoscience",
+  "data_type": "csv",
+  "temporal_coverage": "1983-07 至 2026-05",
+  "spatial_coverage": "全球海洋表面站的全球平均",
+  "tags": [
+    "可视化样例",
+    "开放科学",
+    "series",
+    "viz-plotly",
+    "geoscience"
+  ],
+  "metadata": {
+    "curated": true,
+    "source_catalog": "open-science",
+    "catalog_version": 1,
+    "source_descriptor_sha256": "bfcaced3f6be37e5a99d85c9aeed3e3ec2e656dffddbefbf09299b248f626252",
+    "download_date": "2026-09-18",
+    "inventory_complete": true,
+    "recursive_file_count": 3,
+    "total_size_bytes": 48881,
+    "visualization_view_kind": "series",
+    "visualization_plugin_id": "viz-plotly",
+    "visualization_entry_file": "ch4_mm_gl.csv",
+    "sample_note": "所选官方 ch4_mm_gl.csv 文件的全部 515 条月记录和 7 列，不是全球各站逐次采样原始库。原文件带说明注释完整保留。average/trend 与不确定度单位均为 ppb；注释称缺失不确定度标记为 -9.9，实际末期单元格为 -9.99，均应作为未计算值而非负标准差，未修改这些原值。显示窗口 200 行不等于全时段数据。",
+    "provenance": [
+      {
+        "path": "ch4_mm_gl_original.csv",
+        "url": "https://gml.noaa.gov/webdata/ccgg/trends/ch4/ch4_mm_gl.csv",
+        "size": 23937,
+        "sha256": "c45ca56872999f8d8e8e04f9f3523c2599d6358960171dd0a0b374eb89be3163"
+      },
+      {
+        "path": "ch4_mm_gl.csv",
+        "derived_from": [
+          "ch4_mm_gl_original.csv"
+        ],
+        "size": 21822,
+        "sha256": "dd6b1477f17dec4a46c7d7e2fde12c07a3969c1ac16a2c044c1a6b082be27ea2"
+      }
+    ],
+    "publisher": "NOAA Global Monitoring Laboratory, Carbon Cycle and Greenhouse Gases Group",
+    "source_url": "https://gml.noaa.gov/ccgg/trends_ch4/",
+    "license": "Public domain — NOAA GML data-use and attribution policy",
+    "license_url": "https://gml.noaa.gov/about/disclaimer.html",
+    "license_details": "NOAA GML 将其政府服务器信息列为公共领域（另有标注除外），允许公众自由使用，但不得冒称为自有数据、暗示 NOAA 背书、或将修改后材料冒称为官方原件；须按数据产品要求致谢和引用。此文件 USE OF NOAA GML DATA 注释明确向公众和科研群体免费提供并请求相关引用，鼓励联系数据提供者；本条不是 CC0 或 CC BY 许可。引用 Lan, X., K.W. Thoning, and E.J. Dlugokencky: Trends in globally-averaged CH4, N2O, and SF6 determined from NOAA Global Monitoring Laboratory measurements, Version 2026-09, https://doi.org/10.15138/P8XG-AA10。",
+    "authors": [
+      "Xin Lan",
+      "Kirk W. Thoning",
+      "Edward J. Dlugokencky"
+    ],
+    "source_version": "Version 2026-09；官方文件创建时间 2026-09-05 04:05:17；2026-09-18 下载快照",
+    "sample_scope": "所选官方 ch4_mm_gl.csv 文件的全部 515 条月记录和 7 列，不是全球各站逐次采样原始库。原文件带说明注释完整保留。average/trend 与不确定度单位均为 ppb；注释称缺失不确定度标记为 -9.9，实际末期单元格为 -9.99，均应作为未计算值而非负标准差，未修改这些原值。显示窗口 200 行不等于全时段数据。",
+    "doi": "10.15138/P8XG-AA10",
+    "transformation": "从 ch4_mm_gl_original.csv 逐字节筛除以 # 开头的说明注释行和空行，生成 ch4_mm_gl.csv；保留原列名、顺序、515 条数据行及每个数值原文，不插值、不换算、不截断、不把缺失标记补零。原件和署名/说明注释完整保留。可复现脚本 backend/scripts/reproduce-science-samples.py。",
+    "suggested_questions": [
+      "横轴选 decimal、纵轴选 average，用完整 515 条记录分析全球甲烷月均值的长期变化，单位为 ppb。",
+      "比较 average 与 trend 的季节波动；把 average_unc/trend_unc 中的 -9.9 或 -9.99 视为缺失而非真实负不确定度。"
+    ]
+  },
+  "files": [
+    {
+      "path": "SOURCE.md",
+      "size": 3122,
+      "sha256": "d6147cfce6621f269dbcafcd25a58bfe08c43320a89ecf2e03414a626bbb76cc",
+      "role": "documentation",
+      "content_type": "text/markdown"
+    },
+    {
+      "path": "ch4_mm_gl.csv",
+      "size": 21822,
+      "sha256": "dd6b1477f17dec4a46c7d7e2fde12c07a3969c1ac16a2c044c1a6b082be27ea2",
+      "role": "data",
+      "content_type": "text/csv"
+    },
+    {
+      "path": "ch4_mm_gl_original.csv",
+      "size": 23937,
+      "sha256": "c45ca56872999f8d8e8e04f9f3523c2599d6358960171dd0a0b374eb89be3163",
+      "role": "data",
+      "content_type": "text/csv"
+    }
+  ]
+}

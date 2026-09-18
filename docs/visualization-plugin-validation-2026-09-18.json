@@ -1,0 +1,2652 @@
+{
+  "date": "2026-09-18",
+  "scope": "One explicit sample entry per current plugin; basic preview/interactions, not exhaustive feature/performance certification.",
+  "coverage": {
+    "plugins": 83,
+    "new_datasets": 52,
+    "new_files": 194,
+    "new_bytes": 2364883977,
+    "positive_datasets_used": 64,
+    "reused_existing_datasets": 14,
+    "retained_new_boundary_datasets": 2
+  },
+  "browser_status_counts": {
+    "passed": 81,
+    "disabled": 1,
+    "passed_with_known_limit": 1
+  },
+  "api_status_counts": {
+    "passed": 82,
+    "disabled": 1
+  },
+  "safety": {
+    "original_dataset_public_metadata_fingerprints_unchanged": 61,
+    "plugin_preferences_unchanged": 83,
+    "agent_or_model_calls": 0,
+    "fastqc_jobs_started": 1,
+    "fastqc_job_outcome": "succeeded",
+    "existing_onlyoffice_readonly_service_used": true,
+    "dataset_readonly_mount_and_allowlist_preserved": true,
+    "runtime_plugins_or_services_modified": false,
+    "recommendation_questions_only_mocked": true
+  },
+  "known_limits": [
+    "CZI-window: 16x16 ROI rendered; 128x128 actual range request returned HTTP503.",
+    "VTK remains previously disabled; offline parser verified, live UI not tested.",
+    "Original NOAA chunked files exceed unchanged range-request budget; full-value contiguous 2025 copy is the positive GB entry.",
+    "BigTIFF uses Viv; basic TIFF uses exact-pixel classic TIFF copy.",
+    "Two initial PPTX/standalone-DBF cases were retained and labeled as expected boundary cases; positive replacements verified.",
+    "Full sandbox pytest blocked by missing existing test dependencies; no installation attempted."
+  ],
+  "regression": {
+    "date": "2026-09-18",
+    "frontend": {
+      "type_check": "passed",
+      "build": "passed",
+      "duration_seconds": 17.71,
+      "warnings": [
+        "Vite bundle chunks over 500 kB; warning only"
+      ],
+      "log": "frontend-build.log"
+    },
+    "backend": {
+      "status": "passed",
+      "passed": 6730,
+      "skipped": 31,
+      "subtests_passed": 190,
+      "warnings": 2,
+      "duration_seconds": 73.47,
+      "excluded": [
+        "tests/test_visualization_plugin_samples.py"
+      ],
+      "log": "backend-tests.log",
+      "environment": {
+        "BROWSER_USE_CONFIG_DIR": ".cache/plugin-samples-20260918/regression/browseruse",
+        "ANONYMIZED_TELEMETRY": "false",
+        "BROWSER_USE_CLOUD_SYNC": "false"
+      },
+      "initial_attempt": "Collection blocked by browser_use attempting to create user-wide configuration; rerun used task-specific supported config directory, no source changes."
+    },
+    "compose": {
+      "status": "passed",
+      "command": "./run.sh config --quiet",
+      "log": "compose-config.log"
+    },
+    "sandbox": {
+      "status": "blocked_environment",
+      "reason": "Local sandbox venv lacks pytest and scientific modules; existing backend pytest environment lacks scientific modules; existing sandbox image has science modules but lacks pytest/pytest_asyncio/pytest_mock. No dependencies installed.",
+      "log": "sandbox-dependency-check.log"
+    },
+    "read_only_review": {
+      "status": "complete_no_blocking_findings",
+      "report": "readonly-review.md"
+    },
+    "mutations": "Only standard frontend build output, test temporary files and approved cache logs. No deployments, service restarts, dependency installs, data registrations or application source modifications during regression."
+  },
+  "final_backend_regression": {
+    "status": "passed",
+    "passed": 6803,
+    "skipped": 31,
+    "subtests_passed": 190,
+    "warnings": 2,
+    "duration_seconds": 79.71,
+    "excluded": [],
+    "junit_evidence": "regression/backend-final.xml"
+  },
+  "canonical_matrix_tests": {
+    "passed": 4
+  },
+  "evidence_root": ".cache/plugin-samples-20260918",
+  "interrupted_attempt": {
+    "report": "all-api-check-final.json",
+    "reason": "Frontend container was recreated by concurrent work during this read-only run; connection resets/refusals are not interpreted as sample-format failures. This task did not deploy or restart services.",
+    "final_report": "all-api-check-recovered.json"
+  },
+  "results": [
+    {
+      "plugin_id": "csv",
+      "dataset_id": "viz-palmer-penguins",
+      "entry_file": "penguins.csv",
+      "expected_file_sha256": "f204db2c753b0937caac3cb35258562c14f073e4bbc76be24b4c51ce22767a93",
+      "expected_file_bytes": 15241,
+      "sample_kind": "scientific_original",
+      "browser": {
+        "status": "passed",
+        "actions": [
+          "preview opened; see screenshot/manual steps"
+        ],
+        "evidence": "main-browser/csv.png"
+      },
+      "api": {
+        "seconds": 0.666,
+        "status": "passed",
+        "checks": [
+          {
+            "operation": "page",
+            "kind": "page",
+            "version": "cd2962e4bbfec968aee55c8525ac2652fff930de0f7ae4c5d727537eae8138c5",
+            "revision": "5ee2524f7765085c420bc15b11422e11f8e9a10ac0b3a159399e0beaadae5d22"
+          }
+        ]
+      }
+    },
+    {
+      "plugin_id": "text",
+      "dataset_id": "viz-noaa-mauna-loa-co2",
+      "entry_file": "co2_mm_mlo.txt",
+      "expected_file_sha256": "c9a91a170d09d16afaaad56c4f383ed4fcb7fa0da967998694842d5c8168bcf3",
+      "expected_file_bytes": 59608,
+      "sample_kind": "scientific_original",
+      "browser": {
+        "status": "passed",
+        "actions": [
+          "preview opened; see screenshot/manual steps"
+        ],
+        "evidence": "main-browser/text.png"
+      },
+      "api": {
+        "seconds": 0.651,
+        "status": "passed",
+        "checks": [
+          {
+            "operation": "page",
+            "kind": "page",
+            "version": "a79285e84eb5ec27134ee7f9a31b6edf7d630c5481c94be5ab3ee0bb6c075a92",
+            "revision": "5ee2524f7765085c420bc15b11422e11f8e9a10ac0b3a159399e0beaadae5d22"
+          }
+        ]
+      }
+    },
+    {
+      "plugin_id": "viz-pdfjs",
+      "dataset_id": "viz-plos-research-software",
+      "entry_file": "research-software-robustness.pdf",
+      "expected_file_sha256": "002081be65fbd42c0356d3e49ac7f49fa6202f566f50341481ead22d3cce78b2",
+      "expected_file_bytes": 1212928,
+      "sample_kind": "scientific_original",
+      "browser": {
+        "status": "passed",
+        "actions": [
+          "PDF canvas rendered",
+          "fit-page zoom"
+        ],
+        "evidence": "main-browser/viz-pdfjs.png"
+      },
+      "api": {
+        "seconds": 0.48,
+        "status": "passed",
+        "checks": [
+          {
+            "operation": "bytes",
+            "bytes": 1212928,
+            "sha256": "002081be65fbd42c0356d3e49ac7f49fa6202f566f50341481ead22d3cce78b2"
+          }
+        ]
+      }
+    },
+    {
+      "plugin_id": "viz-plotly",
+      "dataset_id": "viz-noaa-global-methane",
+      "entry_file": "ch4_mm_gl.csv",
+      "expected_file_sha256": "dd6b1477f17dec4a46c7d7e2fde12c07a3969c1ac16a2c044c1a6b082be27ea2",
+      "expected_file_bytes": 21822,
+      "sample_kind": "scientific_original",
+      "browser": {
+        "status": "passed",
+        "actions": [
+          "CH4 decimal/average line rendered"
+        ],
+        "evidence": "main-browser/viz-plotly.png"
+      },
+      "api": {
+        "seconds": 2.703,
+        "status": "passed",
+        "checks": [
+          {
+            "operation": "prepare",
+            "kind": "resources",
+            "version": "923ae3564c8b379af8fd164a97a4eff9d45f1a66b20611bc1b107541fb46e8d4",
+            "revision": "5ee2524f7765085c420bc15b11422e11f8e9a10ac0b3a159399e0beaadae5d22"
+          },
+          {
+            "operation": "preview",
+            "kind": "table",
+            "version": "923ae3564c8b379af8fd164a97a4eff9d45f1a66b20611bc1b107541fb46e8d4",
+            "revision": "5ee2524f7765085c420bc15b11422e11f8e9a10ac0b3a159399e0beaadae5d22"
+          }
+        ]
+      }
+    },
+    {
+      "plugin_id": "viz-dbf-table",
+      "dataset_id": "viz-test-dbf-natural-earth",
+      "entry_file": "countries.dbf",
+      "expected_file_sha256": "141cf9edea8b2ee63066f3230b45e3ad9c2762aa07adf0d1dd026dd60a90afa1",
+      "expected_file_bytes": 16751,
+      "sample_kind": "scientific_derived",
+      "browser": {
+        "status": "passed",
+        "actions": [
+          "读取数据库分页",
+          "table rows rendered",
+          "next page"
+        ],
+        "evidence": "main-browser/viz-dbf-table.png"
+      },
+      "api": {
+        "seconds": 0.85,
+        "status": "passed",
+        "checks": [
+          {
+            "operation": "preview",
+            "kind": "tree",
+            "version": "b63de01e4d52017bb3e6061b8366e4d159f19fdfcea68121e175a141fe4d6dad",
+            "revision": "5ee2524f7765085c420bc15b11422e11f8e9a10ac0b3a159399e0beaadae5d22"
+          }
+        ]
+      }
+    },
+    {
+      "plugin_id": "viz-sqlite-table",
+      "dataset_id": "viz-test-sqlite-table",
+      "entry_file": "penguins.sqlite",
+      "expected_file_sha256": "afe910d6c27f67cb53f9c12afc859340ac0ee7cbeeaa294b8b8f4a3b51cf1c72",
+      "expected_file_bytes": 28672,
+      "sample_kind": "scientific_derived",
+      "browser": {
+        "status": "passed",
+        "actions": [
+          "读取 SQLite 分页",
+          "SQLite rows rendered"
+        ],
+        "evidence": "main-browser/viz-sqlite-table.png"
+      },
+      "api": {
+        "seconds": 0.859,
+        "status": "passed",
+        "checks": [
+          {
+            "operation": "preview",
+            "kind": "tree",
+            "version": "4384683a6892d26b53b4f792d5ce418c74a109c60271011a8d6b388674d0f206",
+            "revision": "5ee2524f7765085c420bc15b11422e11f8e9a10ac0b3a159399e0beaadae5d22"
+          }
+        ]
+      }
+    },
+    {
+      "plugin_id": "viz-duckdb-table",
+      "dataset_id": "viz-test-duckdb-table",
+      "entry_file": "penguins.duckdb",
+      "expected_file_sha256": "dd1eec5d6b575e01b1b5ad4398e0c47bbcabf1ef6a5c2ef4d6dcf52054d2e271",
+      "expected_file_bytes": 536576,
+      "sample_kind": "scientific_derived",
+      "browser": {
+        "status": "passed",
+        "actions": [
+          "读取数据库分页",
+          "table rows rendered",
+          "next page"
+        ],
+        "evidence": "main-browser/viz-duckdb-table.png"
+      },
+      "api": {
+        "seconds": 1.017,
+        "status": "passed",
+        "checks": [
+          {
+            "operation": "preview",
+            "kind": "tree",
+            "version": "8219cac8942b6827fad1678399554e7ea69a53627700860659f5bb0f3b45faeb",
+            "revision": "5ee2524f7765085c420bc15b11422e11f8e9a10ac0b3a159399e0beaadae5d22"
+          }
+        ]
+      }
+    },
+    {
+      "plugin_id": "viz-columnar-window",
+      "dataset_id": "viz-test-columnar-window",
+      "entry_file": "penguins.parquet",
+      "expected_file_sha256": "f1e590a8c43e3404958ec02d7c0715c95bc4c7880f08285cade0a3f82709d56c",
+      "expected_file_bytes": 18079,
+      "sample_kind": "scientific_derived",
+      "browser": {
+        "status": "passed",
+        "actions": [
+          "读取选定窗口",
+          "Parquet page rendered",
+          "下一页"
+        ],
+        "evidence": "main-browser/viz-columnar-window.png"
+      },
+      "api": {
+        "seconds": 2.019,
+        "status": "passed",
+        "checks": [
+          {
+            "operation": "preview",
+            "kind": "tree",
+            "version": "9e35d8c327bf1379a6757cd8468e116273a357ef5a0d4d07436b7017d2e2f9e0",
+            "revision": "5ee2524f7765085c420bc15b11422e11f8e9a10ac0b3a159399e0beaadae5d22"
+          }
+        ]
+      }
+    },
+    {
+      "plugin_id": "viz-sql-dump",
+      "dataset_id": "viz-test-sql-dump",
+      "entry_file": "penguins.sql",
+      "expected_file_sha256": "6ed194a90bfb83db2a3634bfcfb078cd09da218414ffa9540c628e06fce5ff23",
+      "expected_file_bytes": 28600,
+      "sample_kind": "scientific_derived",
+      "browser": {
+        "status": "passed",
+        "actions": [
+          "读取 SQL 转储目录",
+          "SQL dialect and catalog inspected"
+        ],
+        "evidence": "main-browser/viz-sql-dump.png"
+      },
+      "api": {
+        "seconds": 1.039,
+        "status": "passed",
+        "checks": [
+          {
+            "operation": "preview",
+            "kind": "tree",
+            "version": "524f788ee3d1ef948550d59c1c1d291442a47fa7ed85c3a43675061786a4e2c7",
+            "revision": "5ee2524f7765085c420bc15b11422e11f8e9a10ac0b3a159399e0beaadae5d22"
+          }
+        ]
+      }
+    },
+    {
+      "plugin_id": "viz-structured-tree",
+      "dataset_id": "viz-test-structured-tree",
+      "entry_file": "penguins.json",
+      "expected_file_sha256": "08f7a6edccf0330bb635ebdb6c74b76958983bd2d35b2ebc522af5593a737e31",
+      "expected_file_bytes": 77769,
+      "sample_kind": "scientific_derived",
+      "browser": {
+        "status": "passed",
+        "actions": [
+          "preview opened; see screenshot/manual steps"
+        ],
+        "evidence": "main-browser/viz-structured-tree.png",
+        "additional_actions": [
+          "实际登记文件已打开并选择指定插件",
+          "展开observations数组",
+          "展开第0条观测对象"
+        ],
+        "additional_evidence": "main-extra-browser/viz-structured-tree.png"
+      },
+      "api": {
+        "seconds": 0.855,
+        "status": "passed",
+        "checks": [
+          {
+            "operation": "preview",
+            "kind": "tree",
+            "version": "be757be9c0162b200d96224240d95f4455318674580a71f8673c50093b7d88d3",
+            "revision": "5ee2524f7765085c420bc15b11422e11f8e9a10ac0b3a159399e0beaadae5d22"
+          }
+        ]
+      }
+    },
+    {
+      "plugin_id": "html",
+      "dataset_id": "viz-test-html",
+      "entry_file": "penguins.html",
+      "expected_file_sha256": "e0ece445b84a6456d1509b639d63853f42dede6d571307b6e77a34d150c04eeb",
+      "expected_file_bytes": 40972,
+      "sample_kind": "scientific_derived",
+      "browser": {
+        "status": "passed",
+        "actions": [
+          "preview opened; see screenshot/manual steps"
+        ],
+        "evidence": "main-browser/html.png"
+      },
+      "api": {
+        "seconds": 0.46,
+        "status": "passed",
+        "checks": [
+          {
+            "operation": "bytes",
+            "bytes": 40972,
+            "sha256": "e0ece445b84a6456d1509b639d63853f42dede6d571307b6e77a34d150c04eeb"
+          }
+        ]
+      }
+    },
+    {
+      "plugin_id": "markdown",
+      "dataset_id": "viz-test-markdown",
+      "entry_file": "penguins.md",
+      "expected_file_sha256": "6afe4596963f4a5119c555c7f9a835b36f308f63401c4ab3aeb40b6d8d7feff7",
+      "expected_file_bytes": 21707,
+      "sample_kind": "scientific_derived",
+      "browser": {
+        "status": "passed",
+        "actions": [
+          "preview opened; see screenshot/manual steps"
+        ],
+        "evidence": "main-browser/markdown.png"
+      },
+      "api": {
+        "seconds": 0.436,
+        "status": "passed",
+        "checks": [
+          {
+            "operation": "bytes",
+            "bytes": 21707,
+            "sha256": "6afe4596963f4a5119c555c7f9a835b36f308f63401c4ab3aeb40b6d8d7feff7"
+          }
+        ]
+      }
+    },
+    {
+      "plugin_id": "viz-archive-directory",
+      "dataset_id": "viz-test-archive-directory",
+      "entry_file": "penguins-bundle.zip",
+      "expected_file_sha256": "99656819f02d6b16ea246d4807f11b523ca6fa433c0239b87662272b7198cc9f",
+      "expected_file_bytes": 6701,
+      "sample_kind": "scientific_derived",
+      "browser": {
+        "status": "passed",
+        "actions": [
+          "preview opened; see screenshot/manual steps"
+        ],
+        "evidence": "main-browser/viz-archive-directory.png"
+      },
+      "api": {
+        "seconds": 0.831,
+        "status": "passed",
+        "checks": [
+          {
+            "operation": "preview",
+            "kind": "table",
+            "version": "4ad46ee70ea9d18821a42c6fb50be25be4864780e6ed47f5882caaef6c9ffc24",
+            "revision": "5ee2524f7765085c420bc15b11422e11f8e9a10ac0b3a159399e0beaadae5d22"
+          }
+        ]
+      }
+    },
+    {
+      "plugin_id": "viz-archive-members",
+      "dataset_id": "viz-test-archive-members",
+      "entry_file": "penguins-bundle.zip",
+      "expected_file_sha256": "99656819f02d6b16ea246d4807f11b523ca6fa433c0239b87662272b7198cc9f",
+      "expected_file_bytes": 6701,
+      "sample_kind": "scientific_derived",
+      "browser": {
+        "status": "passed",
+        "actions": [
+          "preview opened; see screenshot/manual steps"
+        ],
+        "evidence": "main-browser/viz-archive-members.png",
+        "additional_actions": [
+          "实际登记文件已打开并选择指定插件",
+          "选择penguins.csv并点击查看文本",
+          "下一页",
+          "真实预览CSV文本第二页，未解包到宿主"
+        ],
+        "additional_evidence": "main-extra-browser/viz-archive-members.png"
+      },
+      "api": {
+        "seconds": 0.806,
+        "status": "passed",
+        "checks": [
+          {
+            "operation": "preview",
+            "kind": "table",
+            "version": "51443991d50912a372b8eee0fcc66783f48326edbeb4fea3279cc28d1c468792",
+            "revision": "5ee2524f7765085c420bc15b11422e11f8e9a10ac0b3a159399e0beaadae5d22"
+          }
+        ]
+      }
+    },
+    {
+      "plugin_id": "viz-access-table",
+      "dataset_id": "viz-test-access-table",
+      "entry_file": "synthetic-v2010.accdb",
+      "expected_file_sha256": "e00a13460bc8ecb634405b8333d3584b09d4cfd3f0ad55af1b71c946ae2833ed",
+      "expected_file_bytes": 368640,
+      "sample_kind": "project_fixture",
+      "browser": {
+        "status": "passed",
+        "actions": [
+          "读取数据库分页",
+          "table rows rendered"
+        ],
+        "evidence": "main-browser/viz-access-table.png"
+      },
+      "api": {
+        "seconds": 0.835,
+        "status": "passed",
+        "checks": [
+          {
+            "operation": "preview",
+            "kind": "tree",
+            "version": "805c00324f180b0e69a9043fd938b5830793ee38c709c33ce96ebfcde2149175",
+            "revision": "5ee2524f7765085c420bc15b11422e11f8e9a10ac0b3a159399e0beaadae5d22"
+          }
+        ]
+      }
+    },
+    {
+      "plugin_id": "viz-bson",
+      "dataset_id": "viz-test-bson",
+      "entry_file": "synthetic-pymongo-4.17.0.bson",
+      "expected_file_sha256": "239cddebb3967003caf75cf5b20cd1de3c47b0a16df1f66481cee29a244db986",
+      "expected_file_bytes": 1213,
+      "sample_kind": "project_fixture",
+      "browser": {
+        "status": "passed",
+        "actions": [
+          "preview opened; see screenshot/manual steps"
+        ],
+        "evidence": "main-browser/viz-bson.png",
+        "additional_actions": [
+          "实际登记文件已打开并选择指定插件",
+          "读取记录分页",
+          "展开记录0，显示字段/类型/值",
+          "下一页",
+          "下一页真实请求offset=1并展开记录1"
+        ],
+        "additional_evidence": "main-extra-browser/viz-bson.png"
+      },
+      "api": {
+        "seconds": 0.903,
+        "status": "passed",
+        "checks": [
+          {
+            "operation": "preview",
+            "kind": "tree",
+            "version": "70f27fa54c37b770d7e951d686e733c328fdab8eedbda685a1e057f1d3136f73",
+            "revision": "5ee2524f7765085c420bc15b11422e11f8e9a10ac0b3a159399e0beaadae5d22"
+          }
+        ]
+      }
+    },
+    {
+      "plugin_id": "viz-redis-rdb",
+      "dataset_id": "viz-test-redis-rdb",
+      "entry_file": "native-redis-7.2.7.rdb",
+      "expected_file_sha256": "d7853cacc4bbee20f5d632226ac309ce3b913da47a669f2bfa373426431fed69",
+      "expected_file_bytes": 346,
+      "sample_kind": "project_fixture",
+      "browser": {
+        "status": "passed",
+        "actions": [
+          "preview opened; see screenshot/manual steps"
+        ],
+        "evidence": "main-browser/viz-redis-rdb.png",
+        "additional_actions": [
+          "实际登记文件已打开并选择指定插件",
+          "读取记录分页",
+          "展开记录0，显示字段/类型/值",
+          "下一页",
+          "下一页真实请求offset=1并展开记录1"
+        ],
+        "additional_evidence": "main-extra-browser/viz-redis-rdb.png"
+      },
+      "api": {
+        "seconds": 0.898,
+        "status": "passed",
+        "checks": [
+          {
+            "operation": "preview",
+            "kind": "tree",
+            "version": "bd854d7ad7677abe11e7b3dd9685d5e1df287b1cb1b3207a7432d4785b8a276d",
+            "revision": "5ee2524f7765085c420bc15b11422e11f8e9a10ac0b3a159399e0beaadae5d22"
+          }
+        ]
+      }
+    },
+    {
+      "plugin_id": "viz-mysql-sdi",
+      "dataset_id": "viz-test-mysql-sdi",
+      "entry_file": "mysql-8.0.46.ibd",
+      "expected_file_sha256": "ef03c988c5e6ddf489c80be3d903b783ad15cb6777bb877ff18f360b5e13f954",
+      "expected_file_bytes": 131072,
+      "sample_kind": "project_fixture",
+      "browser": {
+        "status": "passed",
+        "actions": [
+          "preview opened; see screenshot/manual steps"
+        ],
+        "evidence": "main-browser/viz-mysql-sdi.png",
+        "additional_actions": [
+          "实际登记文件已打开并选择指定插件",
+          "自动读取SDI结构表，搜索measurements字段/索引元数据；未读取数据库行"
+        ],
+        "additional_evidence": "main-extra-browser/viz-mysql-sdi.png"
+      },
+      "api": {
+        "seconds": 0.899,
+        "status": "passed",
+        "checks": [
+          {
+            "operation": "preview",
+            "kind": "table",
+            "version": "0d364bab548e0233c24f756a7ebff6cccabcc3ff4663822e065be2cf602846fd",
+            "revision": "5ee2524f7765085c420bc15b11422e11f8e9a10ac0b3a159399e0beaadae5d22"
+          }
+        ]
+      }
+    },
+    {
+      "plugin_id": "viz-sst-records",
+      "dataset_id": "viz-test-sst-records",
+      "entry_file": "rocksdb-6.11.4.sst",
+      "expected_file_sha256": "f02d53fc206bbdc4026e7be71cfc1597bd20bfa1a466127d3acb7f06ba61b6fd",
+      "expected_file_bytes": 855,
+      "sample_kind": "project_fixture",
+      "browser": {
+        "status": "passed",
+        "actions": [
+          "preview opened; see screenshot/manual steps"
+        ],
+        "evidence": "main-browser/viz-sst-records.png",
+        "additional_actions": [
+          "实际登记文件已打开并选择指定插件",
+          "自动读取SST物理键值/精确序号表，按第一条十六进制键筛选；未启动数据库"
+        ],
+        "additional_evidence": "main-extra-browser/viz-sst-records.png"
+      },
+      "api": {
+        "seconds": 0.948,
+        "status": "passed",
+        "checks": [
+          {
+            "operation": "preview",
+            "kind": "table",
+            "version": "126ed8224983695aafc6c1369da935bd5d89e6b02c5135b4168b668ec792ed8e",
+            "revision": "5ee2524f7765085c420bc15b11422e11f8e9a10ac0b3a159399e0beaadae5d22"
+          }
+        ]
+      }
+    },
+    {
+      "plugin_id": "viz-postgres-dump",
+      "dataset_id": "viz-test-postgres-dump",
+      "entry_file": "synthetic-postgres-none.dump",
+      "expected_file_sha256": "b2e2db08384a26283e98d0e51aca30f8a945d43f9c43426b39bf52a4a1b8261f",
+      "expected_file_bytes": 2017,
+      "sample_kind": "project_fixture",
+      "browser": {
+        "status": "passed",
+        "actions": [
+          "preview opened; see screenshot/manual steps"
+        ],
+        "evidence": "main-browser/viz-postgres-dump.png",
+        "additional_actions": [
+          "实际登记文件已打开并选择指定插件",
+          "自动读取归档TOC，过滤TABLE DATA对象；没有解压/校验数据段，也没有恢复数据库"
+        ],
+        "additional_evidence": "main-extra-browser/viz-postgres-dump.png"
+      },
+      "api": {
+        "seconds": 0.903,
+        "status": "passed",
+        "checks": [
+          {
+            "operation": "preview",
+            "kind": "tree",
+            "version": "89e64f6103da30509e071cfee937ee470d2a14cf870a0381efb3fce02662a33f",
+            "revision": "5ee2524f7765085c420bc15b11422e11f8e9a10ac0b3a159399e0beaadae5d22"
+          }
+        ]
+      }
+    },
+    {
+      "plugin_id": "viz-excel",
+      "dataset_id": "viz-test-excel",
+      "entry_file": "ENB2012_data.xlsx",
+      "expected_file_sha256": "0089fcffc1415e41e2ff63730cca5280efe54fc43d722dfde1b0aaa808e35dc4",
+      "expected_file_bytes": 76189,
+      "sample_kind": "scientific_original",
+      "browser": {
+        "status": "passed",
+        "actions": [
+          "preview opened; see screenshot/manual steps"
+        ],
+        "evidence": "main-browser/viz-excel.png",
+        "additional_actions": [
+          "实际登记文件已打开并选择指定插件",
+          "后200行",
+          "真实读取并显示201–400行，A–J十列有值、K/L保持空白，不重算公式/执行宏"
+        ],
+        "additional_evidence": "main-extra-browser/viz-excel.png"
+      },
+      "api": {
+        "seconds": 0.913,
+        "status": "passed",
+        "checks": [
+          {
+            "operation": "preview",
+            "kind": "table",
+            "version": "731789e86d715092686496659faa0278f1d37cba1b75b954dcefb185c5086b22",
+            "revision": "5ee2524f7765085c420bc15b11422e11f8e9a10ac0b3a159399e0beaadae5d22"
+          }
+        ]
+      }
+    },
+    {
+      "plugin_id": "viz-docx",
+      "dataset_id": "viz-test-docx",
+      "entry_file": "blk-inner-content.docx",
+      "expected_file_sha256": "16243dd05f686d6d5fab331843691492ad78ae3eb4f13cc8686077b44718c0ba",
+      "expected_file_bytes": 11949,
+      "sample_kind": "official_fixture",
+      "browser": {
+        "status": "passed",
+        "actions": [
+          "DOCX paragraphs and table rendered",
+          "DOCX zoom 150%"
+        ],
+        "evidence": "main-browser/viz-docx.png"
+      },
+      "api": {
+        "seconds": 0.445,
+        "status": "passed",
+        "checks": [
+          {
+            "operation": "bytes",
+            "bytes": 11949,
+            "sha256": "16243dd05f686d6d5fab331843691492ad78ae3eb4f13cc8686077b44718c0ba"
+          }
+        ]
+      }
+    },
+    {
+      "plugin_id": "viz-word",
+      "dataset_id": "viz-test-word",
+      "entry_file": "blk-inner-content.docx",
+      "expected_file_sha256": "16243dd05f686d6d5fab331843691492ad78ae3eb4f13cc8686077b44718c0ba",
+      "expected_file_bytes": 11949,
+      "sample_kind": "official_fixture",
+      "browser": {
+        "status": "passed",
+        "actions": [
+          "PDF canvas rendered",
+          "fit-page zoom"
+        ],
+        "evidence": "main-browser/viz-word.png"
+      },
+      "api": {
+        "seconds": 1.359,
+        "status": "passed",
+        "checks": [
+          {
+            "operation": "preview",
+            "kind": "media",
+            "version": "5707eaa24951f1ef402fa9682ad9d9117794f9513585d3e54185092202f1a587",
+            "revision": "5ee2524f7765085c420bc15b11422e11f8e9a10ac0b3a159399e0beaadae5d22"
+          }
+        ]
+      }
+    },
+    {
+      "plugin_id": "viz-onlyoffice",
+      "dataset_id": "viz-test-onlyoffice",
+      "entry_file": "blk-inner-content.docx",
+      "expected_file_sha256": "16243dd05f686d6d5fab331843691492ad78ae3eb4f13cc8686077b44718c0ba",
+      "expected_file_bytes": 11949,
+      "sample_kind": "official_fixture",
+      "browser": {
+        "status": "passed",
+        "actions": [
+          "ONLYOFFICE readiness callback"
+        ],
+        "evidence": "main-browser/viz-onlyoffice.png"
+      },
+      "api": {
+        "seconds": 0.558,
+        "status": "passed",
+        "checks": [
+          {
+            "operation": "prepare",
+            "kind": "resources",
+            "version": "71e89211ad38b97806bcaeb6134fb485de86c24fc87c413f1077a6bc194c7f21",
+            "revision": "5ee2524f7765085c420bc15b11422e11f8e9a10ac0b3a159399e0beaadae5d22"
+          }
+        ]
+      }
+    },
+    {
+      "plugin_id": "viz-powerpoint",
+      "dataset_id": "viz-test-powerpoint-font",
+      "entry_file": "txt-font-typeface.pptx",
+      "expected_file_sha256": "c1127c3fc5ca34bcca630dafdb1d78352c77ff6ed6c182679ef629bc028784c2",
+      "expected_file_bytes": 25817,
+      "sample_kind": "official_fixture",
+      "browser": {
+        "status": "passed",
+        "actions": [
+          "PDF canvas rendered",
+          "fit-page zoom"
+        ],
+        "evidence": "main-browser/viz-powerpoint.png"
+      },
+      "api": {
+        "seconds": 1.465,
+        "status": "passed",
+        "checks": [
+          {
+            "operation": "preview",
+            "kind": "media",
+            "version": "be0fc30ebc80cfdc93accdb7f44a5dbf39dc8ae70b049a50582a352b3b4bbee6",
+            "revision": "5ee2524f7765085c420bc15b11422e11f8e9a10ac0b3a159399e0beaadae5d22"
+          }
+        ]
+      }
+    },
+    {
+      "plugin_id": "molecular",
+      "dataset_id": "pdb-ubiquitin",
+      "entry_file": "1UBQ.pdb",
+      "expected_file_sha256": "d4a6812d8951cf6594e6a0763f089e35f5a80b62acb3c117b2c5565228a7b161",
+      "expected_file_bytes": 78570,
+      "sample_kind": "scientific_original",
+      "browser": {
+        "status": "passed",
+        "actions": [
+          "Open registered file and select molecular",
+          "stick style",
+          "复位",
+          "WebGL draw calls observed; pointer zoom"
+        ],
+        "evidence": "chem-browser/molecular.png"
+      },
+      "api": {
+        "seconds": 0.072,
+        "status": "passed",
+        "checks": [
+          {
+            "operation": "prepare",
+            "kind": "molecule",
+            "version": "ccb2d8f61f42c5c07f85cf903219c40df4f1b5b1ff104efa02ecccd91b433b8b",
+            "revision": "5ee2524f7765085c420bc15b11422e11f8e9a10ac0b3a159399e0beaadae5d22"
+          },
+          {
+            "operation": "bytes",
+            "bytes": 78570,
+            "sha256": "d4a6812d8951cf6594e6a0763f089e35f5a80b62acb3c117b2c5565228a7b161"
+          }
+        ]
+      }
+    },
+    {
+      "plugin_id": "viz-molstar",
+      "dataset_id": "viz-pdb-myoglobin-1mbn",
+      "entry_file": "1MBN.cif",
+      "expected_file_sha256": "91c8a5754c748c7cc1c1508ee92bc1df4c332be2383c8ae93fd084292ec8722e",
+      "expected_file_bytes": 191665,
+      "sample_kind": "scientific_original",
+      "browser": {
+        "status": "passed",
+        "actions": [
+          "Open registered file and select viz-molstar",
+          "WebGL draw calls observed; pointer zoom"
+        ],
+        "evidence": "chem-browser/viz-molstar.png"
+      },
+      "api": {
+        "seconds": 0.459,
+        "status": "passed",
+        "checks": [
+          {
+            "operation": "bytes",
+            "bytes": 191665,
+            "sha256": "91c8a5754c748c7cc1c1508ee92bc1df4c332be2383c8ae93fd084292ec8722e"
+          }
+        ]
+      }
+    },
+    {
+      "plugin_id": "viz-diffraction",
+      "dataset_id": "mendeley-high-entropy-alloys",
+      "entry_file": "CoCrCuFeNi_AC.xrdml",
+      "expected_file_sha256": "8dd4de1cb5596d57f62e7ca8357d2adb8644dde9b4e9134c120748bbf724b895",
+      "expected_file_bytes": 19827,
+      "sample_kind": "scientific_original",
+      "browser": {
+        "status": "passed",
+        "actions": [
+          "Open registered file and select viz-diffraction",
+          "绘制所选扫描"
+        ],
+        "evidence": "chem-browser/viz-diffraction.png"
+      },
+      "api": {
+        "seconds": 0.556,
+        "status": "passed",
+        "checks": [
+          {
+            "operation": "preview",
+            "phase": "catalog",
+            "kind": "tree",
+            "version": "31646c561ebf4a29a47d762ac7dfb92cdad99b48a7304a4e3babc6d53b93e895",
+            "revision": "5ee2524f7765085c420bc15b11422e11f8e9a10ac0b3a159399e0beaadae5d22"
+          },
+          {
+            "operation": "preview",
+            "kind": "series",
+            "version": "31646c561ebf4a29a47d762ac7dfb92cdad99b48a7304a4e3babc6d53b93e895",
+            "revision": "5ee2524f7765085c420bc15b11422e11f8e9a10ac0b3a159399e0beaadae5d22"
+          }
+        ]
+      }
+    },
+    {
+      "plugin_id": "viz-scientific-graph",
+      "dataset_id": "viz-mangal-greenland-pollination-908",
+      "entry_file": "lundgren-olesen-2005-network-908.graphml",
+      "expected_file_sha256": "8d8f28a62fbeeb257a437c227bf073bafa98a749fe99c0d7ea462e9afa06dd2a",
+      "expected_file_bytes": 12342,
+      "sample_kind": "scientific_derived",
+      "browser": {
+        "status": "passed",
+        "actions": [
+          "Open registered file and select viz-scientific-graph",
+          "适应视口"
+        ],
+        "evidence": "chem-browser/viz-scientific-graph.png"
+      },
+      "api": {
+        "seconds": 0.901,
+        "status": "passed",
+        "checks": [
+          {
+            "operation": "preview",
+            "kind": "graph",
+            "version": "60dcd2cb1627a1c3e3a7eeec6fcb359c990b78638ee3b791fdc11e5ca807194e",
+            "revision": "5ee2524f7765085c420bc15b11422e11f8e9a10ac0b3a159399e0beaadae5d22"
+          }
+        ]
+      }
+    },
+    {
+      "plugin_id": "viz-phylogeny",
+      "dataset_id": "viz-elife-seph-phylogeny",
+      "entry_file": "seph_phyml_quoted.nwk",
+      "expected_file_sha256": "67700ba0fd792e5190732a1d3b670b433bdca0e4de0d5ceb64a8d486d1ae4d60",
+      "expected_file_bytes": 19114,
+      "sample_kind": "scientific_derived",
+      "browser": {
+        "status": "passed",
+        "actions": [
+          "Open registered file and select viz-phylogeny",
+          "Branch-length view with 720 nodes/361 leaves"
+        ],
+        "evidence": "chem-browser/viz-phylogeny.png"
+      },
+      "api": {
+        "seconds": 0.873,
+        "status": "passed",
+        "checks": [
+          {
+            "operation": "preview",
+            "kind": "tree",
+            "version": "f2d22fd8d1f262c93e611cb2e90ee8765229861c1879ad76b6ca9ac81f7d7445",
+            "revision": "5ee2524f7765085c420bc15b11422e11f8e9a10ac0b3a159399e0beaadae5d22"
+          }
+        ]
+      }
+    },
+    {
+      "plugin_id": "viz-rdkit",
+      "dataset_id": "viz-plugin-rdkit-cis",
+      "entry_file": "cis.sdf",
+      "expected_file_sha256": "bb78bd9ead6f2fadada9204e561d6c4643b40f17330ae5034a2287641eafe4b0",
+      "expected_file_bytes": 565,
+      "sample_kind": "official_fixture",
+      "browser": {
+        "status": "passed",
+        "actions": [
+          "Open registered file and select viz-rdkit",
+          "RDKit generated image decoded"
+        ],
+        "evidence": "chem-browser/viz-rdkit.png"
+      },
+      "api": {
+        "seconds": 0.924,
+        "status": "passed",
+        "checks": [
+          {
+            "operation": "preview",
+            "kind": "media",
+            "version": "c0b75c18c24eb9be848532a8490500919cd6851217505e438ae279143140afc0",
+            "revision": "5ee2524f7765085c420bc15b11422e11f8e9a10ac0b3a159399e0beaadae5d22"
+          }
+        ]
+      }
+    },
+    {
+      "plugin_id": "viz-mass-spectrum",
+      "dataset_id": "viz-plugin-mass-pyteomics",
+      "entry_file": "example.mgf",
+      "expected_file_sha256": "c32687aba71bb61def1fb7e39045ef948e6185146e9d4185465f4b9e67a9c74f",
+      "expected_file_bytes": 768,
+      "sample_kind": "official_fixture",
+      "browser": {
+        "status": "passed",
+        "actions": [
+          "Open registered file and select viz-mass-spectrum",
+          "读取所选质谱"
+        ],
+        "evidence": "chem-browser/viz-mass-spectrum.png"
+      },
+      "api": {
+        "seconds": 1.632,
+        "status": "passed",
+        "checks": [
+          {
+            "operation": "preview",
+            "phase": "catalog",
+            "kind": "tree",
+            "version": "ab536fe93aa1c076d3571abfc9bb2063d6f8c091c6b24e4eb41fadb882765557",
+            "revision": "5ee2524f7765085c420bc15b11422e11f8e9a10ac0b3a159399e0beaadae5d22"
+          },
+          {
+            "operation": "preview",
+            "kind": "array",
+            "version": "ab536fe93aa1c076d3571abfc9bb2063d6f8c091c6b24e4eb41fadb882765557",
+            "revision": "5ee2524f7765085c420bc15b11422e11f8e9a10ac0b3a159399e0beaadae5d22"
+          }
+        ]
+      }
+    },
+    {
+      "plugin_id": "viz-mca-spectrum",
+      "dataset_id": "viz-plugin-mca-sigima",
+      "entry_file": "spectrum_ascii.mca",
+      "expected_file_sha256": "5199480d6d44233abc29963f41ca572cd9a491f39e7d31a7e7a23027dc472745",
+      "expected_file_bytes": 6469,
+      "sample_kind": "official_fixture",
+      "browser": {
+        "status": "passed",
+        "actions": [
+          "Open registered file and select viz-mca-spectrum",
+          "MCA 2048-channel raw-count plot rendered"
+        ],
+        "evidence": "chem-browser/viz-mca-spectrum.png"
+      },
+      "api": {
+        "seconds": 0.832,
+        "status": "passed",
+        "checks": [
+          {
+            "operation": "preview",
+            "kind": "array",
+            "version": "1739583de7b85bec3094366d70e5eef8d6e9d3e322e6f29b7329fbae946ff8c9",
+            "revision": "5ee2524f7765085c420bc15b11422e11f8e9a10ac0b3a159399e0beaadae5d22"
+          }
+        ]
+      }
+    },
+    {
+      "plugin_id": "viz-gro-trajectory",
+      "dataset_id": "viz-plugin-gro-mdanalysis",
+      "entry_file": "two_water_gro_multiframe.gro",
+      "expected_file_sha256": "4406c5bd48369b8f9a5648c9f8fc7503ad4c2a204fa4809ac342ff73474b8559",
+      "expected_file_bytes": 648,
+      "sample_kind": "official_fixture",
+      "browser": {
+        "status": "passed",
+        "actions": [
+          "Open registered file and select viz-gro-trajectory",
+          "显示所选帧",
+          "WebGL draw calls observed; pointer zoom"
+        ],
+        "evidence": "chem-browser/viz-gro-trajectory.png"
+      },
+      "api": {
+        "seconds": 1.554,
+        "status": "passed",
+        "checks": [
+          {
+            "operation": "preview",
+            "phase": "catalog",
+            "kind": "tree",
+            "version": "931bf16da406b568dea0aa37224dc138928f658d7584fc8fde70b906545afbc2",
+            "revision": "5ee2524f7765085c420bc15b11422e11f8e9a10ac0b3a159399e0beaadae5d22"
+          },
+          {
+            "operation": "preview",
+            "kind": "geometry",
+            "version": "931bf16da406b568dea0aa37224dc138928f658d7584fc8fde70b906545afbc2",
+            "revision": "5ee2524f7765085c420bc15b11422e11f8e9a10ac0b3a159399e0beaadae5d22"
+          }
+        ]
+      }
+    },
+    {
+      "plugin_id": "viz-simulation-mesh",
+      "dataset_id": "viz-plugin-mesh-scikit-fem",
+      "entry_file": "mesh.vtu",
+      "expected_file_sha256": "93cca2f9052663807430bd9861302c30bda4374141afc4a918e7544153e23780",
+      "expected_file_bytes": 9902,
+      "sample_kind": "official_fixture",
+      "browser": {
+        "status": "passed",
+        "actions": [
+          "Open registered file and select viz-simulation-mesh",
+          "绘制所选网格",
+          "WebGL draw calls observed; pointer zoom"
+        ],
+        "evidence": "chem-browser/viz-simulation-mesh.png"
+      },
+      "api": {
+        "seconds": 1.708,
+        "status": "passed",
+        "checks": [
+          {
+            "operation": "preview",
+            "phase": "catalog",
+            "kind": "tree",
+            "version": "58a4b82a891eeb244dcdad554205aecec9ac868ffd6ead0a164358e1a2abffd8",
+            "revision": "5ee2524f7765085c420bc15b11422e11f8e9a10ac0b3a159399e0beaadae5d22"
+          },
+          {
+            "operation": "preview",
+            "kind": "geometry",
+            "version": "58a4b82a891eeb244dcdad554205aecec9ac868ffd6ead0a164358e1a2abffd8",
+            "revision": "5ee2524f7765085c420bc15b11422e11f8e9a10ac0b3a159399e0beaadae5d22"
+          }
+        ]
+      }
+    },
+    {
+      "plugin_id": "obj",
+      "dataset_id": "viz-plugin-mesh-scikit-fem",
+      "entry_file": "surface.obj",
+      "expected_file_sha256": "678bd1cd06d06ebab94ed7997feca25a3ed597b7a6d550d7da11ae0ed8a403fa",
+      "expected_file_bytes": 4705,
+      "sample_kind": "official_fixture",
+      "browser": {
+        "status": "passed",
+        "actions": [
+          "Open registered file and select obj",
+          "WebGL draw calls observed; pointer zoom"
+        ],
+        "evidence": "chem-browser/obj.png"
+      },
+      "api": {
+        "seconds": 0.465,
+        "status": "passed",
+        "checks": [
+          {
+            "operation": "bytes",
+            "bytes": 4705,
+            "sha256": "678bd1cd06d06ebab94ed7997feca25a3ed597b7a6d550d7da11ae0ed8a403fa"
+          }
+        ]
+      }
+    },
+    {
+      "plugin_id": "viz-vtk",
+      "dataset_id": "viz-plugin-mesh-scikit-fem",
+      "entry_file": "surface.obj",
+      "expected_file_sha256": "678bd1cd06d06ebab94ed7997feca25a3ed597b7a6d550d7da11ae0ed8a403fa",
+      "expected_file_bytes": 4705,
+      "sample_kind": "official_fixture",
+      "browser": {
+        "status": "disabled",
+        "actions": [],
+        "evidence": "chem-browser/viz-vtk.png"
+      },
+      "api": {
+        "seconds": 0,
+        "status": "disabled",
+        "reason": "Existing plugin preference preserved; not enabled by this check"
+      }
+    },
+    {
+      "plugin_id": "viz-nexus-window",
+      "dataset_id": "viz-plugin-nexus-rosettasciio",
+      "entry_file": "nexus_fixed.nxs",
+      "expected_file_sha256": "4fd7483002faa100e82bc97cb85fd7d93a96a65941d6587afa02efa56a46f997",
+      "expected_file_bytes": 5240,
+      "sample_kind": "official_fixture",
+      "browser": {
+        "status": "passed",
+        "actions": [
+          "Open registered file and select viz-nexus-window",
+          "读取 NXdata 窗口"
+        ],
+        "evidence": "chem-browser/viz-nexus-window.png"
+      },
+      "api": {
+        "seconds": 2.675,
+        "status": "passed",
+        "checks": [
+          {
+            "operation": "preview",
+            "phase": "catalog",
+            "kind": "tree",
+            "version": "3e6f50a2c76bf3231361866f9d48e280f62ab621adfa81044c8aa8bdec9e685f",
+            "revision": "5ee2524f7765085c420bc15b11422e11f8e9a10ac0b3a159399e0beaadae5d22"
+          },
+          {
+            "operation": "preview",
+            "kind": "array",
+            "version": "3e6f50a2c76bf3231361866f9d48e280f62ab621adfa81044c8aa8bdec9e685f",
+            "revision": "5ee2524f7765085c420bc15b11422e11f8e9a10ac0b3a159399e0beaadae5d22"
+          }
+        ]
+      }
+    },
+    {
+      "plugin_id": "viz-ripple-window",
+      "dataset_id": "viz-plugin-ripple-rosettasciio",
+      "entry_file": "ripple_little_endian.rpl",
+      "expected_file_sha256": "da334a052c28531bacd18ed6d604cf3dd9e2b69214c63e2bc218f05b7f02fe77",
+      "expected_file_bytes": 398,
+      "sample_kind": "official_fixture",
+      "browser": {
+        "status": "passed",
+        "actions": [
+          "Open registered file and select viz-ripple-window",
+          "读取 Ripple 窗口",
+          "读取 Ripple 窗口"
+        ],
+        "evidence": "chem-browser/viz-ripple-window.png"
+      },
+      "api": {
+        "seconds": 1.571,
+        "status": "passed",
+        "checks": [
+          {
+            "operation": "preview",
+            "phase": "catalog",
+            "kind": "tree",
+            "version": "9549227cdd71efb5fc31c5b4ddfa76139eb0372d5f25f15e65382776ae611b08",
+            "revision": "5ee2524f7765085c420bc15b11422e11f8e9a10ac0b3a159399e0beaadae5d22"
+          },
+          {
+            "operation": "preview",
+            "kind": "array",
+            "version": "9549227cdd71efb5fc31c5b4ddfa76139eb0372d5f25f15e65382776ae611b08",
+            "revision": "5ee2524f7765085c420bc15b11422e11f8e9a10ac0b3a159399e0beaadae5d22"
+          }
+        ]
+      }
+    },
+    {
+      "plugin_id": "viz-nmrium",
+      "dataset_id": "viz-plugin-nmr-project",
+      "entry_file": "synthetic-1h.jdx",
+      "expected_file_sha256": "db7229c49b972aca49174e7f71ecd76afc9898e0c75333ebe3f7f0028265ca82",
+      "expected_file_bytes": 8542,
+      "sample_kind": "project_fixture",
+      "browser": {
+        "status": "passed",
+        "actions": [
+          "Open registered file and select viz-nmrium",
+          "NMRium rendered processed 1H spectrum"
+        ],
+        "evidence": "chem-browser/viz-nmrium.png"
+      },
+      "api": {
+        "seconds": 0.903,
+        "status": "passed",
+        "checks": [
+          {
+            "operation": "preview",
+            "kind": "array",
+            "version": "4237890bdd00189535db658760dcf201f6ff851ee4b268acd8d371a79945f58f",
+            "revision": "5ee2524f7765085c420bc15b11422e11f8e9a10ac0b3a159399e0beaadae5d22"
+          }
+        ]
+      }
+    },
+    {
+      "plugin_id": "viz-jsroot",
+      "dataset_id": "viz-plugin-root-project",
+      "entry_file": "synthetic-histogram.root",
+      "expected_file_sha256": "be0ac108135865e09337caf51b901ad85674095d5ab26393545b608be23518b0",
+      "expected_file_bytes": 12880,
+      "sample_kind": "project_fixture",
+      "browser": {
+        "status": "passed",
+        "actions": [
+          "Open registered file and select viz-jsroot",
+          "JSROOT TH1 numeric SVG rendered"
+        ],
+        "evidence": "chem-browser/viz-jsroot.png"
+      },
+      "api": {
+        "seconds": 1.262,
+        "status": "passed",
+        "checks": [
+          {
+            "operation": "preview",
+            "kind": "array",
+            "version": "33670fb697fb7a4a20ac41358d195e4da0bf61d048164b934ab95cf00508af09",
+            "revision": "5ee2524f7765085c420bc15b11422e11f8e9a10ac0b3a159399e0beaadae5d22"
+          }
+        ]
+      }
+    },
+    {
+      "plugin_id": "viz-instrument-images",
+      "dataset_id": "viz-plugin-instrument-project",
+      "entry_file": "calibration-grid.edf",
+      "expected_file_sha256": "ad1d53496bbe3dd1cc66158a178ea4cc211dd3f90068d69be175c52863b199fa",
+      "expected_file_bytes": 19968,
+      "sample_kind": "project_fixture",
+      "browser": {
+        "status": "passed",
+        "actions": [
+          "Open registered file and select viz-instrument-images",
+          "读取所选 ROI"
+        ],
+        "evidence": "chem-browser/viz-instrument-images.png"
+      },
+      "api": {
+        "seconds": 12.31,
+        "status": "passed",
+        "checks": [
+          {
+            "operation": "preview",
+            "phase": "catalog",
+            "kind": "tree",
+            "version": "7c43f7c3f6d4a35f57444ebee23293b32297fddc3f32cf53115c65c289908a0d",
+            "revision": "5ee2524f7765085c420bc15b11422e11f8e9a10ac0b3a159399e0beaadae5d22"
+          },
+          {
+            "operation": "preview",
+            "kind": "media",
+            "version": "7c43f7c3f6d4a35f57444ebee23293b32297fddc3f32cf53115c65c289908a0d",
+            "revision": "5ee2524f7765085c420bc15b11422e11f8e9a10ac0b3a159399e0beaadae5d22"
+          }
+        ]
+      }
+    },
+    {
+      "plugin_id": "image",
+      "dataset_id": "viz-bio-lightmycells-formats",
+      "entry_file": "nucleus-uint16.png",
+      "expected_file_sha256": "65f211a479418e8e9eabf38f0a193aad9575ec431cc56b6a35744ff8b607b1a7",
+      "expected_file_bytes": 1922725,
+      "sample_kind": "scientific_derived",
+      "browser": {
+        "status": "passed",
+        "actions": [
+          "1200×1200 PNG显微细胞核影像可见；显示强度不替代uint16测量值。"
+        ],
+        "known_limits": [],
+        "evidence": "bio-browser/image.png"
+      },
+      "api": {
+        "seconds": 0.463,
+        "status": "passed",
+        "checks": [
+          {
+            "operation": "bytes",
+            "bytes": 1922725,
+            "sha256": "65f211a479418e8e9eabf38f0a193aad9575ec431cc56b6a35744ff8b607b1a7"
+          }
+        ]
+      }
+    },
+    {
+      "plugin_id": "tiff",
+      "dataset_id": "viz-bio-lightmycells-classic-tiff",
+      "entry_file": "nucleus-classic-uint16.tiff",
+      "expected_file_sha256": "d13f993415506041e260876b9414a13f1b3a9532e831f69a73073d0781fb9c8a",
+      "expected_file_bytes": 2880122,
+      "sample_kind": "scientific_derived",
+      "browser": {
+        "status": "passed",
+        "actions": [
+          "普通TIFF-6绘制为1200×1200灰度画布，像素与随附OME原件完全相同。"
+        ],
+        "known_limits": [
+          "原始OME文件为BigTIFF；当前旧TIFF插件无法处理它，应使用此普通TIFF副本或选择Viv读原件。"
+        ],
+        "evidence": "bio-browser/tiff.png"
+      },
+      "api": {
+        "seconds": 1.393,
+        "status": "passed",
+        "checks": [
+          {
+            "operation": "prepare",
+            "kind": "resources",
+            "version": "9efdc85f658fb344042bd95067e266fdf512d619f7ca19b1df1ad322743ae702",
+            "revision": "5ee2524f7765085c420bc15b11422e11f8e9a10ac0b3a159399e0beaadae5d22"
+          },
+          {
+            "operation": "bytes",
+            "bytes": 2880122,
+            "sha256": "d13f993415506041e260876b9414a13f1b3a9532e831f69a73073d0781fb9c8a"
+          }
+        ]
+      }
+    },
+    {
+      "plugin_id": "viz-viv",
+      "dataset_id": "viz-bio-lightmycells-formats",
+      "entry_file": "image_399_Nucleus.ome.tiff",
+      "expected_file_sha256": "61892dc211cf96032c14752a734c61d414980006490e65795faec14483c06048",
+      "expected_file_bytes": 2239243,
+      "sample_kind": "scientific_original",
+      "browser": {
+        "status": "passed",
+        "actions": [
+          "原始1200×1200 OME-BigTIFF的单Nucleus通道可见；Z=0、T=0，应用切片后正常显示。"
+        ],
+        "known_limits": [],
+        "evidence": "bio-browser/viz-viv.png"
+      },
+      "api": {
+        "seconds": 1.452,
+        "status": "passed",
+        "checks": [
+          {
+            "operation": "prepare",
+            "kind": "resources",
+            "version": "ba88369200c75bbccd1e4c3341e4542d8990af3d550121cb6d47ec17d0045ac2",
+            "revision": "5ee2524f7765085c420bc15b11422e11f8e9a10ac0b3a159399e0beaadae5d22"
+          },
+          {
+            "operation": "bytes",
+            "bytes": 2239243,
+            "sha256": "61892dc211cf96032c14752a734c61d414980006490e65795faec14483c06048"
+          }
+        ]
+      }
+    },
+    {
+      "plugin_id": "viz-czi",
+      "dataset_id": "viz-bio-lightmycells-formats",
+      "entry_file": "nucleus-uncompressed.czi",
+      "expected_file_sha256": "88f6c9bc90a4d84179f8ddb6538232cf037ac862cc8ba8a00a86419bb37a3585",
+      "expected_file_bytes": 2882240,
+      "sample_kind": "scientific_derived",
+      "browser": {
+        "status": "passed",
+        "actions": [
+          "显示128×128原始ROI对应的灰度PNG；C/Z/T均0，不凭空补齐或重采样。"
+        ],
+        "known_limits": [],
+        "evidence": "bio-browser/viz-czi.png"
+      },
+      "api": {
+        "seconds": 1.739,
+        "status": "passed",
+        "checks": [
+          {
+            "operation": "preview",
+            "phase": "catalog",
+            "kind": "tree",
+            "version": "4d8d9de54ee7dc46da0c9aba1c7b0f0c4b371b8004de6926f50ad1f1e82512a9",
+            "revision": "5ee2524f7765085c420bc15b11422e11f8e9a10ac0b3a159399e0beaadae5d22"
+          },
+          {
+            "operation": "preview",
+            "kind": "media",
+            "version": "4d8d9de54ee7dc46da0c9aba1c7b0f0c4b371b8004de6926f50ad1f1e82512a9",
+            "revision": "5ee2524f7765085c420bc15b11422e11f8e9a10ac0b3a159399e0beaadae5d22"
+          }
+        ]
+      }
+    },
+    {
+      "plugin_id": "viz-czi-window",
+      "dataset_id": "viz-bio-lightmycells-formats",
+      "entry_file": "nucleus-uncompressed.czi",
+      "expected_file_sha256": "88f6c9bc90a4d84179f8ddb6538232cf037ac862cc8ba8a00a86419bb37a3585",
+      "expected_file_bytes": 2882240,
+      "sample_kind": "scientific_derived",
+      "browser": {
+        "status": "passed_with_known_limit",
+        "actions": [
+          "目录显示1200×1200、单C/Z/T；16×16 ROI实际灰度PNG可见，实测约7.9秒。"
+        ],
+        "known_limits": [
+          "128×128 ROI在真实浏览器范围读取中长时间等待后返回503；仅16×16已通过端到端验证，较大窗口性能仍需优化。",
+          "whole CZI读取器可处理本小样例；window通过不等于任意8GiB文件或所有窗口均已验收。"
+        ],
+        "evidence": "bio-browser/viz-czi-window.png"
+      },
+      "api": {
+        "seconds": 9.79,
+        "status": "passed",
+        "checks": [
+          {
+            "operation": "preview",
+            "phase": "catalog",
+            "kind": "tree",
+            "version": "4d8d9de54ee7dc46da0c9aba1c7b0f0c4b371b8004de6926f50ad1f1e82512a9",
+            "revision": "5ee2524f7765085c420bc15b11422e11f8e9a10ac0b3a159399e0beaadae5d22"
+          },
+          {
+            "operation": "preview",
+            "kind": "media",
+            "version": "4d8d9de54ee7dc46da0c9aba1c7b0f0c4b371b8004de6926f50ad1f1e82512a9",
+            "revision": "5ee2524f7765085c420bc15b11422e11f8e9a10ac0b3a159399e0beaadae5d22"
+          }
+        ]
+      }
+    },
+    {
+      "plugin_id": "viz-ome-zarr",
+      "dataset_id": "viz-bio-lightmycells-formats",
+      "entry_file": "nucleus.zarr/.zattrs",
+      "expected_file_sha256": "0e2d06192692c229c20d4d1b7e95f61daf0c700e2405eb90658c51caf588067f",
+      "expected_file_bytes": 488,
+      "sample_kind": "scientific_derived",
+      "browser": {
+        "status": "passed",
+        "actions": [
+          "单层级YX NGFF读取并绘制128×128区域；同目录4个Zarr对象必须完整保留。"
+        ],
+        "known_limits": [],
+        "evidence": "bio-browser/viz-ome-zarr.png"
+      },
+      "api": {
+        "seconds": 2.188,
+        "status": "passed",
+        "checks": [
+          {
+            "operation": "preview",
+            "phase": "catalog",
+            "kind": "tree",
+            "version": "03dc0ce7bd8de680c81ac9b416f871f5cc8d54ed11009aa154ea094c23eba45b",
+            "revision": "5ee2524f7765085c420bc15b11422e11f8e9a10ac0b3a159399e0beaadae5d22"
+          },
+          {
+            "operation": "preview",
+            "kind": "array",
+            "version": "03dc0ce7bd8de680c81ac9b416f871f5cc8d54ed11009aa154ea094c23eba45b",
+            "revision": "5ee2524f7765085c420bc15b11422e11f8e9a10ac0b3a159399e0beaadae5d22"
+          }
+        ]
+      }
+    },
+    {
+      "plugin_id": "viz-matrix-workbench",
+      "dataset_id": "viz-bio-lightmycells-formats",
+      "entry_file": "nucleus-uint16.npy",
+      "expected_file_sha256": "6f150c9535ba0a4ce7e1decd889520120aa752d01f796d80955b111c2598ad89",
+      "expected_file_bytes": 2880128,
+      "sample_kind": "scientific_derived",
+      "browser": {
+        "status": "passed",
+        "actions": [
+          "二维uint16矩阵热力图非空，可切换有界数值表格再返回热力图；原数组全部1200×1200值保留。"
+        ],
+        "known_limits": [],
+        "evidence": "bio-browser/viz-matrix-workbench.png"
+      },
+      "api": {
+        "seconds": 1.836,
+        "status": "passed",
+        "checks": [
+          {
+            "operation": "preview",
+            "phase": "catalog",
+            "kind": "tree",
+            "version": "5aa2b76b52ad019543474b34fb2a68104c22578f9958fe971b4cb2a727c74bee",
+            "revision": "5ee2524f7765085c420bc15b11422e11f8e9a10ac0b3a159399e0beaadae5d22"
+          },
+          {
+            "operation": "preview",
+            "kind": "array",
+            "version": "5aa2b76b52ad019543474b34fb2a68104c22578f9958fe971b4cb2a727c74bee",
+            "revision": "5ee2524f7765085c420bc15b11422e11f8e9a10ac0b3a159399e0beaadae5d22"
+          }
+        ]
+      }
+    },
+    {
+      "plugin_id": "viz-video-player",
+      "dataset_id": "viz-bio-elife-video",
+      "entry_file": "elife-63387-fig2-data1-v1.mp4",
+      "expected_file_sha256": "f024808c28513d45bd95048e1bda7df75fa5b1e6b5520ad87e8850057bb008f8",
+      "expected_file_bytes": 84174,
+      "sample_kind": "scientific_original",
+      "browser": {
+        "status": "passed",
+        "actions": [
+          "510×74、11.75秒MP4能够播放并跳转中点；不是用播放秒数估算生物过程时长。"
+        ],
+        "known_limits": [],
+        "evidence": "bio-browser/viz-video-player.png"
+      },
+      "api": {
+        "seconds": 0.468,
+        "status": "passed",
+        "checks": [
+          {
+            "operation": "bytes",
+            "bytes": 84174,
+            "sha256": "f024808c28513d45bd95048e1bda7df75fa5b1e6b5520ad87e8850057bb008f8"
+          }
+        ]
+      }
+    },
+    {
+      "plugin_id": "viz-dicom-window",
+      "dataset_id": "viz-bio-dicom-phantom",
+      "entry_file": "synthetic-phantom.dcm",
+      "expected_file_sha256": "88affc0a61e113cd68a2c3cb49a5e57d0c1ccae081705dd29f49d67e90cadec9",
+      "expected_file_bytes": 8730,
+      "sample_kind": "project_fixture",
+      "browser": {
+        "status": "passed",
+        "actions": [
+          "本原创非患者体模显示64×64灰度区域；将窗位改为750时屏幕像素改变而源值不变。"
+        ],
+        "known_limits": [
+          "confirm_deidentified=true仅批准本明确合成体模，不可复用于未经脱敏审查的其他DICOM。"
+        ],
+        "evidence": "bio-browser/viz-dicom-window.png"
+      },
+      "api": {
+        "seconds": 30.001,
+        "status": "passed",
+        "checks": [
+          {
+            "operation": "preview",
+            "phase": "catalog",
+            "kind": "tree",
+            "version": "29836a24080db0c3169344e609a1cb2d21ae70f9e4f219109e2ac1c40f6b8c23",
+            "revision": "5ee2524f7765085c420bc15b11422e11f8e9a10ac0b3a159399e0beaadae5d22"
+          },
+          {
+            "operation": "preview",
+            "kind": "array",
+            "version": "29836a24080db0c3169344e609a1cb2d21ae70f9e4f219109e2ac1c40f6b8c23",
+            "revision": "5ee2524f7765085c420bc15b11422e11f8e9a10ac0b3a159399e0beaadae5d22"
+          }
+        ]
+      }
+    },
+    {
+      "plugin_id": "viz-niivue",
+      "dataset_id": "viz-bio-niivue-phantom",
+      "entry_file": "synthetic-radial-volume.nrrd",
+      "expected_file_sha256": "42a4c7e42780622e41f2b61cd8736ec3a7c4b22b96d915941aaf6e9dc11da70b",
+      "expected_file_bytes": 221281,
+      "sample_kind": "project_fixture",
+      "browser": {
+        "status": "passed",
+        "actions": [
+          "48³原创径向体模的正交切片与3D球体可见；切换影像布局正常，非临床影像。"
+        ],
+        "known_limits": [],
+        "evidence": "bio-browser/viz-niivue.png"
+      },
+      "api": {
+        "seconds": 0.496,
+        "status": "passed",
+        "checks": [
+          {
+            "operation": "bytes",
+            "bytes": 221281,
+            "sha256": "42a4c7e42780622e41f2b61cd8736ec3a7c4b22b96d915941aaf6e9dc11da70b"
+          }
+        ]
+      }
+    },
+    {
+      "plugin_id": "viz-spatial-window",
+      "dataset_id": "viz-bio-spatial-phantom",
+      "entry_file": "synthetic-spatial.h5ad",
+      "expected_file_sha256": "8461499c41ecb39837dad26e496bd4c8eb38d450b102e5c70c7dbe015483e86a",
+      "expected_file_bytes": 30360,
+      "sample_kind": "project_fixture",
+      "browser": {
+        "status": "passed",
+        "actions": [
+          "16×16网格全部256点可见，第三特征等于x+y，颜色梯度反映原创数值而非真实基因表达。"
+        ],
+        "known_limits": [],
+        "evidence": "bio-browser/viz-spatial-window.png"
+      },
+      "api": {
+        "seconds": 3.098,
+        "status": "passed",
+        "checks": [
+          {
+            "operation": "preview",
+            "phase": "catalog",
+            "kind": "tree",
+            "version": "5eeddc31a4f55c67f45179b6b5aea4145aa3e901d2ca2eeef59123fc43c2aad8",
+            "revision": "5ee2524f7765085c420bc15b11422e11f8e9a10ac0b3a159399e0beaadae5d22"
+          },
+          {
+            "operation": "preview",
+            "kind": "geometry",
+            "version": "5eeddc31a4f55c67f45179b6b5aea4145aa3e901d2ca2eeef59123fc43c2aad8",
+            "revision": "5ee2524f7765085c420bc15b11422e11f8e9a10ac0b3a159399e0beaadae5d22"
+          }
+        ]
+      }
+    },
+    {
+      "plugin_id": "viz-alignment-browser",
+      "dataset_id": "viz-bio-alignments-and-tracks",
+      "entry_file": "synthetic-alignments.sam",
+      "expected_file_sha256": "70e414a93e7e4936cc221e64f11681e9bd7b457170da08ce6e368718fae66601",
+      "expected_file_bytes": 479,
+      "sample_kind": "project_fixture",
+      "browser": {
+        "status": "passed",
+        "actions": [
+          "显示5条原创SAM read轨道及覆盖度，可点击read查看匹配/插入/缺失等详情。"
+        ],
+        "known_limits": [],
+        "evidence": "bio-browser/viz-alignment-browser.png"
+      },
+      "api": {
+        "seconds": 1.645,
+        "status": "passed",
+        "checks": [
+          {
+            "operation": "preview",
+            "phase": "catalog",
+            "kind": "tree",
+            "version": "fb4c6eebbf4a445ecb4161030c2b62091dd00bff3902f7839bc325258255edba",
+            "revision": "5ee2524f7765085c420bc15b11422e11f8e9a10ac0b3a159399e0beaadae5d22"
+          },
+          {
+            "operation": "preview",
+            "kind": "table",
+            "version": "fb4c6eebbf4a445ecb4161030c2b62091dd00bff3902f7839bc325258255edba",
+            "revision": "5ee2524f7765085c420bc15b11422e11f8e9a10ac0b3a159399e0beaadae5d22"
+          }
+        ]
+      }
+    },
+    {
+      "plugin_id": "viz-genome-tracks",
+      "dataset_id": "viz-bio-alignments-and-tracks",
+      "entry_file": "synthetic-features.bed",
+      "expected_file_sha256": "12419d12c81b7c9f0a539ea697ecd2b3f15e339d0e12ab922b385a27d715028e",
+      "expected_file_bytes": 99,
+      "sample_kind": "project_fixture",
+      "browser": {
+        "status": "passed",
+        "actions": [
+          "chr_demo的三个BED区间可见；UI起点1对应API起点0，可选区间打开详情。"
+        ],
+        "known_limits": [],
+        "evidence": "bio-browser/viz-genome-tracks.png"
+      },
+      "api": {
+        "seconds": 1.826,
+        "status": "passed",
+        "checks": [
+          {
+            "operation": "preview",
+            "phase": "catalog",
+            "kind": "tree",
+            "version": "f50e3997fd30660d0ea5e2f60fe48386f2dd28dc0fd8b4ecd9b658717759f79c",
+            "revision": "5ee2524f7765085c420bc15b11422e11f8e9a10ac0b3a159399e0beaadae5d22"
+          },
+          {
+            "operation": "preview",
+            "kind": "features",
+            "version": "f50e3997fd30660d0ea5e2f60fe48386f2dd28dc0fd8b4ecd9b658717759f79c",
+            "revision": "5ee2524f7765085c420bc15b11422e11f8e9a10ac0b3a159399e0beaadae5d22"
+          }
+        ]
+      }
+    },
+    {
+      "plugin_id": "viz-igv",
+      "dataset_id": "viz-bio-alignments-and-tracks",
+      "entry_file": "synthetic-features.bed",
+      "expected_file_sha256": "12419d12c81b7c9f0a539ea697ecd2b3f15e339d0e12ab922b385a27d715028e",
+      "expected_file_bytes": 99,
+      "sample_kind": "project_fixture",
+      "browser": {
+        "status": "passed",
+        "actions": [
+          "明确提供本地chrom.sizes后，IGV绘制chr_demo标尺和本地BED注释，不联网猜测参考基因组。"
+        ],
+        "known_limits": [],
+        "evidence": "bio-browser/viz-igv.png"
+      },
+      "api": {
+        "seconds": 0.486,
+        "status": "passed",
+        "checks": [
+          {
+            "operation": "bytes",
+            "bytes": 99,
+            "sha256": "12419d12c81b7c9f0a539ea697ecd2b3f15e339d0e12ab922b385a27d715028e"
+          }
+        ]
+      }
+    },
+    {
+      "plugin_id": "viz-blast-hits",
+      "dataset_id": "viz-bio-alignments-and-tracks",
+      "entry_file": "synthetic-hits.blast6",
+      "expected_file_sha256": "0c8b27bc35eb7e8c24cc9980866b226c0636b62f8f98416afbb62e4a68aaedfa",
+      "expected_file_bytes": 125,
+      "sample_kind": "project_fixture",
+      "browser": {
+        "status": "passed",
+        "actions": [
+          "点击筛选显示2条原创命中；最低一致性90过滤后剩1条，可点条形或表格打开详情。"
+        ],
+        "known_limits": [],
+        "evidence": "bio-browser/viz-blast-hits.png"
+      },
+      "api": {
+        "seconds": 1.708,
+        "status": "passed",
+        "checks": [
+          {
+            "operation": "preview",
+            "phase": "catalog",
+            "kind": "tree",
+            "version": "23ca7a2ac7a97e131fc4b139025e55d68b3e2961a8b88765ef72a025db2571d6",
+            "revision": "5ee2524f7765085c420bc15b11422e11f8e9a10ac0b3a159399e0beaadae5d22"
+          },
+          {
+            "operation": "preview",
+            "kind": "table",
+            "version": "23ca7a2ac7a97e131fc4b139025e55d68b3e2961a8b88765ef72a025db2571d6",
+            "revision": "5ee2524f7765085c420bc15b11422e11f8e9a10ac0b3a159399e0beaadae5d22"
+          }
+        ]
+      }
+    },
+    {
+      "plugin_id": "fastq-quality",
+      "dataset_id": "viz-bio-biopython-fastq",
+      "entry_file": "example.fastq",
+      "expected_file_sha256": "10bc5b39327a363b0019193c9823bc424a6d5706197688fdbdd45023a1481a0c",
+      "expected_file_bytes": 234,
+      "sample_kind": "official_fixture",
+      "browser": {
+        "status": "passed",
+        "actions": [
+          "显示3条官方测试read的逐位置平均Phred+33质量曲线；不是大规模测序统计。"
+        ],
+        "known_limits": [],
+        "evidence": "bio-browser/fastq-quality.png"
+      },
+      "api": {
+        "seconds": 0.967,
+        "status": "passed",
+        "checks": [
+          {
+            "operation": "preview",
+            "kind": "series",
+            "version": "7150631deecb46170e659481e66d31d4f8d6201569afd1ca9a09bbd0632bcae1",
+            "revision": "5ee2524f7765085c420bc15b11422e11f8e9a10ac0b3a159399e0beaadae5d22"
+          }
+        ]
+      }
+    },
+    {
+      "plugin_id": "viz-sequence-browser",
+      "dataset_id": "viz-bio-biopython-fastq",
+      "entry_file": "example.fastq",
+      "expected_file_sha256": "10bc5b39327a363b0019193c9823bc424a6d5706197688fdbdd45023a1481a0c",
+      "expected_file_bytes": 234,
+      "sample_kind": "official_fixture",
+      "browser": {
+        "status": "passed",
+        "actions": [
+          "先点击显示所选序列，显示第一条25字符read及逐碱基质量，再搜索CCC字面模体。"
+        ],
+        "known_limits": [],
+        "evidence": "bio-browser/viz-sequence-browser.png"
+      },
+      "api": {
+        "seconds": 1.67,
+        "status": "passed",
+        "checks": [
+          {
+            "operation": "preview",
+            "phase": "catalog",
+            "kind": "tree",
+            "version": "7150631deecb46170e659481e66d31d4f8d6201569afd1ca9a09bbd0632bcae1",
+            "revision": "5ee2524f7765085c420bc15b11422e11f8e9a10ac0b3a159399e0beaadae5d22"
+          },
+          {
+            "operation": "preview",
+            "kind": "table",
+            "version": "7150631deecb46170e659481e66d31d4f8d6201569afd1ca9a09bbd0632bcae1",
+            "revision": "5ee2524f7765085c420bc15b11422e11f8e9a10ac0b3a159399e0beaadae5d22"
+          }
+        ]
+      }
+    },
+    {
+      "plugin_id": "viz-fastqc",
+      "dataset_id": "viz-bio-biopython-fastq",
+      "entry_file": "example.fastq",
+      "expected_file_sha256": "10bc5b39327a363b0019193c9823bc424a6d5706197688fdbdd45023a1481a0c",
+      "expected_file_bytes": 234,
+      "sample_kind": "official_fixture",
+      "browser": {
+        "status": "passed",
+        "actions": [
+          "已获授权的一次3-read FastQC任务succeeded，Basic Statistics显示3条序列/25长度，MultiQC汇总和各模块表格可见；WARN/FAIL是小样本质量评价。"
+        ],
+        "known_limits": [],
+        "evidence": "bio-browser/viz-fastqc.png"
+      },
+      "api": {
+        "seconds": 0.68,
+        "status": "passed",
+        "checks": [
+          {
+            "operation": "completed_job_result",
+            "method": "GET",
+            "sections": 10,
+            "kind": "report",
+            "version": "7150631deecb46170e659481e66d31d4f8d6201569afd1ca9a09bbd0632bcae1",
+            "revision": "5ee2524f7765085c420bc15b11422e11f8e9a10ac0b3a159399e0beaadae5d22"
+          }
+        ]
+      }
+    },
+    {
+      "plugin_id": "viz-fcs-window",
+      "dataset_id": "viz-bio-flowcal-fcs",
+      "entry_file": "sample001-digital-values.fcs",
+      "expected_file_sha256": "96da8cfd1997baa7f3c141eca643e3502350352563d36cdb3562309d00bdafc2",
+      "expected_file_bytes": 2114253,
+      "sample_kind": "official_fixture",
+      "browser": {
+        "status": "passed",
+        "actions": [
+          "目录33024事件/8通道，读取前256事件后绘制TIME与FSC原始数字值散点，不做原仪器指数/增益/补偿解释。"
+        ],
+        "known_limits": [],
+        "evidence": "bio-browser/viz-fcs-window.png"
+      },
+      "api": {
+        "seconds": 4.255,
+        "status": "passed",
+        "checks": [
+          {
+            "operation": "preview",
+            "phase": "catalog",
+            "kind": "tree",
+            "version": "6dd6b2235b076a1c7c1bb7d45bf7f9ae6add0ab20fc942abfe667c33b670f1de",
+            "revision": "5ee2524f7765085c420bc15b11422e11f8e9a10ac0b3a159399e0beaadae5d22"
+          },
+          {
+            "operation": "preview",
+            "kind": "series",
+            "version": "6dd6b2235b076a1c7c1bb7d45bf7f9ae6add0ab20fc942abfe667c33b670f1de",
+            "revision": "5ee2524f7765085c420bc15b11422e11f8e9a10ac0b3a159399e0beaadae5d22"
+          }
+        ]
+      }
+    },
+    {
+      "plugin_id": "viz-edf-signals",
+      "dataset_id": "viz-bio-physionet-eeg",
+      "entry_file": "S001R01.edf",
+      "expected_file_sha256": "4743b736131a7e147c150e8b37711029b6cda5e356c4b3e8261a03cdcaaf8b0c",
+      "expected_file_bytes": 1275936,
+      "sample_kind": "scientific_original",
+      "browser": {
+        "status": "passed",
+        "actions": [
+          "真实EDF第一通道曲线可见，明确读取2–5秒窗口，160Hz采样；注释通道不作为普通信号。"
+        ],
+        "known_limits": [],
+        "evidence": "bio-browser/viz-edf-signals.png"
+      },
+      "api": {
+        "seconds": 2.711,
+        "status": "passed",
+        "checks": [
+          {
+            "operation": "preview",
+            "kind": "series",
+            "version": "4af23368231a849f5b669361fcfc00fcd1393387add3b9d99afb5c7ce76dbac8",
+            "revision": "5ee2524f7765085c420bc15b11422e11f8e9a10ac0b3a159399e0beaadae5d22"
+          }
+        ]
+      }
+    },
+    {
+      "plugin_id": "viz-audio-waveform",
+      "dataset_id": "viz-bio-physionet-eeg",
+      "entry_file": "eeg-channel0-sonification.wav",
+      "expected_file_sha256": "bd431a0d576fe12638417f4a89584c740bf7e577df1379baab0d68ca447e5d38",
+      "expected_file_bytes": 19564,
+      "sample_kind": "scientific_derived",
+      "browser": {
+        "status": "passed",
+        "actions": [
+          "WAV显示1声道/8000Hz/9760帧峰值包络，1.22秒可播放和跳转；是EEG的50倍时间压缩声音化，不是原始声学观测。"
+        ],
+        "known_limits": [],
+        "evidence": "bio-browser/viz-audio-waveform.png"
+      },
+      "api": {
+        "seconds": 0.444,
+        "status": "passed",
+        "checks": [
+          {
+            "operation": "bytes",
+            "bytes": 19564,
+            "sha256": "bd431a0d576fe12638417f4a89584c740bf7e577df1379baab0d68ca447e5d38"
+          }
+        ]
+      }
+    },
+    {
+      "plugin_id": "viz-metpy",
+      "dataset_id": "viz-metpy-may4-sounding",
+      "entry_file": "may4_sounding.csv",
+      "expected_file_sha256": "b91eb7f9463c5f76aff8bc0cb21fefc222ae4f0ee38c3350a99e7919b0fb0559",
+      "expected_file_bytes": 551,
+      "sample_kind": "official_fixture",
+      "browser": {
+        "status": "passed",
+        "actions": [
+          "打开指定文件及插件，实际读取并呈现；验证请求类型：preview"
+        ],
+        "evidence": "geo-browser/viz-metpy.png"
+      },
+      "api": {
+        "seconds": 1.655,
+        "status": "passed",
+        "checks": [
+          {
+            "operation": "preview",
+            "kind": "media",
+            "version": "14e449c5ae9f28fa5e4c12f3cd6d828f3eea318bbd020354866dcb561a6c7f50",
+            "revision": "5ee2524f7765085c420bc15b11422e11f8e9a10ac0b3a159399e0beaadae5d22"
+          }
+        ]
+      }
+    },
+    {
+      "plugin_id": "viz-pointcloud-window",
+      "dataset_id": "viz-pdal-las12",
+      "entry_file": "1.2-with-color.las",
+      "expected_file_sha256": "1d3e00eae856bffa6e55778dbfc05bdedc992504c64dbf366d5fd2eb6489ee45",
+      "expected_file_bytes": 36439,
+      "sample_kind": "official_fixture",
+      "browser": {
+        "status": "passed",
+        "actions": [
+          "打开指定文件及插件，实际读取并呈现；验证请求类型：geometry, tree"
+        ],
+        "evidence": "geo-browser/viz-pointcloud-window.png"
+      },
+      "api": {
+        "seconds": 2.887,
+        "status": "passed",
+        "checks": [
+          {
+            "operation": "preview",
+            "phase": "catalog",
+            "kind": "tree",
+            "version": "fecbfe8e4aa263716c6b9a172294a05b2abe93a1caa17d5dc7a0593a581357ad",
+            "revision": "5ee2524f7765085c420bc15b11422e11f8e9a10ac0b3a159399e0beaadae5d22"
+          },
+          {
+            "operation": "preview",
+            "kind": "geometry",
+            "version": "fecbfe8e4aa263716c6b9a172294a05b2abe93a1caa17d5dc7a0593a581357ad",
+            "revision": "5ee2524f7765085c420bc15b11422e11f8e9a10ac0b3a159399e0beaadae5d22"
+          }
+        ]
+      }
+    },
+    {
+      "plugin_id": "viz-seismic-window",
+      "dataset_id": "viz-usgs-anmo-seismic",
+      "entry_file": "IU.ANMO.10.BHZ.first-record.mseed",
+      "expected_file_sha256": "903fbfcf8cdb59993af92a428f5a92ebf0db4545d68bcba711b2fbc4235975b9",
+      "expected_file_bytes": 512,
+      "sample_kind": "scientific_derived",
+      "browser": {
+        "status": "passed",
+        "actions": [
+          "打开指定文件及插件，实际读取并呈现；验证请求类型：series, tree"
+        ],
+        "evidence": "geo-browser/viz-seismic-window.png"
+      },
+      "api": {
+        "seconds": 4.44,
+        "status": "passed",
+        "checks": [
+          {
+            "operation": "preview",
+            "phase": "catalog",
+            "kind": "tree",
+            "version": "47379c59bffa7b6f85c123c76587697e28586f3d91b9324ed4187257cb281d02",
+            "revision": "5ee2524f7765085c420bc15b11422e11f8e9a10ac0b3a159399e0beaadae5d22"
+          },
+          {
+            "operation": "preview",
+            "kind": "series",
+            "version": "47379c59bffa7b6f85c123c76587697e28586f3d91b9324ed4187257cb281d02",
+            "revision": "5ee2524f7765085c420bc15b11422e11f8e9a10ac0b3a159399e0beaadae5d22"
+          }
+        ]
+      }
+    },
+    {
+      "plugin_id": "viz-envi-window",
+      "dataset_id": "viz-noaa-climatology-envi",
+      "entry_file": "monthly_air.hdr",
+      "expected_file_sha256": "7a8643e18e53dd909096dc5a3dd6ea6c3d660676741a39afe4a3d682ceab9d47",
+      "expected_file_bytes": 131,
+      "sample_kind": "scientific_derived",
+      "browser": {
+        "status": "passed",
+        "actions": [
+          "打开指定文件及插件，实际读取并呈现；验证请求类型：image, tree"
+        ],
+        "evidence": "geo-browser/viz-envi-window.png"
+      },
+      "api": {
+        "seconds": 1.362,
+        "status": "passed",
+        "checks": [
+          {
+            "operation": "preview",
+            "phase": "catalog",
+            "kind": "tree",
+            "version": "23e8276fb04950d719b0327fd2181df0a44b8c9b3d598ec5cb7e1ff8112d4463",
+            "revision": "5ee2524f7765085c420bc15b11422e11f8e9a10ac0b3a159399e0beaadae5d22"
+          },
+          {
+            "operation": "preview",
+            "kind": "array",
+            "version": "23e8276fb04950d719b0327fd2181df0a44b8c9b3d598ec5cb7e1ff8112d4463",
+            "revision": "5ee2524f7765085c420bc15b11422e11f8e9a10ac0b3a159399e0beaadae5d22"
+          }
+        ]
+      }
+    },
+    {
+      "plugin_id": "viz-geoformats",
+      "dataset_id": "viz-usgs-earthquakes-kml",
+      "entry_file": "usgs-2024-m6.kml",
+      "expected_file_sha256": "c9e24b74d6666ad3cb5a6f845ab77c7be60e6bc76b8d2e63416e6fdbe36730ba",
+      "expected_file_bytes": 10422,
+      "sample_kind": "scientific_derived",
+      "browser": {
+        "status": "passed",
+        "actions": [
+          "打开指定文件及插件，实际读取并呈现；验证请求类型：map"
+        ],
+        "evidence": "geo-browser/viz-geoformats.png"
+      },
+      "api": {
+        "seconds": 0.916,
+        "status": "passed",
+        "checks": [
+          {
+            "operation": "preview",
+            "kind": "features",
+            "version": "5565f45dd200f1c3ffd93ef7db93fc586ee23ded677f261859358b0924520e84",
+            "revision": "5ee2524f7765085c420bc15b11422e11f8e9a10ac0b3a159399e0beaadae5d22"
+          }
+        ]
+      }
+    },
+    {
+      "plugin_id": "viz-grib-window",
+      "dataset_id": "viz-noaa-gfs-grib",
+      "entry_file": "gfs-20260916-00-2mt-wmo.grib2",
+      "expected_file_sha256": "d9571b5f65baa1d6ea6471243186b66d284477d82f4de17a77a8042ebfd9a8e2",
+      "expected_file_bytes": 300,
+      "sample_kind": "scientific_derived",
+      "browser": {
+        "status": "passed",
+        "actions": [
+          "打开指定文件及插件，实际读取并呈现；验证请求类型：image, tree"
+        ],
+        "evidence": "geo-browser/viz-grib-window.png"
+      },
+      "api": {
+        "seconds": 11.506,
+        "status": "passed",
+        "checks": [
+          {
+            "operation": "preview",
+            "phase": "catalog",
+            "kind": "tree",
+            "version": "d6d8cb45c4ca35d881fdaaf81c19763da796e8cdfd161618e11f10c68b8dd8ca",
+            "revision": "5ee2524f7765085c420bc15b11422e11f8e9a10ac0b3a159399e0beaadae5d22"
+          },
+          {
+            "operation": "preview",
+            "kind": "array",
+            "version": "d6d8cb45c4ca35d881fdaaf81c19763da796e8cdfd161618e11f10c68b8dd8ca",
+            "revision": "5ee2524f7765085c420bc15b11422e11f8e9a10ac0b3a159399e0beaadae5d22"
+          }
+        ]
+      }
+    },
+    {
+      "plugin_id": "viz-ugrid-window",
+      "dataset_id": "viz-xugrid-netherlands",
+      "entry_file": "elevation_nl_512faces.nc",
+      "expected_file_sha256": "aa3fbbe24aed6f88eb3ff4730286111b02dc9e5fb4f344a6cc3085dff8b9c16f",
+      "expected_file_bytes": 26968,
+      "sample_kind": "scientific_derived",
+      "browser": {
+        "status": "passed",
+        "actions": [
+          "打开指定文件及插件，实际读取并呈现；验证请求类型：geometry, prepare, tree"
+        ],
+        "evidence": "geo-browser/viz-ugrid-window.png"
+      },
+      "api": {
+        "seconds": 3.316,
+        "status": "passed",
+        "checks": [
+          {
+            "operation": "preview",
+            "phase": "catalog",
+            "kind": "tree",
+            "version": "f2482dc98c41156811a25c03d709ccf57226e3b7e06c460a1d59fb59ef5099a5",
+            "revision": "5ee2524f7765085c420bc15b11422e11f8e9a10ac0b3a159399e0beaadae5d22"
+          },
+          {
+            "operation": "preview",
+            "kind": "geometry",
+            "version": "f2482dc98c41156811a25c03d709ccf57226e3b7e06c460a1d59fb59ef5099a5",
+            "revision": "5ee2524f7765085c420bc15b11422e11f8e9a10ac0b3a159399e0beaadae5d22"
+          }
+        ]
+      }
+    },
+    {
+      "plugin_id": "viz-array-window",
+      "dataset_id": "viz-noaa-pressure-air-2022-2025",
+      "entry_file": "air.2025.contiguous.h5",
+      "expected_file_sha256": "25de54ccd30d2f62324321b07eb31d23bc68e0750fcabdaf7c8eebae1c4bc491",
+      "expected_file_bytes": 1043648072,
+      "sample_kind": "scientific_derived",
+      "browser": {
+        "status": "passed",
+        "actions": [
+          "打开指定文件及插件，实际读取并呈现；验证请求类型：image, tree"
+        ],
+        "evidence": "geo-browser/viz-array-window.png"
+      },
+      "api": {
+        "seconds": 2.907,
+        "status": "passed",
+        "checks": [
+          {
+            "operation": "preview",
+            "phase": "catalog",
+            "kind": "tree",
+            "version": "a292fc895655b52ab372583f38d4a1e7cef314daedc2258d515e66916e251b1a",
+            "revision": "5ee2524f7765085c420bc15b11422e11f8e9a10ac0b3a159399e0beaadae5d22"
+          },
+          {
+            "operation": "preview",
+            "kind": "array",
+            "version": "a292fc895655b52ab372583f38d4a1e7cef314daedc2258d515e66916e251b1a",
+            "revision": "5ee2524f7765085c420bc15b11422e11f8e9a10ac0b3a159399e0beaadae5d22"
+          }
+        ]
+      }
+    },
+    {
+      "plugin_id": "viz-radar-window",
+      "dataset_id": "viz-dataseek-odim24-fixture",
+      "entry_file": "synthetic-odim24.h5",
+      "expected_file_sha256": "925377d9e6ce072e1c576962fa0feb3d7a859dd03b5da7b4aa408ce168ab2164",
+      "expected_file_bytes": 32168,
+      "sample_kind": "project_fixture",
+      "browser": {
+        "status": "passed",
+        "actions": [
+          "打开指定文件及插件，实际读取并呈现；验证请求类型：image, prepare, tree"
+        ],
+        "evidence": "geo-browser/viz-radar-window.png"
+      },
+      "api": {
+        "seconds": 3.322,
+        "status": "passed",
+        "checks": [
+          {
+            "operation": "preview",
+            "phase": "catalog",
+            "kind": "tree",
+            "version": "724b9c0c3be3061276eee8d6b4f04d00f9c0d1a742bedb2bd76c9934478f555c",
+            "revision": "5ee2524f7765085c420bc15b11422e11f8e9a10ac0b3a159399e0beaadae5d22"
+          },
+          {
+            "operation": "preview",
+            "kind": "array",
+            "version": "724b9c0c3be3061276eee8d6b4f04d00f9c0d1a742bedb2bd76c9934478f555c",
+            "revision": "5ee2524f7765085c420bc15b11422e11f8e9a10ac0b3a159399e0beaadae5d22"
+          }
+        ]
+      }
+    },
+    {
+      "plugin_id": "viz-aladin",
+      "dataset_id": "nasa-hst-wfpc2",
+      "entry_file": "WFPC2ASSNu5780205bx.fits",
+      "expected_file_sha256": "9851bc2bf9a42008ea606ec532d04900b60865daaff2f233e5c8565dac56ad5f",
+      "expected_file_bytes": 63360,
+      "sample_kind": "official_fixture",
+      "browser": {
+        "status": "passed",
+        "actions": [
+          "打开指定文件及插件，实际读取并呈现；验证请求类型：bytes"
+        ],
+        "evidence": "geo-browser/viz-aladin.png"
+      },
+      "api": {
+        "seconds": 0.135,
+        "status": "passed",
+        "checks": [
+          {
+            "operation": "bytes",
+            "bytes": 63360,
+            "sha256": "9851bc2bf9a42008ea606ec532d04900b60865daaff2f233e5c8565dac56ad5f"
+          }
+        ]
+      }
+    },
+    {
+      "plugin_id": "fits-image",
+      "dataset_id": "nasa-hst-wfpc2",
+      "entry_file": "WFPC2ASSNu5780205bx.fits",
+      "expected_file_sha256": "9851bc2bf9a42008ea606ec532d04900b60865daaff2f233e5c8565dac56ad5f",
+      "expected_file_bytes": 63360,
+      "sample_kind": "official_fixture",
+      "browser": {
+        "status": "passed",
+        "actions": [
+          "打开指定文件及插件，实际读取并呈现；验证请求类型：preview"
+        ],
+        "evidence": "geo-browser/fits-image.png"
+      },
+      "api": {
+        "seconds": 0.34,
+        "status": "passed",
+        "checks": [
+          {
+            "operation": "preview",
+            "kind": "raster",
+            "version": "70974742492a93ddd166d78059733740da382f87d776edf84cfdc5160f0c7541",
+            "revision": "5ee2524f7765085c420bc15b11422e11f8e9a10ac0b3a159399e0beaadae5d22"
+          }
+        ]
+      }
+    },
+    {
+      "plugin_id": "fits-series",
+      "dataset_id": "nasa-hst-fos",
+      "entry_file": "FOSy19g0309t_c2f.fits",
+      "expected_file_sha256": "059710c4f988f6319e0146f932a68a0ec6ba09d82293b978a294da0c58281086",
+      "expected_file_bytes": 43200,
+      "sample_kind": "official_fixture",
+      "browser": {
+        "status": "passed",
+        "actions": [
+          "打开指定文件及插件，实际读取并呈现；验证请求类型：preview"
+        ],
+        "evidence": "geo-browser/fits-series.png"
+      },
+      "api": {
+        "seconds": 0.291,
+        "status": "passed",
+        "checks": [
+          {
+            "operation": "preview",
+            "kind": "series",
+            "version": "1935a94e33d1ccc11f893118b86e1836107fe4b71b9107a6bf0d95c1bb0c3e5d",
+            "revision": "5ee2524f7765085c420bc15b11422e11f8e9a10ac0b3a159399e0beaadae5d22"
+          }
+        ]
+      }
+    },
+    {
+      "plugin_id": "viz-astronomy-workbench",
+      "dataset_id": "nasa-hst-wfpc2",
+      "entry_file": "WFPC2ASSNu5780205bx.fits",
+      "expected_file_sha256": "9851bc2bf9a42008ea606ec532d04900b60865daaff2f233e5c8565dac56ad5f",
+      "expected_file_bytes": 63360,
+      "sample_kind": "official_fixture",
+      "browser": {
+        "status": "passed",
+        "actions": [
+          "打开指定文件及插件，实际读取并呈现；验证请求类型：image, tree"
+        ],
+        "evidence": "geo-browser/viz-astronomy-workbench.png"
+      },
+      "api": {
+        "seconds": 1.422,
+        "status": "passed",
+        "checks": [
+          {
+            "operation": "preview",
+            "phase": "catalog",
+            "kind": "tree",
+            "version": "70974742492a93ddd166d78059733740da382f87d776edf84cfdc5160f0c7541",
+            "revision": "5ee2524f7765085c420bc15b11422e11f8e9a10ac0b3a159399e0beaadae5d22"
+          },
+          {
+            "operation": "preview",
+            "kind": "raster",
+            "version": "70974742492a93ddd166d78059733740da382f87d776edf84cfdc5160f0c7541",
+            "revision": "5ee2524f7765085c420bc15b11422e11f8e9a10ac0b3a159399e0beaadae5d22"
+          }
+        ]
+      }
+    },
+    {
+      "plugin_id": "viz-cesium",
+      "dataset_id": "viz-usgs-2024-m6-earthquakes",
+      "entry_file": "usgs-2024-m6-wgs84-2d.geojson",
+      "expected_file_sha256": "d70327cc520822069489662cdb1c099628cf04740adcd654cb48b06eddf101b7",
+      "expected_file_bytes": 129037,
+      "sample_kind": "scientific_derived",
+      "browser": {
+        "status": "passed",
+        "actions": [
+          "打开指定文件及插件，实际读取并呈现；验证请求类型：bytes"
+        ],
+        "evidence": "geo-browser/viz-cesium.png"
+      },
+      "api": {
+        "seconds": 0.452,
+        "status": "passed",
+        "checks": [
+          {
+            "operation": "bytes",
+            "bytes": 129037,
+            "sha256": "d70327cc520822069489662cdb1c099628cf04740adcd654cb48b06eddf101b7"
+          }
+        ]
+      }
+    },
+    {
+      "plugin_id": "viz-maplibre",
+      "dataset_id": "viz-usgs-2024-m6-earthquakes",
+      "entry_file": "usgs-2024-m6-wgs84-2d.geojson",
+      "expected_file_sha256": "d70327cc520822069489662cdb1c099628cf04740adcd654cb48b06eddf101b7",
+      "expected_file_bytes": 129037,
+      "sample_kind": "scientific_derived",
+      "browser": {
+        "status": "passed",
+        "actions": [
+          "打开指定文件及插件，实际读取并呈现；验证请求类型：bytes"
+        ],
+        "evidence": "geo-browser/viz-maplibre.png"
+      },
+      "api": {
+        "seconds": 0.448,
+        "status": "passed",
+        "checks": [
+          {
+            "operation": "bytes",
+            "bytes": 129037,
+            "sha256": "d70327cc520822069489662cdb1c099628cf04740adcd654cb48b06eddf101b7"
+          }
+        ]
+      }
+    },
+    {
+      "plugin_id": "viz-openlayers",
+      "dataset_id": "viz-usgs-2024-m6-earthquakes",
+      "entry_file": "usgs-2024-m6-wgs84-2d.geojson",
+      "expected_file_sha256": "d70327cc520822069489662cdb1c099628cf04740adcd654cb48b06eddf101b7",
+      "expected_file_bytes": 129037,
+      "sample_kind": "scientific_derived",
+      "browser": {
+        "status": "passed",
+        "actions": [
+          "打开指定文件及插件，实际读取并呈现；验证请求类型：bytes"
+        ],
+        "evidence": "geo-browser/viz-openlayers.png"
+      },
+      "api": {
+        "seconds": 3.077,
+        "status": "passed",
+        "checks": [
+          {
+            "operation": "prepare",
+            "kind": "resources",
+            "version": "e7c70c655bb78f1077ef3b59bd5c18a82623b678956213b151f5e35cecec37da",
+            "revision": "5ee2524f7765085c420bc15b11422e11f8e9a10ac0b3a159399e0beaadae5d22"
+          },
+          {
+            "operation": "bytes",
+            "bytes": 129037,
+            "sha256": "d70327cc520822069489662cdb1c099628cf04740adcd654cb48b06eddf101b7"
+          }
+        ]
+      }
+    },
+    {
+      "plugin_id": "shapefile",
+      "dataset_id": "open-natural-earth-countries",
+      "entry_file": "ne_110m_admin_0_countries.shp",
+      "expected_file_sha256": "08e341606e8391e458c3f08deb312de664b56bfae376064c5aa0aee6681a5f55",
+      "expected_file_bytes": 180924,
+      "sample_kind": "scientific_original",
+      "browser": {
+        "status": "passed",
+        "actions": [
+          "打开指定文件及插件，实际读取并呈现；验证请求类型：bytes"
+        ],
+        "evidence": "geo-browser/shapefile.png"
+      },
+      "api": {
+        "seconds": 0.093,
+        "status": "passed",
+        "checks": [
+          {
+            "operation": "bytes",
+            "bytes": 180924,
+            "sha256": "08e341606e8391e458c3f08deb312de664b56bfae376064c5aa0aee6681a5f55"
+          }
+        ]
+      }
+    },
+    {
+      "plugin_id": "netcdf-map",
+      "dataset_id": "open-noaa-air-climatology",
+      "entry_file": "air.sig995.mon.ltm.1991-2020.nc",
+      "expected_file_sha256": "31e6f601fd8e1ecc0bd63e9907ae9e0f931fe675c397ab608abe191b15576619",
+      "expected_file_bytes": 657356,
+      "sample_kind": "scientific_original",
+      "browser": {
+        "status": "passed",
+        "actions": [
+          "打开指定文件及插件，实际读取并呈现；验证请求类型：prepare, preview"
+        ],
+        "evidence": "geo-browser/netcdf-map.png"
+      },
+      "api": {
+        "seconds": 0.254,
+        "status": "passed",
+        "checks": [
+          {
+            "operation": "preview",
+            "kind": "raster",
+            "version": "78dda429b87e64a8039af68f71d1484614af0c2d715dc4e9cf30d2e2d28968e9",
+            "revision": "5ee2524f7765085c420bc15b11422e11f8e9a10ac0b3a159399e0beaadae5d22"
+          }
+        ]
+      }
+    },
+    {
+      "plugin_id": "netcdf-series",
+      "dataset_id": "open-noaa-air-climatology",
+      "entry_file": "air.sig995.mon.ltm.1991-2020.nc",
+      "expected_file_sha256": "31e6f601fd8e1ecc0bd63e9907ae9e0f931fe675c397ab608abe191b15576619",
+      "expected_file_bytes": 657356,
+      "sample_kind": "scientific_original",
+      "browser": {
+        "status": "passed",
+        "actions": [
+          "打开指定文件及插件，实际读取并呈现；验证请求类型：prepare, preview"
+        ],
+        "evidence": "geo-browser/netcdf-series.png"
+      },
+      "api": {
+        "seconds": 0.312,
+        "status": "passed",
+        "checks": [
+          {
+            "operation": "preview",
+            "kind": "series",
+            "version": "78dda429b87e64a8039af68f71d1484614af0c2d715dc4e9cf30d2e2d28968e9",
+            "revision": "5ee2524f7765085c420bc15b11422e11f8e9a10ac0b3a159399e0beaadae5d22"
+          }
+        ]
+      }
+    },
+    {
+      "plugin_id": "viz-h5web",
+      "dataset_id": "open-noaa-air-climatology",
+      "entry_file": "air.sig995.mon.ltm.1991-2020.nc",
+      "expected_file_sha256": "31e6f601fd8e1ecc0bd63e9907ae9e0f931fe675c397ab608abe191b15576619",
+      "expected_file_bytes": 657356,
+      "sample_kind": "scientific_original",
+      "browser": {
+        "status": "passed",
+        "actions": [
+          "打开指定文件及插件，实际读取并呈现；验证请求类型：heatmap, prepare, series, tree"
+        ],
+        "evidence": "geo-browser/viz-h5web.png"
+      },
+      "api": {
+        "seconds": 0.413,
+        "status": "passed",
+        "checks": [
+          {
+            "operation": "prepare",
+            "kind": "resources",
+            "version": "78dda429b87e64a8039af68f71d1484614af0c2d715dc4e9cf30d2e2d28968e9",
+            "revision": "5ee2524f7765085c420bc15b11422e11f8e9a10ac0b3a159399e0beaadae5d22"
+          },
+          {
+            "operation": "preview",
+            "kind": "array",
+            "version": "78dda429b87e64a8039af68f71d1484614af0c2d715dc4e9cf30d2e2d28968e9",
+            "revision": "5ee2524f7765085c420bc15b11422e11f8e9a10ac0b3a159399e0beaadae5d22"
+          }
+        ]
+      }
+    }
+  ]
+}

@@ -1,0 +1,83 @@
+{
+  "dataset_id": "viz-plugin-instrument-project",
+  "external_id": "viz-plugin-instrument-project",
+  "data_center_id": "reviewed-visualization-plugin-tests",
+  "data_center_name": "逐插件可视化测试样例",
+  "name": "插件测试·ESRF EDF 合成三帧标定网格",
+  "description": "按公开 ESRF EDF 格式构造的三帧 uint16 测试图，用于帧选择、ROI 窗口与原值读取检查；不是实际探测器采集。",
+  "domain": "image_science",
+  "data_type": "edf",
+  "temporal_coverage": "",
+  "spatial_coverage": "",
+  "tags": [
+    "插件测试样例",
+    "viz-instrument-images",
+    "project_fixture",
+    "image",
+    "image_science"
+  ],
+  "metadata": {
+    "curated": true,
+    "source_catalog": "plugin-tests",
+    "catalog_version": 1,
+    "source_descriptor_sha256": "e976f6cdec3a22c861b1100bfbc579ade10052751df45462e5795ce65afc4e52",
+    "download_date": "2026-09-18",
+    "inventory_complete": true,
+    "recursive_file_count": 2,
+    "total_size_bytes": 21754,
+    "visualization_view_kind": "image",
+    "visualization_plugin_id": "viz-instrument-images",
+    "visualization_entry_file": "calibration-grid.edf",
+    "sample_note": "64×48、3 帧、little-endian uint16；值为 frame×1000+y×64+x，每帧 512-byte header，文件 19,968 bytes。ROI [8,8,32,24] 的第 2 帧显示范围 [1520,3023]。",
+    "provenance": [
+      {
+        "path": "calibration-grid.edf",
+        "size": 19968,
+        "sha256": "ad1d53496bbe3dd1cc66158a178ea4cc211dd3f90068d69be175c52863b199fa",
+        "role": "data",
+        "origin": {
+          "kind": "generated_fixture",
+          "generator": "backend/scripts/plugin_samples_chem.py",
+          "generator_sha256": "e554476b6fdc1ec995917052035955e5026530359e853773359faa59b4dc23f2",
+          "description": "明确合成格式测试值，生成参数见本项 sample_scope；不是科研实验观测。"
+        }
+      }
+    ],
+    "publisher": "AI-DataSeek project",
+    "source_url": "https://github.com/km345297256/AI-DATASEEK",
+    "license": "MIT",
+    "license_url": "https://opensource.org/license/mit/",
+    "license_details": "本项目原创合成格式测试样本，沿用仓库 MIT 许可。没有外部下载原始实验，也不代表真实科学测量。",
+    "authors": [
+      "AI-DataSeek contributors"
+    ],
+    "source_version": "Generator SHA256 e554476b6fdc1ec995917052035955e5026530359e853773359faa59b4dc23f2",
+    "sample_scope": "64×48、3 帧、little-endian uint16；值为 frame×1000+y×64+x，每帧 512-byte header，文件 19,968 bytes。ROI [8,8,32,24] 的第 2 帧显示范围 [1520,3023]。",
+    "transformation": {
+      "generator": "backend/scripts/plugin_samples_chem.py",
+      "generator_sha256": "e554476b6fdc1ec995917052035955e5026530359e853773359faa59b4dc23f2",
+      "changes": "从明确固定参数生成，无外部实验数据。"
+    },
+    "sample_kind": "project_fixture",
+    "test_steps": [
+      "打开 calibration-grid.edf，选择 viz-instrument-images。",
+      "确认显示标注的合成值和格式功能，不将其解释为实验结论。"
+    ]
+  },
+  "files": [
+    {
+      "path": "SOURCE.md",
+      "size": 1786,
+      "sha256": "575bf1fede4c916e13c394bf71bb9856db11498ba009dca25d1404ce552b1bb1",
+      "role": "documentation",
+      "content_type": "text/markdown"
+    },
+    {
+      "path": "calibration-grid.edf",
+      "size": 19968,
+      "sha256": "ad1d53496bbe3dd1cc66158a178ea4cc211dd3f90068d69be175c52863b199fa",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    }
+  ]
+}

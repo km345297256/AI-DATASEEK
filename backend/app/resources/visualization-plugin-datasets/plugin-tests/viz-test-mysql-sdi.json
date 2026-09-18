@@ -1,0 +1,94 @@
+{
+  "dataset_id": "viz-test-mysql-sdi",
+  "external_id": "viz-test-mysql-sdi",
+  "data_center_id": "reviewed-visualization-plugin-tests",
+  "data_center_name": "逐插件可视化测试样例",
+  "name": "插件测试 · MySQL 表空间结构目录 · MySQL 8.0.46 元数据",
+  "description": "本项目已有的原创合成兼容性测试夹具，非真实科研观测。检查 measurements 表字段、主键和二级索引元数据；不是数据库行数据恢复。",
+  "domain": "tabular",
+  "data_type": "ibd",
+  "temporal_coverage": "",
+  "spatial_coverage": "",
+  "tags": [
+    "插件测试样例",
+    "viz-mysql-sdi",
+    "project_fixture",
+    "table",
+    "tabular"
+  ],
+  "metadata": {
+    "curated": true,
+    "source_catalog": "plugin-tests",
+    "catalog_version": 1,
+    "source_descriptor_sha256": "ffbcfa004cce8ea2191a7743e9a6745194e9c733034781aa6457e2075889d3a9",
+    "download_date": "2026-09-18",
+    "inventory_complete": true,
+    "recursive_file_count": 3,
+    "total_size_bytes": 133816,
+    "visualization_view_kind": "table",
+    "visualization_plugin_id": "viz-mysql-sdi",
+    "visualization_entry_file": "mysql-8.0.46.ibd",
+    "sample_note": "本项目已有的原创合成兼容性测试夹具，非真实科研观测。检查 measurements 表字段、主键和二级索引元数据；不是数据库行数据恢复。",
+    "provenance": [
+      {
+        "path": "mysql-8.0.46.ibd",
+        "size": 131072,
+        "sha256": "ef03c988c5e6ddf489c80be3d903b783ad15cb6777bb877ff18f360b5e13f954",
+        "origin": {
+          "kind": "project_fixture",
+          "repository_file": "sandbox/tests/fixtures/physical-database/mysql-8.0.46.ibd",
+          "sha256": "ef03c988c5e6ddf489c80be3d903b783ad15cb6777bb877ff18f360b5e13f954"
+        }
+      },
+      {
+        "path": "LICENSE.txt",
+        "size": 1066,
+        "sha256": "991f0bde5249ee6aad0a5a597197c7a7f6024abd2650516fcd7a83d908234115",
+        "role": "documentation",
+        "origin": {
+          "kind": "project_fixture",
+          "repository_file": "LICENSE",
+          "sha256": "991f0bde5249ee6aad0a5a597197c7a7f6024abd2650516fcd7a83d908234115"
+        }
+      }
+    ],
+    "publisher": "AI-DataSeek 测试夹具",
+    "source_url": "https://github.com/km345297256/AI-DATASEEK",
+    "license": "MIT",
+    "license_url": "https://github.com/km345297256/AI-DATASEEK/blob/v2/LICENSE",
+    "license_details": "MIT；用于可视化测试，样本性质为 project_fixture。",
+    "authors": [
+      "AI-DataSeek 测试夹具"
+    ],
+    "source_version": "AI-DataSeek fixture snapshot fb609ed5460e9c247dc58fb2c3cb51410de27c6f",
+    "sample_scope": "本项目已有的原创合成兼容性测试夹具，非真实科研观测。检查 measurements 表字段、主键和二级索引元数据；不是数据库行数据恢复。",
+    "sample_kind": "project_fixture",
+    "test_steps": [
+      "预览主文件并选择 viz-mysql-sdi",
+      "检查 measurements 表字段、主键和二级索引元数据；不是数据库行数据恢复。"
+    ]
+  },
+  "files": [
+    {
+      "path": "LICENSE.txt",
+      "size": 1066,
+      "sha256": "991f0bde5249ee6aad0a5a597197c7a7f6024abd2650516fcd7a83d908234115",
+      "role": "documentation",
+      "content_type": "text/plain"
+    },
+    {
+      "path": "SOURCE.md",
+      "size": 1678,
+      "sha256": "818f8d727edf20595e15a3601ab36739b96e333c50daffea77264a4b8e55f2bd",
+      "role": "documentation",
+      "content_type": "text/markdown"
+    },
+    {
+      "path": "mysql-8.0.46.ibd",
+      "size": 131072,
+      "sha256": "ef03c988c5e6ddf489c80be3d903b783ad15cb6777bb877ff18f360b5e13f954",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    }
+  ]
+}

@@ -1,0 +1,94 @@
+{
+  "dataset_id": "viz-test-postgres-dump",
+  "external_id": "viz-test-postgres-dump",
+  "data_center_id": "reviewed-visualization-plugin-tests",
+  "data_center_name": "逐插件可视化测试样例",
+  "name": "插件测试 · PostgreSQL 备份目录 · PostgreSQL 18.6 原生目录",
+  "description": "本项目已有的原创合成兼容性测试夹具，非真实科研观测。浏览两张表及TABLE DATA目录；不恢复或解压数据段，不能当作行查询。",
+  "domain": "tabular",
+  "data_type": "dump",
+  "temporal_coverage": "",
+  "spatial_coverage": "",
+  "tags": [
+    "插件测试样例",
+    "viz-postgres-dump",
+    "project_fixture",
+    "table",
+    "tabular"
+  ],
+  "metadata": {
+    "curated": true,
+    "source_catalog": "plugin-tests",
+    "catalog_version": 1,
+    "source_descriptor_sha256": "d37d0fdeb03e4fc3efe57816520a05ec45bc8e5cf89d694656d06e0b2e5334c9",
+    "download_date": "2026-09-18",
+    "inventory_complete": true,
+    "recursive_file_count": 3,
+    "total_size_bytes": 4772,
+    "visualization_view_kind": "table",
+    "visualization_plugin_id": "viz-postgres-dump",
+    "visualization_entry_file": "synthetic-postgres-none.dump",
+    "sample_note": "本项目已有的原创合成兼容性测试夹具，非真实科研观测。浏览两张表及TABLE DATA目录；不恢复或解压数据段，不能当作行查询。",
+    "provenance": [
+      {
+        "path": "synthetic-postgres-none.dump",
+        "size": 2017,
+        "sha256": "b2e2db08384a26283e98d0e51aca30f8a945d43f9c43426b39bf52a4a1b8261f",
+        "origin": {
+          "kind": "project_fixture",
+          "repository_file": "sandbox/tests/fixtures/database-dumps/synthetic-postgres-none.dump",
+          "sha256": "b2e2db08384a26283e98d0e51aca30f8a945d43f9c43426b39bf52a4a1b8261f"
+        }
+      },
+      {
+        "path": "LICENSE.txt",
+        "size": 1066,
+        "sha256": "991f0bde5249ee6aad0a5a597197c7a7f6024abd2650516fcd7a83d908234115",
+        "role": "documentation",
+        "origin": {
+          "kind": "project_fixture",
+          "repository_file": "LICENSE",
+          "sha256": "991f0bde5249ee6aad0a5a597197c7a7f6024abd2650516fcd7a83d908234115"
+        }
+      }
+    ],
+    "publisher": "AI-DataSeek 测试夹具",
+    "source_url": "https://github.com/km345297256/AI-DATASEEK",
+    "license": "MIT",
+    "license_url": "https://github.com/km345297256/AI-DATASEEK/blob/v2/LICENSE",
+    "license_details": "MIT；用于可视化测试，样本性质为 project_fixture。",
+    "authors": [
+      "AI-DataSeek 测试夹具"
+    ],
+    "source_version": "AI-DataSeek fixture snapshot fb609ed5460e9c247dc58fb2c3cb51410de27c6f",
+    "sample_scope": "本项目已有的原创合成兼容性测试夹具，非真实科研观测。浏览两张表及TABLE DATA目录；不恢复或解压数据段，不能当作行查询。",
+    "sample_kind": "project_fixture",
+    "test_steps": [
+      "预览主文件并选择 viz-postgres-dump",
+      "浏览两张表及TABLE DATA目录；不恢复或解压数据段，不能当作行查询。"
+    ]
+  },
+  "files": [
+    {
+      "path": "LICENSE.txt",
+      "size": 1066,
+      "sha256": "991f0bde5249ee6aad0a5a597197c7a7f6024abd2650516fcd7a83d908234115",
+      "role": "documentation",
+      "content_type": "text/plain"
+    },
+    {
+      "path": "SOURCE.md",
+      "size": 1689,
+      "sha256": "b4db517327bfc8af13777142257f0282135f20ccb93dde3f37edeab21fa667e6",
+      "role": "documentation",
+      "content_type": "text/markdown"
+    },
+    {
+      "path": "synthetic-postgres-none.dump",
+      "size": 2017,
+      "sha256": "b2e2db08384a26283e98d0e51aca30f8a945d43f9c43426b39bf52a4a1b8261f",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    }
+  ]
+}

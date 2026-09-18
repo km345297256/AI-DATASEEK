@@ -1,0 +1,107 @@
+{
+  "dataset_id": "viz-plugin-nexus-rosettasciio",
+  "external_id": "viz-plugin-nexus-rosettasciio",
+  "data_center_id": "reviewed-visualization-plugin-tests",
+  "data_center_name": "逐插件可视化测试样例",
+  "name": "插件测试·RosettaSciIO NeXus 二维信号切片",
+  "description": "从 RosettaSciIO 官方 NeXus 测试文件的明确测试信号抽取第三轴索引 0 的二维切片，复制原 x/y 坐标，以固定字符串元信息发布为受限 NXdata。",
+  "domain": "general",
+  "data_type": "nxs",
+  "temporal_coverage": "",
+  "spatial_coverage": "",
+  "tags": [
+    "插件测试样例",
+    "viz-nexus-window",
+    "official_fixture",
+    "image",
+    "general"
+  ],
+  "metadata": {
+    "curated": true,
+    "source_catalog": "plugin-tests",
+    "catalog_version": 1,
+    "source_descriptor_sha256": "64e67b694b96372df02eae3d1088040334c74f543965d8cdc2eba91dcbda198a",
+    "download_date": "2026-09-18",
+    "inventory_complete": true,
+    "recursive_file_count": 4,
+    "total_size_bytes": 219729,
+    "visualization_view_kind": "image",
+    "visualization_plugin_id": "viz-nexus-window",
+    "visualization_entry_file": "nexus_fixed.nxs",
+    "sample_note": "来源 /entry1/testdata/nexustest/data 为 10×10×15 测试数组，派生仅取 [...,0] 得 10×10；x/y 坐标原样复制，未声明单位保持未声明。原 nxs 完整保留。",
+    "provenance": [
+      {
+        "path": "nexus_dls_example.nxs",
+        "size": 176944,
+        "sha256": "68fa53f6dd71688bb80b5e6e0fbcaa0dad241bd8003f04055457dd00c14e32f7",
+        "role": "data",
+        "url": "https://raw.githubusercontent.com/hyperspy/rosettasciio/bc254db14cd7d4d23169b11aeb622a0a7eac1fbe/rsciio/tests/data/nexus/nexus_dls_example.nxs"
+      },
+      {
+        "path": "nexus_fixed.nxs",
+        "size": 5240,
+        "sha256": "4fd7483002faa100e82bc97cb85fd7d93a96a65941d6587afa02efa56a46f997",
+        "role": "data",
+        "derived_from": [
+          "nexus_dls_example.nxs"
+        ]
+      },
+      {
+        "path": "COPYING.txt",
+        "size": 35151,
+        "sha256": "e79e9c8a0c85d735ff98185918ec94ed7d175efc377012787aebcf3b80f0d90b",
+        "role": "documentation",
+        "url": "https://raw.githubusercontent.com/hyperspy/rosettasciio/bc254db14cd7d4d23169b11aeb622a0a7eac1fbe/COPYING.txt"
+      }
+    ],
+    "publisher": "hyperspy/rosettasciio",
+    "source_url": "https://github.com/hyperspy/rosettasciio/blob/bc254db14cd7d4d23169b11aeb622a0a7eac1fbe/rsciio/tests/data/nexus/nexus_dls_example.nxs",
+    "license": "GPL-3.0 (repository COPYING)",
+    "license_url": "https://raw.githubusercontent.com/hyperspy/rosettasciio/bc254db14cd7d4d23169b11aeb622a0a7eac1fbe/COPYING.txt",
+    "license_details": "官方仓库测试/文档文件，按随附仓库许可保留版权与许可全文。此处标注为官方格式测试样本，不宣称是独立同行评审实验数据。",
+    "authors": [
+      "RosettaSciIO contributors"
+    ],
+    "source_version": "Git commit bc254db14cd7d4d23169b11aeb622a0a7eac1fbe",
+    "sample_scope": "来源 /entry1/testdata/nexustest/data 为 10×10×15 测试数组，派生仅取 [...,0] 得 10×10；x/y 坐标原样复制，未声明单位保持未声明。原 nxs 完整保留。",
+    "transformation": {
+      "generator": "backend/scripts/plugin_samples_chem.py",
+      "changes": "精确选取 testdata 的第三维索引 0；无重采样、归一化或错误值填充；仅把此信号与轴复制到固定字符串属性 NXentry/NXdata，不复制仪器目录及其他数据。HDF5 二进制元数据可能含创建时间，复现以逐值相等验证。"
+    },
+    "sample_kind": "official_fixture",
+    "test_steps": [
+      "打开 nexus_fixed.nxs，在视图选择器选择 viz-nexus-window。",
+      "确认无格式错误且数值/结构按样本范围显示；不执行拟合或外部请求。"
+    ]
+  },
+  "files": [
+    {
+      "path": "COPYING.txt",
+      "size": 35151,
+      "sha256": "e79e9c8a0c85d735ff98185918ec94ed7d175efc377012787aebcf3b80f0d90b",
+      "role": "documentation",
+      "content_type": "text/plain"
+    },
+    {
+      "path": "SOURCE.md",
+      "size": 2394,
+      "sha256": "b5df43f8b2be54218a8ab27678201c4a41bcac94352fe721b4d66a7d94909c47",
+      "role": "documentation",
+      "content_type": "text/markdown"
+    },
+    {
+      "path": "nexus_dls_example.nxs",
+      "size": 176944,
+      "sha256": "68fa53f6dd71688bb80b5e6e0fbcaa0dad241bd8003f04055457dd00c14e32f7",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "nexus_fixed.nxs",
+      "size": 5240,
+      "sha256": "4fd7483002faa100e82bc97cb85fd7d93a96a65941d6587afa02efa56a46f997",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    }
+  ]
+}

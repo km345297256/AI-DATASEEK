@@ -1,0 +1,83 @@
+{
+  "dataset_id": "viz-plugin-nmr-project",
+  "external_id": "viz-plugin-nmr-project",
+  "data_center_id": "reviewed-visualization-plugin-tests",
+  "data_center_name": "逐插件可视化测试样例",
+  "name": "插件测试·NMRium 合成 1H 明文谱",
+  "description": "明确合成的一维 1H JCAMP-DX AFFN 光谱，只用于坐标、峰形和核磁查看器测试；不是任何化合物实测谱。",
+  "domain": "spectroscopy",
+  "data_type": "jdx",
+  "temporal_coverage": "",
+  "spatial_coverage": "",
+  "tags": [
+    "插件测试样例",
+    "viz-nmrium",
+    "project_fixture",
+    "series",
+    "spectroscopy"
+  ],
+  "metadata": {
+    "curated": true,
+    "source_catalog": "plugin-tests",
+    "catalog_version": 1,
+    "source_descriptor_sha256": "c4dd3c6aa64d309fc9d18bde5166b5af5ae097d5bca62951006b498d7592aba3",
+    "download_date": "2026-09-18",
+    "inventory_complete": true,
+    "recursive_file_count": 2,
+    "total_size_bytes": 10235,
+    "visualization_view_kind": "series",
+    "visualization_plugin_id": "viz-nmrium",
+    "visualization_entry_file": "synthetic-1h.jdx",
+    "sample_note": "1024 点；x_i=10-i/100 ppm；y_i=max(0,120-8|i-230|)+max(0,80-4|i-700|)，i=0..1023；声明 1H、400 MHz；不做 FID 处理。",
+    "provenance": [
+      {
+        "path": "synthetic-1h.jdx",
+        "size": 8542,
+        "sha256": "db7229c49b972aca49174e7f71ecd76afc9898e0c75333ebe3f7f0028265ca82",
+        "role": "data",
+        "origin": {
+          "kind": "generated_fixture",
+          "generator": "backend/scripts/plugin_samples_chem.py",
+          "generator_sha256": "e554476b6fdc1ec995917052035955e5026530359e853773359faa59b4dc23f2",
+          "description": "明确合成格式测试值，生成参数见本项 sample_scope；不是科研实验观测。"
+        }
+      }
+    ],
+    "publisher": "AI-DataSeek project",
+    "source_url": "https://github.com/km345297256/AI-DATASEEK",
+    "license": "MIT",
+    "license_url": "https://opensource.org/license/mit/",
+    "license_details": "本项目原创合成格式测试样本，沿用仓库 MIT 许可。没有外部下载原始实验，也不代表真实科学测量。",
+    "authors": [
+      "AI-DataSeek contributors"
+    ],
+    "source_version": "Generator SHA256 e554476b6fdc1ec995917052035955e5026530359e853773359faa59b4dc23f2",
+    "sample_scope": "1024 点；x_i=10-i/100 ppm；y_i=max(0,120-8|i-230|)+max(0,80-4|i-700|)，i=0..1023；声明 1H、400 MHz；不做 FID 处理。",
+    "transformation": {
+      "generator": "backend/scripts/plugin_samples_chem.py",
+      "generator_sha256": "e554476b6fdc1ec995917052035955e5026530359e853773359faa59b4dc23f2",
+      "changes": "从明确固定参数生成，无外部实验数据。"
+    },
+    "sample_kind": "project_fixture",
+    "test_steps": [
+      "打开 synthetic-1h.jdx，选择 viz-nmrium。",
+      "确认显示标注的合成值和格式功能，不将其解释为实验结论。"
+    ]
+  },
+  "files": [
+    {
+      "path": "SOURCE.md",
+      "size": 1693,
+      "sha256": "de44406e7a9d378cf2625d6874fca90c7573f13c7fbdeef9f85ac6b3e2ca9607",
+      "role": "documentation",
+      "content_type": "text/markdown"
+    },
+    {
+      "path": "synthetic-1h.jdx",
+      "size": 8542,
+      "sha256": "db7229c49b972aca49174e7f71ecd76afc9898e0c75333ebe3f7f0028265ca82",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    }
+  ]
+}

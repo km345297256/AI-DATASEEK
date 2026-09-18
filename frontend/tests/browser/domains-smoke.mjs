@@ -11,6 +11,7 @@ import { existsSync } from 'node:fs';
 import { dirname, resolve, join, extname } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { domainCases } from './domain-fixtures.mjs';
+import assert from 'node:assert/strict';
 
 const frontend = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const require = createRequire(resolve(frontend, 'package.json'));
@@ -19,7 +20,18 @@ let playwrightEntry = process.env.VISUALIZATION_PLAYWRIGHT_MODULE;
 if (!playwrightEntry) { try { playwrightEntry = require.resolve('playwright'); } catch { playwrightEntry = bundledPlaywright; } }
 const { chromium } = await import(pathToFileURL(resolve(playwrightEntry)).href);
 const output = await mkdtemp(join(tmpdir(), 'dataseek-visualization-browser-'));
-let cases = domainCases;
+// These fault cases still use the real Cesium SDK and local fixture bytes.
+// Only bundled imagery requests fail; data loading and scene creation remain real.
+let cases = domainCases.flatMap(item => item.component === 'domains/CesiumPreview.vue'
+  ? [item, { ...item, name: `${item.name}-basemap-fallback`, cesiumBasemapFailure: true }]
+  : [item]);
+// Cross-continent synthetic points force a globe overview so the bundled
+// land/ocean imagery can be visually inspected at its intended coarse scale.
+cases.push({ ...domainCases.find(item => item.name === 'cesium-geojson'), name: 'cesium-global-geojson',
+  filename: 'synthetic-global-points.geojson', bytes: new TextEncoder().encode(JSON.stringify({
+    type: 'FeatureCollection', features: [[-122,37],[-74,41],[-58,-34],[2,49],[25,-25],[120,35],[135,-25]].map(
+      (coordinates,index) => ({type:'Feature',properties:{name:`Synthetic point ${index+1}`},geometry:{type:'Point',coordinates}})),
+  })) });
 try { const { mainMatrixCases } = await import('./main-matrix-fixtures.mjs'); cases = [...cases, ...mainMatrixCases]; } catch (error) { if (error.code !== 'ERR_MODULE_NOT_FOUND') throw error; }
 try { const { mainAstronomyCases } = await import('./main-astronomy-fixtures.mjs'); cases = [...cases, ...mainAstronomyCases]; } catch (error) { if (error.code !== 'ERR_MODULE_NOT_FOUND') throw error; }
 try { const { mainBioCases } = await import('./main-bio-fixtures.mjs'); cases = [...cases, ...mainBioCases]; } catch (error) { if (error.code !== 'ERR_MODULE_NOT_FOUND') throw error; }
@@ -95,6 +107,80 @@ await build({ stdin: { contents: entry, sourcefile: 'entry.js', resolveDir: fron
   } }] });
 
 const mime = { '.html': 'text/html', '.js': 'application/javascript', '.mjs': 'application/javascript', '.css': 'text/css', '.json': 'application/json', '.wasm': 'application/wasm', '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.gif': 'image/gif', '.woff2': 'font/woff2', '.ttf': 'font/ttf' };
+const cesiumNaturalAsset = /^\/visualization-assets\/cesium\/Assets\/Textures\/NaturalEarthII\//;
+const cesiumQaHooks = `;(() => {
+ const qa=window.__cesiumQA={viewers:[],parseCalls:{geojson:0,czml:0},zoomCalls:0};
+ const zoom=Cesium.Viewer.prototype.zoomTo;
+ Cesium.Viewer.prototype.zoomTo=function(...args){if(!qa.viewers.includes(this))qa.viewers.push(this);qa.zoomCalls++;return zoom.apply(this,args);};
+ for(const [name,key] of [['GeoJsonDataSource','geojson'],['CzmlDataSource','czml']]){
+  const load=Cesium[name].load;Cesium[name].load=function(...args){qa.parseCalls[key]++;return load.apply(this,args);};
+ }
+})();`;
+
+async function verifyCesiumBasemap(page, scenario, record) {
+  const selector = page.getByTestId('cesium-basemap-select');
+  const frame = page.frames().find(item => item !== page.mainFrame());
+  assert.ok(frame, 'Cesium must own an isolated real SDK realm');
+  await page.locator('[data-basemap][data-basemap-status="ready"]').waitFor({ timeout: 30000 });
+  const expected = scenario.cesiumBasemapFailure ? 'grid' : 'natural-earth';
+  assert.equal(await selector.inputValue(), expected);
+  const csp = await frame.locator('meta[http-equiv="Content-Security-Policy"]').getAttribute('content');
+  assert.match(csp, /connect-src 'self' data: blob:/);
+  assert.match(csp, /img-src 'self' data: blob:/);
+  assert.doesNotMatch(csp, /(?:https?:|\*)/);
+  if (scenario.cesiumBasemapFailure) await page.getByTestId('cesium-basemap-warning').waitFor();
+  else {
+    // Real fetched JPEG textures must reach the globe, not just an empty canvas.
+    await frame.waitForFunction(() => window.__cesiumQA?.viewers[0]?.scene.globe._surface._tilesToRender.some(
+      tile => tile.data?.imagery?.some(item => item.readyImagery?.texture)), undefined, { timeout: 30000 });
+    assert.ok(record.cesiumAssets.some(item => /\/\d+\/\d+\/\d+\.jpg$/.test(item.path) && item.status === 200),
+      'Natural Earth must load actual local image tiles');
+  }
+  await page.screenshot({ path: join(output, `${scenario.name}-initial-basemap.png`) });
+  const before = await frame.evaluate(() => {
+    const qa = window.__cesiumQA, viewer = qa.viewers[0];
+    viewer.clock.shouldAnimate = false;
+    viewer.camera.moveRight(100000); viewer.camera.moveUp(50000); viewer.scene.requestRender();
+    qa.originalViewer = viewer; qa.originalSource = viewer.dataSources.get(0);
+    const pose = () => ({position: [viewer.camera.position.x,viewer.camera.position.y,viewer.camera.position.z],
+      direction: [viewer.camera.direction.x,viewer.camera.direction.y,viewer.camera.direction.z],
+      up: [viewer.camera.up.x,viewer.camera.up.y,viewer.camera.up.z]});
+    qa.pose = pose;
+    return {pose:pose(), parseCalls:{...qa.parseCalls}, zoomCalls:qa.zoomCalls,
+      entities:qa.originalSource.entities.values.length, time:Cesium.JulianDate.toIso8601(viewer.clock.currentTime)};
+  });
+  assert.equal(before.parseCalls.geojson + before.parseCalls.czml, 1);
+  assert.equal(before.zoomCalls, 1);
+  const apiBefore = record.apiRequests.length;
+  const states = [];
+  for (const mode of ['none', 'grid', 'natural-earth']) {
+    await selector.selectOption(mode);
+    const targetMode = scenario.cesiumBasemapFailure && mode === 'natural-earth' ? 'grid' : mode;
+    await page.locator(`[data-basemap="${targetMode}"][data-basemap-status="ready"]`).waitFor({ timeout: 30000 });
+    const state = await frame.evaluate(() => {
+      const qa=window.__cesiumQA, viewer=qa.viewers[0];
+      return {sameViewer:viewer===qa.originalViewer, sameSource:viewer.dataSources.get(0)===qa.originalSource,
+        viewerCount:qa.viewers.length, parseCalls:{...qa.parseCalls}, zoomCalls:qa.zoomCalls, pose:qa.pose(),
+        entities:viewer.dataSources.get(0).entities.values.length,
+        time:Cesium.JulianDate.toIso8601(viewer.clock.currentTime), layers:viewer.imageryLayers.length};
+    });
+    assert.equal(state.sameViewer, true); assert.equal(state.sameSource, true); assert.equal(state.viewerCount, 1);
+    assert.deepEqual(state.parseCalls, before.parseCalls); assert.equal(state.zoomCalls, before.zoomCalls);
+    for (const key of ['position','direction','up']) state.pose[key].forEach((value,index) => {
+      assert.ok(Math.abs(value-before.pose[key][index]) <= (key === 'position' ? 0.0001 : 1e-10),
+        `Basemap ${mode} must not reset the user camera ${key}`);
+    });
+    assert.equal(state.time, before.time); assert.equal(state.entities, before.entities);
+    assert.equal(state.layers, targetMode === 'none' ? 0 : 1);
+    assert.equal(record.apiRequests.length, apiBefore, 'Basemap switching must not refetch or parse user input');
+    states.push({ requested: mode, displayed: targetMode, layers: state.layers });
+  }
+  assert.ok(record.cesiumAssets.length > 0, 'The local imagery path must actually be exercised');
+  if (scenario.cesiumBasemapFailure) assert.ok(record.cesiumAssets.every(item => item.status === 404));
+  return {localNaturalEarthTextures:!scenario.cesiumBasemapFailure, imageryFailureFallback:!!scenario.cesiumBasemapFailure,
+    parseCalls:before.parseCalls, cameraPreserved:true, clockPreserved:true, viewerAndDataSourcePreserved:true,
+    originalEntities:before.entities, cspRemainsLocalOnly:true, states};
+}
 const projectCss = (await readdir(resolve(frontend, 'dist/assets'))).find((name) => /^index-.*\.css$/.test(name));
 const systemChrome = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
 const executablePath = process.env.VISUALIZATION_BROWSER_EXECUTABLE || (existsSync(systemChrome) ? systemChrome : undefined);
@@ -102,11 +188,15 @@ const browser = await chromium.launch({ executablePath, headless: true, args: ['
 const results = [];
 try {
   for (const scenario of cases) {
-    const record = { name: scenario.name, sdk: scenario.component, passed: false, errors: [], consoleErrors: [], externalAttempts: [], unexpectedRequests: [], apiRequests: [], webgl: [] };
+    const record = { name: scenario.name, sdk: scenario.component, passed: false, errors: [], consoleErrors: [], expectedConsoleErrors: [], externalAttempts: [], unexpectedRequests: [], apiRequests: [], cesiumAssets: [], webgl: [] };
     const context = await browser.newContext({ viewport: { width: 1100, height: 760 }, deviceScaleFactor: scenario.deviceScaleFactor ?? 1 });
     const page = await context.newPage();
     page.on('pageerror', (error) => record.errors.push(error.message));
-    page.on('console', (message) => { if (message.type() === 'error') record.consoleErrors.push(message.text().slice(0, 800)); });
+    page.on('console', (message) => { if (message.type() === 'error') {
+      const localMissingImagery = scenario.cesiumBasemapFailure && cesiumNaturalAsset.test(new URL(message.location().url || 'http://localhost:7001/').pathname)
+        && /Failed to load resource.*404/.test(message.text());
+      (localMissingImagery ? record.expectedConsoleErrors : record.consoleErrors).push(message.text().slice(0, 800));
+    } });
     await page.addInitScript(() => {
       window.__webglStats = [];
       window.__webglDraws = 0;
@@ -126,6 +216,14 @@ try {
       const request = route.request(), url = new URL(request.url());
       if (!['localhost', '127.0.0.1'].includes(url.hostname) || url.port !== '7001') { record.externalAttempts.push(`${request.method()} ${url.origin}${url.pathname}`); return route.abort(); }
       const pathname = decodeURIComponent(url.pathname);
+      if (cesiumNaturalAsset.test(pathname)) {
+        record.cesiumAssets.push({ path: pathname, status: scenario.cesiumBasemapFailure ? 404 : 200 });
+        if (scenario.cesiumBasemapFailure) return route.fulfill({ status: 404, body: 'Synthetic local imagery unavailable' });
+      }
+      if (pathname === '/visualization-assets/cesium/Cesium.js' && scenario.component === 'domains/CesiumPreview.vue') {
+        const sdk = await readFile(resolve(frontend, 'node_modules/cesium/Build/Cesium/Cesium.js'), 'utf8');
+        return route.fulfill({ contentType:'application/javascript', body:sdk + cesiumQaHooks });
+      }
       if (pathname === '/__visualization_test__/') return route.fulfill({ contentType: 'text/html', body: '<!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="/__visualization_test__/entry.css"><link rel="stylesheet" href="/__visualization_test__/project.css"><style>html,body{margin:0;height:100%;font-family:Arial,sans-serif}#app{display:flex;flex-direction:column;height:700px;width:1060px;margin:20px}*{box-sizing:border-box}button{cursor:pointer}canvas{max-width:100%}</style></head><body><div id="app"></div><script type="module" src="/__visualization_test__/entry.js"></script></body></html>' });
       if (pathname === '/__visualization_test__/project.css' && projectCss) return route.fulfill({ contentType: 'text/css', body: await readFile(resolve(frontend, 'dist/assets', projectCss)) });
       if (pathname === '/vendor/o3dv.min.js') return route.fulfill({ contentType: 'application/javascript', body: await readFile(resolve(frontend, 'public/vendor/o3dv.min.js')) });
@@ -178,17 +276,24 @@ try {
         if (!record.expectedErrorMatched) throw new Error(`Expected alert ${record.expectedError}, received: ${record.alerts.join('; ') || '(none)'}`);
       } else if (record.alerts.length) throw new Error(record.alerts.join('; '));
       if (scenario.verify) record.checks = await scenario.verify(page);
+      if (scenario.component === 'domains/CesiumPreview.vue') record.cesiumChecks = await verifyCesiumBasemap(page, scenario, record);
       record.webgl = await page.evaluate(() => window.__webglStats);
       record.drawCalls = await page.evaluate(() => window.__webglDraws);
       record.frameDrawCalls = await Promise.all(page.frames().filter((frame) => frame !== page.mainFrame()).map((frame) => frame.evaluate(() => window.__webglDraws).catch(() => null)));
       record.canvasCount = await page.locator('canvas').count();
       await page.screenshot({ path: join(output, `${scenario.name}.png`) });
       if (scenario.beforeUnmount) await scenario.beforeUnmount(page);
+      const requestsBeforeUnmount = record.apiRequests.length + record.cesiumAssets.length;
       await page.evaluate(() => window.unmountHarness()); await page.waitForTimeout(250);
       record.unmounted = await page.locator('#app').evaluate((element) => element.childElementCount === 0);
       const stoppedDraws = await page.evaluate(() => window.__webglDraws); await page.waitForTimeout(250);
       record.cleanup = await page.evaluate((stoppedDraws) => ({ activeWorkers: window.__activeWorkers.size, activeBlobs: window.__activeBlobs.size, drawingStopped: window.__webglDraws === stoppedDraws, childFramesRemoved: document.querySelectorAll('iframe').length === 0 }), stoppedDraws);
       if (scenario.verifyCleanup) record.resourceChecks = await scenario.verifyCleanup(page);
+      if (scenario.component === 'domains/CesiumPreview.vue') {
+        assert.equal(record.apiRequests.length + record.cesiumAssets.length, requestsBeforeUnmount,
+          'Detached Cesium realm must not continue input or imagery requests');
+        record.cleanup.cesiumRequestsStopped = true;
+      }
       record.libraryBlobBaseline = scenario.libraryBlobBaseline ?? 0;
       record.passed = record.unmounted && record.cleanup.drawingStopped && !record.cleanup.activeWorkers && record.cleanup.activeBlobs === record.libraryBlobBaseline && record.cleanup.childFramesRemoved && !record.errors.length && !record.unexpectedRequests.length && !record.externalAttempts.length && !record.consoleErrors.length;
     } catch (error) { record.failure = error.message; record.failureStack = error.stack; record.alerts = await page.locator('[role="alert"]').allTextContents().catch(() => []); record.workerTrace = await Promise.all(page.frames().map(frame => frame.evaluate(() => window.__workerTrace).catch(() => []))); await page.screenshot({ path: join(output, `${scenario.name}-failure.png`) }).catch(() => {}); }

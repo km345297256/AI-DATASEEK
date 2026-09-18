@@ -1,0 +1,153 @@
+{
+  "dataset_id": "viz-mangal-greenland-pollination-908",
+  "external_id": "10.1657/1523-0430(2005)037[0514:TDAHCW]2.0.CO;2",
+  "data_center_id": "reviewed-open-science-catalog",
+  "data_center_name": "开放科学可视化样例",
+  "name": "可视化样例·关系网络｜Mangal 格陵兰植物—传粉者科学关系网络",
+  "description": "Lundgren 与 Olesen 研究的格陵兰 Uummannaq 岛实地访花网络，Mangal 网络号 908。包含完整 43 个分类单元节点、63 条互惠关系及观察次数；可直接用现有 Cytoscape 科学网络视图浏览。",
+  "domain": "general",
+  "data_type": "graphml, json",
+  "temporal_coverage": "",
+  "spatial_coverage": "",
+  "tags": [
+    "可视化样例",
+    "开放科学",
+    "graph",
+    "viz-scientific-graph",
+    "general"
+  ],
+  "metadata": {
+    "curated": true,
+    "source_catalog": "open-science",
+    "catalog_version": 1,
+    "source_descriptor_sha256": "a880175f53cb71543ded95af30833380345528ce0a0c73307670eb434f5e74cd",
+    "download_date": "2026-09-18",
+    "inventory_complete": true,
+    "recursive_file_count": 7,
+    "total_size_bytes": 68312,
+    "visualization_view_kind": "graph",
+    "visualization_plugin_id": "viz-scientific-graph",
+    "visualization_entry_file": "lundgren-olesen-2005-network-908.graphml",
+    "sample_note": "完整的单个已发布网络（43节点/63条记录），不是Mangal或原数据库全集。5份公开API原件保留分类、采样、属性定义与原始引用。GraphML保留全部节点ID/名称、关系ID/端点/方向/类型/访花次数，不筛选或合并边。all_interactions=false，未记录关系不能自动解释为真实不存在；数据库有向编码不应解释为因果方向。",
+    "provenance": [
+      {
+        "path": "dataset.json",
+        "size": 248,
+        "sha256": "3e5fc1fe21ebfc90c426a342c791b0799f3a38f58108ccbc7bd25e96821d2bb9",
+        "url": "https://mangal.io/api/v2/dataset/7",
+        "role": "documentation"
+      },
+      {
+        "path": "interactions.json",
+        "size": 34968,
+        "sha256": "824dc691d13c5112147f73735a363d355bda3ba2f714ee167af2ef679ddfe69a",
+        "url": "https://mangal.io/api/v2/interaction?network_id=908&count=1000",
+        "role": "data"
+      },
+      {
+        "path": "lundgren-olesen-2005-network-908.graphml",
+        "size": 12342,
+        "sha256": "8d8f28a62fbeeb257a437c227bf073bafa98a749fe99c0d7ea462e9afa06dd2a",
+        "role": "data",
+        "derived_from": [
+          "nodes.json",
+          "interactions.json"
+        ]
+      },
+      {
+        "path": "network.json",
+        "size": 401,
+        "sha256": "529beca770dbaa30bef0b6e2843d3f96b6371597105405b1aa9bf6d35d157313",
+        "url": "https://mangal.io/api/v2/network?dataset_id=7&count=1000",
+        "role": "documentation"
+      },
+      {
+        "path": "nodes.json",
+        "size": 16354,
+        "sha256": "6335cb9c53edb3532a7d39837ca29750789b3cad7b41e387afb9a4157d469d09",
+        "url": "https://mangal.io/api/v2/node?network_id=908&count=1000",
+        "role": "data"
+      },
+      {
+        "path": "reference.json",
+        "size": 606,
+        "sha256": "5019431e41ef6ad0f4232802e1e6fe6fbfcc5305da3ba07c9ca1fbf20df6167b",
+        "url": "https://mangal.io/api/v2/reference/7",
+        "role": "documentation"
+      }
+    ],
+    "publisher": "Mangal ecological interactions database",
+    "source_url": "https://mangal.io/api/v2/network?dataset_id=7&count=1000",
+    "license": "CC0 1.0 (Mangal default data license)",
+    "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "license_details": "Mangal 官方贡献说明的 Additional questions 明确：数据库数据默认 CC0，若原数据在其他存储库另有许可证则从其。该公开记录未标注覆盖默认条款的其他许可；原研究和来源链接保留在 reference.json。不使用网站/软件代码许可证冒充数据许可证。许可依据：https://github.com/mangal-interactions/contribute#additional-questions",
+    "authors": [
+      "Rebekka Lundgren",
+      "Jens M. Olesen"
+    ],
+    "source_version": "Mangal API v2 network 908 / dataset 7, snapshot 2026-09-18; observation date 2002-08-04",
+    "sample_scope": "完整的单个已发布网络（43节点/63条记录），不是Mangal或原数据库全集。5份公开API原件保留分类、采样、属性定义与原始引用。GraphML保留全部节点ID/名称、关系ID/端点/方向/类型/访花次数，不筛选或合并边。all_interactions=false，未记录关系不能自动解释为真实不存在；数据库有向编码不应解释为因果方向。",
+    "doi": "10.1657/1523-0430(2005)037[0514:TDAHCW]2.0.CO;2",
+    "transformation": {
+      "source": [
+        "nodes.json",
+        "interactions.json"
+      ],
+      "output": "lundgren-olesen-2005-network-908.graphml",
+      "method": "按数值ID稳定排序：节点id=m{原id}，label=original_name，group=node_level；边id=i{原id}，source/target对应原node_from/node_to，label=type，weight=value；edgedefault=directed与全部原记录一致。仅使用应用支持的GraphML label/group/weight键，XML转义数据文本，无注释、DTD、外部样式或URL资源。",
+      "lossless_scope": "所有拓扑、记录ID、标签、方向、类型和权重逐项比对相同，无删除/合并/合成边。额外分类与时间等完整元信息保留于原始JSON，不声称全部元数据都装入GraphML。派生文件通过 files.derived_from 记录真实原件，不虚构下载地址。",
+      "reproducible_script": "reproduce-map-graph.mjs"
+    }
+  },
+  "files": [
+    {
+      "path": "SOURCE.md",
+      "size": 3393,
+      "sha256": "70a4b9ffa0cf7d5918bfd7ab4747d2dfccf853fa17e6e9be2b59caad6b88ff76",
+      "role": "documentation",
+      "content_type": "text/markdown"
+    },
+    {
+      "path": "dataset.json",
+      "size": 248,
+      "sha256": "3e5fc1fe21ebfc90c426a342c791b0799f3a38f58108ccbc7bd25e96821d2bb9",
+      "role": "documentation",
+      "content_type": "application/json"
+    },
+    {
+      "path": "interactions.json",
+      "size": 34968,
+      "sha256": "824dc691d13c5112147f73735a363d355bda3ba2f714ee167af2ef679ddfe69a",
+      "role": "data",
+      "content_type": "application/json"
+    },
+    {
+      "path": "lundgren-olesen-2005-network-908.graphml",
+      "size": 12342,
+      "sha256": "8d8f28a62fbeeb257a437c227bf073bafa98a749fe99c0d7ea462e9afa06dd2a",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "network.json",
+      "size": 401,
+      "sha256": "529beca770dbaa30bef0b6e2843d3f96b6371597105405b1aa9bf6d35d157313",
+      "role": "documentation",
+      "content_type": "application/json"
+    },
+    {
+      "path": "nodes.json",
+      "size": 16354,
+      "sha256": "6335cb9c53edb3532a7d39837ca29750789b3cad7b41e387afb9a4157d469d09",
+      "role": "data",
+      "content_type": "application/json"
+    },
+    {
+      "path": "reference.json",
+      "size": 606,
+      "sha256": "5019431e41ef6ad0f4232802e1e6fe6fbfcc5305da3ba07c9ca1fbf20df6167b",
+      "role": "documentation",
+      "content_type": "application/json"
+    }
+  ]
+}

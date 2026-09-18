@@ -1,0 +1,88 @@
+{
+  "dataset_id": "viz-plugin-gro-mdanalysis",
+  "external_id": "viz-plugin-gro-mdanalysis",
+  "data_center_id": "reviewed-visualization-plugin-tests",
+  "data_center_name": "逐插件可视化测试样例",
+  "name": "插件测试·MDAnalysis 双帧水分子轨迹官方样本",
+  "description": "MDAnalysis 官方坐标格式测试文件：两个水分子、两帧，每帧 6 个原子；用于帧切换和 nm 坐标保真测试，不作为生产分子动力学研究。",
+  "domain": "chemistry",
+  "data_type": "gro",
+  "temporal_coverage": "",
+  "spatial_coverage": "",
+  "tags": [
+    "插件测试样例",
+    "viz-gro-trajectory",
+    "official_fixture",
+    "structure",
+    "chemistry"
+  ],
+  "metadata": {
+    "curated": true,
+    "source_catalog": "plugin-tests",
+    "catalog_version": 1,
+    "source_descriptor_sha256": "73cdfb0fbbb8171dc6b1fdbfbb4a3157115224da3a106e2c1a45cc93398d0849",
+    "download_date": "2026-09-18",
+    "inventory_complete": true,
+    "recursive_file_count": 3,
+    "total_size_bytes": 85044,
+    "visualization_view_kind": "structure",
+    "visualization_plugin_id": "viz-gro-trajectory",
+    "visualization_entry_file": "two_water_gro_multiframe.gro",
+    "sample_note": "原始两帧 GRO 完整文件，2 帧 × 6 原子。保留坐标、时间/盒信息；不推断化学键或展开周期边界。",
+    "provenance": [
+      {
+        "path": "two_water_gro_multiframe.gro",
+        "size": 648,
+        "sha256": "4406c5bd48369b8f9a5648c9f8fc7503ad4c2a204fa4809ac342ff73474b8559",
+        "role": "data",
+        "url": "https://raw.githubusercontent.com/MDAnalysis/mdanalysis/8b8875c73782c8c7f9710f6f6b9ae715bd5ad1bb/testsuite/MDAnalysisTests/data/two_water_gro_multiframe.gro"
+      },
+      {
+        "path": "LICENSE.txt",
+        "size": 82409,
+        "sha256": "7614dd55e5b9851e0a2d197abc0e319dd10034f5a729aa7e698193aa7a8779e9",
+        "role": "documentation",
+        "url": "https://raw.githubusercontent.com/MDAnalysis/mdanalysis/8b8875c73782c8c7f9710f6f6b9ae715bd5ad1bb/testsuite/LICENSE"
+      }
+    ],
+    "publisher": "MDAnalysis/mdanalysis",
+    "source_url": "https://github.com/MDAnalysis/mdanalysis/blob/8b8875c73782c8c7f9710f6f6b9ae715bd5ad1bb/testsuite/MDAnalysisTests/data/two_water_gro_multiframe.gro",
+    "license": "LGPL-3.0-or-later (repository distribution)",
+    "license_url": "https://raw.githubusercontent.com/MDAnalysis/mdanalysis/8b8875c73782c8c7f9710f6f6b9ae715bd5ad1bb/testsuite/LICENSE",
+    "license_details": "官方仓库测试/文档文件，按随附仓库许可保留版权与许可全文。此处标注为官方格式测试样本，不宣称是独立同行评审实验数据。",
+    "authors": [
+      "MDAnalysis developers"
+    ],
+    "source_version": "Git commit 8b8875c73782c8c7f9710f6f6b9ae715bd5ad1bb",
+    "sample_scope": "原始两帧 GRO 完整文件，2 帧 × 6 原子。保留坐标、时间/盒信息；不推断化学键或展开周期边界。",
+    "transformation": "原始公开测试文件未改写。",
+    "sample_kind": "official_fixture",
+    "test_steps": [
+      "打开 two_water_gro_multiframe.gro，在视图选择器选择 viz-gro-trajectory。",
+      "确认无格式错误且数值/结构按样本范围显示；不执行拟合或外部请求。"
+    ]
+  },
+  "files": [
+    {
+      "path": "LICENSE.txt",
+      "size": 82409,
+      "sha256": "7614dd55e5b9851e0a2d197abc0e319dd10034f5a729aa7e698193aa7a8779e9",
+      "role": "documentation",
+      "content_type": "text/plain"
+    },
+    {
+      "path": "SOURCE.md",
+      "size": 1987,
+      "sha256": "1bb1bbcc532cf59cd5c6d5723be648f836ab55d688560d6dd0d9b77fa0f79f75",
+      "role": "documentation",
+      "content_type": "text/markdown"
+    },
+    {
+      "path": "two_water_gro_multiframe.gro",
+      "size": 648,
+      "sha256": "4406c5bd48369b8f9a5648c9f8fc7503ad4c2a204fa4809ac342ff73474b8559",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    }
+  ]
+}

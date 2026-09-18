@@ -1,0 +1,722 @@
+[
+  {
+    "dataset_id": "viz-bio-lightmycells-formats",
+    "name": "真实犬细胞核图像：七种影像格式与阅读器对照",
+    "description": "来自 Light My Cells 的真实犬细胞核显微观察，原始 OME-TIFF 完整保留；额外提供保留全部 uint16 像素的 PNG、NPY、未压缩 CZI 和 OME-Zarr 格式。用于比较阅读器结果，不是七次独立实验。",
+    "domain": "image_science",
+    "view_kind": "image",
+    "plugin_id": "viz-viv",
+    "entry_file": "image_399_Nucleus.ome.tiff",
+    "source_url": "https://www.ebi.ac.uk/biostudies/BioImages/studies/S-BIAD1047",
+    "publisher": "France-BioImaging / EMBL-EBI BioImage Archive",
+    "license": "CC BY 4.0",
+    "license_url": "https://creativecommons.org/licenses/by/4.0/legalcode",
+    "license_details": "BioImage Archive S-BIAD1047 官方研究元数据明确指定 CC BY 4.0；允许复制、分享和改编，须署名、保留许可链接并说明改动。来源论文为 2D Multimodal Image Collection for Fluorescence Prediction from Transmitted Light Microscopy，https://doi.org/10.1038/s41597-026-07004-w。本地文件是官网单文件原样下载，未调整亮度或改变像素。 本轮产生容器转换文件，已明确记录改动，原文件保留。",
+    "authors": [
+      "Dorian Kauffmann",
+      "Guillaume Gay",
+      "Emmanuel Faure",
+      "Julio Mateos-Langerak",
+      "Oriane Pourcelot",
+      "Virginie Georget",
+      "Maëlle Carraz",
+      "Juliette Van Dijk",
+      "Stéphanie Bosch",
+      "Elsa Castellani",
+      "Qiyan Mao",
+      "Laura Ruiz",
+      "Valentin Asei-Ceschino",
+      "Tudor Manoliu",
+      "Julia Bonnet-Gelebart",
+      "Youssef Elhabouz",
+      "Marc Tramier",
+      "Jacques Pécréaux",
+      "Louis Ruel",
+      "Jean-Bernard Fiche",
+      "David Lleres",
+      "Christine Doucet",
+      "Erwan Gandon",
+      "Yves Lutz",
+      "Bertrand Vernay",
+      "Daniel Stockholm",
+      "Abbass Jaber",
+      "Aude Moret",
+      "Romain Morichon",
+      "Mónica Fernández-Monreal",
+      "Edouard Bertrand"
+    ],
+    "source_version": "S-BIAD1047，官方元数据 ReleaseDate 2025-02-26；2026-09-18 下载快照",
+    "sample_scope": "Study_24/image_399_Nucleus.ome.tiff 一张完整的已发布 OME-TIFF。官方 Study Component 名为 Cocker 4，描述为正常成年雌性可卡犬；不是人体影像。保留单通道 1200×1200 全部分辨率与 OME 元数据，未取得该库其他图像。",
+    "suggested_questions": [
+      "统计这张图像的细胞核数量，并说明阈值及分割误差。",
+      "比较细胞核面积、形态和荧光强度分布；不要将单张图像推断为群体实验结论。"
+    ],
+    "files": [
+      {
+        "path": "image_399_Nucleus.ome.tiff",
+        "url": "https://ftp.ebi.ac.uk/biostudies/fire/S-BIAD/047/S-BIAD1047/Files/Images/Study_24/image_399_Nucleus.ome.tiff",
+        "size": 2239243,
+        "sha256": "61892dc211cf96032c14752a734c61d414980006490e65795faec14483c06048"
+      },
+      {
+        "path": "nucleus-uint16.png",
+        "size": 1922725,
+        "sha256": "65f211a479418e8e9eabf38f0a193aad9575ec431cc56b6a35744ff8b607b1a7",
+        "role": "data",
+        "derived_from": [
+          "image_399_Nucleus.ome.tiff"
+        ]
+      },
+      {
+        "path": "nucleus-uint16.npy",
+        "size": 2880128,
+        "sha256": "6f150c9535ba0a4ce7e1decd889520120aa752d01f796d80955b111c2598ad89",
+        "role": "data",
+        "derived_from": [
+          "image_399_Nucleus.ome.tiff"
+        ]
+      },
+      {
+        "path": "nucleus-uncompressed.czi",
+        "size": 2882240,
+        "sha256": "88f6c9bc90a4d84179f8ddb6538232cf037ac862cc8ba8a00a86419bb37a3585",
+        "role": "data",
+        "derived_from": [
+          "image_399_Nucleus.ome.tiff"
+        ]
+      },
+      {
+        "path": "nucleus.zarr/.zgroup",
+        "size": 23,
+        "sha256": "e1e1914ae531ecb50e1ead685ef01895a5452faf5f25f35cd78f1f5de1367470",
+        "role": "data",
+        "derived_from": [
+          "image_399_Nucleus.ome.tiff"
+        ]
+      },
+      {
+        "path": "nucleus.zarr/.zattrs",
+        "size": 488,
+        "sha256": "0e2d06192692c229c20d4d1b7e95f61daf0c700e2405eb90658c51caf588067f",
+        "role": "data",
+        "derived_from": [
+          "image_399_Nucleus.ome.tiff"
+        ]
+      },
+      {
+        "path": "nucleus.zarr/0/.zarray",
+        "size": 222,
+        "sha256": "edbb62a3587a8537cc627f8c396e713ae37d183e2479295a1f27bebb46c2c15f",
+        "role": "data",
+        "derived_from": [
+          "image_399_Nucleus.ome.tiff"
+        ]
+      },
+      {
+        "path": "nucleus.zarr/0/0.0",
+        "size": 2880000,
+        "sha256": "5214b86a1883c64945ba1fc479ffaa1efdaeacf930f6bb59b94f17dd9000aed5",
+        "role": "data",
+        "derived_from": [
+          "image_399_Nucleus.ome.tiff"
+        ]
+      },
+      {
+        "path": "GENERATION_SPEC.json",
+        "size": 635,
+        "sha256": "b08b315cea8c3725f7571c204ab9385b7d4ee298d279d42710105f49af82514e",
+        "role": "documentation",
+        "origin": {
+          "kind": "generated_fixture",
+          "generator": "backend/scripts/plugin_samples_bio.py",
+          "generator_sha256": "5ec25b14053c29d7f0b6ec7443f4994eec9d05eb448b8d3c302289488e3098c1",
+          "description": "数据生成/格式转换参数记录；不是上游下载文件。"
+        }
+      }
+    ],
+    "sample_kind": "scientific_derived",
+    "transformation": "只转换容器，不裁剪、不重采样、不修改1200×1200 uint16像素。OME-Zarr采用像素索引坐标，不伪造物理标定；原OME元数据保留于原件。CZI由已安装官方pylibCZIrw写入器生成。",
+    "test_steps": [
+      "打开原始 OME-TIFF 并选择 Viv；确认单通道1200×1200。",
+      "比较同集 PNG、NPY、CZI 与 OME-Zarr 的相同 ROI；数值未修改。"
+    ]
+  },
+  {
+    "dataset_id": "viz-bio-elife-video",
+    "name": "链霉菌 FtsZ-YPet 分裂环荧光延时观测（MP4）",
+    "description": "eLife 63387 Figure 2—source data 1：野生型 Streptomyces venezuelae SS12 的 FtsZ-YPet 荧光时间序列，作者选择并拉直菌丝用于 Figure 2C 时空图。是真实细菌显微观测，不是宣传片、模拟动画或人体影像。H.264 MP4，510×74 像素，47 帧，播放时长 11.75 秒；播放时长不直接等于生物学实验时间。",
+    "domain": "image_science",
+    "view_kind": "media",
+    "plugin_id": "viz-video-player",
+    "entry_file": "elife-63387-fig2-data1-v1.mp4",
+    "source_url": "https://elifesciences.org/articles/63387/figures",
+    "publisher": "eLife / John Innes Centre and collaborating researchers",
+    "license": "CC BY 4.0",
+    "license_url": "https://creativecommons.org/licenses/by/4.0/",
+    "license_details": "官方论文 A conserved cell division protein directly regulates FtsZ dynamics in filamentous and unicellular actinobacteria（Ramos-León et al., 2021, eLife 10:e63387，https://doi.org/10.7554/eLife.63387）及其开放源数据适用 CC BY 4.0，须署名并保留许可链接。此处为 Figure 2—source data 1 原始发布 MP4，未转码、剪辑或改变帧。",
+    "authors": [
+      "Félix Ramos-León",
+      "Matthew J Bush",
+      "Joseph W Sallmen",
+      "Govind Chandra",
+      "Jake Richardson",
+      "Kim C Findlay",
+      "Joseph R McCormick",
+      "Susan Schlimpert"
+    ],
+    "doi": "10.7554/eLife.63387",
+    "source_version": "Figure 2—source data 1 v1；论文发表于 2021-03-17；2026-09-18 下载快照",
+    "sample_scope": "一条完整已发布的野生型 SS12 拉直菌丝荧光观测视频，不包括其他菌株、全部显微原始采集或作者整套实验。视频已由原作者进行菌丝选择和拉直处理；本次下载未再处理。测量真实形成速率需先查原论文采样时间与空间标定，不能用视频播放秒数替代。",
+    "suggested_questions": [
+      "观察 FtsZ-YPet 荧光随帧变化的时空模式，哪些位置形成持续信号？",
+      "若要计算真实分裂环形成速率，还需要从论文获取哪些实验时间和空间标定？"
+    ],
+    "files": [
+      {
+        "path": "elife-63387-fig2-data1-v1.mp4",
+        "url": "https://cdn.elifesciences.org/articles/63387/elife-63387-fig2-data1-v1.mp4",
+        "size": 84174,
+        "sha256": "f024808c28513d45bd95048e1bda7df75fa5b1e6b5520ad87e8850057bb008f8"
+      }
+    ],
+    "sample_kind": "scientific_original",
+    "test_steps": [
+      "打开MP4并选择视频插件，播放并拖动进度条。",
+      "约11.75秒播放时间不等于生物学实验时间，不据此计算细胞分裂速率。"
+    ]
+  },
+  {
+    "dataset_id": "viz-bio-dicom-phantom",
+    "name": "原创DICOM数值体模（非临床）",
+    "description": "原创64×64二维数值梯度；没有病人、医院采集或真实CT；DICOM去标识标记用于演示安全读取门槛，不能证明任何其他文件匿名。",
+    "domain": "image_science",
+    "view_kind": "image",
+    "plugin_id": "viz-dicom-window",
+    "entry_file": "synthetic-phantom.dcm",
+    "source_url": "https://github.com/km345297256/AI-DATASEEK",
+    "publisher": "AI-DataSeek 原创功能测试样例",
+    "license": "MIT (project-generated fixture)",
+    "license_url": "https://github.com/km345297256/AI-DATASEEK/blob/v2/LICENSE",
+    "license_details": "本项目原创算法生成的功能样例，按项目 MIT 许可提供；不是来自医院、受试者或真实实验的观测。保留随附项目 LICENSE.txt。",
+    "authors": [
+      "AI-DataSeek contributors"
+    ],
+    "source_version": "original deterministic fixture 2026-09-18",
+    "sample_scope": "原创64×64二维数值梯度；没有病人、医院采集或真实CT；DICOM去标识标记用于演示安全读取门槛，不能证明任何其他文件匿名。",
+    "sample_kind": "project_fixture",
+    "test_steps": [
+      "打开DICOM元数据，确认单帧64×64。",
+      "仅对本明确合成文件勾选已去标识确认，再选择frame=0与ROI=[0,0,64,64]；不是诊断影像。"
+    ],
+    "files": [
+      {
+        "path": "synthetic-phantom.dcm",
+        "size": 8730,
+        "sha256": "88affc0a61e113cd68a2c3cb49a5e57d0c1ccae081705dd29f49d67e90cadec9",
+        "role": "data",
+        "origin": {
+          "kind": "generated_fixture",
+          "generator": "backend/scripts/plugin_samples_bio.py",
+          "generator_sha256": "5ec25b14053c29d7f0b6ec7443f4994eec9d05eb448b8d3c302289488e3098c1",
+          "description": "原创64×64二维数值梯度；没有病人、医院采集或真实CT；DICOM去标识标记用于演示安全读取门槛，不能证明任何其他文件匿名。"
+        }
+      },
+      {
+        "path": "LICENSE.txt",
+        "size": 1066,
+        "sha256": "991f0bde5249ee6aad0a5a597197c7a7f6024abd2650516fcd7a83d908234115",
+        "role": "documentation",
+        "origin": {
+          "kind": "generated_fixture",
+          "generator": "backend/scripts/plugin_samples_bio.py",
+          "generator_sha256": "5ec25b14053c29d7f0b6ec7443f4994eec9d05eb448b8d3c302289488e3098c1",
+          "description": "项目 MIT 许可证原文的本地副本。"
+        }
+      },
+      {
+        "path": "GENERATION_SPEC.json",
+        "size": 156,
+        "sha256": "3f439ef8d9fb8e1874ad36aeecd8f66aa14ffc5b27a3d9cf3911eb4b53c1ded4",
+        "role": "documentation",
+        "origin": {
+          "kind": "generated_fixture",
+          "generator": "backend/scripts/plugin_samples_bio.py",
+          "generator_sha256": "5ec25b14053c29d7f0b6ec7443f4994eec9d05eb448b8d3c302289488e3098c1",
+          "description": "数据生成/格式转换参数记录；不是上游下载文件。"
+        }
+      }
+    ]
+  },
+  {
+    "dataset_id": "viz-bio-niivue-phantom",
+    "name": "原创三维球体体模：NiiVue正交切片",
+    "description": "48×48×48原创径向球体数组，单位是任意数值/体素索引，不是MRI、CT或真实组织。",
+    "domain": "image_science",
+    "view_kind": "image",
+    "plugin_id": "viz-niivue",
+    "entry_file": "synthetic-radial-volume.nrrd",
+    "source_url": "https://github.com/km345297256/AI-DATASEEK",
+    "publisher": "AI-DataSeek 原创功能测试样例",
+    "license": "MIT (project-generated fixture)",
+    "license_url": "https://github.com/km345297256/AI-DATASEEK/blob/v2/LICENSE",
+    "license_details": "本项目原创算法生成的功能样例，按项目 MIT 许可提供；不是来自医院、受试者或真实实验的观测。保留随附项目 LICENSE.txt。",
+    "authors": [
+      "AI-DataSeek contributors"
+    ],
+    "source_version": "original deterministic fixture 2026-09-18",
+    "sample_scope": "48×48×48原创径向球体数组，单位是任意数值/体素索引，不是MRI、CT或真实组织。",
+    "sample_kind": "project_fixture",
+    "test_steps": [
+      "打开内嵌raw NRRD，选择NiiVue。",
+      "切换正交切片与体渲染；中心强度高、外围为0，确认轴向一致；不要作医学解释。"
+    ],
+    "files": [
+      {
+        "path": "synthetic-radial-volume.nrrd",
+        "size": 221281,
+        "sha256": "42a4c7e42780622e41f2b61cd8736ec3a7c4b22b96d915941aaf6e9dc11da70b",
+        "role": "data",
+        "origin": {
+          "kind": "generated_fixture",
+          "generator": "backend/scripts/plugin_samples_bio.py",
+          "generator_sha256": "5ec25b14053c29d7f0b6ec7443f4994eec9d05eb448b8d3c302289488e3098c1",
+          "description": "48×48×48原创径向球体数组，单位是任意数值/体素索引，不是MRI、CT或真实组织。"
+        }
+      },
+      {
+        "path": "LICENSE.txt",
+        "size": 1066,
+        "sha256": "991f0bde5249ee6aad0a5a597197c7a7f6024abd2650516fcd7a83d908234115",
+        "role": "documentation",
+        "origin": {
+          "kind": "generated_fixture",
+          "generator": "backend/scripts/plugin_samples_bio.py",
+          "generator_sha256": "5ec25b14053c29d7f0b6ec7443f4994eec9d05eb448b8d3c302289488e3098c1",
+          "description": "项目 MIT 许可证原文的本地副本。"
+        }
+      },
+      {
+        "path": "GENERATION_SPEC.json",
+        "size": 191,
+        "sha256": "9e7e0596a42cde9daceb3990f14bf2c9ac00c56a9554cbd19dd2cb5cf3b566a5",
+        "role": "documentation",
+        "origin": {
+          "kind": "generated_fixture",
+          "generator": "backend/scripts/plugin_samples_bio.py",
+          "generator_sha256": "5ec25b14053c29d7f0b6ec7443f4994eec9d05eb448b8d3c302289488e3098c1",
+          "description": "数据生成/格式转换参数记录；不是上游下载文件。"
+        }
+      }
+    ]
+  },
+  {
+    "dataset_id": "viz-bio-spatial-phantom",
+    "name": "原创AnnData空间网格（非转录组观测）",
+    "description": "256个规则网格位置及3个人工数值特征[x,y,x+y]，没有真实基因/细胞/受试者；用于AnnData空间窗口与坐标数值一致性检查。",
+    "domain": "image_science",
+    "view_kind": "map",
+    "plugin_id": "viz-spatial-window",
+    "entry_file": "synthetic-spatial.h5ad",
+    "source_url": "https://github.com/km345297256/AI-DATASEEK",
+    "publisher": "AI-DataSeek 原创功能测试样例",
+    "license": "MIT (project-generated fixture)",
+    "license_url": "https://github.com/km345297256/AI-DATASEEK/blob/v2/LICENSE",
+    "license_details": "本项目原创算法生成的功能样例，按项目 MIT 许可提供；不是来自医院、受试者或真实实验的观测。保留随附项目 LICENSE.txt。",
+    "authors": [
+      "AI-DataSeek contributors"
+    ],
+    "source_version": "original deterministic fixture 2026-09-18",
+    "sample_scope": "256个规则网格位置及3个人工数值特征[x,y,x+y]，没有真实基因/细胞/受试者；用于AnnData空间窗口与坐标数值一致性检查。",
+    "sample_kind": "project_fixture",
+    "test_steps": [
+      "选择空间窗口，feature=2、observation_start=0、observation_count=256、decode=raw。",
+      "核对右上方向梯度以及每个点value=x+y；没有基因表达生物学含义。"
+    ],
+    "files": [
+      {
+        "path": "synthetic-spatial.h5ad",
+        "size": 30360,
+        "sha256": "8461499c41ecb39837dad26e496bd4c8eb38d450b102e5c70c7dbe015483e86a",
+        "role": "data",
+        "origin": {
+          "kind": "generated_fixture",
+          "generator": "backend/scripts/plugin_samples_bio.py",
+          "generator_sha256": "5ec25b14053c29d7f0b6ec7443f4994eec9d05eb448b8d3c302289488e3098c1",
+          "description": "256个规则网格位置及3个人工数值特征[x,y,x+y]，没有真实基因/细胞/受试者；用于AnnData空间窗口与坐标数值一致性检查。"
+        }
+      },
+      {
+        "path": "LICENSE.txt",
+        "size": 1066,
+        "sha256": "991f0bde5249ee6aad0a5a597197c7a7f6024abd2650516fcd7a83d908234115",
+        "role": "documentation",
+        "origin": {
+          "kind": "generated_fixture",
+          "generator": "backend/scripts/plugin_samples_bio.py",
+          "generator_sha256": "5ec25b14053c29d7f0b6ec7443f4994eec9d05eb448b8d3c302289488e3098c1",
+          "description": "项目 MIT 许可证原文的本地副本。"
+        }
+      },
+      {
+        "path": "GENERATION_SPEC.json",
+        "size": 190,
+        "sha256": "7fc72b80f799f9a5ee1df9b0d1282ada31967f90791aa2b549c65db603fcea5a",
+        "role": "documentation",
+        "origin": {
+          "kind": "generated_fixture",
+          "generator": "backend/scripts/plugin_samples_bio.py",
+          "generator_sha256": "5ec25b14053c29d7f0b6ec7443f4994eec9d05eb448b8d3c302289488e3098c1",
+          "description": "数据生成/格式转换参数记录；不是上游下载文件。"
+        }
+      }
+    ]
+  },
+  {
+    "dataset_id": "viz-bio-alignments-and-tracks",
+    "name": "原创基因组阅读器功能样例：SAM/BED/BLAST",
+    "description": "原创合成chr_demo（长度5000）、5条SAM比对、3条BED特征和2条BLAST12列记录；不是人类/动物个体测序，不是实际BLAST运行结果。",
+    "domain": "sequence",
+    "view_kind": "map",
+    "plugin_id": "viz-alignment-browser",
+    "entry_file": "synthetic-alignments.sam",
+    "source_url": "https://github.com/km345297256/AI-DATASEEK",
+    "publisher": "AI-DataSeek 原创功能测试样例",
+    "license": "MIT (project-generated fixture)",
+    "license_url": "https://github.com/km345297256/AI-DATASEEK/blob/v2/LICENSE",
+    "license_details": "本项目原创算法生成的功能样例，按项目 MIT 许可提供；不是来自医院、受试者或真实实验的观测。保留随附项目 LICENSE.txt。",
+    "authors": [
+      "AI-DataSeek contributors"
+    ],
+    "source_version": "original deterministic fixture 2026-09-18",
+    "sample_scope": "原创合成chr_demo（长度5000）、5条SAM比对、3条BED特征和2条BLAST12列记录；不是人类/动物个体测序，不是实际BLAST运行结果。",
+    "sample_kind": "project_fixture",
+    "test_steps": [
+      "SAM选择reference=0,start=100,end=180，观察匹配、插入、缺失与成对关系。",
+      "BED选择chr_demo区间0–500；IGV需要粘贴demo.chrom.sizes正文chr_demo TAB 5000。",
+      "BLAST文件有正向与反向命中，数值仅为功能测试；不推断真实同源关系。"
+    ],
+    "files": [
+      {
+        "path": "synthetic-alignments.sam",
+        "size": 479,
+        "sha256": "70e414a93e7e4936cc221e64f11681e9bd7b457170da08ce6e368718fae66601",
+        "role": "data",
+        "origin": {
+          "kind": "generated_fixture",
+          "generator": "backend/scripts/plugin_samples_bio.py",
+          "generator_sha256": "5ec25b14053c29d7f0b6ec7443f4994eec9d05eb448b8d3c302289488e3098c1",
+          "description": "原创合成chr_demo（长度5000）、5条SAM比对、3条BED特征和2条BLAST12列记录；不是人类/动物个体测序，不是实际BLAST运行结果。"
+        }
+      },
+      {
+        "path": "synthetic-features.bed",
+        "size": 99,
+        "sha256": "12419d12c81b7c9f0a539ea697ecd2b3f15e339d0e12ab922b385a27d715028e",
+        "role": "data",
+        "origin": {
+          "kind": "generated_fixture",
+          "generator": "backend/scripts/plugin_samples_bio.py",
+          "generator_sha256": "5ec25b14053c29d7f0b6ec7443f4994eec9d05eb448b8d3c302289488e3098c1",
+          "description": "原创合成chr_demo（长度5000）、5条SAM比对、3条BED特征和2条BLAST12列记录；不是人类/动物个体测序，不是实际BLAST运行结果。"
+        }
+      },
+      {
+        "path": "demo.chrom.sizes",
+        "size": 14,
+        "sha256": "33bfc9044fa58958ff2cb26787c46de9530a66baeae00c7b0f5d5335462ac2ef",
+        "role": "data",
+        "origin": {
+          "kind": "generated_fixture",
+          "generator": "backend/scripts/plugin_samples_bio.py",
+          "generator_sha256": "5ec25b14053c29d7f0b6ec7443f4994eec9d05eb448b8d3c302289488e3098c1",
+          "description": "原创合成chr_demo（长度5000）、5条SAM比对、3条BED特征和2条BLAST12列记录；不是人类/动物个体测序，不是实际BLAST运行结果。"
+        }
+      },
+      {
+        "path": "synthetic-hits.blast6",
+        "size": 125,
+        "sha256": "0c8b27bc35eb7e8c24cc9980866b226c0636b62f8f98416afbb62e4a68aaedfa",
+        "role": "data",
+        "origin": {
+          "kind": "generated_fixture",
+          "generator": "backend/scripts/plugin_samples_bio.py",
+          "generator_sha256": "5ec25b14053c29d7f0b6ec7443f4994eec9d05eb448b8d3c302289488e3098c1",
+          "description": "原创合成chr_demo（长度5000）、5条SAM比对、3条BED特征和2条BLAST12列记录；不是人类/动物个体测序，不是实际BLAST运行结果。"
+        }
+      },
+      {
+        "path": "LICENSE.txt",
+        "size": 1066,
+        "sha256": "991f0bde5249ee6aad0a5a597197c7a7f6024abd2650516fcd7a83d908234115",
+        "role": "documentation",
+        "origin": {
+          "kind": "generated_fixture",
+          "generator": "backend/scripts/plugin_samples_bio.py",
+          "generator_sha256": "5ec25b14053c29d7f0b6ec7443f4994eec9d05eb448b8d3c302289488e3098c1",
+          "description": "项目 MIT 许可证原文的本地副本。"
+        }
+      },
+      {
+        "path": "GENERATION_SPEC.json",
+        "size": 177,
+        "sha256": "2a58aca6c6c16c3ccda894aa28fc77623385f63eec78e7fb01f4893e119d8d2d",
+        "role": "documentation",
+        "origin": {
+          "kind": "generated_fixture",
+          "generator": "backend/scripts/plugin_samples_bio.py",
+          "generator_sha256": "5ec25b14053c29d7f0b6ec7443f4994eec9d05eb448b8d3c302289488e3098c1",
+          "description": "数据生成/格式转换参数记录；不是上游下载文件。"
+        }
+      }
+    ]
+  },
+  {
+    "dataset_id": "viz-bio-biopython-fastq",
+    "name": "Biopython官方FASTQ最小测试样例",
+    "description": "Biopython Tests/Quality/example.fastq原样文件，3条短序列。用于读取与质量面板功能测试；不是代表性测序研究，不推断样本身份或实验结果。",
+    "domain": "sequence",
+    "view_kind": "series",
+    "plugin_id": "fastq-quality",
+    "entry_file": "example.fastq",
+    "publisher": "Biopython contributors",
+    "source_url": "https://github.com/biopython/biopython/tree/5bbc6c12c505301f2d681f932c30fdb8fcbe9a6e/Tests/Quality",
+    "license": "Biopython License Agreement",
+    "license_url": "https://raw.githubusercontent.com/biopython/biopython/5bbc6c12c505301f2d681f932c30fdb8fcbe9a6e/LICENSE.rst",
+    "license_details": "固定提交LICENSE.rst明确所有文件除单独声明外按Biopython License Agreement提供；该FASTQ无例外头。保留许可正文；不将库代码许可证推论为另一个未收录的科学数据许可。",
+    "authors": [
+      "Biopython contributors"
+    ],
+    "source_version": "Git commit 5bbc6c12c505301f2d681f932c30fdb8fcbe9a6e",
+    "sample_kind": "official_fixture",
+    "sample_scope": "官方仓库完整234字节功能测试文件，共3条23/24bp左右短读段；不用于群体统计或临床结论。",
+    "test_steps": [
+      "质量概览确认3条完整读段；按Phred+33解释。",
+      "序列浏览器选择record=0、start=1、count=23、quality_encoding=phred33。",
+      "FastQC应完成解析生成报告；小样本的WARN/FAIL是质量评价，不等于工具失败。"
+    ],
+    "files": [
+      {
+        "path": "example.fastq",
+        "size": 234,
+        "sha256": "10bc5b39327a363b0019193c9823bc424a6d5706197688fdbdd45023a1481a0c",
+        "role": "data",
+        "url": "https://raw.githubusercontent.com/biopython/biopython/5bbc6c12c505301f2d681f932c30fdb8fcbe9a6e/Tests/Quality/example.fastq"
+      },
+      {
+        "path": "LICENSE.rst",
+        "size": 3267,
+        "sha256": "11d1ebcaad2eb9f0f09a3df1deb4aca99a4da366ae9ae70f828c7447a24de453",
+        "role": "documentation",
+        "url": "https://raw.githubusercontent.com/biopython/biopython/5bbc6c12c505301f2d681f932c30fdb8fcbe9a6e/LICENSE.rst"
+      }
+    ]
+  },
+  {
+    "dataset_id": "viz-bio-flowcal-fcs",
+    "name": "FlowCal官方流式细胞示例FCS",
+    "description": "FlowCal官方完整FCS原件与兼容转换：24-bit原始数字事件无损保存为float64 FCS3.1，用于当前窗口插件。33024事件×8通道；不补偿、不门控、不应用原仪器指数/增益、不转换为物理强度。",
+    "domain": "image_science",
+    "view_kind": "series",
+    "plugin_id": "viz-fcs-window",
+    "entry_file": "sample001-digital-values.fcs",
+    "publisher": "Rice University Tabor Lab / FlowCal",
+    "source_url": "https://flowcal.readthedocs.io/en/latest/python_tutorial/read.html",
+    "license": "MIT (official FlowCal bundled example)",
+    "license_url": "https://raw.githubusercontent.com/taborlab/FlowCal/0212f417a53b2fc76658d83b751b892f2d05f175/license.txt",
+    "license_details": "官方MIT仓库随软件分发的FCFiles示例，保留license.txt原文及原始例子路径；此处按官方功能样例收录，不声称所有外部流式实验数据均受MIT覆盖。",
+    "authors": [
+      "John Sexton",
+      "Brian Landry",
+      "Sebastian Castillo-Hair"
+    ],
+    "source_version": "Git commit 0212f417a53b2fc76658d83b751b892f2d05f175",
+    "sample_kind": "official_fixture",
+    "sample_scope": "完整FlowCal官方FCS3.0原件保留。当前阅读器不支持24位整数，因此提供全33024事件×8通道的float64原始数字值容器；原事件顺序和数字值不变。派生文件的零指数只声明float存储，不能用作原仪器线性化校准。",
+    "transformation": "源FCS每值3字节uint24按原$BYTEORD逐值无损变成float64 FCS3.1，保留事件顺序/通道名/原量程；$PnE设0,0是浮点存储约束，原指数在GENERATION_SPEC及源FCS保留。未应用源指数/增益、补偿、门控、掩码、标定或物理单位换算。派生文件只代表原始编码数字值，不是MESF或线性荧光强度。",
+    "test_steps": [
+      "打开sample001-digital-values.fcs而非24-bit原件，检查33024事件和8通道。",
+      "选择scatter、channels=[0,1]、event_offset=0、event_count=256；显示原始数字值，不能自动作原仪器线性化或MESF解释。"
+    ],
+    "files": [
+      {
+        "path": "sample001.fcs",
+        "size": 796672,
+        "sha256": "f0794d5d0b0ff2936e4008baad42b00214904a0ba26b3d59d60b84162ff34c52",
+        "role": "data",
+        "url": "https://raw.githubusercontent.com/taborlab/FlowCal/0212f417a53b2fc76658d83b751b892f2d05f175/examples/FCFiles/sample001.fcs"
+      },
+      {
+        "path": "sample001-digital-values.fcs",
+        "size": 2114253,
+        "sha256": "96da8cfd1997baa7f3c141eca643e3502350352563d36cdb3562309d00bdafc2",
+        "role": "data",
+        "derived_from": [
+          "sample001.fcs"
+        ]
+      },
+      {
+        "path": "LICENSE.txt",
+        "size": 1116,
+        "sha256": "e5eebb8c216efad43e5d10f191c4ce8f777f65898855c0eb271ec94543f23941",
+        "role": "documentation",
+        "url": "https://raw.githubusercontent.com/taborlab/FlowCal/0212f417a53b2fc76658d83b751b892f2d05f175/license.txt"
+      },
+      {
+        "path": "GENERATION_SPEC.json",
+        "size": 1189,
+        "sha256": "266f58f4837497f2bdc5e041fa3b672906a4cb934a20008a33f92e3032072336",
+        "role": "documentation",
+        "origin": {
+          "kind": "generated_fixture",
+          "generator": "backend/scripts/plugin_samples_bio.py",
+          "generator_sha256": "5ec25b14053c29d7f0b6ec7443f4994eec9d05eb448b8d3c302289488e3098c1",
+          "description": "数据生成/格式转换参数记录；不是上游下载文件。"
+        }
+      }
+    ]
+  },
+  {
+    "dataset_id": "viz-bio-physionet-eeg",
+    "name": "PhysioNet公开EEG基线与明确标注的声化转换",
+    "description": "EEG Motor Movement/Imagery v1.0.0的S001R01睁眼静息基线EDF+；原64导EEG与注释保留。附加WAV只是第0通道原始整数样本以8000Hz重解释的声化，不是现场声音或临床诊断。",
+    "domain": "general",
+    "view_kind": "series",
+    "plugin_id": "viz-edf-signals",
+    "entry_file": "S001R01.edf",
+    "publisher": "PhysioNet / BCI R&D Program, Wadsworth Center",
+    "source_url": "https://physionet.org/content/eegmmidb/1.0.0/",
+    "license": "Open Data Commons Attribution License v1.0",
+    "license_url": "https://physionet.org/content/eegmmidb/view-license/1.0.0/",
+    "license_details": "官方数据集明确Open Access，并将files许可指定为Open Data Commons Attribution License v1.0。引用Gerwin Schalk (2009), DOI 10.13026/C28G6P及BCI2000论文；标注WAV转换。未获取受控数据或额外身份资料。",
+    "authors": [
+      "Gerwin Schalk"
+    ],
+    "doi": "10.13026/C28G6P",
+    "source_version": "PhysioNet eegmmidb 1.0.0",
+    "sample_kind": "scientific_derived",
+    "sample_scope": "完整单条公开S001R01基线记录；并非109人全部数据。WAV仅通道0，数字样本不放大，以8000Hz播放，原始采样率160Hz、时间压缩50倍。不能用WAV播放时间当作实验时间。",
+    "transformation": "原EDF+不变。按EDF记录布局提取通道0有符号little-endian 16位数字样本，未重采样/插值/滤波/放大；WAV采样率声明8000而原EEG160，用于50倍时间声化。WAV不是真实声学观测，低幅度可能较安静。",
+    "test_steps": [
+      "EDF选择通道0与前10秒，检查160Hz与物理单位；不要把注释通道作普通信号。",
+      "WAV选择音频波形/播放；约1.22秒对应约61秒EEG，不能作原始声音或诊断解释。"
+    ],
+    "files": [
+      {
+        "path": "S001R01.edf",
+        "size": 1275936,
+        "sha256": "4743b736131a7e147c150e8b37711029b6cda5e356c4b3e8261a03cdcaaf8b0c",
+        "role": "data",
+        "url": "https://physionet.org/files/eegmmidb/1.0.0/S001/S001R01.edf"
+      },
+      {
+        "path": "eeg-channel0-sonification.wav",
+        "size": 19564,
+        "sha256": "bd431a0d576fe12638417f4a89584c740bf7e577df1379baab0d68ca447e5d38",
+        "role": "data",
+        "derived_from": [
+          "S001R01.edf"
+        ]
+      },
+      {
+        "path": "GENERATION_SPEC.json",
+        "size": 249,
+        "sha256": "0c1310a24baccc944240e8a40f7e1100089dec5da6f1ac13576fae65dc75e5b5",
+        "role": "documentation",
+        "origin": {
+          "kind": "generated_fixture",
+          "generator": "backend/scripts/plugin_samples_bio.py",
+          "generator_sha256": "5ec25b14053c29d7f0b6ec7443f4994eec9d05eb448b8d3c302289488e3098c1",
+          "description": "数据生成/格式转换参数记录；不是上游下载文件。"
+        }
+      }
+    ]
+  },
+  {
+    "dataset_id": "viz-bio-lightmycells-classic-tiff",
+    "name": "真实犬细胞核图像：普通TIFF像素无损兼容样例",
+    "description": "Light My Cells 已发布犬细胞核单张影像的普通 TIFF-6 兼容副本，1200×1200 uint16 全像素与原始 OME-BigTIFF 完全相同。只转换容器，不增强、不归一化、不裁剪、不重采样；不代表新的独立观测。原始 OME 文件随附，保留上游完整显微元数据。",
+    "domain": "image_science",
+    "view_kind": "image",
+    "plugin_id": "tiff",
+    "entry_file": "nucleus-classic-uint16.tiff",
+    "source_url": "https://www.ebi.ac.uk/biostudies/BioImages/studies/S-BIAD1047",
+    "publisher": "France-BioImaging / EMBL-EBI BioImage Archive",
+    "license": "CC BY 4.0",
+    "license_url": "https://creativecommons.org/licenses/by/4.0/legalcode",
+    "license_details": "BioImage Archive S-BIAD1047 官方研究元数据明确指定 CC BY 4.0；允许复制、分享和改编，须署名、保留许可链接并说明改动。来源论文为 2D Multimodal Image Collection for Fluorescence Prediction from Transmitted Light Microscopy，https://doi.org/10.1038/s41597-026-07004-w。本地文件是官网单文件原样下载，未调整亮度或改变像素。 本轮产生容器转换文件，已明确记录改动，原文件保留。 本补充数据集新增普通 TIFF-6 格式副本，许可与署名不变。",
+    "authors": [
+      "Dorian Kauffmann",
+      "Guillaume Gay",
+      "Emmanuel Faure",
+      "Julio Mateos-Langerak",
+      "Oriane Pourcelot",
+      "Virginie Georget",
+      "Maëlle Carraz",
+      "Juliette Van Dijk",
+      "Stéphanie Bosch",
+      "Elsa Castellani",
+      "Qiyan Mao",
+      "Laura Ruiz",
+      "Valentin Asei-Ceschino",
+      "Tudor Manoliu",
+      "Julia Bonnet-Gelebart",
+      "Youssef Elhabouz",
+      "Marc Tramier",
+      "Jacques Pécréaux",
+      "Louis Ruel",
+      "Jean-Bernard Fiche",
+      "David Lleres",
+      "Christine Doucet",
+      "Erwan Gandon",
+      "Yves Lutz",
+      "Bertrand Vernay",
+      "Daniel Stockholm",
+      "Abbass Jaber",
+      "Aude Moret",
+      "Romain Morichon",
+      "Mónica Fernández-Monreal",
+      "Edouard Bertrand"
+    ],
+    "source_version": "S-BIAD1047，官方元数据 ReleaseDate 2025-02-26；2026-09-18 下载快照",
+    "sample_scope": "Study_24/image_399_Nucleus.ome.tiff 一张完整的已发布 OME-TIFF。官方 Study Component 名为 Cocker 4，描述为正常成年雌性可卡犬；不是人体影像。保留单通道 1200×1200 全部分辨率与 OME 元数据，未取得该库其他图像。",
+    "suggested_questions": [
+      "统计这张图像的细胞核数量，并说明阈值及分割误差。",
+      "比较细胞核面积、形态和荧光强度分布；不要将单张图像推断为群体实验结论。"
+    ],
+    "files": [
+      {
+        "path": "image_399_Nucleus.ome.tiff",
+        "url": "https://ftp.ebi.ac.uk/biostudies/fire/S-BIAD/047/S-BIAD1047/Files/Images/Study_24/image_399_Nucleus.ome.tiff",
+        "size": 2239243,
+        "sha256": "61892dc211cf96032c14752a734c61d414980006490e65795faec14483c06048"
+      },
+      {
+        "path": "nucleus-classic-uint16.tiff",
+        "size": 2880122,
+        "sha256": "d13f993415506041e260876b9414a13f1b3a9532e831f69a73073d0781fb9c8a",
+        "role": "data",
+        "derived_from": [
+          "image_399_Nucleus.ome.tiff"
+        ]
+      },
+      {
+        "path": "GENERATION_SPEC.json",
+        "size": 576,
+        "sha256": "8436811549fa697d696d9561847472b9d4b5d3a887052e838e1df97a6424454f",
+        "role": "documentation",
+        "origin": {
+          "kind": "generated_fixture",
+          "generator": "backend/scripts/plugin_samples_bio_classic_tiff.py",
+          "generator_sha256": "414a4377281bfb30e6c85e60a6022141702f6c921eb6cd2d5a0fb2b98da4bc9f",
+          "description": "普通 TIFF-6 无损容器转换参数；不是上游发布文件。"
+        }
+      }
+    ],
+    "sample_kind": "scientific_derived",
+    "transformation": "原始 OME-BigTIFF 经 Pillow 解码后，以未压缩 little-endian TIFF-6 单平面 uint16 写出；全部 1,440,000 像素逐项相同。派生文件不声明 OME 或物理标定；原始 OME 元数据仅在随附原件内保留。",
+    "test_steps": [
+      "打开 nucleus-classic-uint16.tiff，选择 TIFF 栅格插件，确认1200×1200灰度影像可见。",
+      "用原始 OME-BigTIFF 与兼容文件读取数组比对，必须完整逐像素相等；屏幕亮度不代表原始数值。"
+    ]
+  }
+]

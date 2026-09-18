@@ -1,0 +1,123 @@
+{
+  "dataset_id": "viz-plugin-mesh-scikit-fem",
+  "external_id": "viz-plugin-mesh-scikit-fem",
+  "data_center_id": "reviewed-visualization-plugin-tests",
+  "data_center_name": "逐插件可视化测试样例",
+  "name": "插件测试·scikit-fem 数值网格与 OBJ 表面",
+  "description": "scikit-fem 官方示例 Gmsh 网格转换为 ASCII VTU，另提供从原四面体外表面提取的 OBJ。用于有限元网格与几何查看；无新增求解结果。",
+  "domain": "general",
+  "data_type": "msh, obj, vtu",
+  "temporal_coverage": "",
+  "spatial_coverage": "",
+  "tags": [
+    "插件测试样例",
+    "viz-simulation-mesh",
+    "official_fixture",
+    "structure",
+    "general"
+  ],
+  "metadata": {
+    "curated": true,
+    "source_catalog": "plugin-tests",
+    "catalog_version": 1,
+    "source_descriptor_sha256": "e0c5297c56b661d7d496e478fef5374fd371efce1bf407b60a640461acd8e3e9",
+    "download_date": "2026-09-18",
+    "inventory_complete": true,
+    "recursive_file_count": 5,
+    "total_size_bytes": 31403,
+    "visualization_view_kind": "structure",
+    "visualization_plugin_id": "viz-simulation-mesh",
+    "visualization_entry_file": "mesh.vtu",
+    "sample_note": "原始 Gmsh 4.1 网格含 81 点、340 单元；VTU 保留所有点、单元和 GmshEntity 分类。OBJ 为四面体集合的 156 个外边界三角形，保留 81 点，不包含内部单元和场值。",
+    "provenance": [
+      {
+        "path": "cube_oriented_sub.msh",
+        "size": 12909,
+        "sha256": "1eff6f31bac4a995e2367bdcb011b2ef548e22c996892cd1ec50d6327b21da99",
+        "role": "data",
+        "url": "https://raw.githubusercontent.com/kinnala/scikit-fem/a9ea0d58af5364948ccbd8a89b4eaf05940cf407/docs/examples/meshes/cube_oriented_sub.msh"
+      },
+      {
+        "path": "mesh.vtu",
+        "size": 9902,
+        "sha256": "93cca2f9052663807430bd9861302c30bda4374141afc4a918e7544153e23780",
+        "role": "data",
+        "derived_from": [
+          "cube_oriented_sub.msh"
+        ]
+      },
+      {
+        "path": "surface.obj",
+        "size": 4705,
+        "sha256": "678bd1cd06d06ebab94ed7997feca25a3ed597b7a6d550d7da11ae0ed8a403fa",
+        "role": "data",
+        "derived_from": [
+          "cube_oriented_sub.msh"
+        ]
+      },
+      {
+        "path": "LICENSE.txt",
+        "size": 1469,
+        "sha256": "383a8df7a707975913b2439594903a9b7e4f31372da3cd7be9b096ce1839ed34",
+        "role": "documentation",
+        "url": "https://raw.githubusercontent.com/kinnala/scikit-fem/a9ea0d58af5364948ccbd8a89b4eaf05940cf407/LICENSE"
+      }
+    ],
+    "publisher": "kinnala/scikit-fem",
+    "source_url": "https://github.com/kinnala/scikit-fem/blob/a9ea0d58af5364948ccbd8a89b4eaf05940cf407/docs/examples/meshes/cube_oriented_sub.msh",
+    "license": "BSD-3-Clause",
+    "license_url": "https://raw.githubusercontent.com/kinnala/scikit-fem/a9ea0d58af5364948ccbd8a89b4eaf05940cf407/LICENSE",
+    "license_details": "官方仓库测试/文档文件，按随附仓库许可保留版权与许可全文。此处标注为官方格式测试样本，不宣称是独立同行评审实验数据。",
+    "authors": [
+      "scikit-fem contributors"
+    ],
+    "source_version": "Git commit a9ea0d58af5364948ccbd8a89b4eaf05940cf407",
+    "sample_scope": "原始 Gmsh 4.1 网格含 81 点、340 单元；VTU 保留所有点、单元和 GmshEntity 分类。OBJ 为四面体集合的 156 个外边界三角形，保留 81 点，不包含内部单元和场值。",
+    "transformation": {
+      "generator": "backend/scripts/plugin_samples_chem.py",
+      "changes": "确定性解析 ASCII Gmsh 4.1；VTU 重新编码节点/单元且携带 entity 标签；OBJ 去掉出现两次的四面体共享面，仅保留外边界。原件包含完整物理组等额外元数据，派生文件不是原件替代。"
+    },
+    "sample_kind": "official_fixture",
+    "test_steps": [
+      "打开 mesh.vtu，在视图选择器选择 viz-simulation-mesh。",
+      "确认无格式错误且数值/结构按样本范围显示；不执行拟合或外部请求。"
+    ]
+  },
+  "files": [
+    {
+      "path": "LICENSE.txt",
+      "size": 1469,
+      "sha256": "383a8df7a707975913b2439594903a9b7e4f31372da3cd7be9b096ce1839ed34",
+      "role": "documentation",
+      "content_type": "text/plain"
+    },
+    {
+      "path": "SOURCE.md",
+      "size": 2418,
+      "sha256": "8933df3d03f80f40076c2dc139654d5444ea1a49b57e9c163dea2ba6a967b286",
+      "role": "documentation",
+      "content_type": "text/markdown"
+    },
+    {
+      "path": "cube_oriented_sub.msh",
+      "size": 12909,
+      "sha256": "1eff6f31bac4a995e2367bdcb011b2ef548e22c996892cd1ec50d6327b21da99",
+      "role": "data",
+      "content_type": "model/mesh"
+    },
+    {
+      "path": "mesh.vtu",
+      "size": 9902,
+      "sha256": "93cca2f9052663807430bd9861302c30bda4374141afc4a918e7544153e23780",
+      "role": "data",
+      "content_type": "model/vnd.vtu"
+    },
+    {
+      "path": "surface.obj",
+      "size": 4705,
+      "sha256": "678bd1cd06d06ebab94ed7997feca25a3ed597b7a6d550d7da11ae0ed8a403fa",
+      "role": "data",
+      "content_type": "application/x-tgif"
+    }
+  ]
+}

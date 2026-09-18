@@ -1,0 +1,86 @@
+{
+  "dataset_id": "viz-test-powerpoint",
+  "external_id": "viz-test-powerpoint",
+  "data_center_id": "reviewed-visualization-plugin-tests",
+  "data_center_name": "逐插件可视化测试样例",
+  "name": "插件测试 · PowerPoint 演示预览 · python-pptx 图表坐标轴",
+  "description": "python-pptx v1.0.2 官方图表格式测试夹具，非科研观测。静态分页预览，不要求播放动画或视频。",
+  "domain": "documents",
+  "data_type": "pptx",
+  "temporal_coverage": "",
+  "spatial_coverage": "",
+  "tags": [
+    "插件测试样例",
+    "viz-powerpoint",
+    "official_fixture",
+    "document",
+    "documents"
+  ],
+  "metadata": {
+    "curated": true,
+    "source_catalog": "plugin-tests",
+    "catalog_version": 1,
+    "source_descriptor_sha256": "9ae849b1f4a249cae15e4466d70d977878164dbc461a9dd1d32500223fde8806",
+    "download_date": "2026-09-18",
+    "inventory_complete": true,
+    "recursive_file_count": 3,
+    "total_size_bytes": 369218,
+    "visualization_view_kind": "document",
+    "visualization_plugin_id": "viz-powerpoint",
+    "visualization_entry_file": "cht-axis-props.pptx",
+    "sample_note": "python-pptx v1.0.2 官方图表格式测试夹具，非科研观测。静态分页预览，不要求播放动画或视频。",
+    "provenance": [
+      {
+        "path": "cht-axis-props.pptx",
+        "size": 366536,
+        "sha256": "e5fc3cf4f639cd686d09859702346dc3a269d35eaf7a4e74e6f19ba9fe8c5fa3",
+        "url": "https://raw.githubusercontent.com/scanny/python-pptx/v1.0.2/features/steps/test_files/cht-axis-props.pptx"
+      },
+      {
+        "path": "pptx-LICENSE.txt",
+        "size": 1104,
+        "sha256": "7652f271e46d0d533e9dc463f3b5fcbdcacf4d6a9c8d6b554d15efd0f37f6132",
+        "role": "documentation",
+        "url": "https://raw.githubusercontent.com/scanny/python-pptx/v1.0.2/LICENSE"
+      }
+    ],
+    "publisher": "python-pptx · Steve Canny",
+    "source_url": "https://github.com/scanny/python-pptx/tree/v1.0.2/features/steps/test_files",
+    "license": "MIT",
+    "license_url": "https://github.com/scanny/python-pptx/blob/v1.0.2/LICENSE",
+    "license_details": "MIT；用于可视化测试，样本性质为 official_fixture。",
+    "authors": [
+      "python-pptx · Steve Canny"
+    ],
+    "source_version": "python-pptx v1.0.2",
+    "sample_scope": "python-pptx v1.0.2 官方图表格式测试夹具，非科研观测。静态分页预览，不要求播放动画或视频。",
+    "sample_kind": "official_fixture",
+    "test_steps": [
+      "预览 cht-axis-props.pptx，选择 viz-powerpoint",
+      "检查图表、标题、坐标轴；翻页及调整缩放；静态预览不播放动画"
+    ]
+  },
+  "files": [
+    {
+      "path": "SOURCE.md",
+      "size": 1578,
+      "sha256": "8c053a75ebde57ac1f3b692d31190e942afde4d49ca4bed054da58d8ffe074bb",
+      "role": "documentation",
+      "content_type": "text/markdown"
+    },
+    {
+      "path": "cht-axis-props.pptx",
+      "size": 366536,
+      "sha256": "e5fc3cf4f639cd686d09859702346dc3a269d35eaf7a4e74e6f19ba9fe8c5fa3",
+      "role": "data",
+      "content_type": "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+    },
+    {
+      "path": "pptx-LICENSE.txt",
+      "size": 1104,
+      "sha256": "7652f271e46d0d533e9dc463f3b5fcbdcacf4d6a9c8d6b554d15efd0f37f6132",
+      "role": "documentation",
+      "content_type": "text/plain"
+    }
+  ]
+}

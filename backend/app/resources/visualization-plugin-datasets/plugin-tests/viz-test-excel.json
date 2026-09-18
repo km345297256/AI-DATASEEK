@@ -1,0 +1,89 @@
+{
+  "dataset_id": "viz-test-excel",
+  "external_id": "10.24432/C51307",
+  "data_center_id": "reviewed-visualization-plugin-tests",
+  "data_center_name": "逐插件可视化测试样例",
+  "name": "插件测试 · Excel 工作表预览 · UCI 建筑能效",
+  "description": "768种建筑模拟配置，8个输入特征及供暖/制冷负荷两个响应，共10列。研究原始发布工作簿，未填补末尾空白行。",
+  "domain": "tabular",
+  "data_type": "xlsx, zip",
+  "temporal_coverage": "",
+  "spatial_coverage": "",
+  "tags": [
+    "插件测试样例",
+    "viz-excel",
+    "scientific_original",
+    "table",
+    "tabular"
+  ],
+  "metadata": {
+    "curated": true,
+    "source_catalog": "plugin-tests",
+    "catalog_version": 1,
+    "source_descriptor_sha256": "44856f48d35f0678289b74a4e023ebf39a30c5279eaded7c0992f5290616025e",
+    "download_date": "2026-09-18",
+    "inventory_complete": true,
+    "recursive_file_count": 3,
+    "total_size_bytes": 154188,
+    "visualization_view_kind": "table",
+    "visualization_plugin_id": "viz-excel",
+    "visualization_entry_file": "ENB2012_data.xlsx",
+    "sample_note": "768种建筑模拟配置，8个输入特征及供暖/制冷负荷两个响应，共10列。研究原始发布工作簿，未填补末尾空白行。",
+    "provenance": [
+      {
+        "path": "energy-efficiency.zip",
+        "size": 76321,
+        "sha256": "499441eee27929a4b00417f58fd8c63c9cc14b8a71520cd0dd27fcb626738351",
+        "url": "https://archive.ics.uci.edu/static/public/242/energy+efficiency.zip"
+      },
+      {
+        "path": "ENB2012_data.xlsx",
+        "size": 76189,
+        "sha256": "0089fcffc1415e41e2ff63730cca5280efe54fc43d722dfde1b0aaa808e35dc4",
+        "derived_from": [
+          "energy-efficiency.zip"
+        ]
+      }
+    ],
+    "publisher": "UCI · Athanasios Tsanas / Angeliki Xifara",
+    "source_url": "https://archive.ics.uci.edu/dataset/242/energy%2Befficiency",
+    "license": "CC BY 4.0",
+    "license_url": "https://creativecommons.org/licenses/by/4.0/",
+    "license_details": "CC BY 4.0；用于可视化测试，样本性质为 scientific_original。",
+    "authors": [
+      "UCI · Athanasios Tsanas / Angeliki Xifara"
+    ],
+    "source_version": "2026-09-18 已审查快照",
+    "sample_scope": "768种建筑模拟配置，8个输入特征及供暖/制冷负荷两个响应，共10列。研究原始发布工作簿，未填补末尾空白行。",
+    "doi": "10.24432/C51307",
+    "transformation": "只提取ZIP内精确成员ENB2012_data.xlsx，工作簿未改动。",
+    "sample_kind": "scientific_original",
+    "test_steps": [
+      "预览 ENB2012_data.xlsx，选择 viz-excel",
+      "选择工作表，核对 X1–X8、Y1、Y2；切换行窗口；共有768条有效模拟记录"
+    ]
+  },
+  "files": [
+    {
+      "path": "ENB2012_data.xlsx",
+      "size": 76189,
+      "sha256": "0089fcffc1415e41e2ff63730cca5280efe54fc43d722dfde1b0aaa808e35dc4",
+      "role": "data",
+      "content_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    },
+    {
+      "path": "SOURCE.md",
+      "size": 1678,
+      "sha256": "50b12f31bb56f03c204b5fe4dd5bf91a2faa97b5a36e22138c787fe21dc7f490",
+      "role": "documentation",
+      "content_type": "text/markdown"
+    },
+    {
+      "path": "energy-efficiency.zip",
+      "size": 76321,
+      "sha256": "499441eee27929a4b00417f58fd8c63c9cc14b8a71520cd0dd27fcb626738351",
+      "role": "data",
+      "content_type": "application/zip"
+    }
+  ]
+}

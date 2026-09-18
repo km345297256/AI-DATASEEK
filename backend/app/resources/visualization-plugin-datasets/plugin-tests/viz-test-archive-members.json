@@ -1,0 +1,88 @@
+{
+  "dataset_id": "viz-test-archive-members",
+  "external_id": "viz-test-archive-members",
+  "data_center_id": "reviewed-visualization-plugin-tests",
+  "data_center_name": "逐插件可视化测试样例",
+  "name": "插件测试 · 归档成员文本预览 · Palmer 企鹅格式转换",
+  "description": "选择 penguins.csv 成员，显示有界文本预览；切换 README.md。由同一份CC0科学观测转换，不增删记录；原CSV保留。",
+  "domain": "tabular",
+  "data_type": "csv, zip",
+  "temporal_coverage": "",
+  "spatial_coverage": "",
+  "tags": [
+    "插件测试样例",
+    "viz-archive-members",
+    "scientific_derived",
+    "text",
+    "tabular"
+  ],
+  "metadata": {
+    "curated": true,
+    "source_catalog": "plugin-tests",
+    "catalog_version": 1,
+    "source_descriptor_sha256": "935b2a9a2c36629a02c6a8d994279b5de3c643cdc02864443b3b102413578270",
+    "download_date": "2026-09-18",
+    "inventory_complete": true,
+    "recursive_file_count": 3,
+    "total_size_bytes": 23712,
+    "visualization_view_kind": "text",
+    "visualization_plugin_id": "viz-archive-members",
+    "visualization_entry_file": "penguins-bundle.zip",
+    "sample_note": "选择 penguins.csv 成员，显示有界文本预览；切换 README.md。由同一份CC0科学观测转换，不增删记录；原CSV保留。",
+    "provenance": [
+      {
+        "path": "penguins.csv",
+        "size": 15241,
+        "sha256": "f204db2c753b0937caac3cb35258562c14f073e4bbc76be24b4c51ce22767a93",
+        "url": "https://raw.githubusercontent.com/allisonhorst/palmerpenguins/8957207b78d6ccd1b4654a9dd9c9041b657478ab/inst/extdata/penguins.csv"
+      },
+      {
+        "path": "penguins-bundle.zip",
+        "size": 6701,
+        "sha256": "99656819f02d6b16ea246d4807f11b523ca6fa433c0239b87662272b7198cc9f",
+        "derived_from": [
+          "penguins.csv"
+        ]
+      }
+    ],
+    "publisher": "Palmer Station LTER / palmerpenguins",
+    "source_url": "https://github.com/allisonhorst/palmerpenguins",
+    "license": "CC0-1.0",
+    "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "license_details": "CC0-1.0；用于可视化测试，样本性质为 scientific_derived。",
+    "authors": [
+      "Palmer Station LTER / palmerpenguins"
+    ],
+    "source_version": "2026-09-18 已审查快照",
+    "sample_scope": "选择 penguins.csv 成员，显示有界文本预览；切换 README.md。由同一份CC0科学观测转换，不增删记录；原CSV保留。",
+    "transformation": "backend/scripts/plugin_samples_tables.py：数字字段按单位转数值；NA仅在数据库/JSON/Arrow转null，HTML/MD保持原文本。344行8列19缺失，未填充。",
+    "sample_kind": "scientific_derived",
+    "test_steps": [
+      "选择文件 penguins-bundle.zip，再选择插件 viz-archive-members",
+      "选择 penguins.csv 成员，显示有界文本预览；切换 README.md"
+    ]
+  },
+  "files": [
+    {
+      "path": "SOURCE.md",
+      "size": 1770,
+      "sha256": "bf978c54c2452f4809a8f2bafa3695f0625371794633474afa4d2d71e330b69e",
+      "role": "documentation",
+      "content_type": "text/markdown"
+    },
+    {
+      "path": "penguins-bundle.zip",
+      "size": 6701,
+      "sha256": "99656819f02d6b16ea246d4807f11b523ca6fa433c0239b87662272b7198cc9f",
+      "role": "data",
+      "content_type": "application/zip"
+    },
+    {
+      "path": "penguins.csv",
+      "size": 15241,
+      "sha256": "f204db2c753b0937caac3cb35258562c14f073e4bbc76be24b4c51ce22767a93",
+      "role": "data",
+      "content_type": "text/csv"
+    }
+  ]
+}

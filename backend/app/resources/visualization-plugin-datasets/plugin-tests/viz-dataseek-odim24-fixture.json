@@ -1,0 +1,98 @@
+{
+  "dataset_id": "viz-dataseek-odim24-fixture",
+  "external_id": "viz-dataseek-odim24-fixture",
+  "data_center_id": "reviewed-visualization-plugin-tests",
+  "data_center_name": "逐插件可视化测试样例",
+  "name": "插件测试样例｜ODIM 2.4 合成雷达双仰角",
+  "description": "本项目雷达安全契约的明确合成回归样本：2 个仰角、DBZH 与 VRADH、8×12 网格；用于验证窗口、gain/offset、nodata 和 undetect 区分。不是实测降水/风场，不能用于科学推断。",
+  "domain": "geoscience",
+  "data_type": "h5",
+  "temporal_coverage": "",
+  "spatial_coverage": "",
+  "tags": [
+    "插件测试样例",
+    "viz-radar-window",
+    "project_fixture",
+    "image",
+    "geoscience"
+  ],
+  "metadata": {
+    "curated": true,
+    "source_catalog": "plugin-tests",
+    "catalog_version": 1,
+    "source_descriptor_sha256": "18b0baede29ea39418c81e23d852f09db3f9b238ccdc85d5107ca335a63cd05f",
+    "download_date": "2026-09-18",
+    "inventory_complete": true,
+    "recursive_file_count": 3,
+    "total_size_bytes": 35491,
+    "visualization_view_kind": "image",
+    "visualization_plugin_id": "viz-radar-window",
+    "visualization_entry_file": "synthetic-odim24.h5",
+    "sample_note": "纯合成 2 sweep × 2 quantity × 8×12 存储单元；含 nodata=255 与 undetect=0、gain=0.5、offset=-32。选择真实 wradlib 观测时发现其 ODIM2.2 原件 nodata=undetect，未篡改观测标记来冒充通过。",
+    "provenance": [
+      {
+        "path": "synthetic-odim24.h5",
+        "size": 32168,
+        "sha256": "925377d9e6ce072e1c576962fa0feb3d7a859dd03b5da7b4aa408ce168ab2164",
+        "origin": {
+          "kind": "generated_fixture",
+          "generator": "sandbox/tests/radar_window_fixtures.py",
+          "generator_sha256": "a564c5191cebff2593a73ac0235287aef161ab63d473565a37b10f9b6c79d717",
+          "description": "radar_bytes() 默认参数生成 2 仰角 × 2 数据量、8×12 单元的合成 ODIM2.4 回归数据；只删掉根 how 组的安全测试占位文字，不改任何栅格或物理标定元数据。不是雷达观测。"
+        },
+        "role": "data"
+      },
+      {
+        "path": "LICENSE.txt",
+        "size": 1066,
+        "sha256": "991f0bde5249ee6aad0a5a597197c7a7f6024abd2650516fcd7a83d908234115",
+        "origin": {
+          "kind": "project_fixture",
+          "repository_file": "LICENSE",
+          "sha256": "991f0bde5249ee6aad0a5a597197c7a7f6024abd2650516fcd7a83d908234115"
+        },
+        "role": "documentation"
+      }
+    ],
+    "publisher": "AI-DataSeek contributors",
+    "source_url": "https://github.com/km345297256/AI-DATASEEK",
+    "license": "MIT",
+    "license_url": "https://github.com/km345297256/AI-DATASEEK/blob/v2/LICENSE",
+    "license_details": "使用当前本项目 MIT 许可和经过审阅的回归 fixture 生成器，保留 Copyright (c) 2026 Simpleyyt 与完整许可。不是从外部网址下载的观测，origin 记录本地生成器文件与 SHA256。",
+    "authors": [
+      "AI-DataSeek contributors"
+    ],
+    "source_version": "radar_window_fixtures.py SHA256 a564c5191cebff2593a73ac0235287aef161ab63d473565a37b10f9b6c79d717",
+    "sample_scope": "纯合成 2 sweep × 2 quantity × 8×12 存储单元；含 nodata=255 与 undetect=0、gain=0.5、offset=-32。选择真实 wradlib 观测时发现其 ODIM2.2 原件 nodata=undetect，未篡改观测标记来冒充通过。",
+    "transformation": "derive_radar_fixture.py 调用已审阅 radar_bytes() 默认参数；删除 how 组的安全测试占位文字，栅格、标定、几何均不变。生成器和本地 MIT 许可 hash 固定。",
+    "sample_kind": "project_fixture",
+    "test_steps": [
+      "打开 synthetic-odim24.h5，选择 viz-radar-window。",
+      "选 sweep=1、quantity=DBZH，ray_start=1、ray_count=2、gate_start=1、gate_count=4，decode=raw。",
+      "窗口有 8 个原值、恰好 1 个 nodata 与 1 个 undetect；检查二者不同样式，不能解读为实际天气。"
+    ]
+  },
+  "files": [
+    {
+      "path": "LICENSE.txt",
+      "size": 1066,
+      "sha256": "991f0bde5249ee6aad0a5a597197c7a7f6024abd2650516fcd7a83d908234115",
+      "role": "documentation",
+      "content_type": "text/plain"
+    },
+    {
+      "path": "SOURCE.md",
+      "size": 2257,
+      "sha256": "0aafddc00752c02cf0c463306fc460d5db1d74755ed068a837bd59038425eea1",
+      "role": "documentation",
+      "content_type": "text/markdown"
+    },
+    {
+      "path": "synthetic-odim24.h5",
+      "size": 32168,
+      "sha256": "925377d9e6ce072e1c576962fa0feb3d7a859dd03b5da7b4aa408ce168ab2164",
+      "role": "data",
+      "content_type": "application/x-hdf5"
+    }
+  ]
+}

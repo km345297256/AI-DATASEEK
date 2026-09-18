@@ -1,0 +1,72 @@
+{
+  "dataset_id": "viz-plos-research-software",
+  "external_id": "10.1371/journal.pcbi.1005412",
+  "data_center_id": "reviewed-open-science-catalog",
+  "data_center_name": "开放科学可视化样例",
+  "name": "可视化样例·文档：科研软件稳健性开放论文",
+  "description": "Taschuk 与 Wilson 在 PLOS Computational Biology 发表的开放论文 Ten simple rules for making research software more robust，10 页 PDF。用于文档分页预览、文本提取与可复现性阅读分析；属于文献型样例，不是实验测量数值数据。",
+  "domain": "documents",
+  "data_type": "pdf",
+  "temporal_coverage": "",
+  "spatial_coverage": "",
+  "tags": [
+    "可视化样例",
+    "开放科学",
+    "document",
+    "viz-pdfjs",
+    "documents"
+  ],
+  "metadata": {
+    "curated": true,
+    "source_catalog": "open-science",
+    "catalog_version": 1,
+    "source_descriptor_sha256": "d074f32e250395bb68456f18f1f83f60b3f5ddd5e325edc2b11b9901fc3d52fe",
+    "download_date": "2026-09-18",
+    "inventory_complete": true,
+    "recursive_file_count": 2,
+    "total_size_bytes": 1214376,
+    "visualization_view_kind": "document",
+    "visualization_plugin_id": "viz-pdfjs",
+    "visualization_entry_file": "research-software-robustness.pdf",
+    "sample_note": "完整 10 页出版 PDF；不含补充材料。文献型科学资料，用于文档可视化。",
+    "provenance": [
+      {
+        "path": "research-software-robustness.pdf",
+        "url": "https://journals.plos.org/ploscompbiol/article/file?id=10.1371/journal.pcbi.1005412&type=printable",
+        "size": 1212928,
+        "sha256": "002081be65fbd42c0356d3e49ac7f49fa6202f566f50341481ead22d3cce78b2"
+      }
+    ],
+    "publisher": "PLOS Computational Biology",
+    "source_url": "https://journals.plos.org/ploscompbiol/article?id=10.1371/journal.pcbi.1005412",
+    "license": "CC BY 4.0",
+    "license_url": "https://creativecommons.org/licenses/by/4.0/",
+    "license_details": "版权归 2017 Taschuk、Wilson，按 CC BY 4.0 使用须保留作者及来源署名。原 PDF 未改写。",
+    "authors": [
+      "Morgan Taschuk",
+      "Greg Wilson"
+    ],
+    "source_version": "Published 2017-04-13; downloaded 2026-09-18",
+    "sample_scope": "完整 10 页出版 PDF；不含补充材料。文献型科学资料，用于文档可视化。",
+    "doi": "10.1371/journal.pcbi.1005412",
+    "suggested_questions": [
+      "归纳文中与科研数据分析可复现性相关的建议，并标注页码。"
+    ]
+  },
+  "files": [
+    {
+      "path": "SOURCE.md",
+      "size": 1448,
+      "sha256": "33384f186e5b84e7c4d815d75a5053f604eb4ac6dade01fa0c68aaa963e969c5",
+      "role": "documentation",
+      "content_type": "text/markdown"
+    },
+    {
+      "path": "research-software-robustness.pdf",
+      "size": 1212928,
+      "sha256": "002081be65fbd42c0356d3e49ac7f49fa6202f566f50341481ead22d3cce78b2",
+      "role": "data",
+      "content_type": "application/pdf"
+    }
+  ]
+}

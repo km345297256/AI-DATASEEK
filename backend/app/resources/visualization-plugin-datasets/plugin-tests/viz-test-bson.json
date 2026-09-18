@@ -1,0 +1,94 @@
+{
+  "dataset_id": "viz-test-bson",
+  "external_id": "viz-test-bson",
+  "data_center_id": "reviewed-visualization-plugin-tests",
+  "data_center_name": "逐插件可视化测试样例",
+  "name": "插件测试 · BSON 文档记录 · BSON 原生类型",
+  "description": "本项目已有的原创合成兼容性测试夹具，非真实科研观测。展开对象/数组；int64、Decimal128 保持精度；JS和正则仅显示安全标记，不执行。",
+  "domain": "tabular",
+  "data_type": "bson",
+  "temporal_coverage": "",
+  "spatial_coverage": "",
+  "tags": [
+    "插件测试样例",
+    "viz-bson",
+    "project_fixture",
+    "tree",
+    "tabular"
+  ],
+  "metadata": {
+    "curated": true,
+    "source_catalog": "plugin-tests",
+    "catalog_version": 1,
+    "source_descriptor_sha256": "0b58613b52e496684d8df07233f9f35315089adcde846935f97bf7fe60acfcbf",
+    "download_date": "2026-09-18",
+    "inventory_complete": true,
+    "recursive_file_count": 3,
+    "total_size_bytes": 3970,
+    "visualization_view_kind": "tree",
+    "visualization_plugin_id": "viz-bson",
+    "visualization_entry_file": "synthetic-pymongo-4.17.0.bson",
+    "sample_note": "本项目已有的原创合成兼容性测试夹具，非真实科研观测。展开对象/数组；int64、Decimal128 保持精度；JS和正则仅显示安全标记，不执行。",
+    "provenance": [
+      {
+        "path": "synthetic-pymongo-4.17.0.bson",
+        "size": 1213,
+        "sha256": "239cddebb3967003caf75cf5b20cd1de3c47b0a16df1f66481cee29a244db986",
+        "origin": {
+          "kind": "project_fixture",
+          "repository_file": "sandbox/tests/fixtures/database-records/synthetic-pymongo-4.17.0.bson",
+          "sha256": "239cddebb3967003caf75cf5b20cd1de3c47b0a16df1f66481cee29a244db986"
+        }
+      },
+      {
+        "path": "LICENSE.txt",
+        "size": 1066,
+        "sha256": "991f0bde5249ee6aad0a5a597197c7a7f6024abd2650516fcd7a83d908234115",
+        "role": "documentation",
+        "origin": {
+          "kind": "project_fixture",
+          "repository_file": "LICENSE",
+          "sha256": "991f0bde5249ee6aad0a5a597197c7a7f6024abd2650516fcd7a83d908234115"
+        }
+      }
+    ],
+    "publisher": "AI-DataSeek 测试夹具",
+    "source_url": "https://github.com/km345297256/AI-DATASEEK",
+    "license": "MIT",
+    "license_url": "https://github.com/km345297256/AI-DATASEEK/blob/v2/LICENSE",
+    "license_details": "MIT；用于可视化测试，样本性质为 project_fixture。",
+    "authors": [
+      "AI-DataSeek 测试夹具"
+    ],
+    "source_version": "AI-DataSeek fixture snapshot fb609ed5460e9c247dc58fb2c3cb51410de27c6f",
+    "sample_scope": "本项目已有的原创合成兼容性测试夹具，非真实科研观测。展开对象/数组；int64、Decimal128 保持精度；JS和正则仅显示安全标记，不执行。",
+    "sample_kind": "project_fixture",
+    "test_steps": [
+      "预览主文件并选择 viz-bson",
+      "展开对象/数组；int64、Decimal128 保持精度；JS和正则仅显示安全标记，不执行。"
+    ]
+  },
+  "files": [
+    {
+      "path": "LICENSE.txt",
+      "size": 1066,
+      "sha256": "991f0bde5249ee6aad0a5a597197c7a7f6024abd2650516fcd7a83d908234115",
+      "role": "documentation",
+      "content_type": "text/plain"
+    },
+    {
+      "path": "SOURCE.md",
+      "size": 1691,
+      "sha256": "a2164b57f3bfb38a2f7f124dcd30b844f67a75e13102f77eb1531fbbf44ee64a",
+      "role": "documentation",
+      "content_type": "text/markdown"
+    },
+    {
+      "path": "synthetic-pymongo-4.17.0.bson",
+      "size": 1213,
+      "sha256": "239cddebb3967003caf75cf5b20cd1de3c47b0a16df1f66481cee29a244db986",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    }
+  ]
+}

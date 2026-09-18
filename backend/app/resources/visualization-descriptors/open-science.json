@@ -1,0 +1,503 @@
+[
+  {
+    "dataset_id": "viz-palmer-penguins",
+    "name": "可视化样例·表格：Palmer 南极企鹅观测",
+    "description": "Palmer 群岛三种企鹅的 344 条真实观测，包含物种、岛屿、喙长、喙深、鳍长、体重、性别和年份。适合分页表格、分组统计与散点图；保留来源的 NA 缺失值，不填零。",
+    "domain": "tabular",
+    "view_kind": "table",
+    "plugin_id": "csv",
+    "entry_file": "penguins.csv",
+    "source_url": "https://github.com/allisonhorst/palmerpenguins",
+    "publisher": "Palmer Station LTER / palmerpenguins",
+    "license": "CC0 1.0",
+    "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "license_details": "数据按 CC0 开放；请引用 Gorman、Williams、Fraser (2014) 及 Horst、Hill、Gorman 的 palmerpenguins。正式发表研究建议联系数据提供者，并遵循来源说明的 LTER 数据使用规范。",
+    "authors": [
+      "Kristen B. Gorman",
+      "Tony D. Williams",
+      "William R. Fraser",
+      "Allison M. Horst",
+      "Alison P. Hill"
+    ],
+    "source_version": "Git commit 8957207b78d6ccd1b4654a9dd9c9041b657478ab",
+    "sample_scope": "原项目完整 penguins 简化表，344 行、8 列；不含 penguins_raw 的同位素等额外变量。",
+    "temporal_coverage": "2007–2009",
+    "spatial_coverage": "南极 Palmer 群岛",
+    "suggested_questions": [
+      "比较三种企鹅的体重和鳍长分布，说明缺失值处理。",
+      "喙长与喙深的关系在不同物种之间有何差异？"
+    ],
+    "files": [
+      {
+        "path": "penguins.csv",
+        "url": "https://raw.githubusercontent.com/allisonhorst/palmerpenguins/8957207b78d6ccd1b4654a9dd9c9041b657478ab/inst/extdata/penguins.csv",
+        "size": 15241,
+        "sha256": "f204db2c753b0937caac3cb35258562c14f073e4bbc76be24b4c51ce22767a93"
+      }
+    ]
+  },
+  {
+    "dataset_id": "viz-noaa-mauna-loa-co2",
+    "name": "可视化样例·文本：NOAA 月均二氧化碳观测",
+    "description": "NOAA GML 发布的 Mauna Loa 月均 CO₂ 文本数据，保留原始注释、月均值、去季节值和不确定度。单位为干空气摩尔分数 ppm。负的不确定度等数值是来源定义的标记，不能作为普通观测；火山喷发停测期间的替代站点说明保留在文件头。",
+    "domain": "geoscience",
+    "view_kind": "text",
+    "plugin_id": "text",
+    "entry_file": "co2_mm_mlo.txt",
+    "source_url": "https://gml.noaa.gov/ccgg/trends/data.html",
+    "publisher": "NOAA Global Monitoring Laboratory / Scripps Institution of Oceanography",
+    "license": "NOAA 开放公共数据（保留署名与使用说明）",
+    "license_url": "https://gml.noaa.gov/about/disclaimer.html",
+    "license_details": "NOAA 声明政府服务器数据除另有标注外为公共领域；不得声称自有版权、暗示官方背书或将修改数据冒充官方材料。文件早期 1958–1974 年数据来源为 Scripps，应同时保留 Scripps 和 NOAA 引用及原文件说明。",
+    "authors": [
+      "Xin Lan / NOAA GML",
+      "Ralph Keeling / Scripps",
+      "C. David Keeling / Scripps"
+    ],
+    "source_version": "File Creation: 2026-09-05; downloaded 2026-09-18",
+    "sample_scope": "官方 co2_mm_mlo.txt 完整下载快照，1958-03 至 2026-08；不是实时更新订阅，后续质量控制可能修订数值。",
+    "temporal_coverage": "1958-03–2026-08",
+    "spatial_coverage": "Mauna Loa；2022-12 至 2023-07 初使用 Maunakea 替代观测",
+    "suggested_questions": [
+      "读取文件头说明，区分观测值、插值和缺测标记，再绘制月均 CO₂ 趋势。",
+      "比较 1960 年代和最近十年的 CO₂ 年增长。"
+    ],
+    "files": [
+      {
+        "path": "co2_mm_mlo.txt",
+        "url": "https://gml.noaa.gov/webdata/ccgg/trends/co2/co2_mm_mlo.txt",
+        "size": 59608,
+        "sha256": "c9a91a170d09d16afaaad56c4f383ed4fcb7fa0da967998694842d5c8168bcf3"
+      }
+    ]
+  },
+  {
+    "dataset_id": "viz-plos-research-software",
+    "name": "可视化样例·文档：科研软件稳健性开放论文",
+    "description": "Taschuk 与 Wilson 在 PLOS Computational Biology 发表的开放论文 Ten simple rules for making research software more robust，10 页 PDF。用于文档分页预览、文本提取与可复现性阅读分析；属于文献型样例，不是实验测量数值数据。",
+    "domain": "documents",
+    "view_kind": "document",
+    "plugin_id": "viz-pdfjs",
+    "entry_file": "research-software-robustness.pdf",
+    "source_url": "https://journals.plos.org/ploscompbiol/article?id=10.1371/journal.pcbi.1005412",
+    "publisher": "PLOS Computational Biology",
+    "license": "CC BY 4.0",
+    "license_url": "https://creativecommons.org/licenses/by/4.0/",
+    "license_details": "版权归 2017 Taschuk、Wilson，按 CC BY 4.0 使用须保留作者及来源署名。原 PDF 未改写。",
+    "authors": [
+      "Morgan Taschuk",
+      "Greg Wilson"
+    ],
+    "doi": "10.1371/journal.pcbi.1005412",
+    "source_version": "Published 2017-04-13; downloaded 2026-09-18",
+    "sample_scope": "完整 10 页出版 PDF；不含补充材料。文献型科学资料，用于文档可视化。",
+    "suggested_questions": [
+      "归纳文中与科研数据分析可复现性相关的建议，并标注页码。"
+    ],
+    "files": [
+      {
+        "path": "research-software-robustness.pdf",
+        "url": "https://journals.plos.org/ploscompbiol/article/file?id=10.1371/journal.pcbi.1005412&type=printable",
+        "size": 1212928,
+        "sha256": "002081be65fbd42c0356d3e49ac7f49fa6202f566f50341481ead22d3cce78b2"
+      }
+    ]
+  },
+  {
+    "dataset_id": "viz-usgs-2024-m6-earthquakes",
+    "name": "可视化样例·地图｜USGS 2024 年全球 M≥6 地震地图",
+    "description": "USGS/NEIC 历史地震目录的固定查询快照，包含 2024 年全球 99 个 M≥6 地震的经纬度、震级、时间和深度。附完整原始 GeoJSON 与保留深度的二维 WGS84 地图文件，适合真实点要素地图预览与地震分布分析。",
+    "domain": "geoscience",
+    "view_kind": "map",
+    "plugin_id": "viz-maplibre",
+    "entry_file": "usgs-2024-m6-wgs84-2d.geojson",
+    "source_url": "https://earthquake.usgs.gov/fdsnws/event/1/",
+    "publisher": "U.S. Geological Survey / National Earthquake Information Center",
+    "license": "U.S. Public Domain (USGS-produced data)",
+    "license_url": "https://www.usgs.gov/information-policies-and-instructions/copyrights-and-credits",
+    "license_details": "USGS 官方政策将其自产数据和信息列为美国公有领域，并要求适当注明 USGS 来源。本查询限定 catalog=us，实际 99 条 net 均为 us；不把第三方图片、机构商标或整个网站内容一概标为公有领域。",
+    "authors": [
+      "U.S. Geological Survey"
+    ],
+    "source_version": "Historical 2024 catalog query, downloaded 2026-09-18; upstream catalog may be revised",
+    "sample_scope": "完整保留指定条件的返回结果：starttime=2024-01-01T00:00:00, endtime=2025-01-01T00:00:00, minmagnitude=6, eventtype=earthquake, catalog=us, orderby=time-asc；99 个点。不是全部震级的全球地震全集，不用于实时预警。",
+    "files": [
+      {
+        "path": "usgs-2024-m6-original.geojson",
+        "size": 84499,
+        "sha256": "b08833bbc9bfb467fdaf808825553840443d91793a0a807b638e86422d1cc36f",
+        "url": "https://earthquake.usgs.gov/fdsnws/event/1/query?format=geojson&starttime=2024-01-01T00:00:00&endtime=2025-01-01T00:00:00&minmagnitude=6&eventtype=earthquake&catalog=us&orderby=time-asc",
+        "role": "data"
+      },
+      {
+        "path": "usgs-2024-m6-wgs84-2d.geojson",
+        "size": 129037,
+        "sha256": "d70327cc520822069489662cdb1c099628cf04740adcd654cb48b06eddf101b7",
+        "role": "data",
+        "derived_from": [
+          "usgs-2024-m6-original.geojson"
+        ]
+      }
+    ],
+    "transformation": {
+      "source": "usgs-2024-m6-original.geojson",
+      "output": "usgs-2024-m6-wgs84-2d.geojson",
+      "method": "保留每个原始 Feature、ID 和属性；将原第三坐标深度（km）移至 properties.depth_km，坐标仅保留原 lon/lat；从 properties.title 复制 name 供现有适配器展示。原始 6 值 bbox 保留在 source_bbox，二维 bbox 取对应4值。没有筛选、插值或合成点。",
+      "reason": "USGS GeoJSON 第三坐标是震源深度 km，不是 RFC7946 高度 m。避免三维视图误读。官方格式说明：https://earthquake.usgs.gov/earthquakes/feed/v1.0/geojson.php",
+      "lossless_scope": "对原始 Feature 做反向重构完全一致；完整 HTTP 原件另存。派生文件通过 files.derived_from 记录真实原件，不虚构下载地址。",
+      "reproducible_script": "reproduce-map-graph.mjs"
+    },
+    "validation": {
+      "status": "passed",
+      "features": 99,
+      "all_geometry": "Point",
+      "all_net": "us",
+      "minimum_magnitude": 6,
+      "crs": "WGS84 2D",
+      "original_feature_roundtrip": true,
+      "input_budget_bytes": 67108864,
+      "feature_budget": 10000,
+      "coordinate_budget": 100000
+    }
+  },
+  {
+    "dataset_id": "viz-pdb-myoglobin-1mbn",
+    "name": "可视化样例·三维结构｜RCSB 抹香鲸肌红蛋白三维结构（1MBN）",
+    "description": "经典肌红蛋白 X 射线晶体结构的完整 mmCIF 条目，包含蛋白、血红素与铁配位相关组分。分辨率 2.00 Å，单模型 1,260 个原子、153 个蛋白残基，适合 Mol* 三维结构与链/配体探查。",
+    "domain": "chemistry",
+    "view_kind": "structure",
+    "plugin_id": "viz-molstar",
+    "entry_file": "1MBN.cif",
+    "source_url": "https://www.rcsb.org/structure/1MBN",
+    "publisher": "RCSB Protein Data Bank / wwPDB",
+    "license": "CC0 1.0",
+    "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "license_details": "RCSB 官方 Usage Policies 明确 PDB archive 数据文件采用 CC0 1.0，并鼓励引用原始作者；不是把网站文章的 CC-BY 许可混用于结构数据。政策证据：https://www.rcsb.org/pages/policies",
+    "authors": [
+      "H. C. Watson",
+      "J. C. Kendrew"
+    ],
+    "source_version": "PDB 1MBN entry version 1.5, revision 2026-08-12; downloaded 2026-09-18",
+    "sample_scope": "完整 1MBN mmCIF 结构模型文件，不裁剪原子；不含结构因子和验证报告。PDB DOI 10.2210/pdb1MBN/pdb；原始文献 H. C. Watson (1969), The Stereochemistry of the Protein Myoglobin, Progress in Stereochemistry 4:299。与已有 1CRN、1UBQ 不重复。",
+    "doi": "10.2210/pdb1MBN/pdb",
+    "files": [
+      {
+        "path": "1MBN.cif",
+        "size": 191665,
+        "sha256": "91c8a5754c748c7cc1c1508ee92bc1df4c332be2383c8ae93fd084292ec8722e",
+        "url": "https://files.rcsb.org/download/1MBN.cif",
+        "role": "data"
+      }
+    ],
+    "validation": {
+      "status": "passed",
+      "parser": "gemmi in existing sandbox-image",
+      "entry_id": "1MBN",
+      "models": 1,
+      "atoms": 1260,
+      "protein_residues_from_official_metadata": 153,
+      "resolution_angstrom": 2,
+      "finite_xyz": true,
+      "input_budget_bytes": 67108864
+    }
+  },
+  {
+    "dataset_id": "viz-mangal-greenland-pollination-908",
+    "name": "可视化样例·关系网络｜Mangal 格陵兰植物—传粉者科学关系网络",
+    "description": "Lundgren 与 Olesen 研究的格陵兰 Uummannaq 岛实地访花网络，Mangal 网络号 908。包含完整 43 个分类单元节点、63 条互惠关系及观察次数；可直接用现有 Cytoscape 科学网络视图浏览。",
+    "domain": "general",
+    "view_kind": "graph",
+    "plugin_id": "viz-scientific-graph",
+    "entry_file": "lundgren-olesen-2005-network-908.graphml",
+    "source_url": "https://mangal.io/api/v2/network?dataset_id=7&count=1000",
+    "publisher": "Mangal ecological interactions database",
+    "license": "CC0 1.0 (Mangal default data license)",
+    "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "license_details": "Mangal 官方贡献说明的 Additional questions 明确：数据库数据默认 CC0，若原数据在其他存储库另有许可证则从其。该公开记录未标注覆盖默认条款的其他许可；原研究和来源链接保留在 reference.json。不使用网站/软件代码许可证冒充数据许可证。许可依据：https://github.com/mangal-interactions/contribute#additional-questions",
+    "authors": [
+      "Rebekka Lundgren",
+      "Jens M. Olesen"
+    ],
+    "source_version": "Mangal API v2 network 908 / dataset 7, snapshot 2026-09-18; observation date 2002-08-04",
+    "sample_scope": "完整的单个已发布网络（43节点/63条记录），不是Mangal或原数据库全集。5份公开API原件保留分类、采样、属性定义与原始引用。GraphML保留全部节点ID/名称、关系ID/端点/方向/类型/访花次数，不筛选或合并边。all_interactions=false，未记录关系不能自动解释为真实不存在；数据库有向编码不应解释为因果方向。",
+    "doi": "10.1657/1523-0430(2005)037[0514:TDAHCW]2.0.CO;2",
+    "citation": "Lundgren, R. & Olesen, J. M. (2005). The Dense and Highly Connected World of Greenland's Plants and Their Pollinators. Arctic, Antarctic, and Alpine Research.",
+    "files": [
+      {
+        "path": "dataset.json",
+        "size": 248,
+        "sha256": "3e5fc1fe21ebfc90c426a342c791b0799f3a38f58108ccbc7bd25e96821d2bb9",
+        "url": "https://mangal.io/api/v2/dataset/7",
+        "role": "documentation"
+      },
+      {
+        "path": "interactions.json",
+        "size": 34968,
+        "sha256": "824dc691d13c5112147f73735a363d355bda3ba2f714ee167af2ef679ddfe69a",
+        "url": "https://mangal.io/api/v2/interaction?network_id=908&count=1000",
+        "role": "data"
+      },
+      {
+        "path": "lundgren-olesen-2005-network-908.graphml",
+        "size": 12342,
+        "sha256": "8d8f28a62fbeeb257a437c227bf073bafa98a749fe99c0d7ea462e9afa06dd2a",
+        "role": "data",
+        "derived_from": [
+          "nodes.json",
+          "interactions.json"
+        ]
+      },
+      {
+        "path": "network.json",
+        "size": 401,
+        "sha256": "529beca770dbaa30bef0b6e2843d3f96b6371597105405b1aa9bf6d35d157313",
+        "url": "https://mangal.io/api/v2/network?dataset_id=7&count=1000",
+        "role": "documentation"
+      },
+      {
+        "path": "nodes.json",
+        "size": 16354,
+        "sha256": "6335cb9c53edb3532a7d39837ca29750789b3cad7b41e387afb9a4157d469d09",
+        "url": "https://mangal.io/api/v2/node?network_id=908&count=1000",
+        "role": "data"
+      },
+      {
+        "path": "reference.json",
+        "size": 606,
+        "sha256": "5019431e41ef6ad0f4232802e1e6fe6fbfcc5305da3ba07c9ca1fbf20df6167b",
+        "url": "https://mangal.io/api/v2/reference/7",
+        "role": "documentation"
+      }
+    ],
+    "transformation": {
+      "source": [
+        "nodes.json",
+        "interactions.json"
+      ],
+      "output": "lundgren-olesen-2005-network-908.graphml",
+      "method": "按数值ID稳定排序：节点id=m{原id}，label=original_name，group=node_level；边id=i{原id}，source/target对应原node_from/node_to，label=type，weight=value；edgedefault=directed与全部原记录一致。仅使用应用支持的GraphML label/group/weight键，XML转义数据文本，无注释、DTD、外部样式或URL资源。",
+      "lossless_scope": "所有拓扑、记录ID、标签、方向、类型和权重逐项比对相同，无删除/合并/合成边。额外分类与时间等完整元信息保留于原始JSON，不声称全部元数据都装入GraphML。派生文件通过 files.derived_from 记录真实原件，不虚构下载地址。",
+      "reproducible_script": "reproduce-map-graph.mjs"
+    },
+    "validation": {
+      "status": "passed",
+      "parser": "app.services.scientific_graph_reader in existing sandbox-image",
+      "dialect": "graphml-flat-static",
+      "node_count": 43,
+      "edge_count": 63,
+      "self_loops": 0,
+      "parallel_edges": 0,
+      "all_directions": "directed",
+      "all_relations": "mutualism",
+      "weight_definition": "number of individual of a species observed/caught on a flower",
+      "min_weight": 1,
+      "max_weight": 45,
+      "sampled": false,
+      "input_budget_bytes": 4194304,
+      "node_budget": 1000,
+      "edge_budget": 3000
+    }
+  },
+  {
+    "dataset_id": "viz-lightmycells-nucleus",
+    "name": "可视化样例·图像：Light My Cells 犬细胞细胞核荧光图像（OME-TIFF）",
+    "description": "BioImage Archive S-BIAD1047 的真实细胞显微图像：Study 24 的 image_399_Nucleus，1200×1200、单通道 uint16、C/Z/T 均为 1。适合用 Viv 查看细胞核形态及荧光强度分布；只选取一个原始发布图像文件，不是整个 Light My Cells 数据库，也不代表所有实验条件。",
+    "domain": "image_science",
+    "view_kind": "image",
+    "plugin_id": "viz-viv",
+    "entry_file": "image_399_Nucleus.ome.tiff",
+    "source_url": "https://www.ebi.ac.uk/biostudies/BioImages/studies/S-BIAD1047",
+    "publisher": "France-BioImaging / EMBL-EBI BioImage Archive",
+    "license": "CC BY 4.0",
+    "license_url": "https://creativecommons.org/licenses/by/4.0/legalcode",
+    "license_details": "BioImage Archive S-BIAD1047 官方研究元数据明确指定 CC BY 4.0；允许复制、分享和改编，须署名、保留许可链接并说明改动。来源论文为 2D Multimodal Image Collection for Fluorescence Prediction from Transmitted Light Microscopy，https://doi.org/10.1038/s41597-026-07004-w。本地文件是官网单文件原样下载，未调整亮度或改变像素。",
+    "authors": [
+      "Dorian Kauffmann",
+      "Guillaume Gay",
+      "Emmanuel Faure",
+      "Julio Mateos-Langerak",
+      "Oriane Pourcelot",
+      "Virginie Georget",
+      "Maëlle Carraz",
+      "Juliette Van Dijk",
+      "Stéphanie Bosch",
+      "Elsa Castellani",
+      "Qiyan Mao",
+      "Laura Ruiz",
+      "Valentin Asei-Ceschino",
+      "Tudor Manoliu",
+      "Julia Bonnet-Gelebart",
+      "Youssef Elhabouz",
+      "Marc Tramier",
+      "Jacques Pécréaux",
+      "Louis Ruel",
+      "Jean-Bernard Fiche",
+      "David Lleres",
+      "Christine Doucet",
+      "Erwan Gandon",
+      "Yves Lutz",
+      "Bertrand Vernay",
+      "Daniel Stockholm",
+      "Abbass Jaber",
+      "Aude Moret",
+      "Romain Morichon",
+      "Mónica Fernández-Monreal",
+      "Edouard Bertrand"
+    ],
+    "source_version": "S-BIAD1047，官方元数据 ReleaseDate 2025-02-26；2026-09-18 下载快照",
+    "sample_scope": "Study_24/image_399_Nucleus.ome.tiff 一张完整的已发布 OME-TIFF。官方 Study Component 名为 Cocker 4，描述为正常成年雌性可卡犬；不是人体影像。保留单通道 1200×1200 全部分辨率与 OME 元数据，未取得该库其他图像。",
+    "suggested_questions": [
+      "统计这张图像的细胞核数量，并说明阈值及分割误差。",
+      "比较细胞核面积、形态和荧光强度分布；不要将单张图像推断为群体实验结论。"
+    ],
+    "files": [
+      {
+        "path": "image_399_Nucleus.ome.tiff",
+        "url": "https://ftp.ebi.ac.uk/biostudies/fire/S-BIAD/047/S-BIAD1047/Files/Images/Study_24/image_399_Nucleus.ome.tiff",
+        "size": 2239243,
+        "sha256": "61892dc211cf96032c14752a734c61d414980006490e65795faec14483c06048"
+      }
+    ]
+  },
+  {
+    "dataset_id": "viz-noaa-global-methane",
+    "name": "可视化样例·数值曲线：NOAA 全球海洋表面大气甲烷月均曲线（1983—2026）",
+    "description": "NOAA 全球海洋表面站观测形成的甲烷干空气摩尔分数月均值及去季节趋势，单位 ppb（nmol/mol），保存 1983-07 至 2026-05 的完整 515 条月记录。Plotly 请把横轴选 decimal，纵轴选 average（月均 CH4）或 trend，勿将默认 year 当作甲烷；现有预览只显示前 200 行窗口，完整文件仍可用于分析。最新年度可能修订。",
+    "domain": "geoscience",
+    "view_kind": "series",
+    "plugin_id": "viz-plotly",
+    "entry_file": "ch4_mm_gl.csv",
+    "source_url": "https://gml.noaa.gov/ccgg/trends_ch4/",
+    "publisher": "NOAA Global Monitoring Laboratory, Carbon Cycle and Greenhouse Gases Group",
+    "license": "Public domain — NOAA GML data-use and attribution policy",
+    "license_url": "https://gml.noaa.gov/about/disclaimer.html",
+    "license_details": "NOAA GML 将其政府服务器信息列为公共领域（另有标注除外），允许公众自由使用，但不得冒称为自有数据、暗示 NOAA 背书、或将修改后材料冒称为官方原件；须按数据产品要求致谢和引用。此文件 USE OF NOAA GML DATA 注释明确向公众和科研群体免费提供并请求相关引用，鼓励联系数据提供者；本条不是 CC0 或 CC BY 许可。引用 Lan, X., K.W. Thoning, and E.J. Dlugokencky: Trends in globally-averaged CH4, N2O, and SF6 determined from NOAA Global Monitoring Laboratory measurements, Version 2026-09, https://doi.org/10.15138/P8XG-AA10。",
+    "authors": [
+      "Xin Lan",
+      "Kirk W. Thoning",
+      "Edward J. Dlugokencky"
+    ],
+    "doi": "10.15138/P8XG-AA10",
+    "source_version": "Version 2026-09；官方文件创建时间 2026-09-05 04:05:17；2026-09-18 下载快照",
+    "temporal_coverage": "1983-07 至 2026-05",
+    "spatial_coverage": "全球海洋表面站的全球平均",
+    "sample_scope": "所选官方 ch4_mm_gl.csv 文件的全部 515 条月记录和 7 列，不是全球各站逐次采样原始库。原文件带说明注释完整保留。average/trend 与不确定度单位均为 ppb；注释称缺失不确定度标记为 -9.9，实际末期单元格为 -9.99，均应作为未计算值而非负标准差，未修改这些原值。显示窗口 200 行不等于全时段数据。",
+    "transformation": "从 ch4_mm_gl_original.csv 逐字节筛除以 # 开头的说明注释行和空行，生成 ch4_mm_gl.csv；保留原列名、顺序、515 条数据行及每个数值原文，不插值、不换算、不截断、不把缺失标记补零。原件和署名/说明注释完整保留。可复现脚本 backend/scripts/reproduce-science-samples.py。",
+    "suggested_questions": [
+      "横轴选 decimal、纵轴选 average，用完整 515 条记录分析全球甲烷月均值的长期变化，单位为 ppb。",
+      "比较 average 与 trend 的季节波动；把 average_unc/trend_unc 中的 -9.9 或 -9.99 视为缺失而非真实负不确定度。"
+    ],
+    "files": [
+      {
+        "path": "ch4_mm_gl_original.csv",
+        "url": "https://gml.noaa.gov/webdata/ccgg/trends/ch4/ch4_mm_gl.csv",
+        "size": 23937,
+        "sha256": "c45ca56872999f8d8e8e04f9f3523c2599d6358960171dd0a0b374eb89be3163"
+      },
+      {
+        "path": "ch4_mm_gl.csv",
+        "derived_from": [
+          "ch4_mm_gl_original.csv"
+        ],
+        "size": 21822,
+        "sha256": "dd6b1477f17dec4a46c7d7e2fde12c07a3969c1ac16a2c044c1a6b082be27ea2"
+      }
+    ]
+  },
+  {
+    "dataset_id": "viz-elife-seph-phylogeny",
+    "name": "可视化样例·系统树：放线菌 SepH 蛋白系统发育树（eLife 原始研究附件）",
+    "description": "eLife 63387 Figure 7—source data 1 中的 SepH 蛋白比对及系统树附件；抽出 Newick 树用于 Phylogeny 查看。文件实测 720 个节点、361 个叶节点，枝长齐全；原论文文字介绍 360 条代表序列，叶数以原树实测为准，不擅自删除额外叶。内部数值标签保持原文，显示器不会自动将其解释为支持度，也不推断生物学根。",
+    "domain": "sequence",
+    "view_kind": "tree",
+    "plugin_id": "viz-phylogeny",
+    "entry_file": "seph_phyml_quoted.nwk",
+    "source_url": "https://elifesciences.org/articles/63387/figures",
+    "publisher": "eLife / John Innes Centre and collaborating researchers",
+    "license": "CC BY 4.0",
+    "license_url": "https://creativecommons.org/licenses/by/4.0/",
+    "license_details": "官方论文 A conserved cell division protein directly regulates FtsZ dynamics in filamentous and unicellular actinobacteria（Ramos-León et al., 2021, eLife 10:e63387，https://doi.org/10.7554/eLife.63387）及其开放源数据适用 CC BY 4.0：须署名、链接许可并说明改动。保留官方 ZIP 和其中原树全文；展示副本只为一个含方括号的分类标签添加 Newick 引号，已明确标为派生文件。",
+    "authors": [
+      "Félix Ramos-León",
+      "Matthew J Bush",
+      "Joseph W Sallmen",
+      "Govind Chandra",
+      "Jake Richardson",
+      "Kim C Findlay",
+      "Joseph R McCormick",
+      "Susan Schlimpert"
+    ],
+    "doi": "10.7554/eLife.63387",
+    "source_version": "Figure 7—source data 1 v1；论文发表于 2021-03-17；2026-09-18 下载快照",
+    "sample_scope": "一个完整官方 Fig7 ZIP 附件（含比对 compare80phy 与树 compare80phy_phyml_tree.txt），另保存树的原文字节副本和兼容 Newick 引号副本。不是全部放线菌物种库或整篇论文所有实验数据。原树含 361 叶，未去根、重根、裁剪或重估枝长。",
+    "transformation": "先从官方 ZIP 的 Figure 7-Source_data_1/compare80phy_phyml_tree.txt 原样提取为 seph_phyml.nwk（仅改扩展名）；再将唯一未引用的叶标签 [Propionibacterium]_humerusii_ 写为 '[Propionibacterium]_humerusii_'，生成 seph_phyml_quoted.nwk。仅增加 2 个单引号，标签字符、括号、分隔符、所有枝长及拓扑均未改变。可复现脚本 backend/scripts/reproduce-science-samples.py。原件保留便于复核。",
+    "suggested_questions": [
+      "从系统树识别主要 SepH 蛋白分支，并说明显示起点不等于确认的生物学根。",
+      "对照原始比对与树文件核查叶标签；不要未经方法学确认就把内部数值标签解释为统计支持度。"
+    ],
+    "files": [
+      {
+        "path": "elife-63387-fig7-data1-v1.zip",
+        "url": "https://cdn.elifesciences.org/articles/63387/elife-63387-fig7-data1-v1.zip",
+        "size": 47094,
+        "sha256": "261ae59ae31abf8e5164b98535f1ea66d6906a13787f66aa6d1b6273b29cd732"
+      },
+      {
+        "path": "seph_phyml.nwk",
+        "derived_from": [
+          "elife-63387-fig7-data1-v1.zip"
+        ],
+        "archive_member": "Figure 7-Source_data_1/compare80phy_phyml_tree.txt",
+        "size": 19112,
+        "sha256": "208f8aaf13755273416ab5313346a37182f7b5337ed6e12b2d5d8b6722dafb92"
+      },
+      {
+        "path": "seph_phyml_quoted.nwk",
+        "derived_from": [
+          "seph_phyml.nwk"
+        ],
+        "size": 19114,
+        "sha256": "67700ba0fd792e5190732a1d3b670b433bdca0e4de0d5ceb64a8d486d1ae4d60"
+      }
+    ]
+  },
+  {
+    "dataset_id": "viz-elife-ftsz-timelapse",
+    "name": "可视化样例·视频：链霉菌 FtsZ-YPet 分裂环荧光延时观测（MP4）",
+    "description": "eLife 63387 Figure 2—source data 1：野生型 Streptomyces venezuelae SS12 的 FtsZ-YPet 荧光时间序列，作者选择并拉直菌丝用于 Figure 2C 时空图。是真实细菌显微观测，不是宣传片、模拟动画或人体影像。H.264 MP4，510×74 像素，47 帧，播放时长 11.75 秒；播放时长不直接等于生物学实验时间。",
+    "domain": "image_science",
+    "view_kind": "media",
+    "plugin_id": "viz-video-player",
+    "entry_file": "elife-63387-fig2-data1-v1.mp4",
+    "source_url": "https://elifesciences.org/articles/63387/figures",
+    "publisher": "eLife / John Innes Centre and collaborating researchers",
+    "license": "CC BY 4.0",
+    "license_url": "https://creativecommons.org/licenses/by/4.0/",
+    "license_details": "官方论文 A conserved cell division protein directly regulates FtsZ dynamics in filamentous and unicellular actinobacteria（Ramos-León et al., 2021, eLife 10:e63387，https://doi.org/10.7554/eLife.63387）及其开放源数据适用 CC BY 4.0，须署名并保留许可链接。此处为 Figure 2—source data 1 原始发布 MP4，未转码、剪辑或改变帧。",
+    "authors": [
+      "Félix Ramos-León",
+      "Matthew J Bush",
+      "Joseph W Sallmen",
+      "Govind Chandra",
+      "Jake Richardson",
+      "Kim C Findlay",
+      "Joseph R McCormick",
+      "Susan Schlimpert"
+    ],
+    "doi": "10.7554/eLife.63387",
+    "source_version": "Figure 2—source data 1 v1；论文发表于 2021-03-17；2026-09-18 下载快照",
+    "sample_scope": "一条完整已发布的野生型 SS12 拉直菌丝荧光观测视频，不包括其他菌株、全部显微原始采集或作者整套实验。视频已由原作者进行菌丝选择和拉直处理；本次下载未再处理。测量真实形成速率需先查原论文采样时间与空间标定，不能用视频播放秒数替代。",
+    "suggested_questions": [
+      "观察 FtsZ-YPet 荧光随帧变化的时空模式，哪些位置形成持续信号？",
+      "若要计算真实分裂环形成速率，还需要从论文获取哪些实验时间和空间标定？"
+    ],
+    "files": [
+      {
+        "path": "elife-63387-fig2-data1-v1.mp4",
+        "url": "https://cdn.elifesciences.org/articles/63387/elife-63387-fig2-data1-v1.mp4",
+        "size": 84174,
+        "sha256": "f024808c28513d45bd95048e1bda7df75fa5b1e6b5520ad87e8850057bb008f8"
+      }
+    ]
+  }
+]

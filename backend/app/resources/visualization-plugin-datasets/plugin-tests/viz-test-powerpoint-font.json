@@ -1,0 +1,86 @@
+{
+  "dataset_id": "viz-test-powerpoint-font",
+  "external_id": "viz-test-powerpoint-font",
+  "data_center_id": "reviewed-visualization-plugin-tests",
+  "data_center_name": "逐插件可视化测试样例",
+  "name": "插件测试 · PowerPoint 静态阅读 · 官方字体样例",
+  "description": "python-pptx v1.0.2官方文本字体格式测试文件；不含外链或嵌入工作簿，已通过现有隔离转换器。非科研观测。",
+  "domain": "documents",
+  "data_type": "pptx",
+  "temporal_coverage": "",
+  "spatial_coverage": "",
+  "tags": [
+    "插件测试样例",
+    "viz-powerpoint",
+    "official_fixture",
+    "document",
+    "documents"
+  ],
+  "metadata": {
+    "curated": true,
+    "source_catalog": "plugin-tests",
+    "catalog_version": 1,
+    "source_descriptor_sha256": "ca4436a68f0fce1a18bb254a6d60636a3c1964fa822c76dae7cfe12f31ac10e6",
+    "download_date": "2026-09-18",
+    "inventory_complete": true,
+    "recursive_file_count": 3,
+    "total_size_bytes": 28496,
+    "visualization_view_kind": "document",
+    "visualization_plugin_id": "viz-powerpoint",
+    "visualization_entry_file": "txt-font-typeface.pptx",
+    "sample_note": "官方格式测试样例，测试纯文本字体、分页与缩放；静态阅读不播放动画。",
+    "provenance": [
+      {
+        "path": "txt-font-typeface.pptx",
+        "size": 25817,
+        "sha256": "c1127c3fc5ca34bcca630dafdb1d78352c77ff6ed6c182679ef629bc028784c2",
+        "url": "https://raw.githubusercontent.com/scanny/python-pptx/v1.0.2/features/steps/test_files/txt-font-typeface.pptx"
+      },
+      {
+        "path": "pptx-LICENSE.txt",
+        "size": 1104,
+        "sha256": "7652f271e46d0d533e9dc463f3b5fcbdcacf4d6a9c8d6b554d15efd0f37f6132",
+        "role": "documentation",
+        "url": "https://raw.githubusercontent.com/scanny/python-pptx/v1.0.2/LICENSE"
+      }
+    ],
+    "publisher": "python-pptx · Steve Canny",
+    "source_url": "https://github.com/scanny/python-pptx/tree/v1.0.2/features/steps/test_files",
+    "license": "MIT",
+    "license_url": "https://github.com/scanny/python-pptx/blob/v1.0.2/LICENSE",
+    "license_details": "MIT；用于可视化测试，样本性质为 official_fixture。",
+    "authors": [
+      "python-pptx · Steve Canny"
+    ],
+    "source_version": "python-pptx v1.0.2",
+    "sample_scope": "官方格式测试样例，测试纯文本字体、分页与缩放；静态阅读不播放动画。",
+    "sample_kind": "official_fixture",
+    "test_steps": [
+      "预览 txt-font-typeface.pptx，选择 viz-powerpoint",
+      "检查文本字体与页面缩放，无外部资源请求；静态预览不执行演示动作"
+    ]
+  },
+  "files": [
+    {
+      "path": "SOURCE.md",
+      "size": 1575,
+      "sha256": "f9e36c21b34d96ec90deb5dcc7d4c971f4b9e8c336778e98eccbbde7dbe5d660",
+      "role": "documentation",
+      "content_type": "text/markdown"
+    },
+    {
+      "path": "pptx-LICENSE.txt",
+      "size": 1104,
+      "sha256": "7652f271e46d0d533e9dc463f3b5fcbdcacf4d6a9c8d6b554d15efd0f37f6132",
+      "role": "documentation",
+      "content_type": "text/plain"
+    },
+    {
+      "path": "txt-font-typeface.pptx",
+      "size": 25817,
+      "sha256": "c1127c3fc5ca34bcca630dafdb1d78352c77ff6ed6c182679ef629bc028784c2",
+      "role": "data",
+      "content_type": "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+    }
+  ]
+}

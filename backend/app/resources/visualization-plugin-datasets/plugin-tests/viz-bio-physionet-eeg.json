@@ -1,0 +1,110 @@
+{
+  "dataset_id": "viz-bio-physionet-eeg",
+  "external_id": "10.13026/C28G6P",
+  "data_center_id": "reviewed-visualization-plugin-tests",
+  "data_center_name": "逐插件可视化测试样例",
+  "name": "PhysioNet公开EEG基线与明确标注的声化转换",
+  "description": "EEG Motor Movement/Imagery v1.0.0的S001R01睁眼静息基线EDF+；原64导EEG与注释保留。附加WAV只是第0通道原始整数样本以8000Hz重解释的声化，不是现场声音或临床诊断。",
+  "domain": "general",
+  "data_type": "edf, wav",
+  "temporal_coverage": "",
+  "spatial_coverage": "",
+  "tags": [
+    "插件测试样例",
+    "viz-edf-signals",
+    "scientific_derived",
+    "series",
+    "general"
+  ],
+  "metadata": {
+    "curated": true,
+    "source_catalog": "plugin-tests",
+    "catalog_version": 1,
+    "source_descriptor_sha256": "5709be0a87c0c1cad06475f7c600132c0be4253dfdc3a3710b3803b012492bc9",
+    "download_date": "2026-09-18",
+    "inventory_complete": true,
+    "recursive_file_count": 4,
+    "total_size_bytes": 1298067,
+    "visualization_view_kind": "series",
+    "visualization_plugin_id": "viz-edf-signals",
+    "visualization_entry_file": "S001R01.edf",
+    "sample_note": "完整单条公开S001R01基线记录；并非109人全部数据。WAV仅通道0，数字样本不放大，以8000Hz播放，原始采样率160Hz、时间压缩50倍。不能用WAV播放时间当作实验时间。",
+    "provenance": [
+      {
+        "path": "S001R01.edf",
+        "size": 1275936,
+        "sha256": "4743b736131a7e147c150e8b37711029b6cda5e356c4b3e8261a03cdcaaf8b0c",
+        "role": "data",
+        "url": "https://physionet.org/files/eegmmidb/1.0.0/S001/S001R01.edf"
+      },
+      {
+        "path": "eeg-channel0-sonification.wav",
+        "size": 19564,
+        "sha256": "bd431a0d576fe12638417f4a89584c740bf7e577df1379baab0d68ca447e5d38",
+        "role": "data",
+        "derived_from": [
+          "S001R01.edf"
+        ]
+      },
+      {
+        "path": "GENERATION_SPEC.json",
+        "size": 249,
+        "sha256": "0c1310a24baccc944240e8a40f7e1100089dec5da6f1ac13576fae65dc75e5b5",
+        "role": "documentation",
+        "origin": {
+          "kind": "generated_fixture",
+          "generator": "backend/scripts/plugin_samples_bio.py",
+          "generator_sha256": "5ec25b14053c29d7f0b6ec7443f4994eec9d05eb448b8d3c302289488e3098c1",
+          "description": "数据生成/格式转换参数记录；不是上游下载文件。"
+        }
+      }
+    ],
+    "publisher": "PhysioNet / BCI R&D Program, Wadsworth Center",
+    "source_url": "https://physionet.org/content/eegmmidb/1.0.0/",
+    "license": "Open Data Commons Attribution License v1.0",
+    "license_url": "https://physionet.org/content/eegmmidb/view-license/1.0.0/",
+    "license_details": "官方数据集明确Open Access，并将files许可指定为Open Data Commons Attribution License v1.0。引用Gerwin Schalk (2009), DOI 10.13026/C28G6P及BCI2000论文；标注WAV转换。未获取受控数据或额外身份资料。",
+    "authors": [
+      "Gerwin Schalk"
+    ],
+    "source_version": "PhysioNet eegmmidb 1.0.0",
+    "sample_scope": "完整单条公开S001R01基线记录；并非109人全部数据。WAV仅通道0，数字样本不放大，以8000Hz播放，原始采样率160Hz、时间压缩50倍。不能用WAV播放时间当作实验时间。",
+    "doi": "10.13026/C28G6P",
+    "transformation": "原EDF+不变。按EDF记录布局提取通道0有符号little-endian 16位数字样本，未重采样/插值/滤波/放大；WAV采样率声明8000而原EEG160，用于50倍时间声化。WAV不是真实声学观测，低幅度可能较安静。",
+    "sample_kind": "scientific_derived",
+    "test_steps": [
+      "EDF选择通道0与前10秒，检查160Hz与物理单位；不要把注释通道作普通信号。",
+      "WAV选择音频波形/播放；约1.22秒对应约61秒EEG，不能作原始声音或诊断解释。"
+    ]
+  },
+  "files": [
+    {
+      "path": "GENERATION_SPEC.json",
+      "size": 249,
+      "sha256": "0c1310a24baccc944240e8a40f7e1100089dec5da6f1ac13576fae65dc75e5b5",
+      "role": "documentation",
+      "content_type": "application/json"
+    },
+    {
+      "path": "S001R01.edf",
+      "size": 1275936,
+      "sha256": "4743b736131a7e147c150e8b37711029b6cda5e356c4b3e8261a03cdcaaf8b0c",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "SOURCE.md",
+      "size": 2318,
+      "sha256": "01af01ce398087b8f6d1df8c07c334c0d622171894e69791b05a0c61567edb85",
+      "role": "documentation",
+      "content_type": "text/markdown"
+    },
+    {
+      "path": "eeg-channel0-sonification.wav",
+      "size": 19564,
+      "sha256": "bd431a0d576fe12638417f4a89584c740bf7e577df1379baab0d68ca447e5d38",
+      "role": "data",
+      "content_type": "audio/x-wav"
+    }
+  ]
+}

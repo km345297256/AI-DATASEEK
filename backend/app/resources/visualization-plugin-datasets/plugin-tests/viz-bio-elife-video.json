@@ -1,0 +1,84 @@
+{
+  "dataset_id": "viz-bio-elife-video",
+  "external_id": "10.7554/eLife.63387",
+  "data_center_id": "reviewed-visualization-plugin-tests",
+  "data_center_name": "逐插件可视化测试样例",
+  "name": "链霉菌 FtsZ-YPet 分裂环荧光延时观测（MP4）",
+  "description": "eLife 63387 Figure 2—source data 1：野生型 Streptomyces venezuelae SS12 的 FtsZ-YPet 荧光时间序列，作者选择并拉直菌丝用于 Figure 2C 时空图。是真实细菌显微观测，不是宣传片、模拟动画或人体影像。H.264 MP4，510×74 像素，47 帧，播放时长 11.75 秒；播放时长不直接等于生物学实验时间。",
+  "domain": "image_science",
+  "data_type": "mp4",
+  "temporal_coverage": "",
+  "spatial_coverage": "",
+  "tags": [
+    "插件测试样例",
+    "viz-video-player",
+    "scientific_original",
+    "media",
+    "image_science"
+  ],
+  "metadata": {
+    "curated": true,
+    "source_catalog": "plugin-tests",
+    "catalog_version": 1,
+    "source_descriptor_sha256": "9f81d51980762c0d0611eccf249d2e737c20592ecb0e0da964ad485fa79f56be",
+    "download_date": "2026-09-18",
+    "inventory_complete": true,
+    "recursive_file_count": 2,
+    "total_size_bytes": 86786,
+    "visualization_view_kind": "media",
+    "visualization_plugin_id": "viz-video-player",
+    "visualization_entry_file": "elife-63387-fig2-data1-v1.mp4",
+    "sample_note": "一条完整已发布的野生型 SS12 拉直菌丝荧光观测视频，不包括其他菌株、全部显微原始采集或作者整套实验。视频已由原作者进行菌丝选择和拉直处理；本次下载未再处理。测量真实形成速率需先查原论文采样时间与空间标定，不能用视频播放秒数替代。",
+    "provenance": [
+      {
+        "path": "elife-63387-fig2-data1-v1.mp4",
+        "url": "https://cdn.elifesciences.org/articles/63387/elife-63387-fig2-data1-v1.mp4",
+        "size": 84174,
+        "sha256": "f024808c28513d45bd95048e1bda7df75fa5b1e6b5520ad87e8850057bb008f8"
+      }
+    ],
+    "publisher": "eLife / John Innes Centre and collaborating researchers",
+    "source_url": "https://elifesciences.org/articles/63387/figures",
+    "license": "CC BY 4.0",
+    "license_url": "https://creativecommons.org/licenses/by/4.0/",
+    "license_details": "官方论文 A conserved cell division protein directly regulates FtsZ dynamics in filamentous and unicellular actinobacteria（Ramos-León et al., 2021, eLife 10:e63387，https://doi.org/10.7554/eLife.63387）及其开放源数据适用 CC BY 4.0，须署名并保留许可链接。此处为 Figure 2—source data 1 原始发布 MP4，未转码、剪辑或改变帧。",
+    "authors": [
+      "Félix Ramos-León",
+      "Matthew J Bush",
+      "Joseph W Sallmen",
+      "Govind Chandra",
+      "Jake Richardson",
+      "Kim C Findlay",
+      "Joseph R McCormick",
+      "Susan Schlimpert"
+    ],
+    "source_version": "Figure 2—source data 1 v1；论文发表于 2021-03-17；2026-09-18 下载快照",
+    "sample_scope": "一条完整已发布的野生型 SS12 拉直菌丝荧光观测视频，不包括其他菌株、全部显微原始采集或作者整套实验。视频已由原作者进行菌丝选择和拉直处理；本次下载未再处理。测量真实形成速率需先查原论文采样时间与空间标定，不能用视频播放秒数替代。",
+    "doi": "10.7554/eLife.63387",
+    "suggested_questions": [
+      "观察 FtsZ-YPet 荧光随帧变化的时空模式，哪些位置形成持续信号？",
+      "若要计算真实分裂环形成速率，还需要从论文获取哪些实验时间和空间标定？"
+    ],
+    "sample_kind": "scientific_original",
+    "test_steps": [
+      "打开MP4并选择视频插件，播放并拖动进度条。",
+      "约11.75秒播放时间不等于生物学实验时间，不据此计算细胞分裂速率。"
+    ]
+  },
+  "files": [
+    {
+      "path": "SOURCE.md",
+      "size": 2612,
+      "sha256": "bf27e9743966a6cfa935a4023d07cb562436e603fe8caa5e70f0d9c98e896158",
+      "role": "documentation",
+      "content_type": "text/markdown"
+    },
+    {
+      "path": "elife-63387-fig2-data1-v1.mp4",
+      "size": 84174,
+      "sha256": "f024808c28513d45bd95048e1bda7df75fa5b1e6b5520ad87e8850057bb008f8",
+      "role": "data",
+      "content_type": "video/mp4"
+    }
+  ]
+}

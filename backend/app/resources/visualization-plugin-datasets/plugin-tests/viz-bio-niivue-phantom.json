@@ -1,0 +1,116 @@
+{
+  "dataset_id": "viz-bio-niivue-phantom",
+  "external_id": "viz-bio-niivue-phantom",
+  "data_center_id": "reviewed-visualization-plugin-tests",
+  "data_center_name": "逐插件可视化测试样例",
+  "name": "原创三维球体体模：NiiVue正交切片",
+  "description": "48×48×48原创径向球体数组，单位是任意数值/体素索引，不是MRI、CT或真实组织。",
+  "domain": "image_science",
+  "data_type": "nrrd",
+  "temporal_coverage": "",
+  "spatial_coverage": "",
+  "tags": [
+    "插件测试样例",
+    "viz-niivue",
+    "project_fixture",
+    "image",
+    "image_science"
+  ],
+  "metadata": {
+    "curated": true,
+    "source_catalog": "plugin-tests",
+    "catalog_version": 1,
+    "source_descriptor_sha256": "51641c68d4d9f329bf51991bca67e1ed6ebe6c7c667e0c2da9fb4b3f8602bc51",
+    "download_date": "2026-09-18",
+    "inventory_complete": true,
+    "recursive_file_count": 4,
+    "total_size_bytes": 224306,
+    "visualization_view_kind": "image",
+    "visualization_plugin_id": "viz-niivue",
+    "visualization_entry_file": "synthetic-radial-volume.nrrd",
+    "sample_note": "48×48×48原创径向球体数组，单位是任意数值/体素索引，不是MRI、CT或真实组织。",
+    "provenance": [
+      {
+        "path": "synthetic-radial-volume.nrrd",
+        "size": 221281,
+        "sha256": "42a4c7e42780622e41f2b61cd8736ec3a7c4b22b96d915941aaf6e9dc11da70b",
+        "role": "data",
+        "origin": {
+          "kind": "generated_fixture",
+          "generator": "backend/scripts/plugin_samples_bio.py",
+          "generator_sha256": "5ec25b14053c29d7f0b6ec7443f4994eec9d05eb448b8d3c302289488e3098c1",
+          "description": "48×48×48原创径向球体数组，单位是任意数值/体素索引，不是MRI、CT或真实组织。"
+        }
+      },
+      {
+        "path": "LICENSE.txt",
+        "size": 1066,
+        "sha256": "991f0bde5249ee6aad0a5a597197c7a7f6024abd2650516fcd7a83d908234115",
+        "role": "documentation",
+        "origin": {
+          "kind": "generated_fixture",
+          "generator": "backend/scripts/plugin_samples_bio.py",
+          "generator_sha256": "5ec25b14053c29d7f0b6ec7443f4994eec9d05eb448b8d3c302289488e3098c1",
+          "description": "项目 MIT 许可证原文的本地副本。"
+        }
+      },
+      {
+        "path": "GENERATION_SPEC.json",
+        "size": 191,
+        "sha256": "9e7e0596a42cde9daceb3990f14bf2c9ac00c56a9554cbd19dd2cb5cf3b566a5",
+        "role": "documentation",
+        "origin": {
+          "kind": "generated_fixture",
+          "generator": "backend/scripts/plugin_samples_bio.py",
+          "generator_sha256": "5ec25b14053c29d7f0b6ec7443f4994eec9d05eb448b8d3c302289488e3098c1",
+          "description": "数据生成/格式转换参数记录；不是上游下载文件。"
+        }
+      }
+    ],
+    "publisher": "AI-DataSeek 原创功能测试样例",
+    "source_url": "https://github.com/km345297256/AI-DATASEEK",
+    "license": "MIT (project-generated fixture)",
+    "license_url": "https://github.com/km345297256/AI-DATASEEK/blob/v2/LICENSE",
+    "license_details": "本项目原创算法生成的功能样例，按项目 MIT 许可提供；不是来自医院、受试者或真实实验的观测。保留随附项目 LICENSE.txt。",
+    "authors": [
+      "AI-DataSeek contributors"
+    ],
+    "source_version": "original deterministic fixture 2026-09-18",
+    "sample_scope": "48×48×48原创径向球体数组，单位是任意数值/体素索引，不是MRI、CT或真实组织。",
+    "sample_kind": "project_fixture",
+    "test_steps": [
+      "打开内嵌raw NRRD，选择NiiVue。",
+      "切换正交切片与体渲染；中心强度高、外围为0，确认轴向一致；不要作医学解释。"
+    ]
+  },
+  "files": [
+    {
+      "path": "GENERATION_SPEC.json",
+      "size": 191,
+      "sha256": "9e7e0596a42cde9daceb3990f14bf2c9ac00c56a9554cbd19dd2cb5cf3b566a5",
+      "role": "documentation",
+      "content_type": "application/json"
+    },
+    {
+      "path": "LICENSE.txt",
+      "size": 1066,
+      "sha256": "991f0bde5249ee6aad0a5a597197c7a7f6024abd2650516fcd7a83d908234115",
+      "role": "documentation",
+      "content_type": "text/plain"
+    },
+    {
+      "path": "SOURCE.md",
+      "size": 1768,
+      "sha256": "2d8c5f2969b1e752dca88434d2921d746513df66175ce5b01f182384dd2011f2",
+      "role": "documentation",
+      "content_type": "text/markdown"
+    },
+    {
+      "path": "synthetic-radial-volume.nrrd",
+      "size": 221281,
+      "sha256": "42a4c7e42780622e41f2b61cd8736ec3a7c4b22b96d915941aaf6e9dc11da70b",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    }
+  ]
+}

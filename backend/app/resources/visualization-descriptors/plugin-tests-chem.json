@@ -1,0 +1,842 @@
+[
+  {
+    "dataset_id": "viz-plugin-rdkit-cis",
+    "name": "插件测试·RDKit 二维顺式结构官方样本",
+    "description": "RDKit 官方测试库的 cis.sdf，包含一个 C2H2BrF 分子；用于二维键型和分子信息查看，非药效或实验测量数据。",
+    "domain": "chemistry",
+    "view_kind": "image",
+    "plugin_id": "viz-rdkit",
+    "entry_file": "cis.sdf",
+    "source_url": "https://github.com/rdkit/rdkit/blob/20331b5101183089580840759c3ddf11a73efe31/rdkit/Chem/test_data/cis.sdf",
+    "publisher": "rdkit/rdkit",
+    "license": "BSD-3-Clause",
+    "license_url": "https://raw.githubusercontent.com/rdkit/rdkit/20331b5101183089580840759c3ddf11a73efe31/license.txt",
+    "license_details": "官方仓库测试/文档文件，按随附仓库许可保留版权与许可全文。此处标注为官方格式测试样本，不宣称是独立同行评审实验数据。",
+    "authors": [
+      "RDKit contributors"
+    ],
+    "source_version": "Git commit 20331b5101183089580840759c3ddf11a73efe31",
+    "sample_kind": "official_fixture",
+    "sample_scope": "完整 cis.sdf 单分子；4 个显式原子、3 条键，氢按分子定义隐式处理。",
+    "files": [
+      {
+        "path": "cis.sdf",
+        "size": 565,
+        "sha256": "bb78bd9ead6f2fadada9204e561d6c4643b40f17330ae5034a2287641eafe4b0",
+        "role": "data",
+        "url": "https://raw.githubusercontent.com/rdkit/rdkit/20331b5101183089580840759c3ddf11a73efe31/rdkit/Chem/test_data/cis.sdf"
+      },
+      {
+        "path": "LICENSE.txt",
+        "size": 1580,
+        "sha256": "daeb8d194502cbcf34c05c39541a0d02be65bc9bada5b891c1974cd24e9fca30",
+        "role": "documentation",
+        "url": "https://raw.githubusercontent.com/rdkit/rdkit/20331b5101183089580840759c3ddf11a73efe31/license.txt"
+      }
+    ],
+    "transformation": "原始公开测试文件未改写。",
+    "test_steps": [
+      "打开 cis.sdf，在视图选择器选择 viz-rdkit。",
+      "确认无格式错误且数值/结构按样本范围显示；不执行拟合或外部请求。"
+    ],
+    "reader_validation": [
+      {
+        "plugin_id": "viz-rdkit",
+        "dataset_id": "viz-plugin-rdkit-cis",
+        "entry_file": "cis.sdf",
+        "status": "passed",
+        "result": {
+          "formula": "C2H2BrF",
+          "molecular_weight": 124.94,
+          "atoms": 4,
+          "bonds": 3,
+          "molecules_listed": 1
+        }
+      }
+    ]
+  },
+  {
+    "dataset_id": "viz-plugin-mass-pyteomics",
+    "name": "插件测试·Pyteomics 单条 MGF 质谱官方示例",
+    "description": "Pyteomics 官方文档的 GPAAIQK MGF 单谱示例，41 个 m/z—强度点，用于受限双列谱图预览。未将文档样本宣称为独立公开实验。",
+    "domain": "spectroscopy",
+    "view_kind": "series",
+    "plugin_id": "viz-mass-spectrum",
+    "entry_file": "example.mgf",
+    "source_url": "https://github.com/levitsky/pyteomics/blob/5ace4adc7467f617db8ad30864a1746e65a91448/doc/source/_static/example.mgf",
+    "publisher": "levitsky/pyteomics",
+    "license": "Apache-2.0",
+    "license_url": "https://raw.githubusercontent.com/levitsky/pyteomics/5ace4adc7467f617db8ad30864a1746e65a91448/LICENSE",
+    "license_details": "官方仓库测试/文档文件，按随附仓库许可保留版权与许可全文。此处标注为官方格式测试样本，不宣称是独立同行评审实验数据。",
+    "authors": [
+      "Pyteomics developers"
+    ],
+    "source_version": "Git commit 5ace4adc7467f617db8ad30864a1746e65a91448",
+    "sample_kind": "official_fixture",
+    "sample_scope": "原始 example.mgf 完整文件，1 个谱块、41 个峰；强度未归一化。",
+    "files": [
+      {
+        "path": "example.mgf",
+        "size": 768,
+        "sha256": "c32687aba71bb61def1fb7e39045ef948e6185146e9d4185465f4b9e67a9c74f",
+        "role": "data",
+        "url": "https://raw.githubusercontent.com/levitsky/pyteomics/5ace4adc7467f617db8ad30864a1746e65a91448/doc/source/_static/example.mgf"
+      },
+      {
+        "path": "LICENSE.txt",
+        "size": 10173,
+        "sha256": "a6cba85bc92e0cff7a450b1d873c0eaa2e9fc96bf472df0247a26bec77bf3ff9",
+        "role": "documentation",
+        "url": "https://raw.githubusercontent.com/levitsky/pyteomics/5ace4adc7467f617db8ad30864a1746e65a91448/LICENSE"
+      }
+    ],
+    "transformation": "原始公开测试文件未改写。",
+    "test_steps": [
+      "打开 example.mgf，在视图选择器选择 viz-mass-spectrum。",
+      "确认无格式错误且数值/结构按样本范围显示；不执行拟合或外部请求。"
+    ],
+    "reader_validation": [
+      {
+        "plugin_id": "viz-mass-spectrum",
+        "dataset_id": "viz-plugin-mass-pyteomics",
+        "entry_file": "example.mgf",
+        "status": "passed",
+        "result": {
+          "format": "mgf",
+          "dialect": "mgf-ions-2column",
+          "input_mode": "whole",
+          "source_bytes": 768,
+          "total_spectra": 1,
+          "offset": 0,
+          "next_offset": null,
+          "decoded_bytes": 0,
+          "output_points": 41
+        }
+      }
+    ]
+  },
+  {
+    "dataset_id": "viz-plugin-mca-sigima",
+    "name": "插件测试·Sigima 2048 道 MCA 官方样本",
+    "description": "Sigima 官方 PMCA 格式测试谱的兼容副本，2048 道原始计数完整保留；仅把不显示的温度 footer 中度符号转写为 ASCII。",
+    "domain": "spectroscopy",
+    "view_kind": "series",
+    "plugin_id": "viz-mca-spectrum",
+    "entry_file": "spectrum_ascii.mca",
+    "source_url": "https://github.com/DataLab-Platform/Sigima/blob/51ee0ed558a57a2f5be7dec72b95c3af742f5bca/sigima/data/tests/curve_formats/spectrum.mca",
+    "publisher": "DataLab-Platform/Sigima",
+    "license": "BSD-3-Clause",
+    "license_url": "https://raw.githubusercontent.com/DataLab-Platform/Sigima/51ee0ed558a57a2f5be7dec72b95c3af742f5bca/LICENSE",
+    "license_details": "官方仓库测试/文档文件，按随附仓库许可保留版权与许可全文。此处标注为官方格式测试样本，不宣称是独立同行评审实验数据。",
+    "authors": [
+      "Sigima / DataLab Platform contributors"
+    ],
+    "source_version": "Git commit 51ee0ed558a57a2f5be7dec72b95c3af742f5bca",
+    "sample_kind": "official_fixture",
+    "sample_scope": "完整 2048 道计数；原文件为 4 点且 LABEL=Channel 的标定，插件保留通道轴，不臆造能量标定。原始谱同时保留。",
+    "files": [
+      {
+        "path": "spectrum.mca",
+        "size": 6466,
+        "sha256": "04fd35becb950025b19bbc2ddcf90be094780a40443638cbfdda34d5601eaaf3",
+        "role": "data",
+        "url": "https://raw.githubusercontent.com/DataLab-Platform/Sigima/51ee0ed558a57a2f5be7dec72b95c3af742f5bca/sigima/data/tests/curve_formats/spectrum.mca"
+      },
+      {
+        "path": "spectrum_ascii.mca",
+        "size": 6469,
+        "sha256": "5199480d6d44233abc29963f41ca572cd9a491f39e7d31a7e7a23027dc472745",
+        "role": "data",
+        "derived_from": [
+          "spectrum.mca"
+        ]
+      },
+      {
+        "path": "LICENSE.txt",
+        "size": 1536,
+        "sha256": "e8cba6f519f32878c7827c12f98e28b14ed9e16b240250c6547e550c68337a88",
+        "role": "documentation",
+        "url": "https://raw.githubusercontent.com/DataLab-Platform/Sigima/51ee0ed558a57a2f5be7dec72b95c3af742f5bca/LICENSE"
+      }
+    ],
+    "transformation": {
+      "generator": "backend/scripts/plugin_samples_chem.py",
+      "changes": "唯一变化：footer 的 Board Temp: 34° C（源字节为 34\\xb0C）转写为 34 degC；<<DATA>>..<<END>> 全部计数字节未变。"
+    },
+    "test_steps": [
+      "打开 spectrum_ascii.mca，在视图选择器选择 viz-mca-spectrum。",
+      "确认无格式错误且数值/结构按样本范围显示；不执行拟合或外部请求。"
+    ],
+    "reader_validation": [
+      {
+        "plugin_id": "viz-mca-spectrum",
+        "dataset_id": "viz-plugin-mca-sigima",
+        "entry_file": "spectrum_ascii.mca",
+        "status": "passed",
+        "result": {
+          "format": "mca",
+          "dialect": "amptek-pmca-ascii",
+          "input_bytes": 6469,
+          "channels": 2048,
+          "axis": "channel",
+          "energy_unit": null,
+          "calibration_applied": false,
+          "calibration_coefficients": null,
+          "calibration_points": [
+            [
+              504,
+              5.89
+            ],
+            [
+              553,
+              6.49
+            ],
+            [
+              1480,
+              17.48
+            ],
+            [
+              1659,
+              19.61
+            ]
+          ],
+          "live_time_seconds": 30,
+          "real_time_seconds": 30,
+          "raw_counts": true,
+          "fitting": false,
+          "header_text_hidden": true,
+          "limits": {
+            "max_channels": 8192,
+            "max_input_bytes": 4194304
+          }
+        }
+      }
+    ]
+  },
+  {
+    "dataset_id": "viz-plugin-gro-mdanalysis",
+    "name": "插件测试·MDAnalysis 双帧水分子轨迹官方样本",
+    "description": "MDAnalysis 官方坐标格式测试文件：两个水分子、两帧，每帧 6 个原子；用于帧切换和 nm 坐标保真测试，不作为生产分子动力学研究。",
+    "domain": "chemistry",
+    "view_kind": "structure",
+    "plugin_id": "viz-gro-trajectory",
+    "entry_file": "two_water_gro_multiframe.gro",
+    "source_url": "https://github.com/MDAnalysis/mdanalysis/blob/8b8875c73782c8c7f9710f6f6b9ae715bd5ad1bb/testsuite/MDAnalysisTests/data/two_water_gro_multiframe.gro",
+    "publisher": "MDAnalysis/mdanalysis",
+    "license": "LGPL-3.0-or-later (repository distribution)",
+    "license_url": "https://raw.githubusercontent.com/MDAnalysis/mdanalysis/8b8875c73782c8c7f9710f6f6b9ae715bd5ad1bb/testsuite/LICENSE",
+    "license_details": "官方仓库测试/文档文件，按随附仓库许可保留版权与许可全文。此处标注为官方格式测试样本，不宣称是独立同行评审实验数据。",
+    "authors": [
+      "MDAnalysis developers"
+    ],
+    "source_version": "Git commit 8b8875c73782c8c7f9710f6f6b9ae715bd5ad1bb",
+    "sample_kind": "official_fixture",
+    "sample_scope": "原始两帧 GRO 完整文件，2 帧 × 6 原子。保留坐标、时间/盒信息；不推断化学键或展开周期边界。",
+    "files": [
+      {
+        "path": "two_water_gro_multiframe.gro",
+        "size": 648,
+        "sha256": "4406c5bd48369b8f9a5648c9f8fc7503ad4c2a204fa4809ac342ff73474b8559",
+        "role": "data",
+        "url": "https://raw.githubusercontent.com/MDAnalysis/mdanalysis/8b8875c73782c8c7f9710f6f6b9ae715bd5ad1bb/testsuite/MDAnalysisTests/data/two_water_gro_multiframe.gro"
+      },
+      {
+        "path": "LICENSE.txt",
+        "size": 82409,
+        "sha256": "7614dd55e5b9851e0a2d197abc0e319dd10034f5a729aa7e698193aa7a8779e9",
+        "role": "documentation",
+        "url": "https://raw.githubusercontent.com/MDAnalysis/mdanalysis/8b8875c73782c8c7f9710f6f6b9ae715bd5ad1bb/testsuite/LICENSE"
+      }
+    ],
+    "transformation": "原始公开测试文件未改写。",
+    "test_steps": [
+      "打开 two_water_gro_multiframe.gro，在视图选择器选择 viz-gro-trajectory。",
+      "确认无格式错误且数值/结构按样本范围显示；不执行拟合或外部请求。"
+    ],
+    "reader_validation": [
+      {
+        "plugin_id": "viz-gro-trajectory",
+        "dataset_id": "viz-plugin-gro-mdanalysis",
+        "entry_file": "two_water_gro_multiframe.gro",
+        "status": "passed",
+        "result": {
+          "format": "gro",
+          "input_mode": "whole",
+          "source_bytes": 648,
+          "frame_count": 2,
+          "total_atoms": 12,
+          "coordinate_unit": "nm",
+          "velocity_unit": "nm/ps",
+          "time_unit": "ps",
+          "topology_consistency": "ordered GRO identifiers; bonds and elements unspecified",
+          "limits": {
+            "max_frames": 64,
+            "max_atoms": 8192,
+            "max_total_atoms": 131072
+          }
+        }
+      }
+    ]
+  },
+  {
+    "dataset_id": "viz-plugin-mesh-scikit-fem",
+    "name": "插件测试·scikit-fem 数值网格与 OBJ 表面",
+    "description": "scikit-fem 官方示例 Gmsh 网格转换为 ASCII VTU，另提供从原四面体外表面提取的 OBJ。用于有限元网格与几何查看；无新增求解结果。",
+    "domain": "general",
+    "view_kind": "structure",
+    "plugin_id": "viz-simulation-mesh",
+    "entry_file": "mesh.vtu",
+    "source_url": "https://github.com/kinnala/scikit-fem/blob/a9ea0d58af5364948ccbd8a89b4eaf05940cf407/docs/examples/meshes/cube_oriented_sub.msh",
+    "publisher": "kinnala/scikit-fem",
+    "license": "BSD-3-Clause",
+    "license_url": "https://raw.githubusercontent.com/kinnala/scikit-fem/a9ea0d58af5364948ccbd8a89b4eaf05940cf407/LICENSE",
+    "license_details": "官方仓库测试/文档文件，按随附仓库许可保留版权与许可全文。此处标注为官方格式测试样本，不宣称是独立同行评审实验数据。",
+    "authors": [
+      "scikit-fem contributors"
+    ],
+    "source_version": "Git commit a9ea0d58af5364948ccbd8a89b4eaf05940cf407",
+    "sample_kind": "official_fixture",
+    "sample_scope": "原始 Gmsh 4.1 网格含 81 点、340 单元；VTU 保留所有点、单元和 GmshEntity 分类。OBJ 为四面体集合的 156 个外边界三角形，保留 81 点，不包含内部单元和场值。",
+    "files": [
+      {
+        "path": "cube_oriented_sub.msh",
+        "size": 12909,
+        "sha256": "1eff6f31bac4a995e2367bdcb011b2ef548e22c996892cd1ec50d6327b21da99",
+        "role": "data",
+        "url": "https://raw.githubusercontent.com/kinnala/scikit-fem/a9ea0d58af5364948ccbd8a89b4eaf05940cf407/docs/examples/meshes/cube_oriented_sub.msh"
+      },
+      {
+        "path": "mesh.vtu",
+        "size": 9902,
+        "sha256": "93cca2f9052663807430bd9861302c30bda4374141afc4a918e7544153e23780",
+        "role": "data",
+        "derived_from": [
+          "cube_oriented_sub.msh"
+        ]
+      },
+      {
+        "path": "surface.obj",
+        "size": 4705,
+        "sha256": "678bd1cd06d06ebab94ed7997feca25a3ed597b7a6d550d7da11ae0ed8a403fa",
+        "role": "data",
+        "derived_from": [
+          "cube_oriented_sub.msh"
+        ]
+      },
+      {
+        "path": "LICENSE.txt",
+        "size": 1469,
+        "sha256": "383a8df7a707975913b2439594903a9b7e4f31372da3cd7be9b096ce1839ed34",
+        "role": "documentation",
+        "url": "https://raw.githubusercontent.com/kinnala/scikit-fem/a9ea0d58af5364948ccbd8a89b4eaf05940cf407/LICENSE"
+      }
+    ],
+    "transformation": {
+      "generator": "backend/scripts/plugin_samples_chem.py",
+      "changes": "确定性解析 ASCII Gmsh 4.1；VTU 重新编码节点/单元且携带 entity 标签；OBJ 去掉出现两次的四面体共享面，仅保留外边界。原件包含完整物理组等额外元数据，派生文件不是原件替代。"
+    },
+    "test_steps": [
+      "打开 mesh.vtu，在视图选择器选择 viz-simulation-mesh。",
+      "确认无格式错误且数值/结构按样本范围显示；不执行拟合或外部请求。"
+    ],
+    "reader_validation": [
+      {
+        "plugin_id": "viz-simulation-mesh",
+        "dataset_id": "viz-plugin-mesh-scikit-fem",
+        "entry_file": "mesh.vtu",
+        "status": "passed",
+        "result": {
+          "format": "vtu",
+          "input_mode": "whole",
+          "source_bytes": 9902,
+          "point_count": 81,
+          "cell_count": 340,
+          "cell_types": [
+            5,
+            10
+          ],
+          "field_values": 340,
+          "coordinate_unit": "unspecified",
+          "field_unit": "unspecified",
+          "limits": {
+            "max_points": 4096,
+            "max_cells": 2048,
+            "max_fields": 32,
+            "max_components": 9,
+            "max_field_values": 131072
+          },
+          "value_semantics": "stored component; no interpolation or deformation"
+        }
+      },
+      {
+        "plugin_id": "obj",
+        "dataset_id": "viz-plugin-mesh-scikit-fem",
+        "entry_file": "surface.obj",
+        "status": "passed",
+        "reader": "actual three.js OBJLoader",
+        "triangle_vertices": 468
+      },
+      {
+        "plugin_id": "viz-vtk",
+        "dataset_id": "viz-plugin-mesh-scikit-fem",
+        "entry_file": "surface.obj",
+        "status": "passed",
+        "reader": "actual assertVtkInput + vtk.js OBJReader",
+        "points": 81,
+        "polygons": 156
+      }
+    ]
+  },
+  {
+    "dataset_id": "viz-plugin-nexus-rosettasciio",
+    "name": "插件测试·RosettaSciIO NeXus 二维信号切片",
+    "description": "从 RosettaSciIO 官方 NeXus 测试文件的明确测试信号抽取第三轴索引 0 的二维切片，复制原 x/y 坐标，以固定字符串元信息发布为受限 NXdata。",
+    "domain": "general",
+    "view_kind": "image",
+    "plugin_id": "viz-nexus-window",
+    "entry_file": "nexus_fixed.nxs",
+    "source_url": "https://github.com/hyperspy/rosettasciio/blob/bc254db14cd7d4d23169b11aeb622a0a7eac1fbe/rsciio/tests/data/nexus/nexus_dls_example.nxs",
+    "publisher": "hyperspy/rosettasciio",
+    "license": "GPL-3.0 (repository COPYING)",
+    "license_url": "https://raw.githubusercontent.com/hyperspy/rosettasciio/bc254db14cd7d4d23169b11aeb622a0a7eac1fbe/COPYING.txt",
+    "license_details": "官方仓库测试/文档文件，按随附仓库许可保留版权与许可全文。此处标注为官方格式测试样本，不宣称是独立同行评审实验数据。",
+    "authors": [
+      "RosettaSciIO contributors"
+    ],
+    "source_version": "Git commit bc254db14cd7d4d23169b11aeb622a0a7eac1fbe",
+    "sample_kind": "official_fixture",
+    "sample_scope": "来源 /entry1/testdata/nexustest/data 为 10×10×15 测试数组，派生仅取 [...,0] 得 10×10；x/y 坐标原样复制，未声明单位保持未声明。原 nxs 完整保留。",
+    "files": [
+      {
+        "path": "nexus_dls_example.nxs",
+        "size": 176944,
+        "sha256": "68fa53f6dd71688bb80b5e6e0fbcaa0dad241bd8003f04055457dd00c14e32f7",
+        "role": "data",
+        "url": "https://raw.githubusercontent.com/hyperspy/rosettasciio/bc254db14cd7d4d23169b11aeb622a0a7eac1fbe/rsciio/tests/data/nexus/nexus_dls_example.nxs"
+      },
+      {
+        "path": "nexus_fixed.nxs",
+        "size": 5240,
+        "sha256": "4fd7483002faa100e82bc97cb85fd7d93a96a65941d6587afa02efa56a46f997",
+        "role": "data",
+        "derived_from": [
+          "nexus_dls_example.nxs"
+        ]
+      },
+      {
+        "path": "COPYING.txt",
+        "size": 35151,
+        "sha256": "e79e9c8a0c85d735ff98185918ec94ed7d175efc377012787aebcf3b80f0d90b",
+        "role": "documentation",
+        "url": "https://raw.githubusercontent.com/hyperspy/rosettasciio/bc254db14cd7d4d23169b11aeb622a0a7eac1fbe/COPYING.txt"
+      }
+    ],
+    "transformation": {
+      "generator": "backend/scripts/plugin_samples_chem.py",
+      "changes": "精确选取 testdata 的第三维索引 0；无重采样、归一化或错误值填充；仅把此信号与轴复制到固定字符串属性 NXentry/NXdata，不复制仪器目录及其他数据。HDF5 二进制元数据可能含创建时间，复现以逐值相等验证。"
+    },
+    "test_steps": [
+      "打开 nexus_fixed.nxs，在视图选择器选择 viz-nexus-window。",
+      "确认无格式错误且数值/结构按样本范围显示；不执行拟合或外部请求。"
+    ],
+    "reader_validation": [
+      {
+        "plugin_id": "viz-nexus-window",
+        "dataset_id": "viz-plugin-nexus-rosettasciio",
+        "entry_file": "nexus_fixed.nxs",
+        "status": "passed",
+        "result": {
+          "metadata": {
+            "format": "nxs",
+            "container": "HDF5",
+            "standard": "NXdata",
+            "input_mode": "window",
+            "value_semantics": "raw signal and coordinates; no scaling, unit conversion or finite fill masking",
+            "source_bytes": 5240,
+            "read_bytes": 5240,
+            "read_requests": 1,
+            "catalog_truncated": false,
+            "skipped_nxdata": 0,
+            "attribute_bytes": 19,
+            "chunks_touched": 0,
+            "decoded_chunk_bytes": 0,
+            "nonfinite_values": 0,
+            "output_values": 120
+          },
+          "signals": [
+            {
+              "id": "n-673952b9de6c987667b4f324c7cb6cbb",
+              "label": "data",
+              "signal": "data",
+              "shape": [
+                10,
+                10
+              ],
+              "dtype": "<f8",
+              "chunks": null,
+              "unit": null,
+              "axes": [
+                {
+                  "label": "y",
+                  "unit": null,
+                  "source": "dataset",
+                  "dtype": "<f8",
+                  "chunks": null
+                },
+                {
+                  "label": "x",
+                  "unit": null,
+                  "source": "dataset",
+                  "dtype": "<f8",
+                  "chunks": null
+                }
+              ],
+              "errors": null
+            }
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "dataset_id": "viz-plugin-ripple-rosettasciio",
+    "name": "插件测试·RosettaSciIO Ripple 谱像官方样本",
+    "description": "RosettaSciIO 官方合成格式测试的 2×3×4 float32 谱像，数值为 0..23；保留原始 RPL/RAW 并提供明确 little-endian 头的兼容副本。不是实际电子显微实验。",
+    "domain": "image_science",
+    "view_kind": "image",
+    "plugin_id": "viz-ripple-window",
+    "entry_file": "ripple_little_endian.rpl",
+    "source_url": "https://github.com/hyperspy/rosettasciio/blob/bc254db14cd7d4d23169b11aeb622a0a7eac1fbe/rsciio/tests/data/ripple/test_ripple_sdim-1_ndim-2_float32.rpl",
+    "publisher": "hyperspy/rosettasciio",
+    "license": "GPL-3.0 (repository COPYING)",
+    "license_url": "https://raw.githubusercontent.com/hyperspy/rosettasciio/bc254db14cd7d4d23169b11aeb622a0a7eac1fbe/COPYING.txt",
+    "license_details": "官方仓库测试/文档文件，按随附仓库许可保留版权与许可全文。此处标注为官方格式测试样本，不宣称是独立同行评审实验数据。",
+    "authors": [
+      "RosettaSciIO contributors"
+    ],
+    "source_version": "Git commit bc254db14cd7d4d23169b11aeb622a0a7eac1fbe",
+    "sample_kind": "official_fixture",
+    "sample_scope": "完整 24 个官方测试值；原头多字节 float32 却写 dont-care，严格插件拒绝。逐值验证 RAW 的 little-endian 解码等于 0..23 后，仅修正字节序字段。人工尺度单位 m/eV 是来源测试元数据，不能解读为真实仪器标定。",
+    "files": [
+      {
+        "path": "test_ripple_sdim-1_ndim-2_float32.rpl",
+        "size": 394,
+        "sha256": "58c38f3974b6eb8f5f6d64a4cf65f22b4016c3235fefa4b948d47fadd802b35f",
+        "role": "data",
+        "url": "https://raw.githubusercontent.com/hyperspy/rosettasciio/bc254db14cd7d4d23169b11aeb622a0a7eac1fbe/rsciio/tests/data/ripple/test_ripple_sdim-1_ndim-2_float32.rpl"
+      },
+      {
+        "path": "test_ripple_sdim-1_ndim-2_float32.raw",
+        "size": 96,
+        "sha256": "45a99655901702d55ab6284a18aed6a5e16677181d16c7a7517b68c2ae2c0c7a",
+        "role": "data",
+        "url": "https://raw.githubusercontent.com/hyperspy/rosettasciio/bc254db14cd7d4d23169b11aeb622a0a7eac1fbe/rsciio/tests/data/ripple/test_ripple_sdim-1_ndim-2_float32.raw"
+      },
+      {
+        "path": "ripple_little_endian.rpl",
+        "size": 398,
+        "sha256": "da334a052c28531bacd18ed6d604cf3dd9e2b69214c63e2bc218f05b7f02fe77",
+        "role": "data",
+        "derived_from": [
+          "test_ripple_sdim-1_ndim-2_float32.rpl",
+          "test_ripple_sdim-1_ndim-2_float32.raw"
+        ]
+      },
+      {
+        "path": "ripple_little_endian.raw",
+        "size": 96,
+        "sha256": "45a99655901702d55ab6284a18aed6a5e16677181d16c7a7517b68c2ae2c0c7a",
+        "role": "data",
+        "derived_from": [
+          "test_ripple_sdim-1_ndim-2_float32.raw"
+        ]
+      },
+      {
+        "path": "COPYING.txt",
+        "size": 35151,
+        "sha256": "e79e9c8a0c85d735ff98185918ec94ed7d175efc377012787aebcf3b80f0d90b",
+        "role": "documentation",
+        "url": "https://raw.githubusercontent.com/hyperspy/rosettasciio/bc254db14cd7d4d23169b11aeb622a0a7eac1fbe/COPYING.txt"
+      }
+    ],
+    "transformation": {
+      "generator": "backend/scripts/plugin_samples_chem.py",
+      "changes": "RAW 原字节完整复制；RPL 唯一修改 byte-order=dont-care 为 little-endian。名称重新配对，便于应用授权同名 RAW。"
+    },
+    "test_steps": [
+      "打开 ripple_little_endian.rpl，在视图选择器选择 viz-ripple-window。",
+      "确认无格式错误且数值/结构按样本范围显示；不执行拟合或外部请求。"
+    ],
+    "reader_validation": [
+      {
+        "plugin_id": "viz-ripple-window",
+        "dataset_id": "viz-plugin-ripple-rosettasciio",
+        "entry_file": "ripple_little_endian.rpl",
+        "status": "passed",
+        "result": {
+          "metadata": {
+            "format": "rpl",
+            "input_mode": "window",
+            "source_bytes": 494,
+            "header_bytes": 398,
+            "data_bytes": 96,
+            "read_bytes": 482,
+            "read_requests": 2,
+            "null_values": 0,
+            "limits": {
+              "max_values": 16384,
+              "max_depth": 1048576,
+              "max_spectrum_channels": 16384
+            },
+            "record_by": "vector",
+            "value_semantics": "raw-storage"
+          },
+          "cube": {
+            "width": 3,
+            "height": 2,
+            "depth": 4,
+            "dtype": "float32",
+            "byte_order": "little-endian",
+            "data_offset": 0,
+            "signal_type": "EELS",
+            "axes": [
+              {
+                "label": "height",
+                "unit": "m",
+                "origin": 0.5,
+                "scale": 100,
+                "calibration": "declared",
+                "origin_defaulted": false
+              },
+              {
+                "label": "width",
+                "unit": "m",
+                "origin": 1,
+                "scale": 200,
+                "calibration": "declared",
+                "origin_defaulted": false
+              },
+              {
+                "label": "depth",
+                "unit": "eV",
+                "origin": 1.5,
+                "scale": 300,
+                "calibration": "declared",
+                "origin_defaulted": false
+              }
+            ]
+          },
+          "image_values_verified": 6,
+          "spectrum_values_verified": 4
+        }
+      }
+    ]
+  },
+  {
+    "dataset_id": "viz-plugin-nmr-project",
+    "name": "插件测试·NMRium 合成 1H 明文谱",
+    "description": "明确合成的一维 1H JCAMP-DX AFFN 光谱，只用于坐标、峰形和核磁查看器测试；不是任何化合物实测谱。",
+    "domain": "spectroscopy",
+    "view_kind": "series",
+    "plugin_id": "viz-nmrium",
+    "entry_file": "synthetic-1h.jdx",
+    "source_url": "https://github.com/km345297256/AI-DATASEEK",
+    "publisher": "AI-DataSeek project",
+    "authors": [
+      "AI-DataSeek contributors"
+    ],
+    "license": "MIT",
+    "license_url": "https://opensource.org/license/mit/",
+    "license_details": "本项目原创合成格式测试样本，沿用仓库 MIT 许可。没有外部下载原始实验，也不代表真实科学测量。",
+    "source_version": "Generator SHA256 e554476b6fdc1ec995917052035955e5026530359e853773359faa59b4dc23f2",
+    "sample_kind": "project_fixture",
+    "sample_scope": "1024 点；x_i=10-i/100 ppm；y_i=max(0,120-8|i-230|)+max(0,80-4|i-700|)，i=0..1023；声明 1H、400 MHz；不做 FID 处理。",
+    "files": [
+      {
+        "path": "synthetic-1h.jdx",
+        "size": 8542,
+        "sha256": "db7229c49b972aca49174e7f71ecd76afc9898e0c75333ebe3f7f0028265ca82",
+        "role": "data",
+        "origin": {
+          "kind": "generated_fixture",
+          "generator": "backend/scripts/plugin_samples_chem.py",
+          "generator_sha256": "e554476b6fdc1ec995917052035955e5026530359e853773359faa59b4dc23f2",
+          "description": "明确合成格式测试值，生成参数见本项 sample_scope；不是科研实验观测。"
+        }
+      }
+    ],
+    "transformation": {
+      "generator": "backend/scripts/plugin_samples_chem.py",
+      "generator_sha256": "e554476b6fdc1ec995917052035955e5026530359e853773359faa59b4dc23f2",
+      "changes": "从明确固定参数生成，无外部实验数据。"
+    },
+    "test_steps": [
+      "打开 synthetic-1h.jdx，选择 viz-nmrium。",
+      "确认显示标注的合成值和格式功能，不将其解释为实验结论。"
+    ],
+    "reader_validation": [
+      {
+        "plugin_id": "viz-nmrium",
+        "dataset_id": "viz-plugin-nmr-project",
+        "entry_file": "synthetic-1h.jdx",
+        "status": "passed",
+        "result": {
+          "is_fid": false,
+          "x_unit": "PPM",
+          "nucleus": "1H",
+          "title": "Synthetic 1H parser fixture - NOT an experimental spectrum",
+          "source_points": 1024,
+          "encoding": "AFFN/PAC",
+          "processed": true,
+          "frequency": 400
+        }
+      }
+    ]
+  },
+  {
+    "dataset_id": "viz-plugin-root-project",
+    "name": "插件测试·JSROOT 合成非均匀分箱直方图",
+    "description": "由当前固定版本 Uproot 写出的合成 TH1D，用于验证非均匀分箱和禁用 ROOT 宏的数值读取；非粒子物理观测数据。",
+    "domain": "general",
+    "view_kind": "series",
+    "plugin_id": "viz-jsroot",
+    "entry_file": "synthetic-histogram.root",
+    "source_url": "https://github.com/km345297256/AI-DATASEEK",
+    "publisher": "AI-DataSeek project",
+    "authors": [
+      "AI-DataSeek contributors"
+    ],
+    "license": "MIT",
+    "license_url": "https://opensource.org/license/mit/",
+    "license_details": "本项目原创合成格式测试样本，沿用仓库 MIT 许可。没有外部下载原始实验，也不代表真实科学测量。",
+    "source_version": "Generator SHA256 e554476b6fdc1ec995917052035955e5026530359e853773359faa59b4dc23f2",
+    "sample_kind": "project_fixture",
+    "sample_scope": "仅 synthetic_counts 对象；4 个计数 [2,5,3,8]，边界 [0,1,3,6,10]；不包含 TTree、宏、公式或自定义动态流类。ROOT 创建时间可变，复现验证内容及 bin edges 相等，已发布快照由 SHA256 固定。",
+    "files": [
+      {
+        "path": "synthetic-histogram.root",
+        "size": 12880,
+        "sha256": "be0ac108135865e09337caf51b901ad85674095d5ab26393545b608be23518b0",
+        "role": "data",
+        "origin": {
+          "kind": "generated_fixture",
+          "generator": "backend/scripts/plugin_samples_chem.py",
+          "generator_sha256": "e554476b6fdc1ec995917052035955e5026530359e853773359faa59b4dc23f2",
+          "description": "明确合成格式测试值，生成参数见本项 sample_scope；不是科研实验观测。"
+        }
+      }
+    ],
+    "transformation": {
+      "generator": "backend/scripts/plugin_samples_chem.py",
+      "generator_sha256": "e554476b6fdc1ec995917052035955e5026530359e853773359faa59b4dc23f2",
+      "changes": "从明确固定参数生成，无外部实验数据。"
+    },
+    "test_steps": [
+      "打开 synthetic-histogram.root，选择 viz-jsroot。",
+      "确认显示标注的合成值和格式功能，不将其解释为实验结论。"
+    ],
+    "reader_validation": [
+      {
+        "plugin_id": "viz-jsroot",
+        "dataset_id": "viz-plugin-root-project",
+        "entry_file": "synthetic-histogram.root",
+        "status": "passed",
+        "result": {
+          "x_edges": [
+            0,
+            1,
+            3,
+            6,
+            10
+          ],
+          "root_class": "TH1D",
+          "title": "",
+          "executable_objects": false
+        }
+      }
+    ]
+  },
+  {
+    "dataset_id": "viz-plugin-instrument-project",
+    "name": "插件测试·ESRF EDF 合成三帧标定网格",
+    "description": "按公开 ESRF EDF 格式构造的三帧 uint16 测试图，用于帧选择、ROI 窗口与原值读取检查；不是实际探测器采集。",
+    "domain": "image_science",
+    "view_kind": "image",
+    "plugin_id": "viz-instrument-images",
+    "entry_file": "calibration-grid.edf",
+    "source_url": "https://github.com/km345297256/AI-DATASEEK",
+    "publisher": "AI-DataSeek project",
+    "authors": [
+      "AI-DataSeek contributors"
+    ],
+    "license": "MIT",
+    "license_url": "https://opensource.org/license/mit/",
+    "license_details": "本项目原创合成格式测试样本，沿用仓库 MIT 许可。没有外部下载原始实验，也不代表真实科学测量。",
+    "source_version": "Generator SHA256 e554476b6fdc1ec995917052035955e5026530359e853773359faa59b4dc23f2",
+    "sample_kind": "project_fixture",
+    "sample_scope": "64×48、3 帧、little-endian uint16；值为 frame×1000+y×64+x，每帧 512-byte header，文件 19,968 bytes。ROI [8,8,32,24] 的第 2 帧显示范围 [1520,3023]。",
+    "files": [
+      {
+        "path": "calibration-grid.edf",
+        "size": 19968,
+        "sha256": "ad1d53496bbe3dd1cc66158a178ea4cc211dd3f90068d69be175c52863b199fa",
+        "role": "data",
+        "origin": {
+          "kind": "generated_fixture",
+          "generator": "backend/scripts/plugin_samples_chem.py",
+          "generator_sha256": "e554476b6fdc1ec995917052035955e5026530359e853773359faa59b4dc23f2",
+          "description": "明确合成格式测试值，生成参数见本项 sample_scope；不是科研实验观测。"
+        }
+      }
+    ],
+    "transformation": {
+      "generator": "backend/scripts/plugin_samples_chem.py",
+      "generator_sha256": "e554476b6fdc1ec995917052035955e5026530359e853773359faa59b4dc23f2",
+      "changes": "从明确固定参数生成，无外部实验数据。"
+    },
+    "test_steps": [
+      "打开 calibration-grid.edf，选择 viz-instrument-images。",
+      "确认显示标注的合成值和格式功能，不将其解释为实验结论。"
+    ],
+    "reader_validation": [
+      {
+        "plugin_id": "viz-instrument-images",
+        "dataset_id": "viz-plugin-instrument-project",
+        "entry_file": "calibration-grid.edf",
+        "status": "passed",
+        "result": {
+          "format": "esrf-edf",
+          "dialect": "edf-inline-2d-uncompressed",
+          "format_version": null,
+          "frame_count": 3,
+          "frame_shape": [
+            48,
+            64
+          ],
+          "dtype": "uint16",
+          "byte_order": "little",
+          "input_mode": "window",
+          "source_bytes": 19968,
+          "read_bytes": 3072,
+          "read_requests": 27,
+          "header_bytes": 1536,
+          "header_text_hidden": true,
+          "calibration": "none; raw detector values",
+          "storage_layout": "row-major; x fastest",
+          "selection_mode": "explicit frame and pixel ROI",
+          "output_shape": [
+            24,
+            32
+          ],
+          "display_range": [
+            1520,
+            3023
+          ],
+          "normalization": "ROI min-max to uint8 grayscale; original data unchanged",
+          "invalid_pixels": 0,
+          "roi_origin": "frame top-left; x right, y down"
+        }
+      }
+    ]
+  }
+]

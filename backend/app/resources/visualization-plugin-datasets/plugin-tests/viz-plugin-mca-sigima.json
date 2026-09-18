@@ -1,0 +1,107 @@
+{
+  "dataset_id": "viz-plugin-mca-sigima",
+  "external_id": "viz-plugin-mca-sigima",
+  "data_center_id": "reviewed-visualization-plugin-tests",
+  "data_center_name": "逐插件可视化测试样例",
+  "name": "插件测试·Sigima 2048 道 MCA 官方样本",
+  "description": "Sigima 官方 PMCA 格式测试谱的兼容副本，2048 道原始计数完整保留；仅把不显示的温度 footer 中度符号转写为 ASCII。",
+  "domain": "spectroscopy",
+  "data_type": "mca",
+  "temporal_coverage": "",
+  "spatial_coverage": "",
+  "tags": [
+    "插件测试样例",
+    "viz-mca-spectrum",
+    "official_fixture",
+    "series",
+    "spectroscopy"
+  ],
+  "metadata": {
+    "curated": true,
+    "source_catalog": "plugin-tests",
+    "catalog_version": 1,
+    "source_descriptor_sha256": "abc4902c59fcd0831147a1225f65f62c3506f6f2414c7f855d059de521c119ba",
+    "download_date": "2026-09-18",
+    "inventory_complete": true,
+    "recursive_file_count": 4,
+    "total_size_bytes": 16646,
+    "visualization_view_kind": "series",
+    "visualization_plugin_id": "viz-mca-spectrum",
+    "visualization_entry_file": "spectrum_ascii.mca",
+    "sample_note": "完整 2048 道计数；原文件为 4 点且 LABEL=Channel 的标定，插件保留通道轴，不臆造能量标定。原始谱同时保留。",
+    "provenance": [
+      {
+        "path": "spectrum.mca",
+        "size": 6466,
+        "sha256": "04fd35becb950025b19bbc2ddcf90be094780a40443638cbfdda34d5601eaaf3",
+        "role": "data",
+        "url": "https://raw.githubusercontent.com/DataLab-Platform/Sigima/51ee0ed558a57a2f5be7dec72b95c3af742f5bca/sigima/data/tests/curve_formats/spectrum.mca"
+      },
+      {
+        "path": "spectrum_ascii.mca",
+        "size": 6469,
+        "sha256": "5199480d6d44233abc29963f41ca572cd9a491f39e7d31a7e7a23027dc472745",
+        "role": "data",
+        "derived_from": [
+          "spectrum.mca"
+        ]
+      },
+      {
+        "path": "LICENSE.txt",
+        "size": 1536,
+        "sha256": "e8cba6f519f32878c7827c12f98e28b14ed9e16b240250c6547e550c68337a88",
+        "role": "documentation",
+        "url": "https://raw.githubusercontent.com/DataLab-Platform/Sigima/51ee0ed558a57a2f5be7dec72b95c3af742f5bca/LICENSE"
+      }
+    ],
+    "publisher": "DataLab-Platform/Sigima",
+    "source_url": "https://github.com/DataLab-Platform/Sigima/blob/51ee0ed558a57a2f5be7dec72b95c3af742f5bca/sigima/data/tests/curve_formats/spectrum.mca",
+    "license": "BSD-3-Clause",
+    "license_url": "https://raw.githubusercontent.com/DataLab-Platform/Sigima/51ee0ed558a57a2f5be7dec72b95c3af742f5bca/LICENSE",
+    "license_details": "官方仓库测试/文档文件，按随附仓库许可保留版权与许可全文。此处标注为官方格式测试样本，不宣称是独立同行评审实验数据。",
+    "authors": [
+      "Sigima / DataLab Platform contributors"
+    ],
+    "source_version": "Git commit 51ee0ed558a57a2f5be7dec72b95c3af742f5bca",
+    "sample_scope": "完整 2048 道计数；原文件为 4 点且 LABEL=Channel 的标定，插件保留通道轴，不臆造能量标定。原始谱同时保留。",
+    "transformation": {
+      "generator": "backend/scripts/plugin_samples_chem.py",
+      "changes": "唯一变化：footer 的 Board Temp: 34° C（源字节为 34\\xb0C）转写为 34 degC；<<DATA>>..<<END>> 全部计数字节未变。"
+    },
+    "sample_kind": "official_fixture",
+    "test_steps": [
+      "打开 spectrum_ascii.mca，在视图选择器选择 viz-mca-spectrum。",
+      "确认无格式错误且数值/结构按样本范围显示；不执行拟合或外部请求。"
+    ]
+  },
+  "files": [
+    {
+      "path": "LICENSE.txt",
+      "size": 1536,
+      "sha256": "e8cba6f519f32878c7827c12f98e28b14ed9e16b240250c6547e550c68337a88",
+      "role": "documentation",
+      "content_type": "text/plain"
+    },
+    {
+      "path": "SOURCE.md",
+      "size": 2175,
+      "sha256": "5dab87042fafa4c2f1912032f27441e0f4dd14f3b8e6afdba3141f2fa45388f0",
+      "role": "documentation",
+      "content_type": "text/markdown"
+    },
+    {
+      "path": "spectrum.mca",
+      "size": 6466,
+      "sha256": "04fd35becb950025b19bbc2ddcf90be094780a40443638cbfdda34d5601eaaf3",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "spectrum_ascii.mca",
+      "size": 6469,
+      "sha256": "5199480d6d44233abc29963f41ca572cd9a491f39e7d31a7e7a23027dc472745",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    }
+  ]
+}

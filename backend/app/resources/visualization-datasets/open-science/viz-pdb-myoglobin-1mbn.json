@@ -1,0 +1,70 @@
+{
+  "dataset_id": "viz-pdb-myoglobin-1mbn",
+  "external_id": "10.2210/pdb1MBN/pdb",
+  "data_center_id": "reviewed-open-science-catalog",
+  "data_center_name": "开放科学可视化样例",
+  "name": "可视化样例·三维结构｜RCSB 抹香鲸肌红蛋白三维结构（1MBN）",
+  "description": "经典肌红蛋白 X 射线晶体结构的完整 mmCIF 条目，包含蛋白、血红素与铁配位相关组分。分辨率 2.00 Å，单模型 1,260 个原子、153 个蛋白残基，适合 Mol* 三维结构与链/配体探查。",
+  "domain": "chemistry",
+  "data_type": "cif",
+  "temporal_coverage": "",
+  "spatial_coverage": "",
+  "tags": [
+    "可视化样例",
+    "开放科学",
+    "structure",
+    "viz-molstar",
+    "chemistry"
+  ],
+  "metadata": {
+    "curated": true,
+    "source_catalog": "open-science",
+    "catalog_version": 1,
+    "source_descriptor_sha256": "54a990dee8c83720acea12cc8105303459b915b36f7926a9a951e42d9c3c39c0",
+    "download_date": "2026-09-18",
+    "inventory_complete": true,
+    "recursive_file_count": 2,
+    "total_size_bytes": 193243,
+    "visualization_view_kind": "structure",
+    "visualization_plugin_id": "viz-molstar",
+    "visualization_entry_file": "1MBN.cif",
+    "sample_note": "完整 1MBN mmCIF 结构模型文件，不裁剪原子；不含结构因子和验证报告。PDB DOI 10.2210/pdb1MBN/pdb；原始文献 H. C. Watson (1969), The Stereochemistry of the Protein Myoglobin, Progress in Stereochemistry 4:299。与已有 1CRN、1UBQ 不重复。",
+    "provenance": [
+      {
+        "path": "1MBN.cif",
+        "size": 191665,
+        "sha256": "91c8a5754c748c7cc1c1508ee92bc1df4c332be2383c8ae93fd084292ec8722e",
+        "url": "https://files.rcsb.org/download/1MBN.cif",
+        "role": "data"
+      }
+    ],
+    "publisher": "RCSB Protein Data Bank / wwPDB",
+    "source_url": "https://www.rcsb.org/structure/1MBN",
+    "license": "CC0 1.0",
+    "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "license_details": "RCSB 官方 Usage Policies 明确 PDB archive 数据文件采用 CC0 1.0，并鼓励引用原始作者；不是把网站文章的 CC-BY 许可混用于结构数据。政策证据：https://www.rcsb.org/pages/policies",
+    "authors": [
+      "H. C. Watson",
+      "J. C. Kendrew"
+    ],
+    "source_version": "PDB 1MBN entry version 1.5, revision 2026-08-12; downloaded 2026-09-18",
+    "sample_scope": "完整 1MBN mmCIF 结构模型文件，不裁剪原子；不含结构因子和验证报告。PDB DOI 10.2210/pdb1MBN/pdb；原始文献 H. C. Watson (1969), The Stereochemistry of the Protein Myoglobin, Progress in Stereochemistry 4:299。与已有 1CRN、1UBQ 不重复。",
+    "doi": "10.2210/pdb1MBN/pdb"
+  },
+  "files": [
+    {
+      "path": "1MBN.cif",
+      "size": 191665,
+      "sha256": "91c8a5754c748c7cc1c1508ee92bc1df4c332be2383c8ae93fd084292ec8722e",
+      "role": "data",
+      "content_type": "chemical/x-cif"
+    },
+    {
+      "path": "SOURCE.md",
+      "size": 1578,
+      "sha256": "c75b03a2fdd5b24e4df2f35eecaa527ff8aeb42c858c1f7f0ae89e3606e6a3c7",
+      "role": "documentation",
+      "content_type": "text/markdown"
+    }
+  ]
+}

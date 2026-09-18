@@ -1,0 +1,460 @@
+[
+  {
+    "dataset_id": "viz-metpy-may4-sounding",
+    "name": "插件样例｜MetPy 官方 May 4 探空剖面",
+    "description": "MetPy 官方测试资料的 30 个完整气压、温度与露点层，气压 hPa、温度/露点 °C。原件未声明完整站点和年份，不将其表述为特定日期业务观测；入口 CSV 为原数值选列。",
+    "domain": "geoscience",
+    "view_kind": "image",
+    "plugin_id": "viz-metpy",
+    "entry_file": "may4_sounding.csv",
+    "source_url": "https://github.com/Unidata/MetPy/blob/07df928b0d47fce73696116d6988d0722bfaa57e/staticdata/may4_sounding.txt",
+    "publisher": "Unidata / MetPy Developers",
+    "license": "BSD-3-Clause",
+    "license_url": "https://github.com/Unidata/MetPy/blob/07df928b0d47fce73696116d6988d0722bfaa57e/LICENSE",
+    "license_details": "按 MetPy 仓库 BSD-3-Clause 分发；随包保留完整版权和免责声明，Copyright (c) 2008–2025 MetPy Developers。官方软件测试样本，不夸大观测来源。",
+    "authors": [
+      "MetPy Developers"
+    ],
+    "source_version": "MetPy 07df928b0d47fce73696116d6988d0722bfaa57e",
+    "sample_kind": "official_fixture",
+    "sample_scope": "保留官方 TXT；仅选取具有全部 11 字段的 30 个数值层中的 PRES/TEMP/DWPT，959.0–268.6 hPa。未填充缺失的 1000 hPa 层，未推算风或 CAPE/CIN。",
+    "transformation": "derive_basic.py：逐行筛选完整 11 数值字段记录，原文本数值选列写 CSV，未换算或插值；原 TXT 保留。",
+    "test_steps": [
+      "打开 may4_sounding.csv，选择 viz-metpy。",
+      "压力选择 pressure_hPa（hPa）；温度 temperature_degC 和露点 dewpoint_degC 均选 degC，点击绘制探空图。",
+      "应显示红色温度、绿色露点曲线，共 30 层；不应显示 CAPE/CIN 诊断。"
+    ],
+    "files": [
+      {
+        "path": "may4_sounding_original.txt",
+        "size": 2730,
+        "sha256": "b3a7c3ee4b1bdb1e1961492265c23f42947dc627156cfacb5fdebac0ad0b4350",
+        "url": "https://raw.githubusercontent.com/Unidata/MetPy/07df928b0d47fce73696116d6988d0722bfaa57e/staticdata/may4_sounding.txt",
+        "role": "data"
+      },
+      {
+        "path": "may4_sounding.csv",
+        "size": 551,
+        "sha256": "b91eb7f9463c5f76aff8bc0cb21fefc222ae4f0ee38c3350a99e7919b0fb0559",
+        "derived_from": [
+          "may4_sounding_original.txt"
+        ],
+        "role": "data"
+      },
+      {
+        "path": "LICENSE.txt",
+        "size": 1521,
+        "sha256": "22bf676ea07500c1b2796c32ef7f7e6a8dc357902c55cf2bef4a2f765cac5e8f",
+        "url": "https://raw.githubusercontent.com/Unidata/MetPy/07df928b0d47fce73696116d6988d0722bfaa57e/LICENSE",
+        "role": "documentation"
+      }
+    ]
+  },
+  {
+    "dataset_id": "viz-pdal-las12",
+    "name": "插件样例｜PDAL LAS 1.2 彩色点记录",
+    "description": "PDAL 官方 LAS 1.2 格式 3 测试样本，共 1065 条带 RGB 的点记录。文件未给出 CRS 与长度单位，预览保留原始坐标和比例因子，不擅自标为经纬度或米。",
+    "domain": "geoscience",
+    "view_kind": "structure",
+    "plugin_id": "viz-pointcloud-window",
+    "entry_file": "1.2-with-color.las",
+    "source_url": "https://github.com/PDAL/PDAL/blob/58af674be2bcde44477ed0b51f5f0ac0a158ce8d/test/data/las/1.2-with-color.las",
+    "publisher": "PDAL / Hobu, Inc.",
+    "license": "BSD-3-Clause",
+    "license_url": "https://github.com/PDAL/PDAL/blob/58af674be2bcde44477ed0b51f5f0ac0a158ce8d/LICENSE.txt",
+    "license_details": "PDAL 根许可明确适用于发行版所有未另标注文件；保留 Copyright (c) 2025 Hobu, Inc.、条款和免责声明。不是使用许可不同的 PDAL/data 仓库文件。",
+    "authors": [
+      "PDAL contributors",
+      "Hobu, Inc."
+    ],
+    "source_version": "PDAL 58af674be2bcde44477ed0b51f5f0ac0a158ce8d",
+    "sample_kind": "official_fixture",
+    "sample_scope": "完整 36,439 字节 LAS 测试文件，1065 条记录；场址/采集时刻/CRS 未获明示，不作调查级定位判断。",
+    "test_steps": [
+      "打开 1.2-with-color.las，选择 viz-pointcloud-window 并读取目录。",
+      "点起点 0，点数 1065，读取连续点窗口。",
+      "显示 1065 点及 RGB/强度/分类；缩放因子 XYZ 均 0.01，坐标单位未知，不能标为 EPSG:4326。"
+    ],
+    "files": [
+      {
+        "path": "1.2-with-color.las",
+        "size": 36439,
+        "sha256": "1d3e00eae856bffa6e55778dbfc05bdedc992504c64dbf366d5fd2eb6489ee45",
+        "url": "https://raw.githubusercontent.com/PDAL/PDAL/58af674be2bcde44477ed0b51f5f0ac0a158ce8d/test/data/las/1.2-with-color.las",
+        "role": "data"
+      },
+      {
+        "path": "LICENSE.txt",
+        "size": 1896,
+        "sha256": "9ab1261b649806f4884539d5fd49d8f2c9a634762ee52f1ddd2330ef417f5cdf",
+        "url": "https://raw.githubusercontent.com/PDAL/PDAL/58af674be2bcde44477ed0b51f5f0ac0a158ce8d/LICENSE.txt",
+        "role": "documentation"
+      }
+    ]
+  },
+  {
+    "dataset_id": "viz-usgs-anmo-seismic",
+    "name": "插件样例｜USGS ANMO 宽带垂向地震记录",
+    "description": "GSN IU.ANMO.10.BHZ 2018 年首日真实波形在 ObsPy 官方测试仓库的镜像；入口是原件首个完整 512 字节 MiniSEED2 记录，223 样本、40 Hz。未去仪器响应，振幅单位未知。",
+    "domain": "geoscience",
+    "view_kind": "series",
+    "plugin_id": "viz-seismic-window",
+    "entry_file": "IU.ANMO.10.BHZ.first-record.mseed",
+    "source_url": "https://www.fdsn.org/networks/detail/IU/",
+    "publisher": "USGS/Albuquerque Seismological Laboratory；ObsPy 官方镜像",
+    "license": "U.S. Public Domain (USGS-produced data)",
+    "license_url": "https://www.usgs.gov/information-policies-and-instructions/copyrights-and-credits",
+    "license_details": "USGS 自产观测数据适用美国公有领域政策；保留机构、网络/目录及镜像来源署名，不将第三方图片或商标扩展解释为公有领域。",
+    "authors": [
+      "USGS/Albuquerque Seismological Laboratory",
+      "ObsPy contributors (fixture mirror)"
+    ],
+    "source_version": "IU network DOI 10.7914/SN/IU; ObsPy 50033e1daf95233cd4f30e95a49c37fd50be2ccd",
+    "sample_kind": "scientific_derived",
+    "sample_scope": "原始一分钟 2560B 镜像完整保留；仅原样提取首个完整 512B 记录用于严格兼容入口，起始 2018-01-01T00:00:00.019500Z，223 点，样本间隔 0.025 秒；不是整分钟合并波形。原文件后续记录含当前 reader 不支持的字段，不将原件声称为全部兼容。",
+    "transformation": "derive_basic.py 从原 MiniSEED 按记录边界复制前 512 字节；压缩样本、时间、头部完全未改，未重采样、补缺口、响应校正。",
+    "test_steps": [
+      "打开 IU.ANMO.10.BHZ.first-record.mseed，选择 viz-seismic-window。",
+      "记录 0，样本起点 0，样本数 223，读取波形窗。",
+      "应为 223 点、0.025 秒间隔、STEIM2；振幅单位 unknown，不能标为 nm/s。"
+    ],
+    "files": [
+      {
+        "path": "IU.ANMO.10.BHZ.2018.001_first_minute.mseed",
+        "size": 2560,
+        "sha256": "6cd52d90ab1f8f17e73400df1286aa3efd9069722232b80ca9578f23193530aa",
+        "url": "https://raw.githubusercontent.com/obspy/obspy/50033e1daf95233cd4f30e95a49c37fd50be2ccd/obspy/clients/filesystem/tests/data/tsindex_data/IU/2018/001/IU.ANMO.10.BHZ.2018.001_first_minute.mseed",
+        "role": "data"
+      },
+      {
+        "path": "IU.ANMO.10.BHZ.first-record.mseed",
+        "size": 512,
+        "sha256": "903fbfcf8cdb59993af92a428f5a92ebf0db4545d68bcba711b2fbc4235975b9",
+        "derived_from": [
+          "IU.ANMO.10.BHZ.2018.001_first_minute.mseed"
+        ],
+        "role": "data"
+      }
+    ]
+  },
+  {
+    "dataset_id": "viz-noaa-climatology-envi",
+    "name": "插件样例｜NOAA 月气温气候态 ENVI 栅格",
+    "description": "将 NOAA/NCEP 1991–2020 月气候态完整 12×73×144 气温数组无损重编码为 ENVI BSQ float32。12 个 band 是月份不是光谱波段；数值单位 °C，空间显示按行列索引。",
+    "domain": "geoscience",
+    "view_kind": "image",
+    "plugin_id": "viz-envi-window",
+    "entry_file": "monthly_air.hdr",
+    "source_url": "https://psl.noaa.gov/data/gridded/data.ncep.reanalysis.html",
+    "publisher": "NOAA/OAR/PSL 与 NCEP/NCAR",
+    "license": "U.S. Public Domain (NOAA-produced data)",
+    "license_url": "https://psl.noaa.gov/disclaimer/",
+    "license_details": "NOAA/PSL 政府自产数据除另有标注者外属公有领域；须注明 NOAA/OAR/PSL 与原数据集，不暗示官方背书。派生格式不是官方新产品。",
+    "authors": [
+      "NOAA/OAR/PSL",
+      "NCEP/NCAR"
+    ],
+    "source_version": "1991–2020 monthly long-term means, downloaded 2026-09-18",
+    "sample_kind": "scientific_derived",
+    "sample_scope": "12 个日历月完整气候态；原 NC 同包保留。ENVI 只承载数值与存储维度，未捏造光谱波长、地图变换或 CRS；不代表逐日/逐年时间序列。",
+    "transformation": "derive_basic.py：原 air[:] 全部 float32 值逐项相等，按 little-endian BSQ 写 504576B IMG 与 HDR；未缩放、插值或丢弃层。",
+    "test_steps": [
+      "打开 monthly_air.hdr，选择 viz-envi-window（同目录 monthly_air.img 自动配对）。",
+      "图像选 band 0、x=0、y=0、width=128、height=73，读取窗口。",
+      "应显示 73×128 个一月气温原值（°C）；可选 x=72、y=36、band_start=0、band_count=12 查看月气候态序列，横轴 band 索引不是波长。"
+    ],
+    "files": [
+      {
+        "path": "air.sig995.mon.ltm.1991-2020.nc",
+        "size": 657356,
+        "sha256": "31e6f601fd8e1ecc0bd63e9907ae9e0f931fe675c397ab608abe191b15576619",
+        "url": "https://downloads.psl.noaa.gov/Datasets/ncep.reanalysis.derived/surface/air.sig995.mon.ltm.1991-2020.nc",
+        "role": "data"
+      },
+      {
+        "path": "monthly_air.hdr",
+        "size": 131,
+        "sha256": "7a8643e18e53dd909096dc5a3dd6ea6c3d660676741a39afe4a3d682ceab9d47",
+        "derived_from": [
+          "air.sig995.mon.ltm.1991-2020.nc"
+        ],
+        "role": "data"
+      },
+      {
+        "path": "monthly_air.img",
+        "size": 504576,
+        "sha256": "f1d46c2e06636edad99583ce4982742b7f8a706e545212dfa1e7bd7b8a2e8fac",
+        "derived_from": [
+          "air.sig995.mon.ltm.1991-2020.nc"
+        ],
+        "role": "data"
+      }
+    ]
+  },
+  {
+    "dataset_id": "viz-usgs-earthquakes-kml",
+    "name": "插件样例｜USGS 2024 强震 KML 点图层",
+    "description": "USGS 2024 年 M≥6 的 99 个地震事件，以同一观测目录生成安全 KML 点图层，保留事件 ID 和原经纬度；完整属性保留在同包 GeoJSON。震源深度不作为三维高度。",
+    "domain": "geoscience",
+    "view_kind": "map",
+    "plugin_id": "viz-geoformats",
+    "entry_file": "usgs-2024-m6.kml",
+    "source_url": "https://earthquake.usgs.gov/fdsnws/event/1/",
+    "publisher": "U.S. Geological Survey",
+    "license": "U.S. Public Domain (USGS-produced data)",
+    "license_url": "https://www.usgs.gov/information-policies-and-instructions/copyrights-and-credits",
+    "license_details": "USGS 自产观测数据适用美国公有领域政策；保留机构、网络/目录及镜像来源署名，不将第三方图片或商标扩展解释为公有领域。",
+    "authors": [
+      "U.S. Geological Survey"
+    ],
+    "source_version": "2024 fixed historical query; snapshot 2026-09-18",
+    "sample_kind": "scientific_derived",
+    "sample_scope": "catalog=us，2024-01-01 至 2025-01-01，M≥6、eventtype=earthquake，99 点。KML 仅事件 ID 与 WGS84 二维坐标，无外部样式、网络链接或 HTML。",
+    "transformation": "derive_basic.py 从完整官方 GeoJSON 原样选 ID、lon、lat 写入 KML；省略深度而非错当高度；不筛选/插值/合成观测点，原所有属性保留。",
+    "test_steps": [
+      "打开 usgs-2024-m6.kml，选择 viz-geoformats。",
+      "应为 WGS84 99 个点，可缩放/平移；无外部底图请求。",
+      "检查跨日期变更线的点，不将震源深度视作高度。"
+    ],
+    "files": [
+      {
+        "path": "usgs-2024-m6-original.geojson",
+        "size": 84499,
+        "sha256": "b08833bbc9bfb467fdaf808825553840443d91793a0a807b638e86422d1cc36f",
+        "url": "https://earthquake.usgs.gov/fdsnws/event/1/query?format=geojson&starttime=2024-01-01T00:00:00&endtime=2025-01-01T00:00:00&minmagnitude=6&eventtype=earthquake&catalog=us&orderby=time-asc",
+        "role": "data"
+      },
+      {
+        "path": "usgs-2024-m6.kml",
+        "size": 10422,
+        "sha256": "c9e24b74d6666ad3cb5a6f845ab77c7be60e6bc76b8d2e63416e6fdbe36730ba",
+        "derived_from": [
+          "usgs-2024-m6-original.geojson"
+        ],
+        "role": "data"
+      }
+    ]
+  },
+  {
+    "dataset_id": "viz-noaa-gfs-grib",
+    "name": "插件样例｜NOAA GFS 东亚 2 米气温 GRIB2",
+    "description": "NOAA GFS 2026-09-16 00Z 的 f000 2 米温度原场，100–110°E、30–40°N 的 1° 格网，11×11=121 点，单位 K。为当前 WMO-only reader 生成只清除未用本地表声明的副本，保留原件。",
+    "domain": "geoscience",
+    "view_kind": "image",
+    "plugin_id": "viz-grib-window",
+    "entry_file": "gfs-20260916-00-2mt-wmo.grib2",
+    "source_url": "https://nomads.ncep.noaa.gov/cgi-bin/filter_gfs_1p00.pl",
+    "publisher": "NOAA/NCEP/NOMADS",
+    "license": "U.S. Public Domain (NOAA-produced data)",
+    "license_url": "https://psl.noaa.gov/disclaimer/",
+    "license_details": "NOAA/PSL 政府自产数据除另有标注者外属公有领域；须注明 NOAA/OAR/PSL 与原数据集，不暗示官方背书。派生格式不是官方新产品。",
+    "authors": [
+      "NOAA/NCEP"
+    ],
+    "source_version": "GFS 2026-09-16 00Z f000 1 degree; query snapshot 2026-09-18",
+    "sample_kind": "scientific_derived",
+    "sample_scope": "仅 1 条 GRIB2 消息、2 m 温度、121 格点、forecast_time=0；不是完整 GFS、实时预报或经过业务质量控制的独立产品。NOMADS 滚动目录可能过期，精确原件和 hash 已固定。",
+    "transformation": "derive_mesh_grib.py 用 ecCodes 验证 discipline/category/number=(0,0,0)，surface=(103,2)，将未用 localTablesVersion 从 1 改为 0。二进制仅第 26 字节变化；121 个解码值、所有经纬度逐项完全一致，未换算 K、未插值。",
+    "test_steps": [
+      "打开 gfs-20260916-00-2mt-wmo.grib2，选择 viz-grib-window 并读取目录。",
+      "选择第一条 2t 消息，ROI x=0、y=0、width=11、height=11。",
+      "应为 121 个 2 m 气温值，K，不应误标 °C；经度 100–110、纬度 30–40，时效 0。"
+    ],
+    "files": [
+      {
+        "path": "gfs-20260916-00-2mt-original.grib2",
+        "size": 300,
+        "sha256": "819eec85f08882ad10361d2fc72bca6a0ae6d9b3f9c1accec21be51622dbe9c0",
+        "url": "https://nomads.ncep.noaa.gov/cgi-bin/filter_gfs_1p00.pl?file=gfs.t00z.pgrb2.1p00.f000&lev_2_m_above_ground=on&var_TMP=on&subregion=&leftlon=100&rightlon=110&toplat=40&bottomlat=30&dir=%2Fgfs.20260916%2F00%2Fatmos",
+        "role": "data"
+      },
+      {
+        "path": "gfs-20260916-00-2mt-wmo.grib2",
+        "size": 300,
+        "sha256": "d9571b5f65baa1d6ea6471243186b66d284477d82f4de17a77a8042ebfd9a8e2",
+        "derived_from": [
+          "gfs-20260916-00-2mt-original.grib2"
+        ],
+        "role": "data"
+      }
+    ]
+  },
+  {
+    "dataset_id": "viz-xugrid-netherlands",
+    "name": "插件样例｜Xugrid 荷兰高程三角网子集",
+    "description": "Deltares/Xugrid 官方荷兰地表高程样本的前 512 个真实三角形（627 个原节点），高程单位原件声明 m NAP。按原拓扑选择，不插值；原数据未明示节点 CRS，保留未知。",
+    "domain": "geoscience",
+    "view_kind": "map",
+    "plugin_id": "viz-ugrid-window",
+    "entry_file": "elevation_nl_512faces.nc",
+    "source_url": "https://github.com/Deltares/xugrid/blob/fae62b62b9ee7c4d32dcdb5f2eb27efef82e2b2a/data/elevation_nl.nc",
+    "publisher": "Deltares / Xugrid contributors",
+    "license": "MIT",
+    "license_url": "https://github.com/Deltares/xugrid/blob/fae62b62b9ee7c4d32dcdb5f2eb27efef82e2b2a/LICENSE",
+    "license_details": "依据 Xugrid 官方仓库 MIT 许可分发，保留 Copyright (c) Deltares 和完整许可；属官方科学示例数据的明确子集，不宣称完整国家高程或测绘权威产品。",
+    "authors": [
+      "Deltares",
+      "Xugrid contributors"
+    ],
+    "source_version": "Xugrid fae62b62b9ee7c4d32dcdb5f2eb27efef82e2b2a",
+    "sample_kind": "scientific_derived",
+    "sample_scope": "原件 5248 面/2790 点完整保留；兼容入口选前 512 面，627 个涉及节点。当前 reader 上限 2048 面/4096 点保持不变。原节点坐标无 units/CRS 明示；高程 m NAP，非椭球高。",
+    "transformation": "derive_mesh_grib.py：选原面 0..511，按原节点索引稳定重编号；节点坐标、三角形关联及 elevation 全相等；将原 unit='m NAP' 写为 units，增加明确 mesh/location 关联。subset-index.json 保存原节点/面索引。未重投影或插值。",
+    "test_steps": [
+      "打开 elevation_nl_512faces.nc，选择 viz-ugrid-window。",
+      "网格选 mesh，字段选 elevation，读取网格。",
+      "显示 512 个三角形、627 个节点及原始高程；未知 CRS 不自动投影到经纬度。"
+    ],
+    "files": [
+      {
+        "path": "elevation_nl_original.nc",
+        "size": 228053,
+        "sha256": "b6e33c3c08d0cc762c28113096a857221d3ae57a899eaf394856aa448bfe9d12",
+        "url": "https://raw.githubusercontent.com/Deltares/xugrid/fae62b62b9ee7c4d32dcdb5f2eb27efef82e2b2a/data/elevation_nl.nc",
+        "role": "data"
+      },
+      {
+        "path": "elevation_nl_512faces.nc",
+        "size": 26968,
+        "sha256": "aa3fbbe24aed6f88eb3ff4730286111b02dc9e5fb4f344a6cc3085dff8b9c16f",
+        "derived_from": [
+          "elevation_nl_original.nc"
+        ],
+        "role": "data"
+      },
+      {
+        "path": "subset-index.json",
+        "size": 10405,
+        "sha256": "823df65c46b34e26dc183a350f5fb64391794ea60d15aa0e46c96b2fa1872845",
+        "derived_from": [
+          "elevation_nl_original.nc"
+        ],
+        "role": "documentation"
+      },
+      {
+        "path": "LICENSE.txt",
+        "size": 1059,
+        "sha256": "d1aaaf0c41e480a095c01b6d272c3f58cd869d2fe3f01d05b0f41599a3fb9910",
+        "url": "https://raw.githubusercontent.com/Deltares/xugrid/fae62b62b9ee7c4d32dcdb5f2eb27efef82e2b2a/LICENSE",
+        "role": "documentation"
+      }
+    ]
+  },
+  {
+    "dataset_id": "viz-noaa-pressure-air-2022-2025",
+    "name": "插件样例｜NOAA 四年全球气压层气温与 GB 数组窗口",
+    "description": "NOAA/NCEP 2022–2025 四年原始再分析气温（约 1.29 GB），加 2025 全年全值连续 HDF5 副本（1.04 GB）供安全窗口预览；副本全部 1460×17×73×144 气温与坐标值逐块相等，单位 K。",
+    "domain": "geoscience",
+    "view_kind": "image",
+    "plugin_id": "viz-array-window",
+    "entry_file": "air.2025.contiguous.h5",
+    "source_url": "https://psl.noaa.gov/data/gridded/data.ncep.reanalysis.html",
+    "publisher": "NOAA/OAR/PSL 与 NCEP/NCAR",
+    "license": "U.S. Public Domain (NOAA-produced data)",
+    "license_url": "https://psl.noaa.gov/disclaimer/",
+    "license_details": "NOAA/PSL 政府自产数据除另有标注者外属公有领域；须注明 NOAA/OAR/PSL 与原数据集，不暗示官方背书。派生格式不是官方新产品。",
+    "authors": [
+      "NOAA/OAR/PSL",
+      "NCEP/NCAR"
+    ],
+    "source_version": "NCEP/NCAR Reanalysis 1 pressure air 2022–2025; snapshots 2026-09-18",
+    "sample_kind": "scientific_derived",
+    "sample_scope": "4 个完整年度原 NC；2025 的 1460 个六小时时刻、17 个气压层、73 纬度×144 经度完整无损转存。不是将小文件复制或填零放大。原 NC 的 chunk 索引目录超出当前 128 次读取预算，不将其声称可直接预览；一键入口为连续 HDF5。显示原存储值，有限 missing_value 不自动掩膜。",
+    "transformation": "repack_array.py：仅 2025 原 NC 的 air、level、lat、lon、time 全部数值数组按原 dtype、维度、顺序写为无压缩连续 HDF5，分 8 行块复制并校验完整 raw-array SHA256。保留 units、long_name、日历和缺失标记；无 CF 解码、缩放、插值、抽样。air 原数值哈希 747c67cc7cd6f06acda9de307db7edca2ee6ba3dd1cd661e92dc816ee45eb3f2。4 原件不改。",
+    "test_steps": [
+      "打开 air.2025.contiguous.h5，选择 viz-array-window，读取目录。",
+      "变量选 air；前两维固定 0（首时刻、首气压层），后两维分别切片 start=0 stop=73 step=1 与 start=0 stop=144 step=1。",
+      "读取图像窗口应显示 73×144=10512 值（K），与原数组完全一致；实测只读 46144B、2 次范围请求，而非下载完整 1.04GB；不选其它三个年度原 NC 冒充兼容。"
+    ],
+    "files": [
+      {
+        "path": "air.2022.nc",
+        "size": 319263529,
+        "sha256": "30cd59f76a5f4d1f6eeb4645fac93ba2de36e82a46c0565636da569e8f6013ef",
+        "url": "https://downloads.psl.noaa.gov/Datasets/ncep.reanalysis/pressure/air.2022.nc",
+        "role": "data"
+      },
+      {
+        "path": "air.2023.nc",
+        "size": 323589222,
+        "sha256": "818a50fed7df50448dfad194a737cdd9c6128787b81a5e8318a546b4ac749275",
+        "url": "https://downloads.psl.noaa.gov/Datasets/ncep.reanalysis/pressure/air.2023.nc",
+        "role": "data"
+      },
+      {
+        "path": "air.2024.nc",
+        "size": 325866047,
+        "sha256": "0e717501e830cc527a30d82f1d964ffb55c89a88fe2c212fb2828b564ea56c84",
+        "url": "https://downloads.psl.noaa.gov/Datasets/ncep.reanalysis/pressure/air.2024.nc",
+        "role": "data"
+      },
+      {
+        "path": "air.2025.nc",
+        "size": 324930172,
+        "sha256": "b7d9d4e232d72539459a6816270ddc38405696dc184b422831ba5a71b0a7abb3",
+        "url": "https://downloads.psl.noaa.gov/Datasets/ncep.reanalysis/pressure/air.2025.nc",
+        "role": "data"
+      },
+      {
+        "path": "air.2025.contiguous.h5",
+        "size": 1043648072,
+        "sha256": "25de54ccd30d2f62324321b07eb31d23bc68e0750fcabdaf7c8eebae1c4bc491",
+        "derived_from": [
+          "air.2025.nc"
+        ],
+        "role": "data"
+      }
+    ]
+  },
+  {
+    "dataset_id": "viz-dataseek-odim24-fixture",
+    "name": "插件测试样例｜ODIM 2.4 合成雷达双仰角",
+    "description": "本项目雷达安全契约的明确合成回归样本：2 个仰角、DBZH 与 VRADH、8×12 网格；用于验证窗口、gain/offset、nodata 和 undetect 区分。不是实测降水/风场，不能用于科学推断。",
+    "domain": "geoscience",
+    "view_kind": "image",
+    "plugin_id": "viz-radar-window",
+    "entry_file": "synthetic-odim24.h5",
+    "source_url": "https://github.com/km345297256/AI-DATASEEK",
+    "publisher": "AI-DataSeek contributors",
+    "license": "MIT",
+    "license_url": "https://github.com/km345297256/AI-DATASEEK/blob/v2/LICENSE",
+    "license_details": "使用当前本项目 MIT 许可和经过审阅的回归 fixture 生成器，保留 Copyright (c) 2026 Simpleyyt 与完整许可。不是从外部网址下载的观测，origin 记录本地生成器文件与 SHA256。",
+    "authors": [
+      "AI-DataSeek contributors"
+    ],
+    "source_version": "radar_window_fixtures.py SHA256 a564c5191cebff2593a73ac0235287aef161ab63d473565a37b10f9b6c79d717",
+    "sample_kind": "project_fixture",
+    "sample_scope": "纯合成 2 sweep × 2 quantity × 8×12 存储单元；含 nodata=255 与 undetect=0、gain=0.5、offset=-32。选择真实 wradlib 观测时发现其 ODIM2.2 原件 nodata=undetect，未篡改观测标记来冒充通过。",
+    "transformation": "derive_radar_fixture.py 调用已审阅 radar_bytes() 默认参数；删除 how 组的安全测试占位文字，栅格、标定、几何均不变。生成器和本地 MIT 许可 hash 固定。",
+    "test_steps": [
+      "打开 synthetic-odim24.h5，选择 viz-radar-window。",
+      "选 sweep=1、quantity=DBZH，ray_start=1、ray_count=2、gate_start=1、gate_count=4，decode=raw。",
+      "窗口有 8 个原值、恰好 1 个 nodata 与 1 个 undetect；检查二者不同样式，不能解读为实际天气。"
+    ],
+    "files": [
+      {
+        "path": "synthetic-odim24.h5",
+        "size": 32168,
+        "sha256": "925377d9e6ce072e1c576962fa0feb3d7a859dd03b5da7b4aa408ce168ab2164",
+        "origin": {
+          "kind": "generated_fixture",
+          "generator": "sandbox/tests/radar_window_fixtures.py",
+          "generator_sha256": "a564c5191cebff2593a73ac0235287aef161ab63d473565a37b10f9b6c79d717",
+          "description": "radar_bytes() 默认参数生成 2 仰角 × 2 数据量、8×12 单元的合成 ODIM2.4 回归数据；只删掉根 how 组的安全测试占位文字，不改任何栅格或物理标定元数据。不是雷达观测。"
+        },
+        "role": "data"
+      },
+      {
+        "path": "LICENSE.txt",
+        "size": 1066,
+        "sha256": "991f0bde5249ee6aad0a5a597197c7a7f6024abd2650516fcd7a83d908234115",
+        "origin": {
+          "kind": "project_fixture",
+          "repository_file": "LICENSE",
+          "sha256": "991f0bde5249ee6aad0a5a597197c7a7f6024abd2650516fcd7a83d908234115"
+        },
+        "role": "documentation"
+      }
+    ]
+  }
+]

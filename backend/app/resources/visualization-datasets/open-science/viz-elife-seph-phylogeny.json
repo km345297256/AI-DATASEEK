@@ -1,0 +1,111 @@
+{
+  "dataset_id": "viz-elife-seph-phylogeny",
+  "external_id": "10.7554/eLife.63387",
+  "data_center_id": "reviewed-open-science-catalog",
+  "data_center_name": "开放科学可视化样例",
+  "name": "可视化样例·系统树：放线菌 SepH 蛋白系统发育树（eLife 原始研究附件）",
+  "description": "eLife 63387 Figure 7—source data 1 中的 SepH 蛋白比对及系统树附件；抽出 Newick 树用于 Phylogeny 查看。文件实测 720 个节点、361 个叶节点，枝长齐全；原论文文字介绍 360 条代表序列，叶数以原树实测为准，不擅自删除额外叶。内部数值标签保持原文，显示器不会自动将其解释为支持度，也不推断生物学根。",
+  "domain": "sequence",
+  "data_type": "nwk, zip",
+  "temporal_coverage": "",
+  "spatial_coverage": "",
+  "tags": [
+    "可视化样例",
+    "开放科学",
+    "tree",
+    "viz-phylogeny",
+    "sequence"
+  ],
+  "metadata": {
+    "curated": true,
+    "source_catalog": "open-science",
+    "catalog_version": 1,
+    "source_descriptor_sha256": "c64e5aaf183d13ea21da5105ad4ecefd29726eb1000fe31281771a7242fba3c8",
+    "download_date": "2026-09-18",
+    "inventory_complete": true,
+    "recursive_file_count": 4,
+    "total_size_bytes": 88389,
+    "visualization_view_kind": "tree",
+    "visualization_plugin_id": "viz-phylogeny",
+    "visualization_entry_file": "seph_phyml_quoted.nwk",
+    "sample_note": "一个完整官方 Fig7 ZIP 附件（含比对 compare80phy 与树 compare80phy_phyml_tree.txt），另保存树的原文字节副本和兼容 Newick 引号副本。不是全部放线菌物种库或整篇论文所有实验数据。原树含 361 叶，未去根、重根、裁剪或重估枝长。",
+    "provenance": [
+      {
+        "path": "elife-63387-fig7-data1-v1.zip",
+        "url": "https://cdn.elifesciences.org/articles/63387/elife-63387-fig7-data1-v1.zip",
+        "size": 47094,
+        "sha256": "261ae59ae31abf8e5164b98535f1ea66d6906a13787f66aa6d1b6273b29cd732"
+      },
+      {
+        "path": "seph_phyml.nwk",
+        "derived_from": [
+          "elife-63387-fig7-data1-v1.zip"
+        ],
+        "archive_member": "Figure 7-Source_data_1/compare80phy_phyml_tree.txt",
+        "size": 19112,
+        "sha256": "208f8aaf13755273416ab5313346a37182f7b5337ed6e12b2d5d8b6722dafb92"
+      },
+      {
+        "path": "seph_phyml_quoted.nwk",
+        "derived_from": [
+          "seph_phyml.nwk"
+        ],
+        "size": 19114,
+        "sha256": "67700ba0fd792e5190732a1d3b670b433bdca0e4de0d5ceb64a8d486d1ae4d60"
+      }
+    ],
+    "publisher": "eLife / John Innes Centre and collaborating researchers",
+    "source_url": "https://elifesciences.org/articles/63387/figures",
+    "license": "CC BY 4.0",
+    "license_url": "https://creativecommons.org/licenses/by/4.0/",
+    "license_details": "官方论文 A conserved cell division protein directly regulates FtsZ dynamics in filamentous and unicellular actinobacteria（Ramos-León et al., 2021, eLife 10:e63387，https://doi.org/10.7554/eLife.63387）及其开放源数据适用 CC BY 4.0：须署名、链接许可并说明改动。保留官方 ZIP 和其中原树全文；展示副本只为一个含方括号的分类标签添加 Newick 引号，已明确标为派生文件。",
+    "authors": [
+      "Félix Ramos-León",
+      "Matthew J Bush",
+      "Joseph W Sallmen",
+      "Govind Chandra",
+      "Jake Richardson",
+      "Kim C Findlay",
+      "Joseph R McCormick",
+      "Susan Schlimpert"
+    ],
+    "source_version": "Figure 7—source data 1 v1；论文发表于 2021-03-17；2026-09-18 下载快照",
+    "sample_scope": "一个完整官方 Fig7 ZIP 附件（含比对 compare80phy 与树 compare80phy_phyml_tree.txt），另保存树的原文字节副本和兼容 Newick 引号副本。不是全部放线菌物种库或整篇论文所有实验数据。原树含 361 叶，未去根、重根、裁剪或重估枝长。",
+    "doi": "10.7554/eLife.63387",
+    "transformation": "先从官方 ZIP 的 Figure 7-Source_data_1/compare80phy_phyml_tree.txt 原样提取为 seph_phyml.nwk（仅改扩展名）；再将唯一未引用的叶标签 [Propionibacterium]_humerusii_ 写为 '[Propionibacterium]_humerusii_'，生成 seph_phyml_quoted.nwk。仅增加 2 个单引号，标签字符、括号、分隔符、所有枝长及拓扑均未改变。可复现脚本 backend/scripts/reproduce-science-samples.py。原件保留便于复核。",
+    "suggested_questions": [
+      "从系统树识别主要 SepH 蛋白分支，并说明显示起点不等于确认的生物学根。",
+      "对照原始比对与树文件核查叶标签；不要未经方法学确认就把内部数值标签解释为统计支持度。"
+    ]
+  },
+  "files": [
+    {
+      "path": "SOURCE.md",
+      "size": 3069,
+      "sha256": "5a8516d29307d3b81c6dcb96eaf0fa4703b10ea306be0ec357a589ff93d931f6",
+      "role": "documentation",
+      "content_type": "text/markdown"
+    },
+    {
+      "path": "elife-63387-fig7-data1-v1.zip",
+      "size": 47094,
+      "sha256": "261ae59ae31abf8e5164b98535f1ea66d6906a13787f66aa6d1b6273b29cd732",
+      "role": "data",
+      "content_type": "application/zip"
+    },
+    {
+      "path": "seph_phyml.nwk",
+      "size": 19112,
+      "sha256": "208f8aaf13755273416ab5313346a37182f7b5337ed6e12b2d5d8b6722dafb92",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "seph_phyml_quoted.nwk",
+      "size": 19114,
+      "sha256": "67700ba0fd792e5190732a1d3b670b433bdca0e4de0d5ceb64a8d486d1ae4d60",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    }
+  ]
+}

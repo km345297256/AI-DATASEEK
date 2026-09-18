@@ -1,0 +1,75 @@
+{
+  "dataset_id": "viz-palmer-penguins",
+  "external_id": "viz-palmer-penguins",
+  "data_center_id": "reviewed-open-science-catalog",
+  "data_center_name": "开放科学可视化样例",
+  "name": "可视化样例·表格：Palmer 南极企鹅观测",
+  "description": "Palmer 群岛三种企鹅的 344 条真实观测，包含物种、岛屿、喙长、喙深、鳍长、体重、性别和年份。适合分页表格、分组统计与散点图；保留来源的 NA 缺失值，不填零。",
+  "domain": "tabular",
+  "data_type": "csv",
+  "temporal_coverage": "2007–2009",
+  "spatial_coverage": "南极 Palmer 群岛",
+  "tags": [
+    "可视化样例",
+    "开放科学",
+    "table",
+    "csv",
+    "tabular"
+  ],
+  "metadata": {
+    "curated": true,
+    "source_catalog": "open-science",
+    "catalog_version": 1,
+    "source_descriptor_sha256": "0affddbc30b2eb8427fe581bfd53530acd11887a2e35d9cf0d5210a9f93c4998",
+    "download_date": "2026-09-18",
+    "inventory_complete": true,
+    "recursive_file_count": 2,
+    "total_size_bytes": 16797,
+    "visualization_view_kind": "table",
+    "visualization_plugin_id": "csv",
+    "visualization_entry_file": "penguins.csv",
+    "sample_note": "原项目完整 penguins 简化表，344 行、8 列；不含 penguins_raw 的同位素等额外变量。",
+    "provenance": [
+      {
+        "path": "penguins.csv",
+        "url": "https://raw.githubusercontent.com/allisonhorst/palmerpenguins/8957207b78d6ccd1b4654a9dd9c9041b657478ab/inst/extdata/penguins.csv",
+        "size": 15241,
+        "sha256": "f204db2c753b0937caac3cb35258562c14f073e4bbc76be24b4c51ce22767a93"
+      }
+    ],
+    "publisher": "Palmer Station LTER / palmerpenguins",
+    "source_url": "https://github.com/allisonhorst/palmerpenguins",
+    "license": "CC0 1.0",
+    "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "license_details": "数据按 CC0 开放；请引用 Gorman、Williams、Fraser (2014) 及 Horst、Hill、Gorman 的 palmerpenguins。正式发表研究建议联系数据提供者，并遵循来源说明的 LTER 数据使用规范。",
+    "authors": [
+      "Kristen B. Gorman",
+      "Tony D. Williams",
+      "William R. Fraser",
+      "Allison M. Horst",
+      "Alison P. Hill"
+    ],
+    "source_version": "Git commit 8957207b78d6ccd1b4654a9dd9c9041b657478ab",
+    "sample_scope": "原项目完整 penguins 简化表，344 行、8 列；不含 penguins_raw 的同位素等额外变量。",
+    "suggested_questions": [
+      "比较三种企鹅的体重和鳍长分布，说明缺失值处理。",
+      "喙长与喙深的关系在不同物种之间有何差异？"
+    ]
+  },
+  "files": [
+    {
+      "path": "SOURCE.md",
+      "size": 1556,
+      "sha256": "94f64be7ad480262abda51e1b7994b386a84832261a1ede708f6e9190f53cf9d",
+      "role": "documentation",
+      "content_type": "text/markdown"
+    },
+    {
+      "path": "penguins.csv",
+      "size": 15241,
+      "sha256": "f204db2c753b0937caac3cb35258562c14f073e4bbc76be24b4c51ce22767a93",
+      "role": "data",
+      "content_type": "text/csv"
+    }
+  ]
+}

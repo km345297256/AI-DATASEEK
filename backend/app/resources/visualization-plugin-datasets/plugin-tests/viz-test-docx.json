@@ -1,0 +1,86 @@
+{
+  "dataset_id": "viz-test-docx",
+  "external_id": "viz-test-docx",
+  "data_center_id": "reviewed-visualization-plugin-tests",
+  "data_center_name": "逐插件可视化测试样例",
+  "name": "插件测试 · DOCX 清晰阅读 · python-docx 段落和表格",
+  "description": "python-docx v1.2.0 官方格式测试夹具，非科研观测。显示官方段落/表格文档；不执行宏或外链。",
+  "domain": "documents",
+  "data_type": "docx",
+  "temporal_coverage": "",
+  "spatial_coverage": "",
+  "tags": [
+    "插件测试样例",
+    "viz-docx",
+    "official_fixture",
+    "document",
+    "documents"
+  ],
+  "metadata": {
+    "curated": true,
+    "source_catalog": "plugin-tests",
+    "catalog_version": 1,
+    "source_descriptor_sha256": "07910a45d3f09339d17b07fbcc780cf9a735f57acb78b7cbab2659fb1388b500",
+    "download_date": "2026-09-18",
+    "inventory_complete": true,
+    "recursive_file_count": 3,
+    "total_size_bytes": 14595,
+    "visualization_view_kind": "document",
+    "visualization_plugin_id": "viz-docx",
+    "visualization_entry_file": "blk-inner-content.docx",
+    "sample_note": "python-docx v1.2.0 官方格式测试夹具，非科研观测。显示官方段落/表格文档；不执行宏或外链。",
+    "provenance": [
+      {
+        "path": "blk-inner-content.docx",
+        "size": 11949,
+        "sha256": "16243dd05f686d6d5fab331843691492ad78ae3eb4f13cc8686077b44718c0ba",
+        "url": "https://raw.githubusercontent.com/python-openxml/python-docx/v1.2.0/tests/test_files/blk-inner-content.docx"
+      },
+      {
+        "path": "docx-LICENSE.txt",
+        "size": 1104,
+        "sha256": "7652f271e46d0d533e9dc463f3b5fcbdcacf4d6a9c8d6b554d15efd0f37f6132",
+        "role": "documentation",
+        "url": "https://raw.githubusercontent.com/python-openxml/python-docx/v1.2.0/LICENSE"
+      }
+    ],
+    "publisher": "python-docx · Steve Canny",
+    "source_url": "https://github.com/python-openxml/python-docx/tree/v1.2.0/tests/test_files",
+    "license": "MIT",
+    "license_url": "https://github.com/python-openxml/python-docx/blob/v1.2.0/LICENSE",
+    "license_details": "MIT；用于可视化测试，样本性质为 official_fixture。",
+    "authors": [
+      "python-docx · Steve Canny"
+    ],
+    "source_version": "python-docx v1.2.0",
+    "sample_scope": "python-docx v1.2.0 官方格式测试夹具，非科研观测。显示官方段落/表格文档；不执行宏或外链。",
+    "sample_kind": "official_fixture",
+    "test_steps": [
+      "预览 blk-inner-content.docx，选择 viz-docx",
+      "显示官方段落/表格文档；不执行宏或外链。"
+    ]
+  },
+  "files": [
+    {
+      "path": "SOURCE.md",
+      "size": 1542,
+      "sha256": "0cd59650965bbc7ec3190d2986428f74151c66e44f2e3690414a0ba1897c1e7d",
+      "role": "documentation",
+      "content_type": "text/markdown"
+    },
+    {
+      "path": "blk-inner-content.docx",
+      "size": 11949,
+      "sha256": "16243dd05f686d6d5fab331843691492ad78ae3eb4f13cc8686077b44718c0ba",
+      "role": "data",
+      "content_type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+    },
+    {
+      "path": "docx-LICENSE.txt",
+      "size": 1104,
+      "sha256": "7652f271e46d0d533e9dc463f3b5fcbdcacf4d6a9c8d6b554d15efd0f37f6132",
+      "role": "documentation",
+      "content_type": "text/plain"
+    }
+  ]
+}

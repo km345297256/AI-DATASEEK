@@ -1,0 +1,94 @@
+{
+  "dataset_id": "viz-test-sst-records",
+  "external_id": "viz-test-sst-records",
+  "data_center_id": "reviewed-visualization-plugin-tests",
+  "data_center_name": "逐插件可视化测试样例",
+  "name": "插件测试 · SST 物理点记录 · RocksDB 物理键值",
+  "description": "本项目已有的原创合成兼容性测试夹具，非真实科研观测。逐条浏览键值、序号、删除标记；二进制用安全表示，不执行数据库操作。",
+  "domain": "tabular",
+  "data_type": "sst",
+  "temporal_coverage": "",
+  "spatial_coverage": "",
+  "tags": [
+    "插件测试样例",
+    "viz-sst-records",
+    "project_fixture",
+    "table",
+    "tabular"
+  ],
+  "metadata": {
+    "curated": true,
+    "source_catalog": "plugin-tests",
+    "catalog_version": 1,
+    "source_descriptor_sha256": "2dac5930652b543dd0df302ebfe159a83155256bf0b2c336d7152a73c16ac70d",
+    "download_date": "2026-09-18",
+    "inventory_complete": true,
+    "recursive_file_count": 3,
+    "total_size_bytes": 3597,
+    "visualization_view_kind": "table",
+    "visualization_plugin_id": "viz-sst-records",
+    "visualization_entry_file": "rocksdb-6.11.4.sst",
+    "sample_note": "本项目已有的原创合成兼容性测试夹具，非真实科研观测。逐条浏览键值、序号、删除标记；二进制用安全表示，不执行数据库操作。",
+    "provenance": [
+      {
+        "path": "rocksdb-6.11.4.sst",
+        "size": 855,
+        "sha256": "f02d53fc206bbdc4026e7be71cfc1597bd20bfa1a466127d3acb7f06ba61b6fd",
+        "origin": {
+          "kind": "project_fixture",
+          "repository_file": "sandbox/tests/fixtures/physical-database/rocksdb-6.11.4.sst",
+          "sha256": "f02d53fc206bbdc4026e7be71cfc1597bd20bfa1a466127d3acb7f06ba61b6fd"
+        }
+      },
+      {
+        "path": "LICENSE.txt",
+        "size": 1066,
+        "sha256": "991f0bde5249ee6aad0a5a597197c7a7f6024abd2650516fcd7a83d908234115",
+        "role": "documentation",
+        "origin": {
+          "kind": "project_fixture",
+          "repository_file": "LICENSE",
+          "sha256": "991f0bde5249ee6aad0a5a597197c7a7f6024abd2650516fcd7a83d908234115"
+        }
+      }
+    ],
+    "publisher": "AI-DataSeek 测试夹具",
+    "source_url": "https://github.com/km345297256/AI-DATASEEK",
+    "license": "MIT",
+    "license_url": "https://github.com/km345297256/AI-DATASEEK/blob/v2/LICENSE",
+    "license_details": "MIT；用于可视化测试，样本性质为 project_fixture。",
+    "authors": [
+      "AI-DataSeek 测试夹具"
+    ],
+    "source_version": "AI-DataSeek fixture snapshot fb609ed5460e9c247dc58fb2c3cb51410de27c6f",
+    "sample_scope": "本项目已有的原创合成兼容性测试夹具，非真实科研观测。逐条浏览键值、序号、删除标记；二进制用安全表示，不执行数据库操作。",
+    "sample_kind": "project_fixture",
+    "test_steps": [
+      "预览主文件并选择 viz-sst-records",
+      "逐条浏览键值、序号、删除标记；二进制用安全表示，不执行数据库操作。"
+    ]
+  },
+  "files": [
+    {
+      "path": "LICENSE.txt",
+      "size": 1066,
+      "sha256": "991f0bde5249ee6aad0a5a597197c7a7f6024abd2650516fcd7a83d908234115",
+      "role": "documentation",
+      "content_type": "text/plain"
+    },
+    {
+      "path": "SOURCE.md",
+      "size": 1676,
+      "sha256": "7efd2443d1e2d437337407197d46fd1133de2232f8c11c67031c71713eaa8629",
+      "role": "documentation",
+      "content_type": "text/markdown"
+    },
+    {
+      "path": "rocksdb-6.11.4.sst",
+      "size": 855,
+      "sha256": "f02d53fc206bbdc4026e7be71cfc1597bd20bfa1a466127d3acb7f06ba61b6fd",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    }
+  ]
+}

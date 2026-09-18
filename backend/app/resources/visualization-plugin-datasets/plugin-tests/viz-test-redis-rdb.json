@@ -1,0 +1,94 @@
+{
+  "dataset_id": "viz-test-redis-rdb",
+  "external_id": "viz-test-redis-rdb",
+  "data_center_id": "reviewed-visualization-plugin-tests",
+  "data_center_name": "逐插件可视化测试样例",
+  "name": "插件测试 · Redis RDB 键值记录 · Redis 7.2.7 原生快照",
+  "description": "本项目已有的原创合成兼容性测试夹具，非真实科研观测。浏览 DB 0/2，string/list/set/hash/zset；精确整数文本与 Unicode；不启动Redis、不恢复。",
+  "domain": "tabular",
+  "data_type": "rdb",
+  "temporal_coverage": "",
+  "spatial_coverage": "",
+  "tags": [
+    "插件测试样例",
+    "viz-redis-rdb",
+    "project_fixture",
+    "tree",
+    "tabular"
+  ],
+  "metadata": {
+    "curated": true,
+    "source_catalog": "plugin-tests",
+    "catalog_version": 1,
+    "source_descriptor_sha256": "4336a32cf42a901814b781eecf23797a6fd8ccc963f814464c71dfa77681ac94",
+    "download_date": "2026-09-18",
+    "inventory_complete": true,
+    "recursive_file_count": 3,
+    "total_size_bytes": 3116,
+    "visualization_view_kind": "tree",
+    "visualization_plugin_id": "viz-redis-rdb",
+    "visualization_entry_file": "native-redis-7.2.7.rdb",
+    "sample_note": "本项目已有的原创合成兼容性测试夹具，非真实科研观测。浏览 DB 0/2，string/list/set/hash/zset；精确整数文本与 Unicode；不启动Redis、不恢复。",
+    "provenance": [
+      {
+        "path": "native-redis-7.2.7.rdb",
+        "size": 346,
+        "sha256": "d7853cacc4bbee20f5d632226ac309ce3b913da47a669f2bfa373426431fed69",
+        "origin": {
+          "kind": "project_fixture",
+          "repository_file": "sandbox/tests/fixtures/database-records/native-redis-7.2.7.rdb",
+          "sha256": "d7853cacc4bbee20f5d632226ac309ce3b913da47a669f2bfa373426431fed69"
+        }
+      },
+      {
+        "path": "LICENSE.txt",
+        "size": 1066,
+        "sha256": "991f0bde5249ee6aad0a5a597197c7a7f6024abd2650516fcd7a83d908234115",
+        "role": "documentation",
+        "origin": {
+          "kind": "project_fixture",
+          "repository_file": "LICENSE",
+          "sha256": "991f0bde5249ee6aad0a5a597197c7a7f6024abd2650516fcd7a83d908234115"
+        }
+      }
+    ],
+    "publisher": "AI-DataSeek 测试夹具",
+    "source_url": "https://github.com/km345297256/AI-DATASEEK",
+    "license": "MIT",
+    "license_url": "https://github.com/km345297256/AI-DATASEEK/blob/v2/LICENSE",
+    "license_details": "MIT；用于可视化测试，样本性质为 project_fixture。",
+    "authors": [
+      "AI-DataSeek 测试夹具"
+    ],
+    "source_version": "AI-DataSeek fixture snapshot fb609ed5460e9c247dc58fb2c3cb51410de27c6f",
+    "sample_scope": "本项目已有的原创合成兼容性测试夹具，非真实科研观测。浏览 DB 0/2，string/list/set/hash/zset；精确整数文本与 Unicode；不启动Redis、不恢复。",
+    "sample_kind": "project_fixture",
+    "test_steps": [
+      "预览主文件并选择 viz-redis-rdb",
+      "浏览 DB 0/2，string/list/set/hash/zset；精确整数文本与 Unicode；不启动Redis、不恢复。"
+    ]
+  },
+  "files": [
+    {
+      "path": "LICENSE.txt",
+      "size": 1066,
+      "sha256": "991f0bde5249ee6aad0a5a597197c7a7f6024abd2650516fcd7a83d908234115",
+      "role": "documentation",
+      "content_type": "text/plain"
+    },
+    {
+      "path": "SOURCE.md",
+      "size": 1704,
+      "sha256": "8913e84baea86ff3168b02b6693a5eaf6a152dc1def95c7307c15b18cd193fcd",
+      "role": "documentation",
+      "content_type": "text/markdown"
+    },
+    {
+      "path": "native-redis-7.2.7.rdb",
+      "size": 346,
+      "sha256": "d7853cacc4bbee20f5d632226ac309ce3b913da47a669f2bfa373426431fed69",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    }
+  ]
+}

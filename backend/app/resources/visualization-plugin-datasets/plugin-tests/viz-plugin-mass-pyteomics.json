@@ -1,0 +1,88 @@
+{
+  "dataset_id": "viz-plugin-mass-pyteomics",
+  "external_id": "viz-plugin-mass-pyteomics",
+  "data_center_id": "reviewed-visualization-plugin-tests",
+  "data_center_name": "逐插件可视化测试样例",
+  "name": "插件测试·Pyteomics 单条 MGF 质谱官方示例",
+  "description": "Pyteomics 官方文档的 GPAAIQK MGF 单谱示例，41 个 m/z—强度点，用于受限双列谱图预览。未将文档样本宣称为独立公开实验。",
+  "domain": "spectroscopy",
+  "data_type": "mgf",
+  "temporal_coverage": "",
+  "spatial_coverage": "",
+  "tags": [
+    "插件测试样例",
+    "viz-mass-spectrum",
+    "official_fixture",
+    "series",
+    "spectroscopy"
+  ],
+  "metadata": {
+    "curated": true,
+    "source_catalog": "plugin-tests",
+    "catalog_version": 1,
+    "source_descriptor_sha256": "e8b80f075d4971fa53b752fad9531e47e5bfcfff6e97327706e75a9e4a435147",
+    "download_date": "2026-09-18",
+    "inventory_complete": true,
+    "recursive_file_count": 3,
+    "total_size_bytes": 12723,
+    "visualization_view_kind": "series",
+    "visualization_plugin_id": "viz-mass-spectrum",
+    "visualization_entry_file": "example.mgf",
+    "sample_note": "原始 example.mgf 完整文件，1 个谱块、41 个峰；强度未归一化。",
+    "provenance": [
+      {
+        "path": "example.mgf",
+        "size": 768,
+        "sha256": "c32687aba71bb61def1fb7e39045ef948e6185146e9d4185465f4b9e67a9c74f",
+        "role": "data",
+        "url": "https://raw.githubusercontent.com/levitsky/pyteomics/5ace4adc7467f617db8ad30864a1746e65a91448/doc/source/_static/example.mgf"
+      },
+      {
+        "path": "LICENSE.txt",
+        "size": 10173,
+        "sha256": "a6cba85bc92e0cff7a450b1d873c0eaa2e9fc96bf472df0247a26bec77bf3ff9",
+        "role": "documentation",
+        "url": "https://raw.githubusercontent.com/levitsky/pyteomics/5ace4adc7467f617db8ad30864a1746e65a91448/LICENSE"
+      }
+    ],
+    "publisher": "levitsky/pyteomics",
+    "source_url": "https://github.com/levitsky/pyteomics/blob/5ace4adc7467f617db8ad30864a1746e65a91448/doc/source/_static/example.mgf",
+    "license": "Apache-2.0",
+    "license_url": "https://raw.githubusercontent.com/levitsky/pyteomics/5ace4adc7467f617db8ad30864a1746e65a91448/LICENSE",
+    "license_details": "官方仓库测试/文档文件，按随附仓库许可保留版权与许可全文。此处标注为官方格式测试样本，不宣称是独立同行评审实验数据。",
+    "authors": [
+      "Pyteomics developers"
+    ],
+    "source_version": "Git commit 5ace4adc7467f617db8ad30864a1746e65a91448",
+    "sample_scope": "原始 example.mgf 完整文件，1 个谱块、41 个峰；强度未归一化。",
+    "transformation": "原始公开测试文件未改写。",
+    "sample_kind": "official_fixture",
+    "test_steps": [
+      "打开 example.mgf，在视图选择器选择 viz-mass-spectrum。",
+      "确认无格式错误且数值/结构按样本范围显示；不执行拟合或外部请求。"
+    ]
+  },
+  "files": [
+    {
+      "path": "LICENSE.txt",
+      "size": 10173,
+      "sha256": "a6cba85bc92e0cff7a450b1d873c0eaa2e9fc96bf472df0247a26bec77bf3ff9",
+      "role": "documentation",
+      "content_type": "text/plain"
+    },
+    {
+      "path": "SOURCE.md",
+      "size": 1782,
+      "sha256": "e5ef6a1465f1b14fda1fe56e3312715db0c1e8b5b9022351af0f81b7ebf17fbc",
+      "role": "documentation",
+      "content_type": "text/markdown"
+    },
+    {
+      "path": "example.mgf",
+      "size": 768,
+      "sha256": "c32687aba71bb61def1fb7e39045ef948e6185146e9d4185465f4b9e67a9c74f",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    }
+  ]
+}

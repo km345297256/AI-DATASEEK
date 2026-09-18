@@ -1,0 +1,83 @@
+{
+  "dataset_id": "viz-plugin-root-project",
+  "external_id": "viz-plugin-root-project",
+  "data_center_id": "reviewed-visualization-plugin-tests",
+  "data_center_name": "逐插件可视化测试样例",
+  "name": "插件测试·JSROOT 合成非均匀分箱直方图",
+  "description": "由当前固定版本 Uproot 写出的合成 TH1D，用于验证非均匀分箱和禁用 ROOT 宏的数值读取；非粒子物理观测数据。",
+  "domain": "general",
+  "data_type": "root",
+  "temporal_coverage": "",
+  "spatial_coverage": "",
+  "tags": [
+    "插件测试样例",
+    "viz-jsroot",
+    "project_fixture",
+    "series",
+    "general"
+  ],
+  "metadata": {
+    "curated": true,
+    "source_catalog": "plugin-tests",
+    "catalog_version": 1,
+    "source_descriptor_sha256": "15e14e84f36360eaedcab1603186a16bcb7a05068826e50424841618d8610582",
+    "download_date": "2026-09-18",
+    "inventory_complete": true,
+    "recursive_file_count": 2,
+    "total_size_bytes": 14728,
+    "visualization_view_kind": "series",
+    "visualization_plugin_id": "viz-jsroot",
+    "visualization_entry_file": "synthetic-histogram.root",
+    "sample_note": "仅 synthetic_counts 对象；4 个计数 [2,5,3,8]，边界 [0,1,3,6,10]；不包含 TTree、宏、公式或自定义动态流类。ROOT 创建时间可变，复现验证内容及 bin edges 相等，已发布快照由 SHA256 固定。",
+    "provenance": [
+      {
+        "path": "synthetic-histogram.root",
+        "size": 12880,
+        "sha256": "be0ac108135865e09337caf51b901ad85674095d5ab26393545b608be23518b0",
+        "role": "data",
+        "origin": {
+          "kind": "generated_fixture",
+          "generator": "backend/scripts/plugin_samples_chem.py",
+          "generator_sha256": "e554476b6fdc1ec995917052035955e5026530359e853773359faa59b4dc23f2",
+          "description": "明确合成格式测试值，生成参数见本项 sample_scope；不是科研实验观测。"
+        }
+      }
+    ],
+    "publisher": "AI-DataSeek project",
+    "source_url": "https://github.com/km345297256/AI-DATASEEK",
+    "license": "MIT",
+    "license_url": "https://opensource.org/license/mit/",
+    "license_details": "本项目原创合成格式测试样本，沿用仓库 MIT 许可。没有外部下载原始实验，也不代表真实科学测量。",
+    "authors": [
+      "AI-DataSeek contributors"
+    ],
+    "source_version": "Generator SHA256 e554476b6fdc1ec995917052035955e5026530359e853773359faa59b4dc23f2",
+    "sample_scope": "仅 synthetic_counts 对象；4 个计数 [2,5,3,8]，边界 [0,1,3,6,10]；不包含 TTree、宏、公式或自定义动态流类。ROOT 创建时间可变，复现验证内容及 bin edges 相等，已发布快照由 SHA256 固定。",
+    "transformation": {
+      "generator": "backend/scripts/plugin_samples_chem.py",
+      "generator_sha256": "e554476b6fdc1ec995917052035955e5026530359e853773359faa59b4dc23f2",
+      "changes": "从明确固定参数生成，无外部实验数据。"
+    },
+    "sample_kind": "project_fixture",
+    "test_steps": [
+      "打开 synthetic-histogram.root，选择 viz-jsroot。",
+      "确认显示标注的合成值和格式功能，不将其解释为实验结论。"
+    ]
+  },
+  "files": [
+    {
+      "path": "SOURCE.md",
+      "size": 1848,
+      "sha256": "a6cf43426495bd9590a9850f8ddc0bad80d23c59ffed9ffc92689dbdb612d85c",
+      "role": "documentation",
+      "content_type": "text/markdown"
+    },
+    {
+      "path": "synthetic-histogram.root",
+      "size": 12880,
+      "sha256": "be0ac108135865e09337caf51b901ad85674095d5ab26393545b608be23518b0",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    }
+  ]
+}

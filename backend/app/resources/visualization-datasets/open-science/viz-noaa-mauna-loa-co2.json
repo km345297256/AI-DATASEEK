@@ -1,0 +1,73 @@
+{
+  "dataset_id": "viz-noaa-mauna-loa-co2",
+  "external_id": "viz-noaa-mauna-loa-co2",
+  "data_center_id": "reviewed-open-science-catalog",
+  "data_center_name": "开放科学可视化样例",
+  "name": "可视化样例·文本：NOAA 月均二氧化碳观测",
+  "description": "NOAA GML 发布的 Mauna Loa 月均 CO₂ 文本数据，保留原始注释、月均值、去季节值和不确定度。单位为干空气摩尔分数 ppm。负的不确定度等数值是来源定义的标记，不能作为普通观测；火山喷发停测期间的替代站点说明保留在文件头。",
+  "domain": "geoscience",
+  "data_type": "txt",
+  "temporal_coverage": "1958-03–2026-08",
+  "spatial_coverage": "Mauna Loa；2022-12 至 2023-07 初使用 Maunakea 替代观测",
+  "tags": [
+    "可视化样例",
+    "开放科学",
+    "text",
+    "text",
+    "geoscience"
+  ],
+  "metadata": {
+    "curated": true,
+    "source_catalog": "open-science",
+    "catalog_version": 1,
+    "source_descriptor_sha256": "a82d474c9151c9578ca4ad5584640782b8c049ae514b766d3ba28388df71e14c",
+    "download_date": "2026-09-18",
+    "inventory_complete": true,
+    "recursive_file_count": 2,
+    "total_size_bytes": 61410,
+    "visualization_view_kind": "text",
+    "visualization_plugin_id": "text",
+    "visualization_entry_file": "co2_mm_mlo.txt",
+    "sample_note": "官方 co2_mm_mlo.txt 完整下载快照，1958-03 至 2026-08；不是实时更新订阅，后续质量控制可能修订数值。",
+    "provenance": [
+      {
+        "path": "co2_mm_mlo.txt",
+        "url": "https://gml.noaa.gov/webdata/ccgg/trends/co2/co2_mm_mlo.txt",
+        "size": 59608,
+        "sha256": "c9a91a170d09d16afaaad56c4f383ed4fcb7fa0da967998694842d5c8168bcf3"
+      }
+    ],
+    "publisher": "NOAA Global Monitoring Laboratory / Scripps Institution of Oceanography",
+    "source_url": "https://gml.noaa.gov/ccgg/trends/data.html",
+    "license": "NOAA 开放公共数据（保留署名与使用说明）",
+    "license_url": "https://gml.noaa.gov/about/disclaimer.html",
+    "license_details": "NOAA 声明政府服务器数据除另有标注外为公共领域；不得声称自有版权、暗示官方背书或将修改数据冒充官方材料。文件早期 1958–1974 年数据来源为 Scripps，应同时保留 Scripps 和 NOAA 引用及原文件说明。",
+    "authors": [
+      "Xin Lan / NOAA GML",
+      "Ralph Keeling / Scripps",
+      "C. David Keeling / Scripps"
+    ],
+    "source_version": "File Creation: 2026-09-05; downloaded 2026-09-18",
+    "sample_scope": "官方 co2_mm_mlo.txt 完整下载快照，1958-03 至 2026-08；不是实时更新订阅，后续质量控制可能修订数值。",
+    "suggested_questions": [
+      "读取文件头说明，区分观测值、插值和缺测标记，再绘制月均 CO₂ 趋势。",
+      "比较 1960 年代和最近十年的 CO₂ 年增长。"
+    ]
+  },
+  "files": [
+    {
+      "path": "SOURCE.md",
+      "size": 1802,
+      "sha256": "f8f35b4252cbdfd8812c22bb5da825cd502c7a8ce38d08d3488d700d5c8bbc85",
+      "role": "documentation",
+      "content_type": "text/markdown"
+    },
+    {
+      "path": "co2_mm_mlo.txt",
+      "size": 59608,
+      "sha256": "c9a91a170d09d16afaaad56c4f383ed4fcb7fa0da967998694842d5c8168bcf3",
+      "role": "data",
+      "content_type": "text/plain"
+    }
+  ]
+}

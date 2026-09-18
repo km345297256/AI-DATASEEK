@@ -1,0 +1,88 @@
+{
+  "dataset_id": "viz-test-sql-dump",
+  "external_id": "viz-test-sql-dump",
+  "data_center_id": "reviewed-visualization-plugin-tests",
+  "data_center_name": "逐插件可视化测试样例",
+  "name": "插件测试 · SQL 转储字面量 · Palmer 企鹅格式转换",
+  "description": "静态解析 CREATE 与344条INSERT；不恢复数据库、不执行SQL。由同一份CC0科学观测转换，不增删记录；原CSV保留。",
+  "domain": "tabular",
+  "data_type": "csv, sql",
+  "temporal_coverage": "",
+  "spatial_coverage": "",
+  "tags": [
+    "插件测试样例",
+    "viz-sql-dump",
+    "scientific_derived",
+    "table",
+    "tabular"
+  ],
+  "metadata": {
+    "curated": true,
+    "source_catalog": "plugin-tests",
+    "catalog_version": 1,
+    "source_descriptor_sha256": "4c012db1c4b788ab407315daa934e88bfb3f52f5f402e8981288eab62a79bee5",
+    "download_date": "2026-09-18",
+    "inventory_complete": true,
+    "recursive_file_count": 3,
+    "total_size_bytes": 45570,
+    "visualization_view_kind": "table",
+    "visualization_plugin_id": "viz-sql-dump",
+    "visualization_entry_file": "penguins.sql",
+    "sample_note": "静态解析 CREATE 与344条INSERT；不恢复数据库、不执行SQL。由同一份CC0科学观测转换，不增删记录；原CSV保留。",
+    "provenance": [
+      {
+        "path": "penguins.csv",
+        "size": 15241,
+        "sha256": "f204db2c753b0937caac3cb35258562c14f073e4bbc76be24b4c51ce22767a93",
+        "url": "https://raw.githubusercontent.com/allisonhorst/palmerpenguins/8957207b78d6ccd1b4654a9dd9c9041b657478ab/inst/extdata/penguins.csv"
+      },
+      {
+        "path": "penguins.sql",
+        "size": 28600,
+        "sha256": "6ed194a90bfb83db2a3634bfcfb078cd09da218414ffa9540c628e06fce5ff23",
+        "derived_from": [
+          "penguins.csv"
+        ]
+      }
+    ],
+    "publisher": "Palmer Station LTER / palmerpenguins",
+    "source_url": "https://github.com/allisonhorst/palmerpenguins",
+    "license": "CC0-1.0",
+    "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "license_details": "CC0-1.0；用于可视化测试，样本性质为 scientific_derived。",
+    "authors": [
+      "Palmer Station LTER / palmerpenguins"
+    ],
+    "source_version": "2026-09-18 已审查快照",
+    "sample_scope": "静态解析 CREATE 与344条INSERT；不恢复数据库、不执行SQL。由同一份CC0科学观测转换，不增删记录；原CSV保留。",
+    "transformation": "backend/scripts/plugin_samples_tables.py：数字字段按单位转数值；NA仅在数据库/JSON/Arrow转null，HTML/MD保持原文本。344行8列19缺失，未填充。",
+    "sample_kind": "scientific_derived",
+    "test_steps": [
+      "选择文件 penguins.sql，再选择插件 viz-sql-dump",
+      "静态解析 CREATE 与344条INSERT；不恢复数据库、不执行SQL"
+    ]
+  },
+  "files": [
+    {
+      "path": "SOURCE.md",
+      "size": 1729,
+      "sha256": "e8e8dc252ee2cf5e6508dcfe2e4719e60acdfd24ccda107eaf5745e58ac05ad1",
+      "role": "documentation",
+      "content_type": "text/markdown"
+    },
+    {
+      "path": "penguins.csv",
+      "size": 15241,
+      "sha256": "f204db2c753b0937caac3cb35258562c14f073e4bbc76be24b4c51ce22767a93",
+      "role": "data",
+      "content_type": "text/csv"
+    },
+    {
+      "path": "penguins.sql",
+      "size": 28600,
+      "sha256": "6ed194a90bfb83db2a3634bfcfb078cd09da218414ffa9540c628e06fce5ff23",
+      "role": "data",
+      "content_type": "application/x-sql"
+    }
+  ]
+}

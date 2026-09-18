@@ -1,0 +1,116 @@
+{
+  "dataset_id": "viz-bio-dicom-phantom",
+  "external_id": "viz-bio-dicom-phantom",
+  "data_center_id": "reviewed-visualization-plugin-tests",
+  "data_center_name": "逐插件可视化测试样例",
+  "name": "原创DICOM数值体模（非临床）",
+  "description": "原创64×64二维数值梯度；没有病人、医院采集或真实CT；DICOM去标识标记用于演示安全读取门槛，不能证明任何其他文件匿名。",
+  "domain": "image_science",
+  "data_type": "dcm",
+  "temporal_coverage": "",
+  "spatial_coverage": "",
+  "tags": [
+    "插件测试样例",
+    "viz-dicom-window",
+    "project_fixture",
+    "image",
+    "image_science"
+  ],
+  "metadata": {
+    "curated": true,
+    "source_catalog": "plugin-tests",
+    "catalog_version": 1,
+    "source_descriptor_sha256": "68d28ff1639892c0a7081e17219ffaac22aaac6cb302a36871e1afeb9851a8b8",
+    "download_date": "2026-09-18",
+    "inventory_complete": true,
+    "recursive_file_count": 4,
+    "total_size_bytes": 11832,
+    "visualization_view_kind": "image",
+    "visualization_plugin_id": "viz-dicom-window",
+    "visualization_entry_file": "synthetic-phantom.dcm",
+    "sample_note": "原创64×64二维数值梯度；没有病人、医院采集或真实CT；DICOM去标识标记用于演示安全读取门槛，不能证明任何其他文件匿名。",
+    "provenance": [
+      {
+        "path": "synthetic-phantom.dcm",
+        "size": 8730,
+        "sha256": "88affc0a61e113cd68a2c3cb49a5e57d0c1ccae081705dd29f49d67e90cadec9",
+        "role": "data",
+        "origin": {
+          "kind": "generated_fixture",
+          "generator": "backend/scripts/plugin_samples_bio.py",
+          "generator_sha256": "5ec25b14053c29d7f0b6ec7443f4994eec9d05eb448b8d3c302289488e3098c1",
+          "description": "原创64×64二维数值梯度；没有病人、医院采集或真实CT；DICOM去标识标记用于演示安全读取门槛，不能证明任何其他文件匿名。"
+        }
+      },
+      {
+        "path": "LICENSE.txt",
+        "size": 1066,
+        "sha256": "991f0bde5249ee6aad0a5a597197c7a7f6024abd2650516fcd7a83d908234115",
+        "role": "documentation",
+        "origin": {
+          "kind": "generated_fixture",
+          "generator": "backend/scripts/plugin_samples_bio.py",
+          "generator_sha256": "5ec25b14053c29d7f0b6ec7443f4994eec9d05eb448b8d3c302289488e3098c1",
+          "description": "项目 MIT 许可证原文的本地副本。"
+        }
+      },
+      {
+        "path": "GENERATION_SPEC.json",
+        "size": 156,
+        "sha256": "3f439ef8d9fb8e1874ad36aeecd8f66aa14ffc5b27a3d9cf3911eb4b53c1ded4",
+        "role": "documentation",
+        "origin": {
+          "kind": "generated_fixture",
+          "generator": "backend/scripts/plugin_samples_bio.py",
+          "generator_sha256": "5ec25b14053c29d7f0b6ec7443f4994eec9d05eb448b8d3c302289488e3098c1",
+          "description": "数据生成/格式转换参数记录；不是上游下载文件。"
+        }
+      }
+    ],
+    "publisher": "AI-DataSeek 原创功能测试样例",
+    "source_url": "https://github.com/km345297256/AI-DATASEEK",
+    "license": "MIT (project-generated fixture)",
+    "license_url": "https://github.com/km345297256/AI-DATASEEK/blob/v2/LICENSE",
+    "license_details": "本项目原创算法生成的功能样例，按项目 MIT 许可提供；不是来自医院、受试者或真实实验的观测。保留随附项目 LICENSE.txt。",
+    "authors": [
+      "AI-DataSeek contributors"
+    ],
+    "source_version": "original deterministic fixture 2026-09-18",
+    "sample_scope": "原创64×64二维数值梯度；没有病人、医院采集或真实CT；DICOM去标识标记用于演示安全读取门槛，不能证明任何其他文件匿名。",
+    "sample_kind": "project_fixture",
+    "test_steps": [
+      "打开DICOM元数据，确认单帧64×64。",
+      "仅对本明确合成文件勾选已去标识确认，再选择frame=0与ROI=[0,0,64,64]；不是诊断影像。"
+    ]
+  },
+  "files": [
+    {
+      "path": "GENERATION_SPEC.json",
+      "size": 156,
+      "sha256": "3f439ef8d9fb8e1874ad36aeecd8f66aa14ffc5b27a3d9cf3911eb4b53c1ded4",
+      "role": "documentation",
+      "content_type": "application/json"
+    },
+    {
+      "path": "LICENSE.txt",
+      "size": 1066,
+      "sha256": "991f0bde5249ee6aad0a5a597197c7a7f6024abd2650516fcd7a83d908234115",
+      "role": "documentation",
+      "content_type": "text/plain"
+    },
+    {
+      "path": "SOURCE.md",
+      "size": 1880,
+      "sha256": "3143d479fe44f569b78048ee98a166ec1ea12204ef0342ceaab4ff11491a663d",
+      "role": "documentation",
+      "content_type": "text/markdown"
+    },
+    {
+      "path": "synthetic-phantom.dcm",
+      "size": 8730,
+      "sha256": "88affc0a61e113cd68a2c3cb49a5e57d0c1ccae081705dd29f49d67e90cadec9",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    }
+  ]
+}

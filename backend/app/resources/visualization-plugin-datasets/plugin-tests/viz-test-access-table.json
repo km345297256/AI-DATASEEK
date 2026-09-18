@@ -1,0 +1,94 @@
+{
+  "dataset_id": "viz-test-access-table",
+  "external_id": "viz-test-access-table",
+  "data_center_id": "reviewed-visualization-plugin-tests",
+  "data_center_name": "逐插件可视化测试样例",
+  "name": "插件测试 · Access 只读数据库 · Access 普通表",
+  "description": "本项目已有的原创合成兼容性测试夹具，非真实科研观测。选择 Samples 普通表；测试中文、空值、精确小数、日期，Empty为空表；不包含用户数据。",
+  "domain": "tabular",
+  "data_type": "accdb",
+  "temporal_coverage": "",
+  "spatial_coverage": "",
+  "tags": [
+    "插件测试样例",
+    "viz-access-table",
+    "project_fixture",
+    "table",
+    "tabular"
+  ],
+  "metadata": {
+    "curated": true,
+    "source_catalog": "plugin-tests",
+    "catalog_version": 1,
+    "source_descriptor_sha256": "2bafd24a1f424cf13b404e6bf809d6be51203080cb152ae0f92d516125d46efb",
+    "download_date": "2026-09-18",
+    "inventory_complete": true,
+    "recursive_file_count": 3,
+    "total_size_bytes": 371443,
+    "visualization_view_kind": "table",
+    "visualization_plugin_id": "viz-access-table",
+    "visualization_entry_file": "synthetic-v2010.accdb",
+    "sample_note": "本项目已有的原创合成兼容性测试夹具，非真实科研观测。选择 Samples 普通表；测试中文、空值、精确小数、日期，Empty为空表；不包含用户数据。",
+    "provenance": [
+      {
+        "path": "synthetic-v2010.accdb",
+        "size": 368640,
+        "sha256": "e00a13460bc8ecb634405b8333d3584b09d4cfd3f0ad55af1b71c946ae2833ed",
+        "origin": {
+          "kind": "project_fixture",
+          "repository_file": "sandbox/tests/fixtures/database/synthetic-v2010.accdb",
+          "sha256": "e00a13460bc8ecb634405b8333d3584b09d4cfd3f0ad55af1b71c946ae2833ed"
+        }
+      },
+      {
+        "path": "LICENSE.txt",
+        "size": 1066,
+        "sha256": "991f0bde5249ee6aad0a5a597197c7a7f6024abd2650516fcd7a83d908234115",
+        "role": "documentation",
+        "origin": {
+          "kind": "project_fixture",
+          "repository_file": "LICENSE",
+          "sha256": "991f0bde5249ee6aad0a5a597197c7a7f6024abd2650516fcd7a83d908234115"
+        }
+      }
+    ],
+    "publisher": "AI-DataSeek 测试夹具",
+    "source_url": "https://github.com/km345297256/AI-DATASEEK",
+    "license": "MIT",
+    "license_url": "https://github.com/km345297256/AI-DATASEEK/blob/v2/LICENSE",
+    "license_details": "MIT；用于可视化测试，样本性质为 project_fixture。",
+    "authors": [
+      "AI-DataSeek 测试夹具"
+    ],
+    "source_version": "AI-DataSeek fixture snapshot fb609ed5460e9c247dc58fb2c3cb51410de27c6f",
+    "sample_scope": "本项目已有的原创合成兼容性测试夹具，非真实科研观测。选择 Samples 普通表；测试中文、空值、精确小数、日期，Empty为空表；不包含用户数据。",
+    "sample_kind": "project_fixture",
+    "test_steps": [
+      "预览主文件并选择 viz-access-table",
+      "选择 Samples 普通表；测试中文、空值、精确小数、日期，Empty为空表；不包含用户数据。"
+    ]
+  },
+  "files": [
+    {
+      "path": "LICENSE.txt",
+      "size": 1066,
+      "sha256": "991f0bde5249ee6aad0a5a597197c7a7f6024abd2650516fcd7a83d908234115",
+      "role": "documentation",
+      "content_type": "text/plain"
+    },
+    {
+      "path": "SOURCE.md",
+      "size": 1737,
+      "sha256": "e649499fc9bae3cc36c97aba01c50ffde1802cba02704b049647f72abd67be00",
+      "role": "documentation",
+      "content_type": "text/markdown"
+    },
+    {
+      "path": "synthetic-v2010.accdb",
+      "size": 368640,
+      "sha256": "e00a13460bc8ecb634405b8333d3584b09d4cfd3f0ad55af1b71c946ae2833ed",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    }
+  ]
+}

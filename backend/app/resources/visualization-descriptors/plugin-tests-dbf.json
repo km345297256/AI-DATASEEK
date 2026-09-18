@@ -1,0 +1,135 @@
+[
+  {
+    "dataset_id": "viz-test-dbf-natural-earth",
+    "name": "插件测试 · DBF 国家属性表与原始边界",
+    "description": "Natural Earth 1:110m 177个国家/地区要素；保留所有原始文件，另提供8字段DBF与字节一致的几何配套。只做字段投影和字符尾部填充规范化，不改观测或制图数值。",
+    "domain": "geoscience",
+    "view_kind": "table",
+    "plugin_id": "viz-dbf-table",
+    "entry_file": "countries.dbf",
+    "source_url": "https://www.naturalearthdata.com/downloads/110m-cultural-vectors/110m-admin-0-countries/",
+    "publisher": "Natural Earth · Tom Patterson / Nathaniel Vaughn Kelso 等",
+    "license": "Public domain",
+    "license_url": "https://www.naturalearthdata.com/about/terms-of-use/",
+    "license_details": "Natural Earth 官方条款声明其栅格和矢量地图数据均属公有领域，允许修改和传播。保留作者与上游出处，不宣称这些边界具有法律效力。",
+    "authors": [
+      "Tom Patterson",
+      "Nathaniel Vaughn Kelso",
+      "Natural Earth contributors"
+    ],
+    "source_version": "5.1.1",
+    "sample_scope": "完整177要素及其原始几何；DBF从168列选8列，英文名称、ISO/主权代码、洲、人口/GDP及各自年份；源没有面积字段，不合成面积。",
+    "sample_kind": "scientific_derived",
+    "test_steps": [
+      "打开 countries.dbf；同目录完整 SHP/SHX/PRJ/CPG 使默认地图预览可以先打开。",
+      "在可视化选择器选择 viz-dbf-table，点击读取数据库分页，核对 8 列、177 行国家/地区属性。",
+      "切换下一页；POP_EST/POP_YEAR/GDP_MD/GDP_YEAR 保留来源值和缺失哨兵，不推定当前年份。",
+      "需要完整168字段时查看 original/；小比例尺边界不用于精确面积或法律边界认定。"
+    ],
+    "files": [
+      {
+        "path": "original/ne_110m_admin_0_countries.shp",
+        "size": 180924,
+        "sha256": "08e341606e8391e458c3f08deb312de664b56bfae376064c5aa0aee6681a5f55",
+        "role": "data",
+        "url": "https://naturalearth.s3.amazonaws.com/110m_cultural/ne_110m_admin_0_countries.zip",
+        "archive_member": "ne_110m_admin_0_countries.shp"
+      },
+      {
+        "path": "original/ne_110m_admin_0_countries.shx",
+        "size": 1516,
+        "sha256": "8b0be2ad97dd484aee5c2ebc98697d5372e832b8ae58a35a661aeef6b985668d",
+        "role": "data",
+        "url": "https://naturalearth.s3.amazonaws.com/110m_cultural/ne_110m_admin_0_countries.zip",
+        "archive_member": "ne_110m_admin_0_countries.shx"
+      },
+      {
+        "path": "original/ne_110m_admin_0_countries.dbf",
+        "size": 531808,
+        "sha256": "1fee677cd4e03b367876e03861eb10197e4022a846bf92060e0313432863785b",
+        "role": "data",
+        "url": "https://naturalearth.s3.amazonaws.com/110m_cultural/ne_110m_admin_0_countries.zip",
+        "archive_member": "ne_110m_admin_0_countries.dbf"
+      },
+      {
+        "path": "original/ne_110m_admin_0_countries.prj",
+        "size": 147,
+        "sha256": "3259f0e55290a82b1350646f604e8a7ee1e2136c0320a40fad838ab40819fff8",
+        "role": "data",
+        "url": "https://naturalearth.s3.amazonaws.com/110m_cultural/ne_110m_admin_0_countries.zip",
+        "archive_member": "ne_110m_admin_0_countries.prj"
+      },
+      {
+        "path": "original/ne_110m_admin_0_countries.cpg",
+        "size": 5,
+        "sha256": "3ad3031f5503a4404af825262ee8232cc04d4ea6683d42c5dd0a2f2a27ac9824",
+        "role": "data",
+        "url": "https://naturalearth.s3.amazonaws.com/110m_cultural/ne_110m_admin_0_countries.zip",
+        "archive_member": "ne_110m_admin_0_countries.cpg"
+      },
+      {
+        "path": "original/ne_110m_admin_0_countries.VERSION.txt",
+        "size": 7,
+        "sha256": "548358969090d629b41888f5fe664ac31b7203dfd849f7c1ef820ac055b62191",
+        "role": "documentation",
+        "url": "https://naturalearth.s3.amazonaws.com/110m_cultural/ne_110m_admin_0_countries.zip",
+        "archive_member": "ne_110m_admin_0_countries.VERSION.txt"
+      },
+      {
+        "path": "countries.shp",
+        "size": 180924,
+        "sha256": "08e341606e8391e458c3f08deb312de664b56bfae376064c5aa0aee6681a5f55",
+        "role": "data",
+        "derived_from": [
+          "original/ne_110m_admin_0_countries.shp"
+        ]
+      },
+      {
+        "path": "countries.shx",
+        "size": 1516,
+        "sha256": "8b0be2ad97dd484aee5c2ebc98697d5372e832b8ae58a35a661aeef6b985668d",
+        "role": "data",
+        "derived_from": [
+          "original/ne_110m_admin_0_countries.shx"
+        ]
+      },
+      {
+        "path": "countries.prj",
+        "size": 147,
+        "sha256": "3259f0e55290a82b1350646f604e8a7ee1e2136c0320a40fad838ab40819fff8",
+        "role": "data",
+        "derived_from": [
+          "original/ne_110m_admin_0_countries.prj"
+        ]
+      },
+      {
+        "path": "countries.cpg",
+        "size": 5,
+        "sha256": "3ad3031f5503a4404af825262ee8232cc04d4ea6683d42c5dd0a2f2a27ac9824",
+        "role": "data",
+        "derived_from": [
+          "original/ne_110m_admin_0_countries.cpg"
+        ]
+      },
+      {
+        "path": "countries.dbf",
+        "size": 16751,
+        "sha256": "141cf9edea8b2ee63066f3230b45e3ad9c2762aa07adf0d1dd026dd60a90afa1",
+        "role": "data",
+        "derived_from": [
+          "original/ne_110m_admin_0_countries.dbf"
+        ]
+      },
+      {
+        "path": "CONVERSION.json",
+        "size": 860,
+        "sha256": "cbcd9ccf20eba5ccf141f40fd81881d9d28e806b4c768ecb929e9822238c8674",
+        "role": "documentation",
+        "derived_from": [
+          "original/ne_110m_admin_0_countries.dbf"
+        ]
+      }
+    ],
+    "transformation": "backend/scripts/plugin_samples_natural_earth_dbf.py (SHA256 ddee7df92d8b5df4999c9f0145f42a63b0b0f25af6fef8dd55404cf20af4da9c)：按原记录顺序选 NAME_EN, ISO_A3, SOV_A3, CONTINENT, POP_EST, POP_YEAR, GDP_MD, GDP_YEAR；C字段仅将尾部NUL填充换为空格，解码文本不变；N字段原始字节不变。SHP/SHX/PRJ/CPG原样复制。CONVERSION.json记录参数，original/保留全部源件。"
+  }
+]

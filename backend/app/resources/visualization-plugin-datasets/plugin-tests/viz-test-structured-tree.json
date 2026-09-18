@@ -1,0 +1,88 @@
+{
+  "dataset_id": "viz-test-structured-tree",
+  "external_id": "viz-test-structured-tree",
+  "data_center_id": "reviewed-visualization-plugin-tests",
+  "data_center_name": "逐插件可视化测试样例",
+  "name": "插件测试 · 结构化数据树 · Palmer 企鹅格式转换",
+  "description": "展开 observations 数组，344项；JSON null对应原CSV的19个NA。由同一份CC0科学观测转换，不增删记录；原CSV保留。",
+  "domain": "tabular",
+  "data_type": "csv, json",
+  "temporal_coverage": "",
+  "spatial_coverage": "",
+  "tags": [
+    "插件测试样例",
+    "viz-structured-tree",
+    "scientific_derived",
+    "tree",
+    "tabular"
+  ],
+  "metadata": {
+    "curated": true,
+    "source_catalog": "plugin-tests",
+    "catalog_version": 1,
+    "source_descriptor_sha256": "235a04e40966b78a79a93fd01fa68924ed4826ec4638cab66d71ff50b0db3ac4",
+    "download_date": "2026-09-18",
+    "inventory_complete": true,
+    "recursive_file_count": 3,
+    "total_size_bytes": 94748,
+    "visualization_view_kind": "tree",
+    "visualization_plugin_id": "viz-structured-tree",
+    "visualization_entry_file": "penguins.json",
+    "sample_note": "展开 observations 数组，344项；JSON null对应原CSV的19个NA。由同一份CC0科学观测转换，不增删记录；原CSV保留。",
+    "provenance": [
+      {
+        "path": "penguins.csv",
+        "size": 15241,
+        "sha256": "f204db2c753b0937caac3cb35258562c14f073e4bbc76be24b4c51ce22767a93",
+        "url": "https://raw.githubusercontent.com/allisonhorst/palmerpenguins/8957207b78d6ccd1b4654a9dd9c9041b657478ab/inst/extdata/penguins.csv"
+      },
+      {
+        "path": "penguins.json",
+        "size": 77769,
+        "sha256": "08f7a6edccf0330bb635ebdb6c74b76958983bd2d35b2ebc522af5593a737e31",
+        "derived_from": [
+          "penguins.csv"
+        ]
+      }
+    ],
+    "publisher": "Palmer Station LTER / palmerpenguins",
+    "source_url": "https://github.com/allisonhorst/palmerpenguins",
+    "license": "CC0-1.0",
+    "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "license_details": "CC0-1.0；用于可视化测试，样本性质为 scientific_derived。",
+    "authors": [
+      "Palmer Station LTER / palmerpenguins"
+    ],
+    "source_version": "2026-09-18 已审查快照",
+    "sample_scope": "展开 observations 数组，344项；JSON null对应原CSV的19个NA。由同一份CC0科学观测转换，不增删记录；原CSV保留。",
+    "transformation": "backend/scripts/plugin_samples_tables.py：数字字段按单位转数值；NA仅在数据库/JSON/Arrow转null，HTML/MD保持原文本。344行8列19缺失，未填充。",
+    "sample_kind": "scientific_derived",
+    "test_steps": [
+      "选择文件 penguins.json，再选择插件 viz-structured-tree",
+      "展开 observations 数组，344项；JSON null对应原CSV的19个NA"
+    ]
+  },
+  "files": [
+    {
+      "path": "SOURCE.md",
+      "size": 1738,
+      "sha256": "04d4a895c215cf690ff854702f115eebb9eaa58d3ece87632f2ce5b25018d6da",
+      "role": "documentation",
+      "content_type": "text/markdown"
+    },
+    {
+      "path": "penguins.csv",
+      "size": 15241,
+      "sha256": "f204db2c753b0937caac3cb35258562c14f073e4bbc76be24b4c51ce22767a93",
+      "role": "data",
+      "content_type": "text/csv"
+    },
+    {
+      "path": "penguins.json",
+      "size": 77769,
+      "sha256": "08f7a6edccf0330bb635ebdb6c74b76958983bd2d35b2ebc522af5593a737e31",
+      "role": "data",
+      "content_type": "application/json"
+    }
+  ]
+}

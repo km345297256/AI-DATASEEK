@@ -1,0 +1,92 @@
+{
+  "dataset_id": "viz-usgs-anmo-seismic",
+  "external_id": "viz-usgs-anmo-seismic",
+  "data_center_id": "reviewed-visualization-plugin-tests",
+  "data_center_name": "逐插件可视化测试样例",
+  "name": "插件样例｜USGS ANMO 宽带垂向地震记录",
+  "description": "GSN IU.ANMO.10.BHZ 2018 年首日真实波形在 ObsPy 官方测试仓库的镜像；入口是原件首个完整 512 字节 MiniSEED2 记录，223 样本、40 Hz。未去仪器响应，振幅单位未知。",
+  "domain": "geoscience",
+  "data_type": "mseed",
+  "temporal_coverage": "",
+  "spatial_coverage": "",
+  "tags": [
+    "插件测试样例",
+    "viz-seismic-window",
+    "scientific_derived",
+    "series",
+    "geoscience"
+  ],
+  "metadata": {
+    "curated": true,
+    "source_catalog": "plugin-tests",
+    "catalog_version": 1,
+    "source_descriptor_sha256": "f6e7bd6b86c5bdbd66094f98949390efec9effa635609d58be24347b8a0842a7",
+    "download_date": "2026-09-18",
+    "inventory_complete": true,
+    "recursive_file_count": 3,
+    "total_size_bytes": 5442,
+    "visualization_view_kind": "series",
+    "visualization_plugin_id": "viz-seismic-window",
+    "visualization_entry_file": "IU.ANMO.10.BHZ.first-record.mseed",
+    "sample_note": "原始一分钟 2560B 镜像完整保留；仅原样提取首个完整 512B 记录用于严格兼容入口，起始 2018-01-01T00:00:00.019500Z，223 点，样本间隔 0.025 秒；不是整分钟合并波形。原文件后续记录含当前 reader 不支持的字段，不将原件声称为全部兼容。",
+    "provenance": [
+      {
+        "path": "IU.ANMO.10.BHZ.2018.001_first_minute.mseed",
+        "size": 2560,
+        "sha256": "6cd52d90ab1f8f17e73400df1286aa3efd9069722232b80ca9578f23193530aa",
+        "url": "https://raw.githubusercontent.com/obspy/obspy/50033e1daf95233cd4f30e95a49c37fd50be2ccd/obspy/clients/filesystem/tests/data/tsindex_data/IU/2018/001/IU.ANMO.10.BHZ.2018.001_first_minute.mseed",
+        "role": "data"
+      },
+      {
+        "path": "IU.ANMO.10.BHZ.first-record.mseed",
+        "size": 512,
+        "sha256": "903fbfcf8cdb59993af92a428f5a92ebf0db4545d68bcba711b2fbc4235975b9",
+        "derived_from": [
+          "IU.ANMO.10.BHZ.2018.001_first_minute.mseed"
+        ],
+        "role": "data"
+      }
+    ],
+    "publisher": "USGS/Albuquerque Seismological Laboratory；ObsPy 官方镜像",
+    "source_url": "https://www.fdsn.org/networks/detail/IU/",
+    "license": "U.S. Public Domain (USGS-produced data)",
+    "license_url": "https://www.usgs.gov/information-policies-and-instructions/copyrights-and-credits",
+    "license_details": "USGS 自产观测数据适用美国公有领域政策；保留机构、网络/目录及镜像来源署名，不将第三方图片或商标扩展解释为公有领域。",
+    "authors": [
+      "USGS/Albuquerque Seismological Laboratory",
+      "ObsPy contributors (fixture mirror)"
+    ],
+    "source_version": "IU network DOI 10.7914/SN/IU; ObsPy 50033e1daf95233cd4f30e95a49c37fd50be2ccd",
+    "sample_scope": "原始一分钟 2560B 镜像完整保留；仅原样提取首个完整 512B 记录用于严格兼容入口，起始 2018-01-01T00:00:00.019500Z，223 点，样本间隔 0.025 秒；不是整分钟合并波形。原文件后续记录含当前 reader 不支持的字段，不将原件声称为全部兼容。",
+    "transformation": "derive_basic.py 从原 MiniSEED 按记录边界复制前 512 字节；压缩样本、时间、头部完全未改，未重采样、补缺口、响应校正。",
+    "sample_kind": "scientific_derived",
+    "test_steps": [
+      "打开 IU.ANMO.10.BHZ.first-record.mseed，选择 viz-seismic-window。",
+      "记录 0，样本起点 0，样本数 223，读取波形窗。",
+      "应为 223 点、0.025 秒间隔、STEIM2；振幅单位 unknown，不能标为 nm/s。"
+    ]
+  },
+  "files": [
+    {
+      "path": "IU.ANMO.10.BHZ.2018.001_first_minute.mseed",
+      "size": 2560,
+      "sha256": "6cd52d90ab1f8f17e73400df1286aa3efd9069722232b80ca9578f23193530aa",
+      "role": "data",
+      "content_type": "application/vnd.fdsn.mseed"
+    },
+    {
+      "path": "IU.ANMO.10.BHZ.first-record.mseed",
+      "size": 512,
+      "sha256": "903fbfcf8cdb59993af92a428f5a92ebf0db4545d68bcba711b2fbc4235975b9",
+      "role": "data",
+      "content_type": "application/vnd.fdsn.mseed"
+    },
+    {
+      "path": "SOURCE.md",
+      "size": 2370,
+      "sha256": "3d879d84253351ba6ea74a9c7b2e940371ea9cbb21b46276398c37f8b8a83851",
+      "role": "documentation",
+      "content_type": "text/markdown"
+    }
+  ]
+}

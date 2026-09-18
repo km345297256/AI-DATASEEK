@@ -1,0 +1,238 @@
+{
+  "dataset_id": "viz-bio-lightmycells-formats",
+  "external_id": "viz-bio-lightmycells-formats",
+  "data_center_id": "reviewed-visualization-plugin-tests",
+  "data_center_name": "逐插件可视化测试样例",
+  "name": "真实犬细胞核图像：七种影像格式与阅读器对照",
+  "description": "来自 Light My Cells 的真实犬细胞核显微观察，原始 OME-TIFF 完整保留；额外提供保留全部 uint16 像素的 PNG、NPY、未压缩 CZI 和 OME-Zarr 格式。用于比较阅读器结果，不是七次独立实验。",
+  "domain": "image_science",
+  "data_type": ", 0, czi, npy, png, tiff",
+  "temporal_coverage": "",
+  "spatial_coverage": "",
+  "tags": [
+    "插件测试样例",
+    "viz-viv",
+    "scientific_derived",
+    "image",
+    "image_science"
+  ],
+  "metadata": {
+    "curated": true,
+    "source_catalog": "plugin-tests",
+    "catalog_version": 1,
+    "source_descriptor_sha256": "b96177f67965940301b697a300a66e498638ff748a1fcfef5ffd353a7e16a614",
+    "download_date": "2026-09-18",
+    "inventory_complete": true,
+    "recursive_file_count": 10,
+    "total_size_bytes": 12809674,
+    "visualization_view_kind": "image",
+    "visualization_plugin_id": "viz-viv",
+    "visualization_entry_file": "image_399_Nucleus.ome.tiff",
+    "sample_note": "Study_24/image_399_Nucleus.ome.tiff 一张完整的已发布 OME-TIFF。官方 Study Component 名为 Cocker 4，描述为正常成年雌性可卡犬；不是人体影像。保留单通道 1200×1200 全部分辨率与 OME 元数据，未取得该库其他图像。",
+    "provenance": [
+      {
+        "path": "image_399_Nucleus.ome.tiff",
+        "url": "https://ftp.ebi.ac.uk/biostudies/fire/S-BIAD/047/S-BIAD1047/Files/Images/Study_24/image_399_Nucleus.ome.tiff",
+        "size": 2239243,
+        "sha256": "61892dc211cf96032c14752a734c61d414980006490e65795faec14483c06048"
+      },
+      {
+        "path": "nucleus-uint16.png",
+        "size": 1922725,
+        "sha256": "65f211a479418e8e9eabf38f0a193aad9575ec431cc56b6a35744ff8b607b1a7",
+        "role": "data",
+        "derived_from": [
+          "image_399_Nucleus.ome.tiff"
+        ]
+      },
+      {
+        "path": "nucleus-uint16.npy",
+        "size": 2880128,
+        "sha256": "6f150c9535ba0a4ce7e1decd889520120aa752d01f796d80955b111c2598ad89",
+        "role": "data",
+        "derived_from": [
+          "image_399_Nucleus.ome.tiff"
+        ]
+      },
+      {
+        "path": "nucleus-uncompressed.czi",
+        "size": 2882240,
+        "sha256": "88f6c9bc90a4d84179f8ddb6538232cf037ac862cc8ba8a00a86419bb37a3585",
+        "role": "data",
+        "derived_from": [
+          "image_399_Nucleus.ome.tiff"
+        ]
+      },
+      {
+        "path": "nucleus.zarr/.zgroup",
+        "size": 23,
+        "sha256": "e1e1914ae531ecb50e1ead685ef01895a5452faf5f25f35cd78f1f5de1367470",
+        "role": "data",
+        "derived_from": [
+          "image_399_Nucleus.ome.tiff"
+        ]
+      },
+      {
+        "path": "nucleus.zarr/.zattrs",
+        "size": 488,
+        "sha256": "0e2d06192692c229c20d4d1b7e95f61daf0c700e2405eb90658c51caf588067f",
+        "role": "data",
+        "derived_from": [
+          "image_399_Nucleus.ome.tiff"
+        ]
+      },
+      {
+        "path": "nucleus.zarr/0/.zarray",
+        "size": 222,
+        "sha256": "edbb62a3587a8537cc627f8c396e713ae37d183e2479295a1f27bebb46c2c15f",
+        "role": "data",
+        "derived_from": [
+          "image_399_Nucleus.ome.tiff"
+        ]
+      },
+      {
+        "path": "nucleus.zarr/0/0.0",
+        "size": 2880000,
+        "sha256": "5214b86a1883c64945ba1fc479ffaa1efdaeacf930f6bb59b94f17dd9000aed5",
+        "role": "data",
+        "derived_from": [
+          "image_399_Nucleus.ome.tiff"
+        ]
+      },
+      {
+        "path": "GENERATION_SPEC.json",
+        "size": 635,
+        "sha256": "b08b315cea8c3725f7571c204ab9385b7d4ee298d279d42710105f49af82514e",
+        "role": "documentation",
+        "origin": {
+          "kind": "generated_fixture",
+          "generator": "backend/scripts/plugin_samples_bio.py",
+          "generator_sha256": "5ec25b14053c29d7f0b6ec7443f4994eec9d05eb448b8d3c302289488e3098c1",
+          "description": "数据生成/格式转换参数记录；不是上游下载文件。"
+        }
+      }
+    ],
+    "publisher": "France-BioImaging / EMBL-EBI BioImage Archive",
+    "source_url": "https://www.ebi.ac.uk/biostudies/BioImages/studies/S-BIAD1047",
+    "license": "CC BY 4.0",
+    "license_url": "https://creativecommons.org/licenses/by/4.0/legalcode",
+    "license_details": "BioImage Archive S-BIAD1047 官方研究元数据明确指定 CC BY 4.0；允许复制、分享和改编，须署名、保留许可链接并说明改动。来源论文为 2D Multimodal Image Collection for Fluorescence Prediction from Transmitted Light Microscopy，https://doi.org/10.1038/s41597-026-07004-w。本地文件是官网单文件原样下载，未调整亮度或改变像素。 本轮产生容器转换文件，已明确记录改动，原文件保留。",
+    "authors": [
+      "Dorian Kauffmann",
+      "Guillaume Gay",
+      "Emmanuel Faure",
+      "Julio Mateos-Langerak",
+      "Oriane Pourcelot",
+      "Virginie Georget",
+      "Maëlle Carraz",
+      "Juliette Van Dijk",
+      "Stéphanie Bosch",
+      "Elsa Castellani",
+      "Qiyan Mao",
+      "Laura Ruiz",
+      "Valentin Asei-Ceschino",
+      "Tudor Manoliu",
+      "Julia Bonnet-Gelebart",
+      "Youssef Elhabouz",
+      "Marc Tramier",
+      "Jacques Pécréaux",
+      "Louis Ruel",
+      "Jean-Bernard Fiche",
+      "David Lleres",
+      "Christine Doucet",
+      "Erwan Gandon",
+      "Yves Lutz",
+      "Bertrand Vernay",
+      "Daniel Stockholm",
+      "Abbass Jaber",
+      "Aude Moret",
+      "Romain Morichon",
+      "Mónica Fernández-Monreal",
+      "Edouard Bertrand"
+    ],
+    "source_version": "S-BIAD1047，官方元数据 ReleaseDate 2025-02-26；2026-09-18 下载快照",
+    "sample_scope": "Study_24/image_399_Nucleus.ome.tiff 一张完整的已发布 OME-TIFF。官方 Study Component 名为 Cocker 4，描述为正常成年雌性可卡犬；不是人体影像。保留单通道 1200×1200 全部分辨率与 OME 元数据，未取得该库其他图像。",
+    "transformation": "只转换容器，不裁剪、不重采样、不修改1200×1200 uint16像素。OME-Zarr采用像素索引坐标，不伪造物理标定；原OME元数据保留于原件。CZI由已安装官方pylibCZIrw写入器生成。",
+    "suggested_questions": [
+      "统计这张图像的细胞核数量，并说明阈值及分割误差。",
+      "比较细胞核面积、形态和荧光强度分布；不要将单张图像推断为群体实验结论。"
+    ],
+    "sample_kind": "scientific_derived",
+    "test_steps": [
+      "打开原始 OME-TIFF 并选择 Viv；确认单通道1200×1200。",
+      "比较同集 PNG、NPY、CZI 与 OME-Zarr 的相同 ROI；数值未修改。"
+    ]
+  },
+  "files": [
+    {
+      "path": "GENERATION_SPEC.json",
+      "size": 635,
+      "sha256": "b08b315cea8c3725f7571c204ab9385b7d4ee298d279d42710105f49af82514e",
+      "role": "documentation",
+      "content_type": "application/json"
+    },
+    {
+      "path": "SOURCE.md",
+      "size": 3970,
+      "sha256": "c9ccc46835aa798c033270bf8f3867408accf3e1472a3e1c449cc555720d9781",
+      "role": "documentation",
+      "content_type": "text/markdown"
+    },
+    {
+      "path": "image_399_Nucleus.ome.tiff",
+      "size": 2239243,
+      "sha256": "61892dc211cf96032c14752a734c61d414980006490e65795faec14483c06048",
+      "role": "data",
+      "content_type": "image/tiff"
+    },
+    {
+      "path": "nucleus-uint16.npy",
+      "size": 2880128,
+      "sha256": "6f150c9535ba0a4ce7e1decd889520120aa752d01f796d80955b111c2598ad89",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "nucleus-uint16.png",
+      "size": 1922725,
+      "sha256": "65f211a479418e8e9eabf38f0a193aad9575ec431cc56b6a35744ff8b607b1a7",
+      "role": "data",
+      "content_type": "image/png"
+    },
+    {
+      "path": "nucleus-uncompressed.czi",
+      "size": 2882240,
+      "sha256": "88f6c9bc90a4d84179f8ddb6538232cf037ac862cc8ba8a00a86419bb37a3585",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "nucleus.zarr/.zattrs",
+      "size": 488,
+      "sha256": "0e2d06192692c229c20d4d1b7e95f61daf0c700e2405eb90658c51caf588067f",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "nucleus.zarr/.zgroup",
+      "size": 23,
+      "sha256": "e1e1914ae531ecb50e1ead685ef01895a5452faf5f25f35cd78f1f5de1367470",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "nucleus.zarr/0/.zarray",
+      "size": 222,
+      "sha256": "edbb62a3587a8537cc627f8c396e713ae37d183e2479295a1f27bebb46c2c15f",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "nucleus.zarr/0/0.0",
+      "size": 2880000,
+      "sha256": "5214b86a1883c64945ba1fc479ffaa1efdaeacf930f6bb59b94f17dd9000aed5",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    }
+  ]
+}

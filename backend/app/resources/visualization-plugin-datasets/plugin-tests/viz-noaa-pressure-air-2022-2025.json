@@ -1,0 +1,134 @@
+{
+  "dataset_id": "viz-noaa-pressure-air-2022-2025",
+  "external_id": "viz-noaa-pressure-air-2022-2025",
+  "data_center_id": "reviewed-visualization-plugin-tests",
+  "data_center_name": "逐插件可视化测试样例",
+  "name": "插件样例｜NOAA 四年全球气压层气温与 GB 数组窗口",
+  "description": "NOAA/NCEP 2022–2025 四年原始再分析气温（约 1.29 GB），加 2025 全年全值连续 HDF5 副本（1.04 GB）供安全窗口预览；副本全部 1460×17×73×144 气温与坐标值逐块相等，单位 K。",
+  "domain": "geoscience",
+  "data_type": "h5, nc",
+  "temporal_coverage": "",
+  "spatial_coverage": "",
+  "tags": [
+    "插件测试样例",
+    "viz-array-window",
+    "scientific_derived",
+    "image",
+    "geoscience"
+  ],
+  "metadata": {
+    "curated": true,
+    "source_catalog": "plugin-tests",
+    "catalog_version": 1,
+    "source_descriptor_sha256": "33a1a6dc684f9851fd3c1fa99d004649c41c7468a12e42cc8d34d1359b2657d4",
+    "download_date": "2026-09-18",
+    "inventory_complete": true,
+    "recursive_file_count": 6,
+    "total_size_bytes": 2337300066,
+    "visualization_view_kind": "image",
+    "visualization_plugin_id": "viz-array-window",
+    "visualization_entry_file": "air.2025.contiguous.h5",
+    "sample_note": "4 个完整年度原 NC；2025 的 1460 个六小时时刻、17 个气压层、73 纬度×144 经度完整无损转存。不是将小文件复制或填零放大。原 NC 的 chunk 索引目录超出当前 128 次读取预算，不将其声称可直接预览；一键入口为连续 HDF5。显示原存储值，有限 missing_value 不自动掩膜。",
+    "provenance": [
+      {
+        "path": "air.2022.nc",
+        "size": 319263529,
+        "sha256": "30cd59f76a5f4d1f6eeb4645fac93ba2de36e82a46c0565636da569e8f6013ef",
+        "url": "https://downloads.psl.noaa.gov/Datasets/ncep.reanalysis/pressure/air.2022.nc",
+        "role": "data"
+      },
+      {
+        "path": "air.2023.nc",
+        "size": 323589222,
+        "sha256": "818a50fed7df50448dfad194a737cdd9c6128787b81a5e8318a546b4ac749275",
+        "url": "https://downloads.psl.noaa.gov/Datasets/ncep.reanalysis/pressure/air.2023.nc",
+        "role": "data"
+      },
+      {
+        "path": "air.2024.nc",
+        "size": 325866047,
+        "sha256": "0e717501e830cc527a30d82f1d964ffb55c89a88fe2c212fb2828b564ea56c84",
+        "url": "https://downloads.psl.noaa.gov/Datasets/ncep.reanalysis/pressure/air.2024.nc",
+        "role": "data"
+      },
+      {
+        "path": "air.2025.nc",
+        "size": 324930172,
+        "sha256": "b7d9d4e232d72539459a6816270ddc38405696dc184b422831ba5a71b0a7abb3",
+        "url": "https://downloads.psl.noaa.gov/Datasets/ncep.reanalysis/pressure/air.2025.nc",
+        "role": "data"
+      },
+      {
+        "path": "air.2025.contiguous.h5",
+        "size": 1043648072,
+        "sha256": "25de54ccd30d2f62324321b07eb31d23bc68e0750fcabdaf7c8eebae1c4bc491",
+        "derived_from": [
+          "air.2025.nc"
+        ],
+        "role": "data"
+      }
+    ],
+    "publisher": "NOAA/OAR/PSL 与 NCEP/NCAR",
+    "source_url": "https://psl.noaa.gov/data/gridded/data.ncep.reanalysis.html",
+    "license": "U.S. Public Domain (NOAA-produced data)",
+    "license_url": "https://psl.noaa.gov/disclaimer/",
+    "license_details": "NOAA/PSL 政府自产数据除另有标注者外属公有领域；须注明 NOAA/OAR/PSL 与原数据集，不暗示官方背书。派生格式不是官方新产品。",
+    "authors": [
+      "NOAA/OAR/PSL",
+      "NCEP/NCAR"
+    ],
+    "source_version": "NCEP/NCAR Reanalysis 1 pressure air 2022–2025; snapshots 2026-09-18",
+    "sample_scope": "4 个完整年度原 NC；2025 的 1460 个六小时时刻、17 个气压层、73 纬度×144 经度完整无损转存。不是将小文件复制或填零放大。原 NC 的 chunk 索引目录超出当前 128 次读取预算，不将其声称可直接预览；一键入口为连续 HDF5。显示原存储值，有限 missing_value 不自动掩膜。",
+    "transformation": "repack_array.py：仅 2025 原 NC 的 air、level、lat、lon、time 全部数值数组按原 dtype、维度、顺序写为无压缩连续 HDF5，分 8 行块复制并校验完整 raw-array SHA256。保留 units、long_name、日历和缺失标记；无 CF 解码、缩放、插值、抽样。air 原数值哈希 747c67cc7cd6f06acda9de307db7edca2ee6ba3dd1cd661e92dc816ee45eb3f2。4 原件不改。",
+    "sample_kind": "scientific_derived",
+    "test_steps": [
+      "打开 air.2025.contiguous.h5，选择 viz-array-window，读取目录。",
+      "变量选 air；前两维固定 0（首时刻、首气压层），后两维分别切片 start=0 stop=73 step=1 与 start=0 stop=144 step=1。",
+      "读取图像窗口应显示 73×144=10512 值（K），与原数组完全一致；实测只读 46144B、2 次范围请求，而非下载完整 1.04GB；不选其它三个年度原 NC 冒充兼容。"
+    ]
+  },
+  "files": [
+    {
+      "path": "SOURCE.md",
+      "size": 3024,
+      "sha256": "4a6017ec6a2d98a2c4e49bfe146719eca0e4ebdfb01f5cf8d05672967267f795",
+      "role": "documentation",
+      "content_type": "text/markdown"
+    },
+    {
+      "path": "air.2022.nc",
+      "size": 319263529,
+      "sha256": "30cd59f76a5f4d1f6eeb4645fac93ba2de36e82a46c0565636da569e8f6013ef",
+      "role": "data",
+      "content_type": "application/x-netcdf"
+    },
+    {
+      "path": "air.2023.nc",
+      "size": 323589222,
+      "sha256": "818a50fed7df50448dfad194a737cdd9c6128787b81a5e8318a546b4ac749275",
+      "role": "data",
+      "content_type": "application/x-netcdf"
+    },
+    {
+      "path": "air.2024.nc",
+      "size": 325866047,
+      "sha256": "0e717501e830cc527a30d82f1d964ffb55c89a88fe2c212fb2828b564ea56c84",
+      "role": "data",
+      "content_type": "application/x-netcdf"
+    },
+    {
+      "path": "air.2025.contiguous.h5",
+      "size": 1043648072,
+      "sha256": "25de54ccd30d2f62324321b07eb31d23bc68e0750fcabdaf7c8eebae1c4bc491",
+      "role": "data",
+      "content_type": "application/x-hdf5"
+    },
+    {
+      "path": "air.2025.nc",
+      "size": 324930172,
+      "sha256": "b7d9d4e232d72539459a6816270ddc38405696dc184b422831ba5a71b0a7abb3",
+      "role": "data",
+      "content_type": "application/x-netcdf"
+    }
+  ]
+}

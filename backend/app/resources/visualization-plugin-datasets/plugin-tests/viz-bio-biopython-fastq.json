@@ -1,0 +1,88 @@
+{
+  "dataset_id": "viz-bio-biopython-fastq",
+  "external_id": "viz-bio-biopython-fastq",
+  "data_center_id": "reviewed-visualization-plugin-tests",
+  "data_center_name": "逐插件可视化测试样例",
+  "name": "Biopython官方FASTQ最小测试样例",
+  "description": "Biopython Tests/Quality/example.fastq原样文件，3条短序列。用于读取与质量面板功能测试；不是代表性测序研究，不推断样本身份或实验结果。",
+  "domain": "sequence",
+  "data_type": "fastq",
+  "temporal_coverage": "",
+  "spatial_coverage": "",
+  "tags": [
+    "插件测试样例",
+    "fastq-quality",
+    "official_fixture",
+    "series",
+    "sequence"
+  ],
+  "metadata": {
+    "curated": true,
+    "source_catalog": "plugin-tests",
+    "catalog_version": 1,
+    "source_descriptor_sha256": "84df3169e42e19baeff41fc29e9a099382a3f70b58db0e93d0e97cbfe2fdaa61",
+    "download_date": "2026-09-18",
+    "inventory_complete": true,
+    "recursive_file_count": 3,
+    "total_size_bytes": 5450,
+    "visualization_view_kind": "series",
+    "visualization_plugin_id": "fastq-quality",
+    "visualization_entry_file": "example.fastq",
+    "sample_note": "官方仓库完整234字节功能测试文件，共3条23/24bp左右短读段；不用于群体统计或临床结论。",
+    "provenance": [
+      {
+        "path": "example.fastq",
+        "size": 234,
+        "sha256": "10bc5b39327a363b0019193c9823bc424a6d5706197688fdbdd45023a1481a0c",
+        "role": "data",
+        "url": "https://raw.githubusercontent.com/biopython/biopython/5bbc6c12c505301f2d681f932c30fdb8fcbe9a6e/Tests/Quality/example.fastq"
+      },
+      {
+        "path": "LICENSE.rst",
+        "size": 3267,
+        "sha256": "11d1ebcaad2eb9f0f09a3df1deb4aca99a4da366ae9ae70f828c7447a24de453",
+        "role": "documentation",
+        "url": "https://raw.githubusercontent.com/biopython/biopython/5bbc6c12c505301f2d681f932c30fdb8fcbe9a6e/LICENSE.rst"
+      }
+    ],
+    "publisher": "Biopython contributors",
+    "source_url": "https://github.com/biopython/biopython/tree/5bbc6c12c505301f2d681f932c30fdb8fcbe9a6e/Tests/Quality",
+    "license": "Biopython License Agreement",
+    "license_url": "https://raw.githubusercontent.com/biopython/biopython/5bbc6c12c505301f2d681f932c30fdb8fcbe9a6e/LICENSE.rst",
+    "license_details": "固定提交LICENSE.rst明确所有文件除单独声明外按Biopython License Agreement提供；该FASTQ无例外头。保留许可正文；不将库代码许可证推论为另一个未收录的科学数据许可。",
+    "authors": [
+      "Biopython contributors"
+    ],
+    "source_version": "Git commit 5bbc6c12c505301f2d681f932c30fdb8fcbe9a6e",
+    "sample_scope": "官方仓库完整234字节功能测试文件，共3条23/24bp左右短读段；不用于群体统计或临床结论。",
+    "sample_kind": "official_fixture",
+    "test_steps": [
+      "质量概览确认3条完整读段；按Phred+33解释。",
+      "序列浏览器选择record=0、start=1、count=23、quality_encoding=phred33。",
+      "FastQC应完成解析生成报告；小样本的WARN/FAIL是质量评价，不等于工具失败。"
+    ]
+  },
+  "files": [
+    {
+      "path": "LICENSE.rst",
+      "size": 3267,
+      "sha256": "11d1ebcaad2eb9f0f09a3df1deb4aca99a4da366ae9ae70f828c7447a24de453",
+      "role": "documentation",
+      "content_type": "text/x-rst"
+    },
+    {
+      "path": "SOURCE.md",
+      "size": 1949,
+      "sha256": "337d4ca56278edb1bf899b728a1f0f539a7e141655ce1081e8bda11cb2e2954c",
+      "role": "documentation",
+      "content_type": "text/markdown"
+    },
+    {
+      "path": "example.fastq",
+      "size": 234,
+      "sha256": "10bc5b39327a363b0019193c9823bc424a6d5706197688fdbdd45023a1481a0c",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    }
+  ]
+}

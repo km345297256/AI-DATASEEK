@@ -1,0 +1,142 @@
+{
+  "dataset_id": "viz-bio-lightmycells-classic-tiff",
+  "external_id": "viz-bio-lightmycells-classic-tiff",
+  "data_center_id": "reviewed-visualization-plugin-tests",
+  "data_center_name": "逐插件可视化测试样例",
+  "name": "真实犬细胞核图像：普通TIFF像素无损兼容样例",
+  "description": "Light My Cells 已发布犬细胞核单张影像的普通 TIFF-6 兼容副本，1200×1200 uint16 全像素与原始 OME-BigTIFF 完全相同。只转换容器，不增强、不归一化、不裁剪、不重采样；不代表新的独立观测。原始 OME 文件随附，保留上游完整显微元数据。",
+  "domain": "image_science",
+  "data_type": "tiff",
+  "temporal_coverage": "",
+  "spatial_coverage": "",
+  "tags": [
+    "插件测试样例",
+    "tiff",
+    "scientific_derived",
+    "image",
+    "image_science"
+  ],
+  "metadata": {
+    "curated": true,
+    "source_catalog": "plugin-tests",
+    "catalog_version": 1,
+    "source_descriptor_sha256": "e92e9b300f43fd29eabdca6e61d13c16a7e92db7443704af14e1d634919d9d43",
+    "download_date": "2026-09-18",
+    "inventory_complete": true,
+    "recursive_file_count": 4,
+    "total_size_bytes": 5123489,
+    "visualization_view_kind": "image",
+    "visualization_plugin_id": "tiff",
+    "visualization_entry_file": "nucleus-classic-uint16.tiff",
+    "sample_note": "Study_24/image_399_Nucleus.ome.tiff 一张完整的已发布 OME-TIFF。官方 Study Component 名为 Cocker 4，描述为正常成年雌性可卡犬；不是人体影像。保留单通道 1200×1200 全部分辨率与 OME 元数据，未取得该库其他图像。",
+    "provenance": [
+      {
+        "path": "image_399_Nucleus.ome.tiff",
+        "url": "https://ftp.ebi.ac.uk/biostudies/fire/S-BIAD/047/S-BIAD1047/Files/Images/Study_24/image_399_Nucleus.ome.tiff",
+        "size": 2239243,
+        "sha256": "61892dc211cf96032c14752a734c61d414980006490e65795faec14483c06048"
+      },
+      {
+        "path": "nucleus-classic-uint16.tiff",
+        "size": 2880122,
+        "sha256": "d13f993415506041e260876b9414a13f1b3a9532e831f69a73073d0781fb9c8a",
+        "role": "data",
+        "derived_from": [
+          "image_399_Nucleus.ome.tiff"
+        ]
+      },
+      {
+        "path": "GENERATION_SPEC.json",
+        "size": 576,
+        "sha256": "8436811549fa697d696d9561847472b9d4b5d3a887052e838e1df97a6424454f",
+        "role": "documentation",
+        "origin": {
+          "kind": "generated_fixture",
+          "generator": "backend/scripts/plugin_samples_bio_classic_tiff.py",
+          "generator_sha256": "414a4377281bfb30e6c85e60a6022141702f6c921eb6cd2d5a0fb2b98da4bc9f",
+          "description": "普通 TIFF-6 无损容器转换参数；不是上游发布文件。"
+        }
+      }
+    ],
+    "publisher": "France-BioImaging / EMBL-EBI BioImage Archive",
+    "source_url": "https://www.ebi.ac.uk/biostudies/BioImages/studies/S-BIAD1047",
+    "license": "CC BY 4.0",
+    "license_url": "https://creativecommons.org/licenses/by/4.0/legalcode",
+    "license_details": "BioImage Archive S-BIAD1047 官方研究元数据明确指定 CC BY 4.0；允许复制、分享和改编，须署名、保留许可链接并说明改动。来源论文为 2D Multimodal Image Collection for Fluorescence Prediction from Transmitted Light Microscopy，https://doi.org/10.1038/s41597-026-07004-w。本地文件是官网单文件原样下载，未调整亮度或改变像素。 本轮产生容器转换文件，已明确记录改动，原文件保留。 本补充数据集新增普通 TIFF-6 格式副本，许可与署名不变。",
+    "authors": [
+      "Dorian Kauffmann",
+      "Guillaume Gay",
+      "Emmanuel Faure",
+      "Julio Mateos-Langerak",
+      "Oriane Pourcelot",
+      "Virginie Georget",
+      "Maëlle Carraz",
+      "Juliette Van Dijk",
+      "Stéphanie Bosch",
+      "Elsa Castellani",
+      "Qiyan Mao",
+      "Laura Ruiz",
+      "Valentin Asei-Ceschino",
+      "Tudor Manoliu",
+      "Julia Bonnet-Gelebart",
+      "Youssef Elhabouz",
+      "Marc Tramier",
+      "Jacques Pécréaux",
+      "Louis Ruel",
+      "Jean-Bernard Fiche",
+      "David Lleres",
+      "Christine Doucet",
+      "Erwan Gandon",
+      "Yves Lutz",
+      "Bertrand Vernay",
+      "Daniel Stockholm",
+      "Abbass Jaber",
+      "Aude Moret",
+      "Romain Morichon",
+      "Mónica Fernández-Monreal",
+      "Edouard Bertrand"
+    ],
+    "source_version": "S-BIAD1047，官方元数据 ReleaseDate 2025-02-26；2026-09-18 下载快照",
+    "sample_scope": "Study_24/image_399_Nucleus.ome.tiff 一张完整的已发布 OME-TIFF。官方 Study Component 名为 Cocker 4，描述为正常成年雌性可卡犬；不是人体影像。保留单通道 1200×1200 全部分辨率与 OME 元数据，未取得该库其他图像。",
+    "transformation": "原始 OME-BigTIFF 经 Pillow 解码后，以未压缩 little-endian TIFF-6 单平面 uint16 写出；全部 1,440,000 像素逐项相同。派生文件不声明 OME 或物理标定；原始 OME 元数据仅在随附原件内保留。",
+    "suggested_questions": [
+      "统计这张图像的细胞核数量，并说明阈值及分割误差。",
+      "比较细胞核面积、形态和荧光强度分布；不要将单张图像推断为群体实验结论。"
+    ],
+    "sample_kind": "scientific_derived",
+    "test_steps": [
+      "打开 nucleus-classic-uint16.tiff，选择 TIFF 栅格插件，确认1200×1200灰度影像可见。",
+      "用原始 OME-BigTIFF 与兼容文件读取数组比对，必须完整逐像素相等；屏幕亮度不代表原始数值。"
+    ]
+  },
+  "files": [
+    {
+      "path": "GENERATION_SPEC.json",
+      "size": 576,
+      "sha256": "8436811549fa697d696d9561847472b9d4b5d3a887052e838e1df97a6424454f",
+      "role": "documentation",
+      "content_type": "application/json"
+    },
+    {
+      "path": "SOURCE.md",
+      "size": 3548,
+      "sha256": "6cf38481cc6d430f2caec5f5c567eec1c94a6897ea021e782834eda45e44ff30",
+      "role": "documentation",
+      "content_type": "text/markdown"
+    },
+    {
+      "path": "image_399_Nucleus.ome.tiff",
+      "size": 2239243,
+      "sha256": "61892dc211cf96032c14752a734c61d414980006490e65795faec14483c06048",
+      "role": "data",
+      "content_type": "image/tiff"
+    },
+    {
+      "path": "nucleus-classic-uint16.tiff",
+      "size": 2880122,
+      "sha256": "d13f993415506041e260876b9414a13f1b3a9532e831f69a73073d0781fb9c8a",
+      "role": "data",
+      "content_type": "image/tiff"
+    }
+  ]
+}

@@ -1,0 +1,88 @@
+{
+  "dataset_id": "viz-test-markdown",
+  "external_id": "viz-test-markdown",
+  "data_center_id": "reviewed-visualization-plugin-tests",
+  "data_center_name": "逐插件可视化测试样例",
+  "name": "插件测试 · Markdown 文档 · Palmer 企鹅格式转换",
+  "description": "Markdown标题与8列表格；344条原始文本记录。由同一份CC0科学观测转换，不增删记录；原CSV保留。",
+  "domain": "documents",
+  "data_type": "csv, md",
+  "temporal_coverage": "",
+  "spatial_coverage": "",
+  "tags": [
+    "插件测试样例",
+    "markdown",
+    "scientific_derived",
+    "document",
+    "documents"
+  ],
+  "metadata": {
+    "curated": true,
+    "source_catalog": "plugin-tests",
+    "catalog_version": 1,
+    "source_descriptor_sha256": "6635ad4cf3cab1dac0e87cc021c8385c62e5adf311672c8f2a5d83c4a6a9be09",
+    "download_date": "2026-09-18",
+    "inventory_complete": true,
+    "recursive_file_count": 3,
+    "total_size_bytes": 38614,
+    "visualization_view_kind": "document",
+    "visualization_plugin_id": "markdown",
+    "visualization_entry_file": "penguins.md",
+    "sample_note": "Markdown标题与8列表格；344条原始文本记录。由同一份CC0科学观测转换，不增删记录；原CSV保留。",
+    "provenance": [
+      {
+        "path": "penguins.csv",
+        "size": 15241,
+        "sha256": "f204db2c753b0937caac3cb35258562c14f073e4bbc76be24b4c51ce22767a93",
+        "url": "https://raw.githubusercontent.com/allisonhorst/palmerpenguins/8957207b78d6ccd1b4654a9dd9c9041b657478ab/inst/extdata/penguins.csv"
+      },
+      {
+        "path": "penguins.md",
+        "size": 21707,
+        "sha256": "6afe4596963f4a5119c555c7f9a835b36f308f63401c4ab3aeb40b6d8d7feff7",
+        "derived_from": [
+          "penguins.csv"
+        ]
+      }
+    ],
+    "publisher": "Palmer Station LTER / palmerpenguins",
+    "source_url": "https://github.com/allisonhorst/palmerpenguins",
+    "license": "CC0-1.0",
+    "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "license_details": "CC0-1.0；用于可视化测试，样本性质为 scientific_derived。",
+    "authors": [
+      "Palmer Station LTER / palmerpenguins"
+    ],
+    "source_version": "2026-09-18 已审查快照",
+    "sample_scope": "Markdown标题与8列表格；344条原始文本记录。由同一份CC0科学观测转换，不增删记录；原CSV保留。",
+    "transformation": "backend/scripts/plugin_samples_tables.py：数字字段按单位转数值；NA仅在数据库/JSON/Arrow转null，HTML/MD保持原文本。344行8列19缺失，未填充。",
+    "sample_kind": "scientific_derived",
+    "test_steps": [
+      "选择文件 penguins.md，再选择插件 markdown",
+      "Markdown标题与8列表格；344条原始文本记录"
+    ]
+  },
+  "files": [
+    {
+      "path": "SOURCE.md",
+      "size": 1666,
+      "sha256": "8a569958016d4ffa45c1b9b6a619cd214a9698b487c5a573324b951f8f82faa5",
+      "role": "documentation",
+      "content_type": "text/markdown"
+    },
+    {
+      "path": "penguins.csv",
+      "size": 15241,
+      "sha256": "f204db2c753b0937caac3cb35258562c14f073e4bbc76be24b4c51ce22767a93",
+      "role": "data",
+      "content_type": "text/csv"
+    },
+    {
+      "path": "penguins.md",
+      "size": 21707,
+      "sha256": "6afe4596963f4a5119c555c7f9a835b36f308f63401c4ab3aeb40b6d8d7feff7",
+      "role": "data",
+      "content_type": "text/markdown"
+    }
+  ]
+}

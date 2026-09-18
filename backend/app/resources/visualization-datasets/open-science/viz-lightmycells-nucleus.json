@@ -1,0 +1,101 @@
+{
+  "dataset_id": "viz-lightmycells-nucleus",
+  "external_id": "viz-lightmycells-nucleus",
+  "data_center_id": "reviewed-open-science-catalog",
+  "data_center_name": "开放科学可视化样例",
+  "name": "可视化样例·图像：Light My Cells 犬细胞细胞核荧光图像（OME-TIFF）",
+  "description": "BioImage Archive S-BIAD1047 的真实细胞显微图像：Study 24 的 image_399_Nucleus，1200×1200、单通道 uint16、C/Z/T 均为 1。适合用 Viv 查看细胞核形态及荧光强度分布；只选取一个原始发布图像文件，不是整个 Light My Cells 数据库，也不代表所有实验条件。",
+  "domain": "image_science",
+  "data_type": "tiff",
+  "temporal_coverage": "",
+  "spatial_coverage": "",
+  "tags": [
+    "可视化样例",
+    "开放科学",
+    "image",
+    "viz-viv",
+    "image_science"
+  ],
+  "metadata": {
+    "curated": true,
+    "source_catalog": "open-science",
+    "catalog_version": 1,
+    "source_descriptor_sha256": "35dd92bd463e6a83998a70ce1b21f2e67f68f3299283847be0cab483e96b6426",
+    "download_date": "2026-09-18",
+    "inventory_complete": true,
+    "recursive_file_count": 2,
+    "total_size_bytes": 2241838,
+    "visualization_view_kind": "image",
+    "visualization_plugin_id": "viz-viv",
+    "visualization_entry_file": "image_399_Nucleus.ome.tiff",
+    "sample_note": "Study_24/image_399_Nucleus.ome.tiff 一张完整的已发布 OME-TIFF。官方 Study Component 名为 Cocker 4，描述为正常成年雌性可卡犬；不是人体影像。保留单通道 1200×1200 全部分辨率与 OME 元数据，未取得该库其他图像。",
+    "provenance": [
+      {
+        "path": "image_399_Nucleus.ome.tiff",
+        "url": "https://ftp.ebi.ac.uk/biostudies/fire/S-BIAD/047/S-BIAD1047/Files/Images/Study_24/image_399_Nucleus.ome.tiff",
+        "size": 2239243,
+        "sha256": "61892dc211cf96032c14752a734c61d414980006490e65795faec14483c06048"
+      }
+    ],
+    "publisher": "France-BioImaging / EMBL-EBI BioImage Archive",
+    "source_url": "https://www.ebi.ac.uk/biostudies/BioImages/studies/S-BIAD1047",
+    "license": "CC BY 4.0",
+    "license_url": "https://creativecommons.org/licenses/by/4.0/legalcode",
+    "license_details": "BioImage Archive S-BIAD1047 官方研究元数据明确指定 CC BY 4.0；允许复制、分享和改编，须署名、保留许可链接并说明改动。来源论文为 2D Multimodal Image Collection for Fluorescence Prediction from Transmitted Light Microscopy，https://doi.org/10.1038/s41597-026-07004-w。本地文件是官网单文件原样下载，未调整亮度或改变像素。",
+    "authors": [
+      "Dorian Kauffmann",
+      "Guillaume Gay",
+      "Emmanuel Faure",
+      "Julio Mateos-Langerak",
+      "Oriane Pourcelot",
+      "Virginie Georget",
+      "Maëlle Carraz",
+      "Juliette Van Dijk",
+      "Stéphanie Bosch",
+      "Elsa Castellani",
+      "Qiyan Mao",
+      "Laura Ruiz",
+      "Valentin Asei-Ceschino",
+      "Tudor Manoliu",
+      "Julia Bonnet-Gelebart",
+      "Youssef Elhabouz",
+      "Marc Tramier",
+      "Jacques Pécréaux",
+      "Louis Ruel",
+      "Jean-Bernard Fiche",
+      "David Lleres",
+      "Christine Doucet",
+      "Erwan Gandon",
+      "Yves Lutz",
+      "Bertrand Vernay",
+      "Daniel Stockholm",
+      "Abbass Jaber",
+      "Aude Moret",
+      "Romain Morichon",
+      "Mónica Fernández-Monreal",
+      "Edouard Bertrand"
+    ],
+    "source_version": "S-BIAD1047，官方元数据 ReleaseDate 2025-02-26；2026-09-18 下载快照",
+    "sample_scope": "Study_24/image_399_Nucleus.ome.tiff 一张完整的已发布 OME-TIFF。官方 Study Component 名为 Cocker 4，描述为正常成年雌性可卡犬；不是人体影像。保留单通道 1200×1200 全部分辨率与 OME 元数据，未取得该库其他图像。",
+    "suggested_questions": [
+      "统计这张图像的细胞核数量，并说明阈值及分割误差。",
+      "比较细胞核面积、形态和荧光强度分布；不要将单张图像推断为群体实验结论。"
+    ]
+  },
+  "files": [
+    {
+      "path": "SOURCE.md",
+      "size": 2595,
+      "sha256": "a2714cc6089c86122a838f98ba12934fa6468b785ac4d15eef87420fa4dbbf65",
+      "role": "documentation",
+      "content_type": "text/markdown"
+    },
+    {
+      "path": "image_399_Nucleus.ome.tiff",
+      "size": 2239243,
+      "sha256": "61892dc211cf96032c14752a734c61d414980006490e65795faec14483c06048",
+      "role": "data",
+      "content_type": "image/tiff"
+    }
+  ]
+}

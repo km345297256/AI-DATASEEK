@@ -1,0 +1,92 @@
+{
+  "dataset_id": "viz-usgs-2024-m6-earthquakes",
+  "external_id": "viz-usgs-2024-m6-earthquakes",
+  "data_center_id": "reviewed-open-science-catalog",
+  "data_center_name": "开放科学可视化样例",
+  "name": "可视化样例·地图｜USGS 2024 年全球 M≥6 地震地图",
+  "description": "USGS/NEIC 历史地震目录的固定查询快照，包含 2024 年全球 99 个 M≥6 地震的经纬度、震级、时间和深度。附完整原始 GeoJSON 与保留深度的二维 WGS84 地图文件，适合真实点要素地图预览与地震分布分析。",
+  "domain": "geoscience",
+  "data_type": "geojson",
+  "temporal_coverage": "",
+  "spatial_coverage": "",
+  "tags": [
+    "可视化样例",
+    "开放科学",
+    "map",
+    "viz-maplibre",
+    "geoscience"
+  ],
+  "metadata": {
+    "curated": true,
+    "source_catalog": "open-science",
+    "catalog_version": 1,
+    "source_descriptor_sha256": "b0b04c163297ea984e9493a29ce4caa429468f575a9c6c0b1ec3c74ce876b1c9",
+    "download_date": "2026-09-18",
+    "inventory_complete": true,
+    "recursive_file_count": 3,
+    "total_size_bytes": 216226,
+    "visualization_view_kind": "map",
+    "visualization_plugin_id": "viz-maplibre",
+    "visualization_entry_file": "usgs-2024-m6-wgs84-2d.geojson",
+    "sample_note": "完整保留指定条件的返回结果：starttime=2024-01-01T00:00:00, endtime=2025-01-01T00:00:00, minmagnitude=6, eventtype=earthquake, catalog=us, orderby=time-asc；99 个点。不是全部震级的全球地震全集，不用于实时预警。",
+    "provenance": [
+      {
+        "path": "usgs-2024-m6-original.geojson",
+        "size": 84499,
+        "sha256": "b08833bbc9bfb467fdaf808825553840443d91793a0a807b638e86422d1cc36f",
+        "url": "https://earthquake.usgs.gov/fdsnws/event/1/query?format=geojson&starttime=2024-01-01T00:00:00&endtime=2025-01-01T00:00:00&minmagnitude=6&eventtype=earthquake&catalog=us&orderby=time-asc",
+        "role": "data"
+      },
+      {
+        "path": "usgs-2024-m6-wgs84-2d.geojson",
+        "size": 129037,
+        "sha256": "d70327cc520822069489662cdb1c099628cf04740adcd654cb48b06eddf101b7",
+        "role": "data",
+        "derived_from": [
+          "usgs-2024-m6-original.geojson"
+        ]
+      }
+    ],
+    "publisher": "U.S. Geological Survey / National Earthquake Information Center",
+    "source_url": "https://earthquake.usgs.gov/fdsnws/event/1/",
+    "license": "U.S. Public Domain (USGS-produced data)",
+    "license_url": "https://www.usgs.gov/information-policies-and-instructions/copyrights-and-credits",
+    "license_details": "USGS 官方政策将其自产数据和信息列为美国公有领域，并要求适当注明 USGS 来源。本查询限定 catalog=us，实际 99 条 net 均为 us；不把第三方图片、机构商标或整个网站内容一概标为公有领域。",
+    "authors": [
+      "U.S. Geological Survey"
+    ],
+    "source_version": "Historical 2024 catalog query, downloaded 2026-09-18; upstream catalog may be revised",
+    "sample_scope": "完整保留指定条件的返回结果：starttime=2024-01-01T00:00:00, endtime=2025-01-01T00:00:00, minmagnitude=6, eventtype=earthquake, catalog=us, orderby=time-asc；99 个点。不是全部震级的全球地震全集，不用于实时预警。",
+    "transformation": {
+      "source": "usgs-2024-m6-original.geojson",
+      "output": "usgs-2024-m6-wgs84-2d.geojson",
+      "method": "保留每个原始 Feature、ID 和属性；将原第三坐标深度（km）移至 properties.depth_km，坐标仅保留原 lon/lat；从 properties.title 复制 name 供现有适配器展示。原始 6 值 bbox 保留在 source_bbox，二维 bbox 取对应4值。没有筛选、插值或合成点。",
+      "reason": "USGS GeoJSON 第三坐标是震源深度 km，不是 RFC7946 高度 m。避免三维视图误读。官方格式说明：https://earthquake.usgs.gov/earthquakes/feed/v1.0/geojson.php",
+      "lossless_scope": "对原始 Feature 做反向重构完全一致；完整 HTTP 原件另存。派生文件通过 files.derived_from 记录真实原件，不虚构下载地址。",
+      "reproducible_script": "reproduce-map-graph.mjs"
+    }
+  },
+  "files": [
+    {
+      "path": "SOURCE.md",
+      "size": 2690,
+      "sha256": "941a4c27e8e053a6b4d90394781efad693964e80d1a0f095e3ae11bf763580e9",
+      "role": "documentation",
+      "content_type": "text/markdown"
+    },
+    {
+      "path": "usgs-2024-m6-original.geojson",
+      "size": 84499,
+      "sha256": "b08833bbc9bfb467fdaf808825553840443d91793a0a807b638e86422d1cc36f",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "usgs-2024-m6-wgs84-2d.geojson",
+      "size": 129037,
+      "sha256": "d70327cc520822069489662cdb1c099628cf04740adcd654cb48b06eddf101b7",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    }
+  ]
+}

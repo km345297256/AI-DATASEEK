@@ -1,0 +1,105 @@
+{
+  "dataset_id": "viz-metpy-may4-sounding",
+  "external_id": "viz-metpy-may4-sounding",
+  "data_center_id": "reviewed-visualization-plugin-tests",
+  "data_center_name": "逐插件可视化测试样例",
+  "name": "插件样例｜MetPy 官方 May 4 探空剖面",
+  "description": "MetPy 官方测试资料的 30 个完整气压、温度与露点层，气压 hPa、温度/露点 °C。原件未声明完整站点和年份，不将其表述为特定日期业务观测；入口 CSV 为原数值选列。",
+  "domain": "geoscience",
+  "data_type": "csv, txt",
+  "temporal_coverage": "",
+  "spatial_coverage": "",
+  "tags": [
+    "插件测试样例",
+    "viz-metpy",
+    "official_fixture",
+    "image",
+    "geoscience"
+  ],
+  "metadata": {
+    "curated": true,
+    "source_catalog": "plugin-tests",
+    "catalog_version": 1,
+    "source_descriptor_sha256": "d6cb04c74704a00fff6e15c111456ca9dfe155a0716c7dc15030b71e254a0b20",
+    "download_date": "2026-09-18",
+    "inventory_complete": true,
+    "recursive_file_count": 4,
+    "total_size_bytes": 7029,
+    "visualization_view_kind": "image",
+    "visualization_plugin_id": "viz-metpy",
+    "visualization_entry_file": "may4_sounding.csv",
+    "sample_note": "保留官方 TXT；仅选取具有全部 11 字段的 30 个数值层中的 PRES/TEMP/DWPT，959.0–268.6 hPa。未填充缺失的 1000 hPa 层，未推算风或 CAPE/CIN。",
+    "provenance": [
+      {
+        "path": "may4_sounding_original.txt",
+        "size": 2730,
+        "sha256": "b3a7c3ee4b1bdb1e1961492265c23f42947dc627156cfacb5fdebac0ad0b4350",
+        "url": "https://raw.githubusercontent.com/Unidata/MetPy/07df928b0d47fce73696116d6988d0722bfaa57e/staticdata/may4_sounding.txt",
+        "role": "data"
+      },
+      {
+        "path": "may4_sounding.csv",
+        "size": 551,
+        "sha256": "b91eb7f9463c5f76aff8bc0cb21fefc222ae4f0ee38c3350a99e7919b0fb0559",
+        "derived_from": [
+          "may4_sounding_original.txt"
+        ],
+        "role": "data"
+      },
+      {
+        "path": "LICENSE.txt",
+        "size": 1521,
+        "sha256": "22bf676ea07500c1b2796c32ef7f7e6a8dc357902c55cf2bef4a2f765cac5e8f",
+        "url": "https://raw.githubusercontent.com/Unidata/MetPy/07df928b0d47fce73696116d6988d0722bfaa57e/LICENSE",
+        "role": "documentation"
+      }
+    ],
+    "publisher": "Unidata / MetPy Developers",
+    "source_url": "https://github.com/Unidata/MetPy/blob/07df928b0d47fce73696116d6988d0722bfaa57e/staticdata/may4_sounding.txt",
+    "license": "BSD-3-Clause",
+    "license_url": "https://github.com/Unidata/MetPy/blob/07df928b0d47fce73696116d6988d0722bfaa57e/LICENSE",
+    "license_details": "按 MetPy 仓库 BSD-3-Clause 分发；随包保留完整版权和免责声明，Copyright (c) 2008–2025 MetPy Developers。官方软件测试样本，不夸大观测来源。",
+    "authors": [
+      "MetPy Developers"
+    ],
+    "source_version": "MetPy 07df928b0d47fce73696116d6988d0722bfaa57e",
+    "sample_scope": "保留官方 TXT；仅选取具有全部 11 字段的 30 个数值层中的 PRES/TEMP/DWPT，959.0–268.6 hPa。未填充缺失的 1000 hPa 层，未推算风或 CAPE/CIN。",
+    "transformation": "derive_basic.py：逐行筛选完整 11 数值字段记录，原文本数值选列写 CSV，未换算或插值；原 TXT 保留。",
+    "sample_kind": "official_fixture",
+    "test_steps": [
+      "打开 may4_sounding.csv，选择 viz-metpy。",
+      "压力选择 pressure_hPa（hPa）；温度 temperature_degC 和露点 dewpoint_degC 均选 degC，点击绘制探空图。",
+      "应显示红色温度、绿色露点曲线，共 30 层；不应显示 CAPE/CIN 诊断。"
+    ]
+  },
+  "files": [
+    {
+      "path": "LICENSE.txt",
+      "size": 1521,
+      "sha256": "22bf676ea07500c1b2796c32ef7f7e6a8dc357902c55cf2bef4a2f765cac5e8f",
+      "role": "documentation",
+      "content_type": "text/plain"
+    },
+    {
+      "path": "SOURCE.md",
+      "size": 2227,
+      "sha256": "633af698726fa345fd92b1f9f773fa468265f6dab021f49d67b9310b2a84819c",
+      "role": "documentation",
+      "content_type": "text/markdown"
+    },
+    {
+      "path": "may4_sounding.csv",
+      "size": 551,
+      "sha256": "b91eb7f9463c5f76aff8bc0cb21fefc222ae4f0ee38c3350a99e7919b0fb0559",
+      "role": "data",
+      "content_type": "text/csv"
+    },
+    {
+      "path": "may4_sounding_original.txt",
+      "size": 2730,
+      "sha256": "b3a7c3ee4b1bdb1e1961492265c23f42947dc627156cfacb5fdebac0ad0b4350",
+      "role": "data",
+      "content_type": "text/plain"
+    }
+  ]
+}

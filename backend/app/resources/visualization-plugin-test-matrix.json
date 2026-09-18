@@ -1,0 +1,2107 @@
+[
+  {
+    "plugin_id": "csv",
+    "dataset_id": "viz-palmer-penguins",
+    "entry_file": "penguins.csv",
+    "sample_kind": "scientific_original",
+    "test_steps": [
+      "点击 penguins.csv，选择 csv",
+      "344 行、8 列；NA 缺失原样保留"
+    ],
+    "plugin_name": "表格",
+    "view_kind": "table",
+    "dataset_name": "可视化样例·表格：Palmer 南极企鹅观测",
+    "expected": "344 行、8 列；NA 缺失原样保留",
+    "expected_file_sha256": "f204db2c753b0937caac3cb35258562c14f073e4bbc76be24b4c51ce22767a93",
+    "expected_file_bytes": 15241,
+    "source_url": "https://github.com/allisonhorst/palmerpenguins",
+    "license": "CC0 1.0"
+  },
+  {
+    "plugin_id": "text",
+    "dataset_id": "viz-noaa-mauna-loa-co2",
+    "entry_file": "co2_mm_mlo.txt",
+    "sample_kind": "scientific_original",
+    "test_steps": [
+      "点击 co2_mm_mlo.txt，选择 text",
+      "保留 NOAA 注释，可分页读取"
+    ],
+    "plugin_name": "文本与代码",
+    "view_kind": "text",
+    "dataset_name": "可视化样例·文本：NOAA 月均二氧化碳观测",
+    "expected": "保留 NOAA 注释，可分页读取",
+    "expected_file_sha256": "c9a91a170d09d16afaaad56c4f383ed4fcb7fa0da967998694842d5c8168bcf3",
+    "expected_file_bytes": 59608,
+    "source_url": "https://gml.noaa.gov/ccgg/trends/data.html",
+    "license": "NOAA 开放公共数据（保留署名与使用说明）"
+  },
+  {
+    "plugin_id": "viz-pdfjs",
+    "dataset_id": "viz-plos-research-software",
+    "entry_file": "research-software-robustness.pdf",
+    "sample_kind": "scientific_original",
+    "test_steps": [
+      "点击 research-software-robustness.pdf，选择 viz-pdfjs",
+      "10 页开放论文，翻页和缩放"
+    ],
+    "plugin_name": "PDF.js 文档阅读",
+    "view_kind": "document",
+    "dataset_name": "可视化样例·文档：科研软件稳健性开放论文",
+    "expected": "10 页开放论文，翻页和缩放",
+    "expected_file_sha256": "002081be65fbd42c0356d3e49ac7f49fa6202f566f50341481ead22d3cce78b2",
+    "expected_file_bytes": 1212928,
+    "source_url": "https://journals.plos.org/ploscompbiol/article?id=10.1371/journal.pcbi.1005412",
+    "license": "CC BY 4.0"
+  },
+  {
+    "plugin_id": "viz-plotly",
+    "dataset_id": "viz-noaa-global-methane",
+    "entry_file": "ch4_mm_gl.csv",
+    "sample_kind": "scientific_original",
+    "test_steps": [
+      "点击 ch4_mm_gl.csv，选择 viz-plotly",
+      "decimal 横轴、average 纵轴呈浓度曲线；预览窗口前200条、全文件515条"
+    ],
+    "plugin_name": "Plotly 数值图表",
+    "view_kind": "series",
+    "dataset_name": "可视化样例·数值曲线：NOAA 全球海洋表面大气甲烷月均曲线（1983—2026）",
+    "expected": "decimal 横轴、average 纵轴呈浓度曲线；预览窗口前200条、全文件515条",
+    "expected_file_sha256": "dd6b1477f17dec4a46c7d7e2fde12c07a3969c1ac16a2c044c1a6b082be27ea2",
+    "expected_file_bytes": 21822,
+    "source_url": "https://gml.noaa.gov/ccgg/trends_ch4/",
+    "license": "Public domain — NOAA GML data-use and attribution policy"
+  },
+  {
+    "plugin_id": "viz-dbf-table",
+    "dataset_id": "viz-test-dbf-natural-earth",
+    "entry_file": "countries.dbf",
+    "sample_kind": "scientific_derived",
+    "test_steps": [
+      "打开 countries.dbf；同目录完整 SHP/SHX/PRJ/CPG 使默认地图预览可以先打开。",
+      "在可视化选择器选择 viz-dbf-table，点击读取数据库分页，核对 8 列、177 行国家/地区属性。",
+      "切换下一页；POP_EST/POP_YEAR/GDP_MD/GDP_YEAR 保留来源值和缺失哨兵，不推定当前年份。",
+      "需要完整168字段时查看 original/；小比例尺边界不用于精确面积或法律边界认定。"
+    ],
+    "plugin_name": "DBF 只读数据表",
+    "view_kind": "table",
+    "dataset_name": "插件测试 · DBF 国家属性表与原始边界",
+    "expected": "完整177行、8列；同名SHP配套保证默认地图可打开，再切DBF表格；所有原数值和坐标未修改。",
+    "expected_file_sha256": "141cf9edea8b2ee63066f3230b45e3ad9c2762aa07adf0d1dd026dd60a90afa1",
+    "expected_file_bytes": 16751,
+    "source_url": "https://www.naturalearthdata.com/downloads/110m-cultural-vectors/110m-admin-0-countries/",
+    "license": "Public domain"
+  },
+  {
+    "plugin_id": "viz-sqlite-table",
+    "dataset_id": "viz-test-sqlite-table",
+    "entry_file": "penguins.sqlite",
+    "sample_kind": "scientific_derived",
+    "test_steps": [
+      "选择文件 penguins.sqlite，再选择插件 viz-sqlite-table",
+      "选择 penguins，344条、8列；翻到下一页，bill_length_mm可画当前页数值图"
+    ],
+    "plugin_name": "SQLite 只读表格",
+    "view_kind": "table",
+    "dataset_name": "插件测试 · SQLite 只读表格 · Palmer 企鹅格式转换",
+    "expected": "选择 penguins，344条、8列；翻到下一页，bill_length_mm可画当前页数值图",
+    "expected_file_sha256": "afe910d6c27f67cb53f9c12afc859340ac0ee7cbeeaa294b8b8f4a3b51cf1c72",
+    "expected_file_bytes": 28672,
+    "source_url": "https://github.com/allisonhorst/palmerpenguins",
+    "license": "CC0-1.0"
+  },
+  {
+    "plugin_id": "viz-duckdb-table",
+    "dataset_id": "viz-test-duckdb-table",
+    "entry_file": "penguins.duckdb",
+    "sample_kind": "scientific_derived",
+    "test_steps": [
+      "选择文件 penguins.duckdb，再选择插件 viz-duckdb-table",
+      "选择 penguins，344条、8列；SQL NULL保留，读文件不执行源SQL"
+    ],
+    "plugin_name": "DuckDB 只读数据库",
+    "view_kind": "table",
+    "dataset_name": "插件测试 · DuckDB 只读数据库 · Palmer 企鹅格式转换",
+    "expected": "选择 penguins，344条、8列；SQL NULL保留，读文件不执行源SQL",
+    "expected_file_sha256": "dd1eec5d6b575e01b1b5ad4398e0c47bbcabf1ef6a5c2ef4d6dcf52054d2e271",
+    "expected_file_bytes": 536576,
+    "source_url": "https://github.com/allisonhorst/palmerpenguins",
+    "license": "CC0-1.0"
+  },
+  {
+    "plugin_id": "viz-columnar-window",
+    "dataset_id": "viz-test-columnar-window",
+    "entry_file": "penguins.parquet",
+    "sample_kind": "scientific_derived",
+    "test_steps": [
+      "选择文件 penguins.parquet，再选择插件 viz-columnar-window",
+      "344行、8列，6个行组；选择列并分页，仅读取窗口"
+    ],
+    "plugin_name": "Parquet / Arrow 分块表格",
+    "view_kind": "table",
+    "dataset_name": "插件测试 · Parquet / Arrow 分块表格 · Palmer 企鹅格式转换",
+    "expected": "344行、8列，6个行组；选择列并分页，仅读取窗口",
+    "expected_file_sha256": "f1e590a8c43e3404958ec02d7c0715c95bc4c7880f08285cade0a3f82709d56c",
+    "expected_file_bytes": 18079,
+    "source_url": "https://github.com/allisonhorst/palmerpenguins",
+    "license": "CC0-1.0"
+  },
+  {
+    "plugin_id": "viz-sql-dump",
+    "dataset_id": "viz-test-sql-dump",
+    "entry_file": "penguins.sql",
+    "sample_kind": "scientific_derived",
+    "test_steps": [
+      "选择文件 penguins.sql，再选择插件 viz-sql-dump",
+      "先在来源数据库中选择 SQLite，再读取SQL转储目录；系统故意不推断方言。",
+      "静态解析 CREATE 与344条INSERT；不恢复数据库、不执行SQL"
+    ],
+    "plugin_name": "SQL 转储字面量",
+    "view_kind": "table",
+    "dataset_name": "插件测试 · SQL 转储字面量 · Palmer 企鹅格式转换",
+    "expected": "静态解析 CREATE 与344条INSERT；不恢复数据库、不执行SQL",
+    "expected_file_sha256": "6ed194a90bfb83db2a3634bfcfb078cd09da218414ffa9540c628e06fce5ff23",
+    "expected_file_bytes": 28600,
+    "source_url": "https://github.com/allisonhorst/palmerpenguins",
+    "license": "CC0-1.0",
+    "preview_options": {
+      "dialect": "sqlite"
+    }
+  },
+  {
+    "plugin_id": "viz-structured-tree",
+    "dataset_id": "viz-test-structured-tree",
+    "entry_file": "penguins.json",
+    "sample_kind": "scientific_derived",
+    "test_steps": [
+      "选择文件 penguins.json，再选择插件 viz-structured-tree",
+      "展开 observations 数组，344项；JSON null对应原CSV的19个NA"
+    ],
+    "plugin_name": "结构化数据树",
+    "view_kind": "tree",
+    "dataset_name": "插件测试 · 结构化数据树 · Palmer 企鹅格式转换",
+    "expected": "展开 observations 数组，344项；JSON null对应原CSV的19个NA",
+    "expected_file_sha256": "08f7a6edccf0330bb635ebdb6c74b76958983bd2d35b2ebc522af5593a737e31",
+    "expected_file_bytes": 77769,
+    "source_url": "https://github.com/allisonhorst/palmerpenguins",
+    "license": "CC0-1.0"
+  },
+  {
+    "plugin_id": "html",
+    "dataset_id": "viz-test-html",
+    "entry_file": "penguins.html",
+    "sample_kind": "scientific_derived",
+    "test_steps": [
+      "选择文件 penguins.html，再选择插件 html",
+      "静态网页展示344行观测，无脚本、外部资源"
+    ],
+    "plugin_name": "HTML 文档",
+    "view_kind": "document",
+    "dataset_name": "插件测试 · HTML 文档 · Palmer 企鹅格式转换",
+    "expected": "静态网页展示344行观测，无脚本、外部资源",
+    "expected_file_sha256": "e0ece445b84a6456d1509b639d63853f42dede6d571307b6e77a34d150c04eeb",
+    "expected_file_bytes": 40972,
+    "source_url": "https://github.com/allisonhorst/palmerpenguins",
+    "license": "CC0-1.0"
+  },
+  {
+    "plugin_id": "markdown",
+    "dataset_id": "viz-test-markdown",
+    "entry_file": "penguins.md",
+    "sample_kind": "scientific_derived",
+    "test_steps": [
+      "选择文件 penguins.md，再选择插件 markdown",
+      "Markdown标题与8列表格；344条原始文本记录"
+    ],
+    "plugin_name": "Markdown 文档",
+    "view_kind": "document",
+    "dataset_name": "插件测试 · Markdown 文档 · Palmer 企鹅格式转换",
+    "expected": "Markdown标题与8列表格；344条原始文本记录",
+    "expected_file_sha256": "6afe4596963f4a5119c555c7f9a835b36f308f63401c4ab3aeb40b6d8d7feff7",
+    "expected_file_bytes": 21707,
+    "source_url": "https://github.com/allisonhorst/palmerpenguins",
+    "license": "CC0-1.0"
+  },
+  {
+    "plugin_id": "viz-archive-directory",
+    "dataset_id": "viz-test-archive-directory",
+    "entry_file": "penguins-bundle.zip",
+    "sample_kind": "scientific_derived",
+    "test_steps": [
+      "选择文件 penguins-bundle.zip，再选择插件 viz-archive-directory",
+      "列出 penguins.csv 与 README.md 两个成员，不解压到宿主目录"
+    ],
+    "plugin_name": "压缩包目录",
+    "view_kind": "table",
+    "dataset_name": "插件测试 · 压缩包目录 · Palmer 企鹅格式转换",
+    "expected": "列出 penguins.csv 与 README.md 两个成员，不解压到宿主目录",
+    "expected_file_sha256": "99656819f02d6b16ea246d4807f11b523ca6fa433c0239b87662272b7198cc9f",
+    "expected_file_bytes": 6701,
+    "source_url": "https://github.com/allisonhorst/palmerpenguins",
+    "license": "CC0-1.0"
+  },
+  {
+    "plugin_id": "viz-archive-members",
+    "dataset_id": "viz-test-archive-members",
+    "entry_file": "penguins-bundle.zip",
+    "sample_kind": "scientific_derived",
+    "test_steps": [
+      "选择文件 penguins-bundle.zip，再选择插件 viz-archive-members",
+      "选择 penguins.csv 成员，显示有界文本预览；切换 README.md"
+    ],
+    "plugin_name": "归档成员文本预览",
+    "view_kind": "text",
+    "dataset_name": "插件测试 · 归档成员文本预览 · Palmer 企鹅格式转换",
+    "expected": "选择 penguins.csv 成员，显示有界文本预览；切换 README.md",
+    "expected_file_sha256": "99656819f02d6b16ea246d4807f11b523ca6fa433c0239b87662272b7198cc9f",
+    "expected_file_bytes": 6701,
+    "source_url": "https://github.com/allisonhorst/palmerpenguins",
+    "license": "CC0-1.0"
+  },
+  {
+    "plugin_id": "viz-access-table",
+    "dataset_id": "viz-test-access-table",
+    "entry_file": "synthetic-v2010.accdb",
+    "sample_kind": "project_fixture",
+    "test_steps": [
+      "预览主文件并选择 viz-access-table",
+      "选择 Samples 普通表；测试中文、空值、精确小数、日期，Empty为空表；不包含用户数据。"
+    ],
+    "plugin_name": "Access 只读数据库",
+    "view_kind": "table",
+    "dataset_name": "插件测试 · Access 只读数据库 · Access 普通表",
+    "expected": "选择 Samples 普通表；测试中文、空值、精确小数、日期，Empty为空表；不包含用户数据。",
+    "expected_file_sha256": "e00a13460bc8ecb634405b8333d3584b09d4cfd3f0ad55af1b71c946ae2833ed",
+    "expected_file_bytes": 368640,
+    "source_url": "https://github.com/km345297256/AI-DATASEEK",
+    "license": "MIT"
+  },
+  {
+    "plugin_id": "viz-bson",
+    "dataset_id": "viz-test-bson",
+    "entry_file": "synthetic-pymongo-4.17.0.bson",
+    "sample_kind": "project_fixture",
+    "test_steps": [
+      "预览主文件并选择 viz-bson",
+      "展开对象/数组；int64、Decimal128 保持精度；JS和正则仅显示安全标记，不执行。"
+    ],
+    "plugin_name": "BSON 文档记录",
+    "view_kind": "tree",
+    "dataset_name": "插件测试 · BSON 文档记录 · BSON 原生类型",
+    "expected": "展开对象/数组；int64、Decimal128 保持精度；JS和正则仅显示安全标记，不执行。",
+    "expected_file_sha256": "239cddebb3967003caf75cf5b20cd1de3c47b0a16df1f66481cee29a244db986",
+    "expected_file_bytes": 1213,
+    "source_url": "https://github.com/km345297256/AI-DATASEEK",
+    "license": "MIT"
+  },
+  {
+    "plugin_id": "viz-redis-rdb",
+    "dataset_id": "viz-test-redis-rdb",
+    "entry_file": "native-redis-7.2.7.rdb",
+    "sample_kind": "project_fixture",
+    "test_steps": [
+      "预览主文件并选择 viz-redis-rdb",
+      "浏览 DB 0/2，string/list/set/hash/zset；精确整数文本与 Unicode；不启动Redis、不恢复。"
+    ],
+    "plugin_name": "Redis RDB 键值记录",
+    "view_kind": "tree",
+    "dataset_name": "插件测试 · Redis RDB 键值记录 · Redis 7.2.7 原生快照",
+    "expected": "浏览 DB 0/2，string/list/set/hash/zset；精确整数文本与 Unicode；不启动Redis、不恢复。",
+    "expected_file_sha256": "d7853cacc4bbee20f5d632226ac309ce3b913da47a669f2bfa373426431fed69",
+    "expected_file_bytes": 346,
+    "source_url": "https://github.com/km345297256/AI-DATASEEK",
+    "license": "MIT"
+  },
+  {
+    "plugin_id": "viz-mysql-sdi",
+    "dataset_id": "viz-test-mysql-sdi",
+    "entry_file": "mysql-8.0.46.ibd",
+    "sample_kind": "project_fixture",
+    "test_steps": [
+      "预览主文件并选择 viz-mysql-sdi",
+      "检查 measurements 表字段、主键和二级索引元数据；不是数据库行数据恢复。"
+    ],
+    "plugin_name": "MySQL 表空间结构目录",
+    "view_kind": "table",
+    "dataset_name": "插件测试 · MySQL 表空间结构目录 · MySQL 8.0.46 元数据",
+    "expected": "检查 measurements 表字段、主键和二级索引元数据；不是数据库行数据恢复。",
+    "expected_file_sha256": "ef03c988c5e6ddf489c80be3d903b783ad15cb6777bb877ff18f360b5e13f954",
+    "expected_file_bytes": 131072,
+    "source_url": "https://github.com/km345297256/AI-DATASEEK",
+    "license": "MIT"
+  },
+  {
+    "plugin_id": "viz-sst-records",
+    "dataset_id": "viz-test-sst-records",
+    "entry_file": "rocksdb-6.11.4.sst",
+    "sample_kind": "project_fixture",
+    "test_steps": [
+      "预览主文件并选择 viz-sst-records",
+      "逐条浏览键值、序号、删除标记；二进制用安全表示，不执行数据库操作。"
+    ],
+    "plugin_name": "SST 物理点记录",
+    "view_kind": "table",
+    "dataset_name": "插件测试 · SST 物理点记录 · RocksDB 物理键值",
+    "expected": "逐条浏览键值、序号、删除标记；二进制用安全表示，不执行数据库操作。",
+    "expected_file_sha256": "f02d53fc206bbdc4026e7be71cfc1597bd20bfa1a466127d3acb7f06ba61b6fd",
+    "expected_file_bytes": 855,
+    "source_url": "https://github.com/km345297256/AI-DATASEEK",
+    "license": "MIT"
+  },
+  {
+    "plugin_id": "viz-postgres-dump",
+    "dataset_id": "viz-test-postgres-dump",
+    "entry_file": "synthetic-postgres-none.dump",
+    "sample_kind": "project_fixture",
+    "test_steps": [
+      "预览主文件并选择 viz-postgres-dump",
+      "浏览两张表及TABLE DATA目录；不恢复或解压数据段，不能当作行查询。"
+    ],
+    "plugin_name": "PostgreSQL 备份目录",
+    "view_kind": "table",
+    "dataset_name": "插件测试 · PostgreSQL 备份目录 · PostgreSQL 18.6 原生目录",
+    "expected": "浏览两张表及TABLE DATA目录；不恢复或解压数据段，不能当作行查询。",
+    "expected_file_sha256": "b2e2db08384a26283e98d0e51aca30f8a945d43f9c43426b39bf52a4a1b8261f",
+    "expected_file_bytes": 2017,
+    "source_url": "https://github.com/km345297256/AI-DATASEEK",
+    "license": "MIT"
+  },
+  {
+    "plugin_id": "viz-excel",
+    "dataset_id": "viz-test-excel",
+    "entry_file": "ENB2012_data.xlsx",
+    "sample_kind": "scientific_original",
+    "test_steps": [
+      "预览 ENB2012_data.xlsx，选择 viz-excel",
+      "选择工作表，核对 X1–X8、Y1、Y2；切换行窗口；共有768条有效模拟记录"
+    ],
+    "plugin_name": "Excel 工作表预览",
+    "view_kind": "table",
+    "dataset_name": "插件测试 · Excel 工作表预览 · UCI 建筑能效",
+    "expected": "768条有效模拟记录，10列。空白格式行不应被误认为实测数据。",
+    "expected_file_sha256": "0089fcffc1415e41e2ff63730cca5280efe54fc43d722dfde1b0aaa808e35dc4",
+    "expected_file_bytes": 76189,
+    "source_url": "https://archive.ics.uci.edu/dataset/242/energy%2Befficiency",
+    "license": "CC BY 4.0"
+  },
+  {
+    "plugin_id": "viz-docx",
+    "dataset_id": "viz-test-docx",
+    "entry_file": "blk-inner-content.docx",
+    "sample_kind": "official_fixture",
+    "test_steps": [
+      "预览 blk-inner-content.docx，选择 viz-docx",
+      "显示官方段落/表格文档；不执行宏或外链。"
+    ],
+    "plugin_name": "DOCX 清晰阅读",
+    "view_kind": "document",
+    "dataset_name": "插件测试 · DOCX 清晰阅读 · python-docx 段落和表格",
+    "expected": "显示官方段落/表格文档；不执行宏或外链。",
+    "expected_file_sha256": "16243dd05f686d6d5fab331843691492ad78ae3eb4f13cc8686077b44718c0ba",
+    "expected_file_bytes": 11949,
+    "source_url": "https://github.com/python-openxml/python-docx/tree/v1.2.0/tests/test_files",
+    "license": "MIT"
+  },
+  {
+    "plugin_id": "viz-word",
+    "dataset_id": "viz-test-word",
+    "entry_file": "blk-inner-content.docx",
+    "sample_kind": "official_fixture",
+    "test_steps": [
+      "预览 blk-inner-content.docx，选择 viz-word",
+      "显示官方段落/表格文档；不执行宏或外链。"
+    ],
+    "plugin_name": "Word 文档预览",
+    "view_kind": "document",
+    "dataset_name": "插件测试 · Word 文档预览 · python-docx 段落和表格",
+    "expected": "显示官方段落/表格文档；不执行宏或外链。",
+    "expected_file_sha256": "16243dd05f686d6d5fab331843691492ad78ae3eb4f13cc8686077b44718c0ba",
+    "expected_file_bytes": 11949,
+    "source_url": "https://github.com/python-openxml/python-docx/tree/v1.2.0/tests/test_files",
+    "license": "MIT"
+  },
+  {
+    "plugin_id": "viz-onlyoffice",
+    "dataset_id": "viz-test-onlyoffice",
+    "entry_file": "blk-inner-content.docx",
+    "sample_kind": "official_fixture",
+    "test_steps": [
+      "预览 blk-inner-content.docx，选择 viz-onlyoffice",
+      "显示官方段落/表格文档；不执行宏或外链。需现有本机文档服务就绪；未配置时记录依赖阻碍，不改变插件开关。"
+    ],
+    "plugin_name": "ONLYOFFICE 本机只读阅读",
+    "view_kind": "document",
+    "dataset_name": "插件测试 · ONLYOFFICE 本机只读阅读 · python-docx 段落和表格",
+    "expected": "显示官方段落/表格文档；不执行宏或外链。需现有本机文档服务就绪；未配置时记录依赖阻碍，不改变插件开关。",
+    "expected_file_sha256": "16243dd05f686d6d5fab331843691492ad78ae3eb4f13cc8686077b44718c0ba",
+    "expected_file_bytes": 11949,
+    "source_url": "https://github.com/python-openxml/python-docx/tree/v1.2.0/tests/test_files",
+    "license": "MIT"
+  },
+  {
+    "plugin_id": "viz-powerpoint",
+    "dataset_id": "viz-test-powerpoint-font",
+    "entry_file": "txt-font-typeface.pptx",
+    "sample_kind": "official_fixture",
+    "test_steps": [
+      "预览 txt-font-typeface.pptx，选择 viz-powerpoint",
+      "检查文本字体与页面缩放，无外部资源请求；静态预览不执行演示动作"
+    ],
+    "plugin_name": "PowerPoint 演示预览",
+    "view_kind": "document",
+    "dataset_name": "插件测试 · PowerPoint 静态阅读 · 官方字体样例",
+    "expected": "静态文本字体页面成功显示，可以调整缩放。",
+    "expected_file_sha256": "c1127c3fc5ca34bcca630dafdb1d78352c77ff6ed6c182679ef629bc028784c2",
+    "expected_file_bytes": 25817,
+    "source_url": "https://github.com/scanny/python-pptx/tree/v1.0.2/features/steps/test_files",
+    "license": "MIT"
+  },
+  {
+    "plugin_id": "molecular",
+    "dataset_id": "pdb-ubiquitin",
+    "entry_file": "1UBQ.pdb",
+    "sample_kind": "scientific_original",
+    "test_steps": [
+      "从现有数据集 pdb-ubiquitin 打开 1UBQ.pdb。",
+      "在视图选择器选择 molecular，核对以下预期并测试基础交互。"
+    ],
+    "plugin_name": "分子与晶体结构",
+    "view_kind": "structure",
+    "dataset_name": "RCSB 泛素蛋白晶体结构（1UBQ）",
+    "expected": "3Dmol 正确解析 1 个模型、660 个原子；可旋转并显示蛋白结构。",
+    "expected_file_sha256": "d4a6812d8951cf6594e6a0763f089e35f5a80b62acb3c117b2c5565228a7b161",
+    "expected_file_bytes": 78570,
+    "source_url": "https://www.rcsb.org/structure/1UBQ",
+    "license": "CC0-1.0"
+  },
+  {
+    "plugin_id": "viz-molstar",
+    "dataset_id": "viz-pdb-myoglobin-1mbn",
+    "entry_file": "1MBN.cif",
+    "sample_kind": "scientific_original",
+    "test_steps": [
+      "从现有数据集 viz-pdb-myoglobin-1mbn 打开 1MBN.cif。",
+      "在视图选择器选择 viz-molstar，核对以下预期并测试基础交互。"
+    ],
+    "plugin_name": "Mol* 生物大分子",
+    "view_kind": "structure",
+    "dataset_name": "可视化样例·三维结构｜RCSB 抹香鲸肌红蛋白三维结构（1MBN）",
+    "expected": "Molstar 正确解析 1,260 条 atom_site 原子记录；模型显示完整且无外部 PDB 请求。",
+    "expected_file_sha256": "91c8a5754c748c7cc1c1508ee92bc1df4c332be2383c8ae93fd084292ec8722e",
+    "expected_file_bytes": 191665,
+    "source_url": "https://www.rcsb.org/structure/1MBN",
+    "license": "CC0 1.0"
+  },
+  {
+    "plugin_id": "viz-diffraction",
+    "dataset_id": "mendeley-high-entropy-alloys",
+    "entry_file": "CoCrCuFeNi_AC.xrdml",
+    "sample_kind": "scientific_original",
+    "test_steps": [
+      "从现有数据集 mendeley-high-entropy-alloys 打开 CoCrCuFeNi_AC.xrdml。",
+      "在视图选择器选择 viz-diffraction，核对以下预期并测试基础交互。"
+    ],
+    "plugin_name": "衍射与散射曲线",
+    "view_kind": "series",
+    "dataset_name": "CoCrCuFeNi 高熵合金工艺对比 XRD 样本",
+    "expected": "Scan 1 展示 3,046 点，2Theta/deg 横轴与原始 counts；不归一化。",
+    "expected_file_sha256": "8dd4de1cb5596d57f62e7ca8357d2adb8644dde9b4e9134c120748bbf724b895",
+    "expected_file_bytes": 19827,
+    "source_url": "https://data.mendeley.com/datasets/x35xrkxpjb/1",
+    "license": "CC-BY-4.0",
+    "preview_options": {
+      "kind": "series",
+      "scan": 0
+    }
+  },
+  {
+    "plugin_id": "viz-scientific-graph",
+    "dataset_id": "viz-mangal-greenland-pollination-908",
+    "entry_file": "lundgren-olesen-2005-network-908.graphml",
+    "sample_kind": "scientific_derived",
+    "test_steps": [
+      "从现有数据集 viz-mangal-greenland-pollination-908 打开 lundgren-olesen-2005-network-908.graphml。",
+      "在视图选择器选择 viz-scientific-graph，核对以下预期并测试基础交互。"
+    ],
+    "plugin_name": "科学关系网络 · Cytoscape",
+    "view_kind": "graph",
+    "dataset_name": "可视化样例·关系网络｜Mangal 格陵兰植物—传粉者科学关系网络",
+    "expected": "43 节点、63 有向边，原相互作用权重保留。",
+    "expected_file_sha256": "8d8f28a62fbeeb257a437c227bf073bafa98a749fe99c0d7ea462e9afa06dd2a",
+    "expected_file_bytes": 12342,
+    "source_url": "https://mangal.io/api/v2/network?dataset_id=7&count=1000",
+    "license": "CC0 1.0 (Mangal default data license)",
+    "preview_options": {
+      "kind": "graph"
+    }
+  },
+  {
+    "plugin_id": "viz-phylogeny",
+    "dataset_id": "viz-elife-seph-phylogeny",
+    "entry_file": "seph_phyml_quoted.nwk",
+    "sample_kind": "scientific_derived",
+    "test_steps": [
+      "从现有数据集 viz-elife-seph-phylogeny 打开 seph_phyml_quoted.nwk。",
+      "在视图选择器选择 viz-phylogeny，核对以下预期并测试基础交互。"
+    ],
+    "plugin_name": "系统发育树 · Newick",
+    "view_kind": "tree",
+    "dataset_name": "可视化样例·系统树：放线菌 SepH 蛋白系统发育树（eLife 原始研究附件）",
+    "expected": "720 节点、361 叶，枝长模式可用；标签搜索与折叠保留拓扑。",
+    "expected_file_sha256": "67700ba0fd792e5190732a1d3b670b433bdca0e4de0d5ceb64a8d486d1ae4d60",
+    "expected_file_bytes": 19114,
+    "source_url": "https://elifesciences.org/articles/63387/figures",
+    "license": "CC BY 4.0",
+    "preview_options": {
+      "kind": "tree"
+    }
+  },
+  {
+    "plugin_id": "viz-rdkit",
+    "dataset_id": "viz-plugin-rdkit-cis",
+    "entry_file": "cis.sdf",
+    "sample_kind": "official_fixture",
+    "test_steps": [
+      "打开 cis.sdf，选择 viz-rdkit。",
+      "检查结构或数值与说明一致，不启用外部网络请求。"
+    ],
+    "plugin_name": "RDKit 二维化学结构",
+    "view_kind": "image",
+    "dataset_name": "插件测试·RDKit 二维顺式结构官方样本",
+    "expected": "显示1个2D分子，4原子、3键，分子式C2H2BrF，分子量124.94。",
+    "expected_file_sha256": "bb78bd9ead6f2fadada9204e561d6c4643b40f17330ae5034a2287641eafe4b0",
+    "expected_file_bytes": 565,
+    "source_url": "https://github.com/rdkit/rdkit/blob/20331b5101183089580840759c3ddf11a73efe31/rdkit/Chem/test_data/cis.sdf",
+    "license": "BSD-3-Clause",
+    "preview_options": {
+      "kind": "image",
+      "molecule": 0
+    },
+    "expected_values": {
+      "formula": "C2H2BrF",
+      "molecular_weight": 124.94,
+      "atoms": 4,
+      "bonds": 3,
+      "molecules_listed": 1
+    }
+  },
+  {
+    "plugin_id": "viz-mass-spectrum",
+    "dataset_id": "viz-plugin-mass-pyteomics",
+    "entry_file": "example.mgf",
+    "sample_kind": "official_fixture",
+    "test_steps": [
+      "打开 example.mgf，选择 viz-mass-spectrum。",
+      "检查结构或数值与说明一致，不启用外部网络请求。"
+    ],
+    "plugin_name": "质谱谱图",
+    "view_kind": "series",
+    "dataset_name": "插件测试·Pyteomics 单条 MGF 质谱官方示例",
+    "expected": "MGF显示1条谱、41个峰；m/z与原始强度原样保留。",
+    "expected_file_sha256": "c32687aba71bb61def1fb7e39045ef948e6185146e9d4185465f4b9e67a9c74f",
+    "expected_file_bytes": 768,
+    "source_url": "https://github.com/levitsky/pyteomics/blob/5ace4adc7467f617db8ad30864a1746e65a91448/doc/source/_static/example.mgf",
+    "license": "Apache-2.0",
+    "preview_options": {
+      "kind": "series",
+      "spectrum": "s-000000"
+    },
+    "expected_values": {
+      "format": "mgf",
+      "dialect": "mgf-ions-2column",
+      "input_mode": "whole",
+      "source_bytes": 768,
+      "total_spectra": 1,
+      "offset": 0,
+      "next_offset": null,
+      "decoded_bytes": 0,
+      "output_points": 41
+    }
+  },
+  {
+    "plugin_id": "viz-mca-spectrum",
+    "dataset_id": "viz-plugin-mca-sigima",
+    "entry_file": "spectrum_ascii.mca",
+    "sample_kind": "official_fixture",
+    "test_steps": [
+      "打开 spectrum_ascii.mca，选择 viz-mca-spectrum。",
+      "检查结构或数值与说明一致，不启用外部网络请求。"
+    ],
+    "plugin_name": "MCA 仪器谱",
+    "view_kind": "series",
+    "dataset_name": "插件测试·Sigima 2048 道 MCA 官方样本",
+    "expected": "2048道原始计数，横轴channel；不自动应用能量标定。",
+    "expected_file_sha256": "5199480d6d44233abc29963f41ca572cd9a491f39e7d31a7e7a23027dc472745",
+    "expected_file_bytes": 6469,
+    "source_url": "https://github.com/DataLab-Platform/Sigima/blob/51ee0ed558a57a2f5be7dec72b95c3af742f5bca/sigima/data/tests/curve_formats/spectrum.mca",
+    "license": "BSD-3-Clause",
+    "preview_options": {
+      "kind": "series"
+    },
+    "expected_values": {
+      "format": "mca",
+      "dialect": "amptek-pmca-ascii",
+      "input_bytes": 6469,
+      "channels": 2048,
+      "axis": "channel",
+      "energy_unit": null,
+      "calibration_applied": false,
+      "calibration_coefficients": null,
+      "calibration_points": [
+        [
+          504,
+          5.89
+        ],
+        [
+          553,
+          6.49
+        ],
+        [
+          1480,
+          17.48
+        ],
+        [
+          1659,
+          19.61
+        ]
+      ],
+      "live_time_seconds": 30,
+      "real_time_seconds": 30,
+      "raw_counts": true,
+      "fitting": false,
+      "header_text_hidden": true,
+      "limits": {
+        "max_channels": 8192,
+        "max_input_bytes": 4194304
+      }
+    }
+  },
+  {
+    "plugin_id": "viz-gro-trajectory",
+    "dataset_id": "viz-plugin-gro-mdanalysis",
+    "entry_file": "two_water_gro_multiframe.gro",
+    "sample_kind": "official_fixture",
+    "test_steps": [
+      "打开 two_water_gro_multiframe.gro，选择 viz-gro-trajectory。",
+      "切换第 1 / 2 帧，确认每帧 6 个原子。"
+    ],
+    "plugin_name": "GRO 多帧轨迹",
+    "view_kind": "structure",
+    "dataset_name": "插件测试·MDAnalysis 双帧水分子轨迹官方样本",
+    "expected": "2帧，每帧6原子；可切帧，坐标nm、速度nm/ps、时间ps。",
+    "expected_file_sha256": "4406c5bd48369b8f9a5648c9f8fc7503ad4c2a204fa4809ac342ff73474b8559",
+    "expected_file_bytes": 648,
+    "source_url": "https://github.com/MDAnalysis/mdanalysis/blob/8b8875c73782c8c7f9710f6f6b9ae715bd5ad1bb/testsuite/MDAnalysisTests/data/two_water_gro_multiframe.gro",
+    "license": "LGPL-3.0-or-later (repository distribution)",
+    "preview_options": {
+      "kind": "geometry",
+      "frame": 1
+    },
+    "expected_values": {
+      "format": "gro",
+      "input_mode": "whole",
+      "source_bytes": 648,
+      "frame_count": 2,
+      "total_atoms": 12,
+      "coordinate_unit": "nm",
+      "velocity_unit": "nm/ps",
+      "time_unit": "ps",
+      "topology_consistency": "ordered GRO identifiers; bonds and elements unspecified",
+      "limits": {
+        "max_frames": 64,
+        "max_atoms": 8192,
+        "max_total_atoms": 131072
+      }
+    }
+  },
+  {
+    "plugin_id": "viz-simulation-mesh",
+    "dataset_id": "viz-plugin-mesh-scikit-fem",
+    "entry_file": "mesh.vtu",
+    "sample_kind": "official_fixture",
+    "test_steps": [
+      "打开 mesh.vtu，选择 viz-simulation-mesh。",
+      "打开网格并选择 GmshEntity / 分量 0；其含义是实体分类标签，不是物理场。"
+    ],
+    "plugin_name": "VTU 仿真网格与场",
+    "view_kind": "structure",
+    "dataset_name": "插件测试·scikit-fem 数值网格与 OBJ 表面",
+    "expected": "81节点、340单元，类型5/10；可切换第340个单元，坐标与场值单位未知。",
+    "expected_file_sha256": "93cca2f9052663807430bd9861302c30bda4374141afc4a918e7544153e23780",
+    "expected_file_bytes": 9902,
+    "source_url": "https://github.com/kinnala/scikit-fem/blob/a9ea0d58af5364948ccbd8a89b4eaf05940cf407/docs/examples/meshes/cube_oriented_sub.msh",
+    "license": "BSD-3-Clause",
+    "preview_options": {
+      "kind": "geometry",
+      "field": "c-0",
+      "component": 0
+    },
+    "expected_values": {
+      "format": "vtu",
+      "input_mode": "whole",
+      "source_bytes": 9902,
+      "point_count": 81,
+      "cell_count": 340,
+      "cell_types": [
+        5,
+        10
+      ],
+      "field_values": 340,
+      "coordinate_unit": "unspecified",
+      "field_unit": "unspecified",
+      "limits": {
+        "max_points": 4096,
+        "max_cells": 2048,
+        "max_fields": 32,
+        "max_components": 9,
+        "max_field_values": 131072
+      },
+      "value_semantics": "stored component; no interpolation or deformation"
+    }
+  },
+  {
+    "plugin_id": "obj",
+    "dataset_id": "viz-plugin-mesh-scikit-fem",
+    "entry_file": "surface.obj",
+    "sample_kind": "official_fixture",
+    "test_steps": [
+      "打开 surface.obj，选择 obj。",
+      "检查结构或数值与说明一致，不启用外部网络请求。"
+    ],
+    "plugin_name": "OBJ 三维模型",
+    "view_kind": "structure",
+    "dataset_name": "插件测试·scikit-fem 数值网格与 OBJ 表面",
+    "expected": "显示由原网格提取的156三角面、81节点；可旋转和缩放。",
+    "expected_file_sha256": "678bd1cd06d06ebab94ed7997feca25a3ed597b7a6d550d7da11ae0ed8a403fa",
+    "expected_file_bytes": 4705,
+    "source_url": "https://github.com/kinnala/scikit-fem/blob/a9ea0d58af5364948ccbd8a89b4eaf05940cf407/docs/examples/meshes/cube_oriented_sub.msh",
+    "license": "BSD-3-Clause",
+    "expected_values": {
+      "plugin_id": "obj",
+      "dataset_id": "viz-plugin-mesh-scikit-fem",
+      "entry_file": "surface.obj",
+      "triangle_vertices": 468
+    }
+  },
+  {
+    "plugin_id": "viz-vtk",
+    "dataset_id": "viz-plugin-mesh-scikit-fem",
+    "entry_file": "surface.obj",
+    "sample_kind": "official_fixture",
+    "test_steps": [
+      "打开 surface.obj，选择 viz-vtk。",
+      "检查结构或数值与说明一致，不启用外部网络请求。"
+    ],
+    "plugin_name": "VTK 三维科学模型",
+    "view_kind": "structure",
+    "dataset_name": "插件测试·scikit-fem 数值网格与 OBJ 表面",
+    "expected": "vtk.js解析81节点、156多边形；当前插件关闭，未进行运行中浏览器渲染。",
+    "expected_file_sha256": "678bd1cd06d06ebab94ed7997feca25a3ed597b7a6d550d7da11ae0ed8a403fa",
+    "expected_file_bytes": 4705,
+    "source_url": "https://github.com/kinnala/scikit-fem/blob/a9ea0d58af5364948ccbd8a89b4eaf05940cf407/docs/examples/meshes/cube_oriented_sub.msh",
+    "license": "BSD-3-Clause",
+    "expected_values": {
+      "plugin_id": "viz-vtk",
+      "dataset_id": "viz-plugin-mesh-scikit-fem",
+      "entry_file": "surface.obj",
+      "points": 81,
+      "polygons": 156
+    }
+  },
+  {
+    "plugin_id": "viz-nexus-window",
+    "dataset_id": "viz-plugin-nexus-rosettasciio",
+    "entry_file": "nexus_fixed.nxs",
+    "sample_kind": "official_fixture",
+    "test_steps": [
+      "打开 nexus_fixed.nxs，选择 viz-nexus-window。",
+      "选择 data 信号，设置两个轴 0..10、step=1，检查 10×10 二维数据。"
+    ],
+    "plugin_name": "NeXus 科学坐标与误差",
+    "view_kind": "image",
+    "dataset_name": "插件测试·RosettaSciIO NeXus 二维信号切片",
+    "expected": "NXdata原始信号10×10，x/y坐标完整；读取显式窗口，不做缩放或缺值推断。",
+    "expected_file_sha256": "4fd7483002faa100e82bc97cb85fd7d93a96a65941d6587afa02efa56a46f997",
+    "expected_file_bytes": 5240,
+    "source_url": "https://github.com/hyperspy/rosettasciio/blob/bc254db14cd7d4d23169b11aeb622a0a7eac1fbe/rsciio/tests/data/nexus/nexus_dls_example.nxs",
+    "license": "GPL-3.0 (repository COPYING)",
+    "preview_options": {
+      "kind": "image",
+      "nxdata": "n-673952b9de6c987667b4f324c7cb6cbb",
+      "selection": [
+        {
+          "start": 0,
+          "stop": 10,
+          "step": 1
+        },
+        {
+          "start": 0,
+          "stop": 10,
+          "step": 1
+        }
+      ]
+    },
+    "expected_values": {
+      "metadata": {
+        "format": "nxs",
+        "container": "HDF5",
+        "standard": "NXdata",
+        "input_mode": "window",
+        "value_semantics": "raw signal and coordinates; no scaling, unit conversion or finite fill masking",
+        "source_bytes": 5240,
+        "read_bytes": 5240,
+        "read_requests": 1,
+        "catalog_truncated": false,
+        "skipped_nxdata": 0,
+        "attribute_bytes": 19,
+        "chunks_touched": 0,
+        "decoded_chunk_bytes": 0,
+        "nonfinite_values": 0,
+        "output_values": 120
+      },
+      "signals": [
+        {
+          "id": "n-673952b9de6c987667b4f324c7cb6cbb",
+          "label": "data",
+          "signal": "data",
+          "shape": [
+            10,
+            10
+          ],
+          "dtype": "<f8",
+          "chunks": null,
+          "unit": null,
+          "axes": [
+            {
+              "label": "y",
+              "unit": null,
+              "source": "dataset",
+              "dtype": "<f8",
+              "chunks": null
+            },
+            {
+              "label": "x",
+              "unit": null,
+              "source": "dataset",
+              "dtype": "<f8",
+              "chunks": null
+            }
+          ],
+          "errors": null
+        }
+      ]
+    }
+  },
+  {
+    "plugin_id": "viz-ripple-window",
+    "dataset_id": "viz-plugin-ripple-rosettasciio",
+    "entry_file": "ripple_little_endian.rpl",
+    "sample_kind": "official_fixture",
+    "test_steps": [
+      "打开 ripple_little_endian.rpl，选择 viz-ripple-window。",
+      "选择通道 2 图像和像素 (1,1) 的 4 点谱线，核对原值。"
+    ],
+    "plugin_name": "电子显微 Ripple 谱像",
+    "view_kind": "image",
+    "dataset_name": "插件测试·RosettaSciIO Ripple 谱像官方样本",
+    "expected": "2×3×4原始float32数据；显示6像素图及4道谱，使用文件声明的轴标定。",
+    "expected_file_sha256": "da334a052c28531bacd18ed6d604cf3dd9e2b69214c63e2bc218f05b7f02fe77",
+    "expected_file_bytes": 398,
+    "source_url": "https://github.com/hyperspy/rosettasciio/blob/bc254db14cd7d4d23169b11aeb622a0a7eac1fbe/rsciio/tests/data/ripple/test_ripple_sdim-1_ndim-2_float32.rpl",
+    "license": "GPL-3.0 (repository COPYING)",
+    "preview_options": {
+      "kind": "image",
+      "channel": 2,
+      "x": 0,
+      "y": 0,
+      "width": 3,
+      "height": 2
+    },
+    "expected_values": {
+      "metadata": {
+        "format": "rpl",
+        "input_mode": "window",
+        "source_bytes": 494,
+        "header_bytes": 398,
+        "data_bytes": 96,
+        "read_bytes": 482,
+        "read_requests": 2,
+        "null_values": 0,
+        "limits": {
+          "max_values": 16384,
+          "max_depth": 1048576,
+          "max_spectrum_channels": 16384
+        },
+        "record_by": "vector",
+        "value_semantics": "raw-storage"
+      },
+      "cube": {
+        "width": 3,
+        "height": 2,
+        "depth": 4,
+        "dtype": "float32",
+        "byte_order": "little-endian",
+        "data_offset": 0,
+        "signal_type": "EELS",
+        "axes": [
+          {
+            "label": "height",
+            "unit": "m",
+            "origin": 0.5,
+            "scale": 100,
+            "calibration": "declared",
+            "origin_defaulted": false
+          },
+          {
+            "label": "width",
+            "unit": "m",
+            "origin": 1,
+            "scale": 200,
+            "calibration": "declared",
+            "origin_defaulted": false
+          },
+          {
+            "label": "depth",
+            "unit": "eV",
+            "origin": 1.5,
+            "scale": 300,
+            "calibration": "declared",
+            "origin_defaulted": false
+          }
+        ]
+      },
+      "image_values_verified": 6,
+      "spectrum_values_verified": 4
+    }
+  },
+  {
+    "plugin_id": "viz-nmrium",
+    "dataset_id": "viz-plugin-nmr-project",
+    "entry_file": "synthetic-1h.jdx",
+    "sample_kind": "project_fixture",
+    "test_steps": [
+      "打开 synthetic-1h.jdx，选择 viz-nmrium。",
+      "检查结构或数值与说明一致，不启用外部网络请求。"
+    ],
+    "plugin_name": "NMRium 核磁谱图",
+    "view_kind": "series",
+    "dataset_name": "插件测试·NMRium 合成 1H 明文谱",
+    "expected": "合成1H谱1024点、PPM轴、两个峰；已处理JCAMP，不执行FID处理，不作化学解释。",
+    "expected_file_sha256": "db7229c49b972aca49174e7f71ecd76afc9898e0c75333ebe3f7f0028265ca82",
+    "expected_file_bytes": 8542,
+    "source_url": "https://github.com/km345297256/AI-DATASEEK",
+    "license": "MIT",
+    "preview_options": {
+      "kind": "series"
+    },
+    "expected_values": {
+      "is_fid": false,
+      "x_unit": "PPM",
+      "nucleus": "1H",
+      "title": "Synthetic 1H parser fixture - NOT an experimental spectrum",
+      "source_points": 1024,
+      "encoding": "AFFN/PAC",
+      "processed": true,
+      "frequency": 400
+    }
+  },
+  {
+    "plugin_id": "viz-jsroot",
+    "dataset_id": "viz-plugin-root-project",
+    "entry_file": "synthetic-histogram.root",
+    "sample_kind": "project_fixture",
+    "test_steps": [
+      "打开 synthetic-histogram.root，选择 viz-jsroot。",
+      "检查结构或数值与说明一致，不启用外部网络请求。"
+    ],
+    "plugin_name": "JSROOT 直方图与曲线",
+    "view_kind": "series",
+    "dataset_name": "插件测试·JSROOT 合成非均匀分箱直方图",
+    "expected": "合成TH1D直方图，边界0、1、3、6、10；非等宽分箱保持不变。",
+    "expected_file_sha256": "be0ac108135865e09337caf51b901ad85674095d5ab26393545b608be23518b0",
+    "expected_file_bytes": 12880,
+    "source_url": "https://github.com/km345297256/AI-DATASEEK",
+    "license": "MIT",
+    "preview_options": {
+      "kind": "series",
+      "path": "/synthetic_counts"
+    },
+    "expected_values": {
+      "x_edges": [
+        0,
+        1,
+        3,
+        6,
+        10
+      ],
+      "root_class": "TH1D",
+      "title": "",
+      "executable_objects": false
+    }
+  },
+  {
+    "plugin_id": "viz-instrument-images",
+    "dataset_id": "viz-plugin-instrument-project",
+    "entry_file": "calibration-grid.edf",
+    "sample_kind": "project_fixture",
+    "test_steps": [
+      "打开 calibration-grid.edf，选择 viz-instrument-images。",
+      "选择第 2 帧、ROI [8,8,32,24]，检查范围 1520..3023。"
+    ],
+    "plugin_name": "ESRF EDF / SPE 2.x 探测器图像",
+    "view_kind": "image",
+    "dataset_name": "插件测试·ESRF EDF 合成三帧标定网格",
+    "expected": "合成ESRF-EDF三帧64×48；frame=1的32×24 ROI可见，uint16原始值不变。",
+    "expected_file_sha256": "ad1d53496bbe3dd1cc66158a178ea4cc211dd3f90068d69be175c52863b199fa",
+    "expected_file_bytes": 19968,
+    "source_url": "https://github.com/km345297256/AI-DATASEEK",
+    "license": "MIT",
+    "preview_options": {
+      "kind": "image",
+      "frame": 1,
+      "roi": [
+        8,
+        8,
+        32,
+        24
+      ]
+    },
+    "expected_values": {
+      "format": "esrf-edf",
+      "dialect": "edf-inline-2d-uncompressed",
+      "format_version": null,
+      "frame_count": 3,
+      "frame_shape": [
+        48,
+        64
+      ],
+      "dtype": "uint16",
+      "byte_order": "little",
+      "input_mode": "window",
+      "source_bytes": 19968,
+      "read_bytes": 3072,
+      "read_requests": 27,
+      "header_bytes": 1536,
+      "header_text_hidden": true,
+      "calibration": "none; raw detector values",
+      "storage_layout": "row-major; x fastest",
+      "selection_mode": "explicit frame and pixel ROI",
+      "output_shape": [
+        24,
+        32
+      ],
+      "display_range": [
+        1520,
+        3023
+      ],
+      "normalization": "ROI min-max to uint8 grayscale; original data unchanged",
+      "invalid_pixels": 0,
+      "roi_origin": "frame top-left; x right, y down"
+    }
+  },
+  {
+    "plugin_id": "image",
+    "dataset_id": "viz-bio-lightmycells-formats",
+    "entry_file": "nucleus-uint16.png",
+    "sample_kind": "scientific_derived",
+    "test_steps": [
+      "打开PNG，确认细胞核影像可见；16位PNG仅作显示，不以显示亮度代替原始强度。"
+    ],
+    "plugin_name": "图片",
+    "view_kind": "image",
+    "dataset_name": "真实犬细胞核图像：七种影像格式与阅读器对照",
+    "expected": "1200×1200 PNG显微细胞核影像可见；显示强度不替代uint16测量值。",
+    "expected_file_sha256": "65f211a479418e8e9eabf38f0a193aad9575ec431cc56b6a35744ff8b607b1a7",
+    "expected_file_bytes": 1922725,
+    "source_url": "https://www.ebi.ac.uk/biostudies/BioImages/studies/S-BIAD1047",
+    "license": "CC BY 4.0"
+  },
+  {
+    "plugin_id": "tiff",
+    "dataset_id": "viz-bio-lightmycells-classic-tiff",
+    "entry_file": "nucleus-classic-uint16.tiff",
+    "sample_kind": "scientific_derived",
+    "test_steps": [
+      "选择TIFF阅读器，确认普通TIFF-6兼容副本1200×1200可解码；逐像素与随附原始OME-BigTIFF相同。"
+    ],
+    "plugin_name": "TIFF 栅格",
+    "view_kind": "image",
+    "dataset_name": "真实犬细胞核图像：普通TIFF像素无损兼容样例",
+    "expected": "普通TIFF-6绘制为1200×1200灰度画布，像素与随附OME原件完全相同。",
+    "expected_file_sha256": "d13f993415506041e260876b9414a13f1b3a9532e831f69a73073d0781fb9c8a",
+    "expected_file_bytes": 2880122,
+    "source_url": "https://www.ebi.ac.uk/biostudies/BioImages/studies/S-BIAD1047",
+    "license": "CC BY 4.0",
+    "known_limits": [
+      "原始OME文件为BigTIFF；当前旧TIFF插件无法处理它，应使用此普通TIFF副本或选择Viv读原件。"
+    ]
+  },
+  {
+    "plugin_id": "viz-viv",
+    "dataset_id": "viz-bio-lightmycells-formats",
+    "entry_file": "image_399_Nucleus.ome.tiff",
+    "sample_kind": "scientific_original",
+    "test_steps": [
+      "选择Viv，显示单通道原始OME-TIFF，Z=0、T=0，点击应用切片。"
+    ],
+    "plugin_name": "Viv 多通道显微图像",
+    "view_kind": "image",
+    "dataset_name": "真实犬细胞核图像：七种影像格式与阅读器对照",
+    "expected": "原始1200×1200 OME-BigTIFF的单Nucleus通道可见；Z=0、T=0，应用切片后正常显示。",
+    "expected_file_sha256": "61892dc211cf96032c14752a734c61d414980006490e65795faec14483c06048",
+    "expected_file_bytes": 2239243,
+    "source_url": "https://www.ebi.ac.uk/biostudies/BioImages/studies/S-BIAD1047",
+    "license": "CC BY 4.0"
+  },
+  {
+    "plugin_id": "viz-czi",
+    "dataset_id": "viz-bio-lightmycells-formats",
+    "entry_file": "nucleus-uncompressed.czi",
+    "sample_kind": "scientific_derived",
+    "test_steps": [
+      "打开CZI，选择C/Z/T均0和128×128 ROI；比较原图。"
+    ],
+    "plugin_name": "CZI 显微切片",
+    "view_kind": "image",
+    "dataset_name": "真实犬细胞核图像：七种影像格式与阅读器对照",
+    "expected": "显示128×128原始ROI对应的灰度PNG；C/Z/T均0，不凭空补齐或重采样。",
+    "expected_file_sha256": "88f6c9bc90a4d84179f8ddb6538232cf037ac862cc8ba8a00a86419bb37a3585",
+    "expected_file_bytes": 2882240,
+    "source_url": "https://www.ebi.ac.uk/biostudies/BioImages/studies/S-BIAD1047",
+    "license": "CC BY 4.0",
+    "preview_options": {
+      "kind": "image",
+      "indices": [
+        0,
+        0,
+        0
+      ],
+      "roi": [
+        0,
+        0,
+        128,
+        128
+      ]
+    }
+  },
+  {
+    "plugin_id": "viz-czi-window",
+    "dataset_id": "viz-bio-lightmycells-formats",
+    "entry_file": "nucleus-uncompressed.czi",
+    "sample_kind": "scientific_derived",
+    "test_steps": [
+      "选择CZI区域阅读器，C/Z/T均0，明确将宽高改为16，读取[0,0,16,16]。",
+      "应约8秒显示16×16灰度像素。128×128当前真实请求出现503超时，不能视为大窗口已通过。"
+    ],
+    "plugin_name": "未压缩 CZI 大文件区域",
+    "view_kind": "image",
+    "dataset_name": "真实犬细胞核图像：七种影像格式与阅读器对照",
+    "expected": "目录显示1200×1200、单C/Z/T；16×16 ROI实际灰度PNG可见，实测约7.9秒。",
+    "expected_file_sha256": "88f6c9bc90a4d84179f8ddb6538232cf037ac862cc8ba8a00a86419bb37a3585",
+    "expected_file_bytes": 2882240,
+    "source_url": "https://www.ebi.ac.uk/biostudies/BioImages/studies/S-BIAD1047",
+    "license": "CC BY 4.0",
+    "preview_options": {
+      "kind": "image",
+      "indices": [
+        0,
+        0,
+        0
+      ],
+      "roi": [
+        0,
+        0,
+        16,
+        16
+      ]
+    },
+    "known_limits": [
+      "128×128 ROI在真实浏览器范围读取中长时间等待后返回503；仅16×16已通过端到端验证，较大窗口性能仍需优化。",
+      "whole CZI读取器可处理本小样例；window通过不等于任意8GiB文件或所有窗口均已验收。"
+    ]
+  },
+  {
+    "plugin_id": "viz-ome-zarr",
+    "dataset_id": "viz-bio-lightmycells-formats",
+    "entry_file": "nucleus.zarr/.zattrs",
+    "sample_kind": "scientific_derived",
+    "test_steps": [
+      "打开同目录.zattrs，level=0、indices=[]、ROI=[0,0,128,128]，保持全部目录文件。"
+    ],
+    "plugin_name": "OME-Zarr 本地分块图像",
+    "view_kind": "image",
+    "dataset_name": "真实犬细胞核图像：七种影像格式与阅读器对照",
+    "expected": "单层级YX NGFF读取并绘制128×128区域；同目录4个Zarr对象必须完整保留。",
+    "expected_file_sha256": "0e2d06192692c229c20d4d1b7e95f61daf0c700e2405eb90658c51caf588067f",
+    "expected_file_bytes": 488,
+    "source_url": "https://www.ebi.ac.uk/biostudies/BioImages/studies/S-BIAD1047",
+    "license": "CC BY 4.0",
+    "preview_options": {
+      "kind": "image",
+      "level": 0,
+      "indices": [],
+      "roi": [
+        0,
+        0,
+        128,
+        128
+      ]
+    }
+  },
+  {
+    "plugin_id": "viz-matrix-workbench",
+    "dataset_id": "viz-bio-lightmycells-formats",
+    "entry_file": "nucleus-uint16.npy",
+    "sample_kind": "scientific_derived",
+    "test_steps": [
+      "选择矩阵工作台，确认二维uint16矩阵与原始像素相同；不启用pickle。"
+    ],
+    "plugin_name": "高维矩阵工作台",
+    "view_kind": "image",
+    "dataset_name": "真实犬细胞核图像：七种影像格式与阅读器对照",
+    "expected": "二维uint16矩阵热力图非空，可切换有界数值表格再返回热力图；原数组全部1200×1200值保留。",
+    "expected_file_sha256": "6f150c9535ba0a4ce7e1decd889520120aa752d01f796d80955b111c2598ad89",
+    "expected_file_bytes": 2880128,
+    "source_url": "https://www.ebi.ac.uk/biostudies/BioImages/studies/S-BIAD1047",
+    "license": "CC BY 4.0",
+    "preview_options": {
+      "kind": "image",
+      "variable": "array-0",
+      "axes": [
+        0,
+        1
+      ],
+      "indices": [
+        0,
+        0
+      ],
+      "component": "real",
+      "row_range": null,
+      "column_range": null,
+      "max_points": 256,
+      "structure": false
+    }
+  },
+  {
+    "plugin_id": "viz-video-player",
+    "dataset_id": "viz-bio-elife-video",
+    "entry_file": "elife-63387-fig2-data1-v1.mp4",
+    "sample_kind": "scientific_original",
+    "test_steps": [
+      "打开MP4并选择视频插件，播放并拖动进度条。",
+      "约11.75秒播放时间不等于生物学实验时间，不据此计算细胞分裂速率。"
+    ],
+    "plugin_name": "本地视频",
+    "view_kind": "media",
+    "dataset_name": "链霉菌 FtsZ-YPet 分裂环荧光延时观测（MP4）",
+    "expected": "510×74、11.75秒MP4能够播放并跳转中点；不是用播放秒数估算生物过程时长。",
+    "expected_file_sha256": "f024808c28513d45bd95048e1bda7df75fa5b1e6b5520ad87e8850057bb008f8",
+    "expected_file_bytes": 84174,
+    "source_url": "https://elifesciences.org/articles/63387/figures",
+    "license": "CC BY 4.0"
+  },
+  {
+    "plugin_id": "viz-dicom-window",
+    "dataset_id": "viz-bio-dicom-phantom",
+    "entry_file": "synthetic-phantom.dcm",
+    "sample_kind": "project_fixture",
+    "test_steps": [
+      "打开DICOM元数据，确认单帧64×64。",
+      "仅对本明确合成文件勾选已去标识确认，再选择frame=0与ROI=[0,0,64,64]；不是诊断影像。"
+    ],
+    "plugin_name": "DICOM 灰度影像",
+    "view_kind": "image",
+    "dataset_name": "原创DICOM数值体模（非临床）",
+    "expected": "本原创非患者体模显示64×64灰度区域；将窗位改为750时屏幕像素改变而源值不变。",
+    "expected_file_sha256": "88affc0a61e113cd68a2c3cb49a5e57d0c1ccae081705dd29f49d67e90cadec9",
+    "expected_file_bytes": 8730,
+    "source_url": "https://github.com/km345297256/AI-DATASEEK",
+    "license": "MIT (project-generated fixture)",
+    "preview_options": {
+      "kind": "image",
+      "frame": 0,
+      "roi": [
+        0,
+        0,
+        64,
+        64
+      ],
+      "confirm_deidentified": true
+    },
+    "known_limits": [
+      "confirm_deidentified=true仅批准本明确合成体模，不可复用于未经脱敏审查的其他DICOM。"
+    ]
+  },
+  {
+    "plugin_id": "viz-niivue",
+    "dataset_id": "viz-bio-niivue-phantom",
+    "entry_file": "synthetic-radial-volume.nrrd",
+    "sample_kind": "project_fixture",
+    "test_steps": [
+      "打开内嵌raw NRRD，选择NiiVue。",
+      "切换正交切片与体渲染；中心强度高、外围为0，确认轴向一致；不要作医学解释。"
+    ],
+    "plugin_name": "NiiVue 医学体数据",
+    "view_kind": "image",
+    "dataset_name": "原创三维球体体模：NiiVue正交切片",
+    "expected": "48³原创径向体模的正交切片与3D球体可见；切换影像布局正常，非临床影像。",
+    "expected_file_sha256": "42a4c7e42780622e41f2b61cd8736ec3a7c4b22b96d915941aaf6e9dc11da70b",
+    "expected_file_bytes": 221281,
+    "source_url": "https://github.com/km345297256/AI-DATASEEK",
+    "license": "MIT (project-generated fixture)"
+  },
+  {
+    "plugin_id": "viz-spatial-window",
+    "dataset_id": "viz-bio-spatial-phantom",
+    "entry_file": "synthetic-spatial.h5ad",
+    "sample_kind": "project_fixture",
+    "test_steps": [
+      "选择空间窗口，feature=2、observation_start=0、observation_count=256、decode=raw。",
+      "核对右上方向梯度以及每个点value=x+y；没有基因表达生物学含义。"
+    ],
+    "plugin_name": "空间组学观测与表达",
+    "view_kind": "map",
+    "dataset_name": "原创AnnData空间网格（非转录组观测）",
+    "expected": "16×16网格全部256点可见，第三特征等于x+y，颜色梯度反映原创数值而非真实基因表达。",
+    "expected_file_sha256": "8461499c41ecb39837dad26e496bd4c8eb38d450b102e5c70c7dbe015483e86a",
+    "expected_file_bytes": 30360,
+    "source_url": "https://github.com/km345297256/AI-DATASEEK",
+    "license": "MIT (project-generated fixture)",
+    "preview_options": {
+      "kind": "geometry",
+      "feature": 2,
+      "observation_start": 0,
+      "observation_count": 256,
+      "decode": "raw"
+    }
+  },
+  {
+    "plugin_id": "viz-alignment-browser",
+    "dataset_id": "viz-bio-alignments-and-tracks",
+    "entry_file": "synthetic-alignments.sam",
+    "sample_kind": "project_fixture",
+    "test_steps": [
+      "SAM选择reference=0,start=100,end=180，观察匹配、插入、缺失与成对关系。"
+    ],
+    "plugin_name": "SAM / BAM / CRAM 比对工作台",
+    "view_kind": "map",
+    "dataset_name": "原创基因组阅读器功能样例：SAM/BED/BLAST",
+    "expected": "显示5条原创SAM read轨道及覆盖度，可点击read查看匹配/插入/缺失等详情。",
+    "expected_file_sha256": "70e414a93e7e4936cc221e64f11681e9bd7b457170da08ce6e368718fae66601",
+    "expected_file_bytes": 479,
+    "source_url": "https://github.com/km345297256/AI-DATASEEK",
+    "license": "MIT (project-generated fixture)",
+    "preview_options": {
+      "kind": "table",
+      "reference": 0,
+      "start": 100,
+      "end": 180,
+      "max_reads": 500,
+      "bins": 500
+    }
+  },
+  {
+    "plugin_id": "viz-genome-tracks",
+    "dataset_id": "viz-bio-alignments-and-tracks",
+    "entry_file": "synthetic-features.bed",
+    "sample_kind": "project_fixture",
+    "test_steps": [
+      "染色体0，start=0，end=500；检查三条BED区间。"
+    ],
+    "plugin_name": "基因组注释轨道",
+    "view_kind": "map",
+    "dataset_name": "原创基因组阅读器功能样例：SAM/BED/BLAST",
+    "expected": "chr_demo的三个BED区间可见；UI起点1对应API起点0，可选区间打开详情。",
+    "expected_file_sha256": "12419d12c81b7c9f0a539ea697ecd2b3f15e339d0e12ab922b385a27d715028e",
+    "expected_file_bytes": 99,
+    "source_url": "https://github.com/km345297256/AI-DATASEEK",
+    "license": "MIT (project-generated fixture)",
+    "preview_options": {
+      "kind": "map",
+      "chromosome": 0,
+      "start": 0,
+      "end": 500
+    }
+  },
+  {
+    "plugin_id": "viz-igv",
+    "dataset_id": "viz-bio-alignments-and-tracks",
+    "entry_file": "synthetic-features.bed",
+    "sample_kind": "project_fixture",
+    "test_steps": [
+      "参考文本填写chr_demo TAB 5000（来自demo.chrom.sizes），确认后本地浏览三条BED特征；不自动联网加载参考。"
+    ],
+    "plugin_name": "IGV 基因组轨道",
+    "view_kind": "series",
+    "dataset_name": "原创基因组阅读器功能样例：SAM/BED/BLAST",
+    "expected": "明确提供本地chrom.sizes后，IGV绘制chr_demo标尺和本地BED注释，不联网猜测参考基因组。",
+    "expected_file_sha256": "12419d12c81b7c9f0a539ea697ecd2b3f15e339d0e12ab922b385a27d715028e",
+    "expected_file_bytes": 99,
+    "source_url": "https://github.com/km345297256/AI-DATASEEK",
+    "license": "MIT (project-generated fixture)"
+  },
+  {
+    "plugin_id": "viz-blast-hits",
+    "dataset_id": "viz-bio-alignments-and-tracks",
+    "entry_file": "synthetic-hits.blast6",
+    "sample_kind": "project_fixture",
+    "test_steps": [
+      "BLAST文件有正向与反向命中，数值仅为功能测试；不推断真实同源关系。"
+    ],
+    "plugin_name": "BLAST 命中工作台",
+    "view_kind": "series",
+    "dataset_name": "原创基因组阅读器功能样例：SAM/BED/BLAST",
+    "expected": "点击筛选显示2条原创命中；最低一致性90过滤后剩1条，可点条形或表格打开详情。",
+    "expected_file_sha256": "0c8b27bc35eb7e8c24cc9980866b226c0636b62f8f98416afbb62e4a68aaedfa",
+    "expected_file_bytes": 125,
+    "source_url": "https://github.com/km345297256/AI-DATASEEK",
+    "license": "MIT (project-generated fixture)",
+    "preview_options": {
+      "kind": "table",
+      "query": null,
+      "min_identity": 0,
+      "min_coverage": 0,
+      "offset": 0,
+      "count": 100
+    }
+  },
+  {
+    "plugin_id": "fastq-quality",
+    "dataset_id": "viz-bio-biopython-fastq",
+    "entry_file": "example.fastq",
+    "sample_kind": "official_fixture",
+    "test_steps": [
+      "质量概览确认3条完整读段；按Phred+33解释。"
+    ],
+    "plugin_name": "FASTQ 质量分析",
+    "view_kind": "series",
+    "dataset_name": "Biopython官方FASTQ最小测试样例",
+    "expected": "显示3条官方测试read的逐位置平均Phred+33质量曲线；不是大规模测序统计。",
+    "expected_file_sha256": "10bc5b39327a363b0019193c9823bc424a6d5706197688fdbdd45023a1481a0c",
+    "expected_file_bytes": 234,
+    "source_url": "https://github.com/biopython/biopython/tree/5bbc6c12c505301f2d681f932c30fdb8fcbe9a6e/Tests/Quality",
+    "license": "Biopython License Agreement"
+  },
+  {
+    "plugin_id": "viz-sequence-browser",
+    "dataset_id": "viz-bio-biopython-fastq",
+    "entry_file": "example.fastq",
+    "sample_kind": "official_fixture",
+    "test_steps": [
+      "序列浏览器选择record=0、start=1、窗口250、quality_encoding=phred33，点击显示所选序列；该记录实际25字符。",
+      "输入CCC并点击搜索，检查模体命中及逐碱基质量颜色。"
+    ],
+    "plugin_name": "FASTA / FASTQ 序列浏览器",
+    "view_kind": "series",
+    "dataset_name": "Biopython官方FASTQ最小测试样例",
+    "expected": "先点击显示所选序列，显示第一条25字符read及逐碱基质量，再搜索CCC字面模体。",
+    "expected_file_sha256": "10bc5b39327a363b0019193c9823bc424a6d5706197688fdbdd45023a1481a0c",
+    "expected_file_bytes": 234,
+    "source_url": "https://github.com/biopython/biopython/tree/5bbc6c12c505301f2d681f932c30fdb8fcbe9a6e/Tests/Quality",
+    "license": "Biopython License Agreement",
+    "preview_options": {
+      "kind": "table",
+      "record": 0,
+      "start": 1,
+      "count": 250,
+      "motif": "CCC",
+      "quality_encoding": "phred33"
+    }
+  },
+  {
+    "plugin_id": "viz-fastqc",
+    "dataset_id": "viz-bio-biopython-fastq",
+    "entry_file": "example.fastq",
+    "sample_kind": "official_fixture",
+    "test_steps": [
+      "FastQC应完成解析生成报告；小样本的WARN/FAIL是质量评价，不等于工具失败。"
+    ],
+    "plugin_name": "FastQC / MultiQC 测序质控",
+    "view_kind": "table",
+    "dataset_name": "Biopython官方FASTQ最小测试样例",
+    "expected": "已获授权的一次3-read FastQC任务succeeded，Basic Statistics显示3条序列/25长度，MultiQC汇总和各模块表格可见；WARN/FAIL是小样本质量评价。",
+    "expected_file_sha256": "10bc5b39327a363b0019193c9823bc424a6d5706197688fdbdd45023a1481a0c",
+    "expected_file_bytes": 234,
+    "source_url": "https://github.com/biopython/biopython/tree/5bbc6c12c505301f2d681f932c30fdb8fcbe9a6e/Tests/Quality",
+    "license": "Biopython License Agreement",
+    "preview_options": {
+      "confirm": true
+    }
+  },
+  {
+    "plugin_id": "viz-fcs-window",
+    "dataset_id": "viz-bio-flowcal-fcs",
+    "entry_file": "sample001-digital-values.fcs",
+    "sample_kind": "official_fixture",
+    "test_steps": [
+      "打开sample001-digital-values.fcs而非24-bit原件，检查33024事件和8通道。",
+      "选择scatter、channels=[0,1]、event_offset=0、event_count=256；显示原始数字值，不能自动作原仪器线性化或MESF解释。"
+    ],
+    "plugin_name": "流式细胞原始事件",
+    "view_kind": "series",
+    "dataset_name": "FlowCal官方流式细胞示例FCS",
+    "expected": "目录33024事件/8通道，读取前256事件后绘制TIME与FSC原始数字值散点，不做原仪器指数/增益/补偿解释。",
+    "expected_file_sha256": "96da8cfd1997baa7f3c141eca643e3502350352563d36cdb3562309d00bdafc2",
+    "expected_file_bytes": 2114253,
+    "source_url": "https://flowcal.readthedocs.io/en/latest/python_tutorial/read.html",
+    "license": "MIT (official FlowCal bundled example)",
+    "preview_options": {
+      "kind": "series",
+      "view": "scatter",
+      "channels": [
+        0,
+        1
+      ],
+      "event_offset": 0,
+      "event_count": 256
+    }
+  },
+  {
+    "plugin_id": "viz-edf-signals",
+    "dataset_id": "viz-bio-physionet-eeg",
+    "entry_file": "S001R01.edf",
+    "sample_kind": "scientific_original",
+    "test_steps": [
+      "EDF选择通道0，起点2秒、时长3秒并点击读取时间窗；检查160Hz与物理单位；不要把注释通道作普通信号。"
+    ],
+    "plugin_name": "EDF/BDF 通道时间窗",
+    "view_kind": "series",
+    "dataset_name": "PhysioNet公开EEG基线与明确标注的声化转换",
+    "expected": "真实EDF第一通道曲线可见，明确读取2–5秒窗口，160Hz采样；注释通道不作为普通信号。",
+    "expected_file_sha256": "4743b736131a7e147c150e8b37711029b6cda5e356c4b3e8261a03cdcaaf8b0c",
+    "expected_file_bytes": 1275936,
+    "source_url": "https://physionet.org/content/eegmmidb/1.0.0/",
+    "license": "Open Data Commons Attribution License v1.0",
+    "preview_options": {
+      "kind": "series",
+      "channels": [
+        0
+      ],
+      "start_seconds": 2,
+      "duration_seconds": 3
+    }
+  },
+  {
+    "plugin_id": "viz-audio-waveform",
+    "dataset_id": "viz-bio-physionet-eeg",
+    "entry_file": "eeg-channel0-sonification.wav",
+    "sample_kind": "scientific_derived",
+    "test_steps": [
+      "WAV选择音频波形/播放；约1.22秒对应约61秒EEG，不能作原始声音或诊断解释。"
+    ],
+    "plugin_name": "音频与 WAV 波形",
+    "view_kind": "series",
+    "dataset_name": "PhysioNet公开EEG基线与明确标注的声化转换",
+    "expected": "WAV显示1声道/8000Hz/9760帧峰值包络，1.22秒可播放和跳转；是EEG的50倍时间压缩声音化，不是原始声学观测。",
+    "expected_file_sha256": "bd431a0d576fe12638417f4a89584c740bf7e577df1379baab0d68ca447e5d38",
+    "expected_file_bytes": 19564,
+    "source_url": "https://physionet.org/content/eegmmidb/1.0.0/",
+    "license": "Open Data Commons Attribution License v1.0"
+  },
+  {
+    "plugin_id": "viz-metpy",
+    "dataset_id": "viz-metpy-may4-sounding",
+    "entry_file": "may4_sounding.csv",
+    "sample_kind": "official_fixture",
+    "test_steps": [
+      "打开 may4_sounding.csv，选择 viz-metpy。",
+      "压力选择 pressure_hPa（hPa）；温度 temperature_degC 和露点 dewpoint_degC 均选 degC，点击绘制探空图。",
+      "应显示红色温度、绿色露点曲线，共 30 层；不应显示 CAPE/CIN 诊断。"
+    ],
+    "plugin_name": "MetPy 大气探空图",
+    "view_kind": "image",
+    "dataset_name": "插件样例｜MetPy 官方 May 4 探空剖面",
+    "expected": "应显示红色温度、绿色露点曲线，共 30 层；不应显示 CAPE/CIN 诊断。",
+    "expected_file_sha256": "b91eb7f9463c5f76aff8bc0cb21fefc222ae4f0ee38c3350a99e7919b0fb0559",
+    "expected_file_bytes": 551,
+    "source_url": "https://github.com/Unidata/MetPy/blob/07df928b0d47fce73696116d6988d0722bfaa57e/staticdata/may4_sounding.txt",
+    "license": "BSD-3-Clause",
+    "preview_options": {
+      "pressure_column": "pressure_hPa",
+      "temperature_column": "temperature_degC",
+      "dewpoint_column": "dewpoint_degC",
+      "pressure_unit": "hPa",
+      "temperature_unit": "degC",
+      "dewpoint_unit": "degC",
+      "kind": "image"
+    }
+  },
+  {
+    "plugin_id": "viz-pointcloud-window",
+    "dataset_id": "viz-pdal-las12",
+    "entry_file": "1.2-with-color.las",
+    "sample_kind": "official_fixture",
+    "test_steps": [
+      "打开 1.2-with-color.las，选择 viz-pointcloud-window 并读取目录。",
+      "点起点 0，点数 1065，读取连续点窗口。",
+      "显示 1065 点及 RGB/强度/分类；缩放因子 XYZ 均 0.01，坐标单位未知，不能标为 EPSG:4326。"
+    ],
+    "plugin_name": "LAS 点云窗口",
+    "view_kind": "structure",
+    "dataset_name": "插件样例｜PDAL LAS 1.2 彩色点记录",
+    "expected": "显示 1065 点及 RGB/强度/分类；缩放因子 XYZ 均 0.01，坐标单位未知，不能标为 EPSG:4326。",
+    "expected_file_sha256": "1d3e00eae856bffa6e55778dbfc05bdedc992504c64dbf366d5fd2eb6489ee45",
+    "expected_file_bytes": 36439,
+    "source_url": "https://github.com/PDAL/PDAL/blob/58af674be2bcde44477ed0b51f5f0ac0a158ce8d/test/data/las/1.2-with-color.las",
+    "license": "BSD-3-Clause",
+    "preview_options": {
+      "point_offset": 0,
+      "point_count": 1065,
+      "kind": "geometry"
+    }
+  },
+  {
+    "plugin_id": "viz-seismic-window",
+    "dataset_id": "viz-usgs-anmo-seismic",
+    "entry_file": "IU.ANMO.10.BHZ.first-record.mseed",
+    "sample_kind": "scientific_derived",
+    "test_steps": [
+      "打开 IU.ANMO.10.BHZ.first-record.mseed，选择 viz-seismic-window。",
+      "记录 0，样本起点 0，样本数 223，读取波形窗。",
+      "应为 223 点、0.025 秒间隔、STEIM2；振幅单位 unknown，不能标为 nm/s。"
+    ],
+    "plugin_name": "MiniSEED / SAC 地震波形",
+    "view_kind": "series",
+    "dataset_name": "插件样例｜USGS ANMO 宽带垂向地震记录",
+    "expected": "应为 223 点、0.025 秒间隔、STEIM2；振幅单位 unknown，不能标为 nm/s。",
+    "expected_file_sha256": "903fbfcf8cdb59993af92a428f5a92ebf0db4545d68bcba711b2fbc4235975b9",
+    "expected_file_bytes": 512,
+    "source_url": "https://www.fdsn.org/networks/detail/IU/",
+    "license": "U.S. Public Domain (USGS-produced data)",
+    "preview_options": {
+      "record": 0,
+      "start_sample": 0,
+      "sample_count": 223,
+      "kind": "series"
+    }
+  },
+  {
+    "plugin_id": "viz-envi-window",
+    "dataset_id": "viz-noaa-climatology-envi",
+    "entry_file": "monthly_air.hdr",
+    "sample_kind": "scientific_derived",
+    "test_steps": [
+      "打开 monthly_air.hdr，选择 viz-envi-window（同目录 monthly_air.img 自动配对）。",
+      "图像选 band 0、x=0、y=0、width=128、height=73，读取窗口。",
+      "应显示 73×128 个一月气温原值（°C）；可选 x=72、y=36、band_start=0、band_count=12 查看月气候态序列，横轴 band 索引不是波长。"
+    ],
+    "plugin_name": "ENVI 波段与像元光谱",
+    "view_kind": "image",
+    "dataset_name": "插件样例｜NOAA 月气温气候态 ENVI 栅格",
+    "expected": "应显示 73×128 个一月气温原值（°C）；可选 x=72、y=36、band_start=0、band_count=12 查看月气候态序列，横轴 band 索引不是波长。",
+    "expected_file_sha256": "7a8643e18e53dd909096dc5a3dd6ea6c3d660676741a39afe4a3d682ceab9d47",
+    "expected_file_bytes": 131,
+    "source_url": "https://psl.noaa.gov/data/gridded/data.ncep.reanalysis.html",
+    "license": "U.S. Public Domain (NOAA-produced data)",
+    "preview_options": {
+      "band": 0,
+      "x": 0,
+      "y": 0,
+      "width": 128,
+      "height": 73,
+      "kind": "image"
+    }
+  },
+  {
+    "plugin_id": "viz-geoformats",
+    "dataset_id": "viz-usgs-earthquakes-kml",
+    "entry_file": "usgs-2024-m6.kml",
+    "sample_kind": "scientific_derived",
+    "test_steps": [
+      "打开 usgs-2024-m6.kml，选择 viz-geoformats。",
+      "应为 WGS84 99 个点，可缩放/平移；无外部底图请求。",
+      "检查跨日期变更线的点，不将震源深度视作高度。"
+    ],
+    "plugin_name": "ASC/GRD/KML 地理数据",
+    "view_kind": "map",
+    "dataset_name": "插件样例｜USGS 2024 强震 KML 点图层",
+    "expected": "检查跨日期变更线的点，不将震源深度视作高度。",
+    "expected_file_sha256": "c9e24b74d6666ad3cb5a6f845ab77c7be60e6bc76b8d2e63416e6fdbe36730ba",
+    "expected_file_bytes": 10422,
+    "source_url": "https://earthquake.usgs.gov/fdsnws/event/1/",
+    "license": "U.S. Public Domain (USGS-produced data)",
+    "preview_options": {
+      "kind": "map"
+    }
+  },
+  {
+    "plugin_id": "viz-grib-window",
+    "dataset_id": "viz-noaa-gfs-grib",
+    "entry_file": "gfs-20260916-00-2mt-wmo.grib2",
+    "sample_kind": "scientific_derived",
+    "test_steps": [
+      "打开 gfs-20260916-00-2mt-wmo.grib2，选择 viz-grib-window 并读取目录。",
+      "选择第一条 2t 消息，ROI x=0、y=0、width=11、height=11。",
+      "应为 121 个 2 m 气温值，K，不应误标 °C；经度 100–110、纬度 30–40，时效 0。"
+    ],
+    "plugin_name": "GRIB 气象场",
+    "view_kind": "image",
+    "dataset_name": "插件样例｜NOAA GFS 东亚 2 米气温 GRIB2",
+    "expected": "应为 121 个 2 m 气温值，K，不应误标 °C；经度 100–110、纬度 30–40，时效 0。",
+    "expected_file_sha256": "d9571b5f65baa1d6ea6471243186b66d284477d82f4de17a77a8042ebfd9a8e2",
+    "expected_file_bytes": 300,
+    "source_url": "https://nomads.ncep.noaa.gov/cgi-bin/filter_gfs_1p00.pl",
+    "license": "U.S. Public Domain (NOAA-produced data)",
+    "preview_options": {
+      "message": "g-0000000000000000",
+      "roi": [
+        0,
+        0,
+        11,
+        11
+      ],
+      "kind": "image"
+    }
+  },
+  {
+    "plugin_id": "viz-ugrid-window",
+    "dataset_id": "viz-xugrid-netherlands",
+    "entry_file": "elevation_nl_512faces.nc",
+    "sample_kind": "scientific_derived",
+    "test_steps": [
+      "打开 elevation_nl_512faces.nc，选择 viz-ugrid-window。",
+      "网格选 mesh，字段选 elevation，读取网格。",
+      "显示 512 个三角形、627 个节点及原始高程；未知 CRS 不自动投影到经纬度。"
+    ],
+    "plugin_name": "UGRID 海洋网格窗口",
+    "view_kind": "map",
+    "dataset_name": "插件样例｜Xugrid 荷兰高程三角网子集",
+    "expected": "显示 512 个三角形、627 个节点及原始高程；未知 CRS 不自动投影到经纬度。",
+    "expected_file_sha256": "aa3fbbe24aed6f88eb3ff4730286111b02dc9e5fb4f344a6cc3085dff8b9c16f",
+    "expected_file_bytes": 26968,
+    "source_url": "https://github.com/Deltares/xugrid/blob/fae62b62b9ee7c4d32dcdb5f2eb27efef82e2b2a/data/elevation_nl.nc",
+    "license": "MIT",
+    "preview_options": {
+      "mesh": "u-d30ca7a7a32bf5772dc5eb2a2e7bd357",
+      "field": "f-e755fdd631ab3dfdae31eed5276e0659",
+      "indices": [],
+      "kind": "geometry"
+    }
+  },
+  {
+    "plugin_id": "viz-array-window",
+    "dataset_id": "viz-noaa-pressure-air-2022-2025",
+    "entry_file": "air.2025.contiguous.h5",
+    "sample_kind": "scientific_derived",
+    "test_steps": [
+      "打开 air.2025.contiguous.h5，选择 viz-array-window，读取目录。",
+      "变量选 air；前两维固定 0（首时刻、首气压层），后两维分别切片 start=0 stop=73 step=1 与 start=0 stop=144 step=1。",
+      "读取图像窗口应显示 73×144=10512 值（K），与原数组完全一致；实测只读 46144B、2 次范围请求，而非下载完整 1.04GB；不选其它三个年度原 NC 冒充兼容。"
+    ],
+    "plugin_name": "HDF5 / NetCDF4 分块变量",
+    "view_kind": "image",
+    "dataset_name": "插件样例｜NOAA 四年全球气压层气温与 GB 数组窗口",
+    "expected": "读取图像窗口应显示 73×144=10512 值（K），与原数组完全一致；实测只读 46144B、2 次范围请求，而非下载完整 1.04GB；不选其它三个年度原 NC 冒充兼容。",
+    "expected_file_sha256": "25de54ccd30d2f62324321b07eb31d23bc68e0750fcabdaf7c8eebae1c4bc491",
+    "expected_file_bytes": 1043648072,
+    "source_url": "https://psl.noaa.gov/data/gridded/data.ncep.reanalysis.html",
+    "license": "U.S. Public Domain (NOAA-produced data)",
+    "preview_options": {
+      "variable": "v-7f07461bad42467175b5d3c7347ca5ea",
+      "selection": [
+        0,
+        0,
+        {
+          "start": 0,
+          "stop": 73,
+          "step": 1
+        },
+        {
+          "start": 0,
+          "stop": 144,
+          "step": 1
+        }
+      ],
+      "decode": "raw",
+      "kind": "image"
+    }
+  },
+  {
+    "plugin_id": "viz-radar-window",
+    "dataset_id": "viz-dataseek-odim24-fixture",
+    "entry_file": "synthetic-odim24.h5",
+    "sample_kind": "project_fixture",
+    "test_steps": [
+      "打开 synthetic-odim24.h5，选择 viz-radar-window。",
+      "选 sweep=1、quantity=DBZH，ray_start=1、ray_count=2、gate_start=1、gate_count=4，decode=raw。",
+      "窗口有 8 个原值、恰好 1 个 nodata 与 1 个 undetect；检查二者不同样式，不能解读为实际天气。"
+    ],
+    "plugin_name": "ODIM 天气雷达窗口",
+    "view_kind": "image",
+    "dataset_name": "插件测试样例｜ODIM 2.4 合成雷达双仰角",
+    "expected": "窗口有 8 个原值、恰好 1 个 nodata 与 1 个 undetect；检查二者不同样式，不能解读为实际天气。",
+    "expected_file_sha256": "925377d9e6ce072e1c576962fa0feb3d7a859dd03b5da7b4aa408ce168ab2164",
+    "expected_file_bytes": 32168,
+    "source_url": "https://github.com/km345297256/AI-DATASEEK",
+    "license": "MIT",
+    "preview_options": {
+      "sweep": 1,
+      "quantity": "DBZH",
+      "ray_start": 1,
+      "ray_count": 2,
+      "gate_start": 1,
+      "gate_count": 4,
+      "decode": "raw",
+      "kind": "image"
+    }
+  },
+  {
+    "plugin_id": "viz-aladin",
+    "dataset_id": "nasa-hst-wfpc2",
+    "entry_file": "WFPC2ASSNu5780205bx.fits",
+    "sample_kind": "official_fixture",
+    "test_steps": [
+      "打开 WFPC2ASSNu5780205bx.fits，选择 viz-aladin。",
+      "应加载本地 100×100 FITS 图像；检查 TAN 天球 WCS 存在，不要求公网底图。"
+    ],
+    "plugin_name": "Aladin 天文天空图",
+    "view_kind": "map",
+    "dataset_name": "NASA 哈勃 WFPC2 天文成像样本",
+    "expected": "SIMPLE 主图像、100×100、RA---TAN / DEC--TAN；实际 Aladin 画布待浏览器验收。",
+    "expected_file_sha256": "9851bc2bf9a42008ea606ec532d04900b60865daaff2f233e5c8565dac56ad5f",
+    "expected_file_bytes": 63360,
+    "source_url": "https://fits.gsfc.nasa.gov/fits_samples.html",
+    "license": "CC0-1.0",
+    "preview_options": {
+      "kind": "image"
+    }
+  },
+  {
+    "plugin_id": "fits-image",
+    "dataset_id": "nasa-hst-wfpc2",
+    "entry_file": "WFPC2ASSNu5780205bx.fits",
+    "sample_kind": "official_fixture",
+    "test_steps": [
+      "打开 WFPC2ASSNu5780205bx.fits，选择 fits-image。",
+      "选择 HDU 0，显示 100×100 原始像素；此插件不应用天空坐标方向。"
+    ],
+    "plugin_name": "FITS 图像",
+    "view_kind": "image",
+    "dataset_name": "NASA 哈勃 WFPC2 天文成像样本",
+    "expected": "100×100 像素图像、10000 数值；像素坐标，不应声称 WCS 投影。",
+    "expected_file_sha256": "9851bc2bf9a42008ea606ec532d04900b60865daaff2f233e5c8565dac56ad5f",
+    "expected_file_bytes": 63360,
+    "source_url": "https://fits.gsfc.nasa.gov/fits_samples.html",
+    "license": "CC0-1.0",
+    "preview_options": {
+      "kind": "image"
+    }
+  },
+  {
+    "plugin_id": "fits-series",
+    "dataset_id": "nasa-hst-fos",
+    "entry_file": "FOSy19g0309t_c2f.fits",
+    "sample_kind": "official_fixture",
+    "test_steps": [
+      "打开 FOSy19g0309t_c2f.fits，选择 fits-series。",
+      "HDU=0、横轴=axis1、axis0=0，绘制曲线。"
+    ],
+    "plugin_name": "FITS 数值曲线",
+    "view_kind": "series",
+    "dataset_name": "NASA 哈勃 FOS 光谱误差数据样本",
+    "expected": "原数组2×2064，FITS FILETYPE=ERR，实际误差谱不是通量谱；横轴 PIXEL，单位 ERGS/CM**2/S/A，预览可抽样到最多1000点。",
+    "expected_file_sha256": "059710c4f988f6319e0146f932a68a0ec6ba09d82293b978a294da0c58281086",
+    "expected_file_bytes": 43200,
+    "source_url": "https://fits.gsfc.nasa.gov/fits_samples.html",
+    "license": "CC0-1.0",
+    "preview_options": {
+      "hdu": 0,
+      "x_dimension": "axis1",
+      "indices": {
+        "axis0": 0
+      },
+      "kind": "series"
+    }
+  },
+  {
+    "plugin_id": "viz-astronomy-workbench",
+    "dataset_id": "nasa-hst-wfpc2",
+    "entry_file": "WFPC2ASSNu5780205bx.fits",
+    "sample_kind": "official_fixture",
+    "test_steps": [
+      "打开 WFPC2ASSNu5780205bx.fits，选择 viz-astronomy-workbench。",
+      "选择 dataset 0、band 1、asinh、zscale、gray，点击渲染；可检查像素或区域统计。"
+    ],
+    "plugin_name": "FITS / TIFF 科学图像工作台",
+    "view_kind": "image",
+    "dataset_name": "NASA 哈勃 WFPC2 天文成像样本",
+    "expected": "100×100 PNG、10000 有效像素、WCS四角存在；显示拉伸不改原值。",
+    "expected_file_sha256": "9851bc2bf9a42008ea606ec532d04900b60865daaff2f233e5c8565dac56ad5f",
+    "expected_file_bytes": 63360,
+    "source_url": "https://fits.gsfc.nasa.gov/fits_samples.html",
+    "license": "CC0-1.0",
+    "preview_options": {
+      "dataset": 0,
+      "slices": [],
+      "band": 1,
+      "action": "render",
+      "stretch": "asinh",
+      "interval": "zscale",
+      "low": null,
+      "high": null,
+      "colour_map": "gray",
+      "invert": false,
+      "kind": "image"
+    }
+  },
+  {
+    "plugin_id": "viz-cesium",
+    "dataset_id": "viz-usgs-2024-m6-earthquakes",
+    "entry_file": "usgs-2024-m6-wgs84-2d.geojson",
+    "sample_kind": "scientific_derived",
+    "test_steps": [
+      "打开 usgs-2024-m6-wgs84-2d.geojson，选择 viz-cesium。",
+      "缩放/平移，检查 99 个全球强震点和属性，不依赖公网底图。"
+    ],
+    "plugin_name": "Cesium 三维地球",
+    "view_kind": "map",
+    "dataset_name": "可视化样例·地图｜USGS 2024 年全球 M≥6 地震地图",
+    "expected": "99 个 USGS 2024 M≥6 二维 WGS84 点；深度km在 depth_km 属性，不作三维高度。",
+    "expected_file_sha256": "d70327cc520822069489662cdb1c099628cf04740adcd654cb48b06eddf101b7",
+    "expected_file_bytes": 129037,
+    "source_url": "https://earthquake.usgs.gov/fdsnws/event/1/",
+    "license": "U.S. Public Domain (USGS-produced data)",
+    "preview_options": {
+      "kind": "map"
+    }
+  },
+  {
+    "plugin_id": "viz-maplibre",
+    "dataset_id": "viz-usgs-2024-m6-earthquakes",
+    "entry_file": "usgs-2024-m6-wgs84-2d.geojson",
+    "sample_kind": "scientific_derived",
+    "test_steps": [
+      "打开 usgs-2024-m6-wgs84-2d.geojson，选择 viz-maplibre。",
+      "缩放/平移，检查 99 个全球强震点和属性，不依赖公网底图。"
+    ],
+    "plugin_name": "MapLibre / deck.gl 地理要素",
+    "view_kind": "map",
+    "dataset_name": "可视化样例·地图｜USGS 2024 年全球 M≥6 地震地图",
+    "expected": "99 个 USGS 2024 M≥6 二维 WGS84 点；深度km在 depth_km 属性，不作三维高度。",
+    "expected_file_sha256": "d70327cc520822069489662cdb1c099628cf04740adcd654cb48b06eddf101b7",
+    "expected_file_bytes": 129037,
+    "source_url": "https://earthquake.usgs.gov/fdsnws/event/1/",
+    "license": "U.S. Public Domain (USGS-produced data)",
+    "preview_options": {
+      "kind": "map"
+    }
+  },
+  {
+    "plugin_id": "viz-openlayers",
+    "dataset_id": "viz-usgs-2024-m6-earthquakes",
+    "entry_file": "usgs-2024-m6-wgs84-2d.geojson",
+    "sample_kind": "scientific_derived",
+    "test_steps": [
+      "打开 usgs-2024-m6-wgs84-2d.geojson，选择 viz-openlayers。",
+      "缩放/平移，检查 99 个全球强震点和属性，不依赖公网底图。"
+    ],
+    "plugin_name": "OpenLayers 地理图层",
+    "view_kind": "map",
+    "dataset_name": "可视化样例·地图｜USGS 2024 年全球 M≥6 地震地图",
+    "expected": "99 个 USGS 2024 M≥6 二维 WGS84 点；深度km在 depth_km 属性，不作三维高度。",
+    "expected_file_sha256": "d70327cc520822069489662cdb1c099628cf04740adcd654cb48b06eddf101b7",
+    "expected_file_bytes": 129037,
+    "source_url": "https://earthquake.usgs.gov/fdsnws/event/1/",
+    "license": "U.S. Public Domain (USGS-produced data)",
+    "preview_options": {
+      "kind": "map"
+    }
+  },
+  {
+    "plugin_id": "shapefile",
+    "dataset_id": "open-natural-earth-countries",
+    "entry_file": "ne_110m_admin_0_countries.shp",
+    "sample_kind": "scientific_original",
+    "test_steps": [
+      "打开 ne_110m_admin_0_countries.shp，选择 shapefile。",
+      "确认同目录 SHX/DBF/PRJ 自动配对，全球国家/地区多边形和属性显示。"
+    ],
+    "plugin_name": "Shapefile 地图",
+    "view_kind": "map",
+    "dataset_name": "Natural Earth 全球国家与地区边界",
+    "expected": "Natural Earth 1:110m 图层，177 要素；小比例尺制图数据不用于精密测量或法律边界。",
+    "expected_file_sha256": "08e341606e8391e458c3f08deb312de664b56bfae376064c5aa0aee6681a5f55",
+    "expected_file_bytes": 180924,
+    "source_url": "https://www.naturalearthdata.com/downloads/110m-cultural-vectors/110m-admin-0-countries/",
+    "license": "Public domain",
+    "preview_options": {
+      "kind": "map"
+    }
+  },
+  {
+    "plugin_id": "netcdf-map",
+    "dataset_id": "open-noaa-air-climatology",
+    "entry_file": "air.sig995.mon.ltm.1991-2020.nc",
+    "sample_kind": "scientific_original",
+    "test_steps": [
+      "打开 air.sig995.mon.ltm.1991-2020.nc，选择 netcdf-map。",
+      "变量 air，time=0（一月），查看经纬度图。"
+    ],
+    "plugin_name": "NetCDF 地图",
+    "view_kind": "map",
+    "dataset_name": "NOAA 近地面气温月气候态",
+    "expected": "一月气候态，degC；原73×144，受限显示按索引抽样，不是2020年单月实况。",
+    "expected_file_sha256": "31e6f601fd8e1ecc0bd63e9907ae9e0f931fe675c397ab608abe191b15576619",
+    "expected_file_bytes": 657356,
+    "source_url": "https://psl.noaa.gov/data/gridded/data.ncep.reanalysis.html",
+    "license": "Public domain (NOAA)",
+    "preview_options": {
+      "variable": "air",
+      "indices": {
+        "time": 0
+      },
+      "kind": "map"
+    }
+  },
+  {
+    "plugin_id": "netcdf-series",
+    "dataset_id": "open-noaa-air-climatology",
+    "entry_file": "air.sig995.mon.ltm.1991-2020.nc",
+    "sample_kind": "scientific_original",
+    "test_steps": [
+      "打开 air.sig995.mon.ltm.1991-2020.nc，选择 netcdf-series。",
+      "变量 air，横轴 time，lat=36、lon=72（0°N、180°E）。"
+    ],
+    "plugin_name": "NetCDF 数值曲线",
+    "view_kind": "series",
+    "dataset_name": "NOAA 近地面气温月气候态",
+    "expected": "12 个日历月气候态值，degC，不是逐年趋势。",
+    "expected_file_sha256": "31e6f601fd8e1ecc0bd63e9907ae9e0f931fe675c397ab608abe191b15576619",
+    "expected_file_bytes": 657356,
+    "source_url": "https://psl.noaa.gov/data/gridded/data.ncep.reanalysis.html",
+    "license": "Public domain (NOAA)",
+    "preview_options": {
+      "variable": "air",
+      "x_dimension": "time",
+      "indices": {
+        "lat": 36,
+        "lon": 72
+      },
+      "kind": "series"
+    }
+  },
+  {
+    "plugin_id": "viz-h5web",
+    "dataset_id": "open-noaa-air-climatology",
+    "entry_file": "air.sig995.mon.ltm.1991-2020.nc",
+    "sample_kind": "scientific_original",
+    "test_steps": [
+      "打开 air.sig995.mon.ltm.1991-2020.nc，选择 viz-h5web。",
+      "选 /air，前导维度索引 0，切换二维热图。"
+    ],
+    "plugin_name": "H5Web 层级与切片",
+    "view_kind": "image",
+    "dataset_name": "NOAA 近地面气温月气候态",
+    "expected": "原12×73×144中的一月平面；H5Web默认坐标为索引，并做有界间隔显示，单位degC。",
+    "expected_file_sha256": "31e6f601fd8e1ecc0bd63e9907ae9e0f931fe675c397ab608abe191b15576619",
+    "expected_file_bytes": 657356,
+    "source_url": "https://psl.noaa.gov/data/gridded/data.ncep.reanalysis.html",
+    "license": "Public domain (NOAA)",
+    "preview_options": {
+      "path": "/air",
+      "indices": [
+        0
+      ],
+      "kind": "heatmap"
+    }
+  }
+]

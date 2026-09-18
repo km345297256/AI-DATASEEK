@@ -1,0 +1,116 @@
+{
+  "dataset_id": "viz-bio-spatial-phantom",
+  "external_id": "viz-bio-spatial-phantom",
+  "data_center_id": "reviewed-visualization-plugin-tests",
+  "data_center_name": "逐插件可视化测试样例",
+  "name": "原创AnnData空间网格（非转录组观测）",
+  "description": "256个规则网格位置及3个人工数值特征[x,y,x+y]，没有真实基因/细胞/受试者；用于AnnData空间窗口与坐标数值一致性检查。",
+  "domain": "image_science",
+  "data_type": "h5ad",
+  "temporal_coverage": "",
+  "spatial_coverage": "",
+  "tags": [
+    "插件测试样例",
+    "viz-spatial-window",
+    "project_fixture",
+    "map",
+    "image_science"
+  ],
+  "metadata": {
+    "curated": true,
+    "source_catalog": "plugin-tests",
+    "catalog_version": 1,
+    "source_descriptor_sha256": "9f70cd344381447185262e2a2a135ca286a1b939e9d18834f0473194449f43ac",
+    "download_date": "2026-09-18",
+    "inventory_complete": true,
+    "recursive_file_count": 4,
+    "total_size_bytes": 33515,
+    "visualization_view_kind": "map",
+    "visualization_plugin_id": "viz-spatial-window",
+    "visualization_entry_file": "synthetic-spatial.h5ad",
+    "sample_note": "256个规则网格位置及3个人工数值特征[x,y,x+y]，没有真实基因/细胞/受试者；用于AnnData空间窗口与坐标数值一致性检查。",
+    "provenance": [
+      {
+        "path": "synthetic-spatial.h5ad",
+        "size": 30360,
+        "sha256": "8461499c41ecb39837dad26e496bd4c8eb38d450b102e5c70c7dbe015483e86a",
+        "role": "data",
+        "origin": {
+          "kind": "generated_fixture",
+          "generator": "backend/scripts/plugin_samples_bio.py",
+          "generator_sha256": "5ec25b14053c29d7f0b6ec7443f4994eec9d05eb448b8d3c302289488e3098c1",
+          "description": "256个规则网格位置及3个人工数值特征[x,y,x+y]，没有真实基因/细胞/受试者；用于AnnData空间窗口与坐标数值一致性检查。"
+        }
+      },
+      {
+        "path": "LICENSE.txt",
+        "size": 1066,
+        "sha256": "991f0bde5249ee6aad0a5a597197c7a7f6024abd2650516fcd7a83d908234115",
+        "role": "documentation",
+        "origin": {
+          "kind": "generated_fixture",
+          "generator": "backend/scripts/plugin_samples_bio.py",
+          "generator_sha256": "5ec25b14053c29d7f0b6ec7443f4994eec9d05eb448b8d3c302289488e3098c1",
+          "description": "项目 MIT 许可证原文的本地副本。"
+        }
+      },
+      {
+        "path": "GENERATION_SPEC.json",
+        "size": 190,
+        "sha256": "7fc72b80f799f9a5ee1df9b0d1282ada31967f90791aa2b549c65db603fcea5a",
+        "role": "documentation",
+        "origin": {
+          "kind": "generated_fixture",
+          "generator": "backend/scripts/plugin_samples_bio.py",
+          "generator_sha256": "5ec25b14053c29d7f0b6ec7443f4994eec9d05eb448b8d3c302289488e3098c1",
+          "description": "数据生成/格式转换参数记录；不是上游下载文件。"
+        }
+      }
+    ],
+    "publisher": "AI-DataSeek 原创功能测试样例",
+    "source_url": "https://github.com/km345297256/AI-DATASEEK",
+    "license": "MIT (project-generated fixture)",
+    "license_url": "https://github.com/km345297256/AI-DATASEEK/blob/v2/LICENSE",
+    "license_details": "本项目原创算法生成的功能样例，按项目 MIT 许可提供；不是来自医院、受试者或真实实验的观测。保留随附项目 LICENSE.txt。",
+    "authors": [
+      "AI-DataSeek contributors"
+    ],
+    "source_version": "original deterministic fixture 2026-09-18",
+    "sample_scope": "256个规则网格位置及3个人工数值特征[x,y,x+y]，没有真实基因/细胞/受试者；用于AnnData空间窗口与坐标数值一致性检查。",
+    "sample_kind": "project_fixture",
+    "test_steps": [
+      "选择空间窗口，feature=2、observation_start=0、observation_count=256、decode=raw。",
+      "核对右上方向梯度以及每个点value=x+y；没有基因表达生物学含义。"
+    ]
+  },
+  "files": [
+    {
+      "path": "GENERATION_SPEC.json",
+      "size": 190,
+      "sha256": "7fc72b80f799f9a5ee1df9b0d1282ada31967f90791aa2b549c65db603fcea5a",
+      "role": "documentation",
+      "content_type": "application/json"
+    },
+    {
+      "path": "LICENSE.txt",
+      "size": 1066,
+      "sha256": "991f0bde5249ee6aad0a5a597197c7a7f6024abd2650516fcd7a83d908234115",
+      "role": "documentation",
+      "content_type": "text/plain"
+    },
+    {
+      "path": "SOURCE.md",
+      "size": 1899,
+      "sha256": "bb050e99d601efd42a99bf286d9ecf0d0e419f66ebba1342b8b01c5a66ff62c8",
+      "role": "documentation",
+      "content_type": "text/markdown"
+    },
+    {
+      "path": "synthetic-spatial.h5ad",
+      "size": 30360,
+      "sha256": "8461499c41ecb39837dad26e496bd4c8eb38d450b102e5c70c7dbe015483e86a",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    }
+  ]
+}

@@ -17,7 +17,7 @@ Input budgets, raw decoding checks and existing plugin IDs remain unchanged.
 | --- | --- | --- |
 | `OpenLayersPreview.vue` | OpenLayers 10.10 / geotiff.js 3.0 | RFC 7946 GeoJSON; axis-aligned GeoTIFF with explicit EPSG:4326 or EPSG:3857, first-band linear color ramp, max 1024×1024 output |
 | `DeckMapPreview.vue` | MapLibre 6.8 / deck.gl 9.3 | Local GeoJSON points, lines and polygons; empty offline background; GPU overlay synchronized to map camera |
-| `CesiumPreview.vue` | CesiumJS 1.145 | Local GeoJSON or CZML 1.0 numeric `cartographicDegrees` positions/trajectories; WGS84 ellipsoid, no ion/terrain/3D Tiles/network models |
+| `CesiumPreview.vue` | CesiumJS 1.145 | Local GeoJSON or CZML 1.0 numeric `cartographicDegrees` positions/trajectories; WGS84 ellipsoid with bundled Natural Earth II overview, reference grid or no basemap; no ion/terrain/3D Tiles/network models |
 | `AladinPreview.vue` | Aladin Lite 3.8.2 | Uncompressed primary-HDU 2-D FITS with RA/DEC WCS; sky coordinate grid, no online HiPS/catalog |
 | `IgvPreview.vue` | IGV.js 3.8.7 | Local BED annotation or VCF core alleles; user must provide actual reference-assembly `chrom.sizes`; no automatic genome/sequence fetch |
 | `VivPreview.vue` | Viv loaders/layers 0.22.1 | Single-file OME-TIFF, up to 6 noninterleaved scalar channels and 1024 Z/T/channel planes; channel switches and explicit Z/T slice controls |
@@ -69,6 +69,17 @@ fall back to a remote default. Its dedicated frame CSP blocks remote catalog,
 survey and image requests; removing the frame tears down its RAF/WASM realm.
 The Aladin logo/license attribution remains present.
 
+Cesium defaults to its bundled Natural Earth II imagery: 42 JPEG tiles at levels
+0–2, served from the same-origin `Assets/Textures/NaturalEarthII/` directory with
+public-domain attribution. This is a low-resolution global overview, not street
+mapping, high-resolution satellite imagery or real terrain. The basemap selector
+replaces only imagery; it preserves the loaded data, camera and CZML clock.
+Metadata timeout or tile failure falls back to a reference grid without failing
+the data preview. This grid is a visual reference, not a fixed-degree graticule.
+No API key, external map request or CSP relaxation is required. Switching and
+unmount invalidate pending imagery work; late completions cannot restore an old
+layer. XML and JPEG MIME types are explicit in the development asset middleware.
+
 Cesium's geometry TaskProcessor pools and MapLibre's global RTL dispatcher can
 outlive individual viewers. They therefore run in dedicated same-origin frames,
 not a shared parent realm; unmount destroys the complete worker-owning realm.
@@ -114,6 +125,13 @@ includes scientific and office fixtures when present. GPU tests require real
 draw calls; IGV checks painted annotation pixels; teardown checks stopped draws,
 no active workers/Blob URLs and removal of child frames. Synthetic fixtures
 verify SDK integration, not accuracy of every possible scientific file.
+
+`node --test tests/cesiumBasemap.test.mjs tests/cesiumOfflineAssets.test.mjs`
+checks imagery lifecycle, failure/timeout fallback, trusted selector messages,
+the complete offline tile pyramid, license and development MIME types. Cesium
+browser cases additionally require local JPEGs to reach globe GPU textures,
+preserve data/camera/clock across all three modes, and exercise unavailable-map
+fallback. They assert zero external requests and no requests after teardown.
 
 Requirements: installed frontend dependencies, local bundled visualization assets
 and project CSS (normally from `npm run build`), Playwright and a compatible Chrome

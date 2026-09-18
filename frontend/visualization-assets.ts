@@ -33,7 +33,7 @@ export function visualizationAssets(): Plugin {
           const source = resolve(roots[prefix], path.slice(prefix.length));
           if (!source.startsWith(roots[prefix] + sep) || !(await stat(source)).isFile()) { res.statusCode = 404; res.end(); return; }
           const extension = source.split('.').pop();
-          const types: Record<string, string> = { js: 'application/javascript', mjs: 'application/javascript', css: 'text/css', wasm: 'application/wasm', json: 'application/json', png: 'image/png', svg: 'image/svg+xml' };
+          const types: Record<string, string> = { js: 'application/javascript', mjs: 'application/javascript', css: 'text/css', wasm: 'application/wasm', json: 'application/json', xml: 'application/xml', png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', svg: 'image/svg+xml' };
           res.setHeader('Content-Type', types[extension ?? ''] ?? 'application/octet-stream');
           res.setHeader('X-Content-Type-Options', 'nosniff');
           createReadStream(source).on('error', () => { res.statusCode = 404; res.end(); }).pipe(res);

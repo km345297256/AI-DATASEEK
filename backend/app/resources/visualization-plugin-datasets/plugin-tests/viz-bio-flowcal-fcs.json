@@ -1,0 +1,125 @@
+{
+  "dataset_id": "viz-bio-flowcal-fcs",
+  "external_id": "viz-bio-flowcal-fcs",
+  "data_center_id": "reviewed-visualization-plugin-tests",
+  "data_center_name": "逐插件可视化测试样例",
+  "name": "FlowCal官方流式细胞示例FCS",
+  "description": "FlowCal官方完整FCS原件与兼容转换：24-bit原始数字事件无损保存为float64 FCS3.1，用于当前窗口插件。33024事件×8通道；不补偿、不门控、不应用原仪器指数/增益、不转换为物理强度。",
+  "domain": "image_science",
+  "data_type": "fcs",
+  "temporal_coverage": "",
+  "spatial_coverage": "",
+  "tags": [
+    "插件测试样例",
+    "viz-fcs-window",
+    "official_fixture",
+    "series",
+    "image_science"
+  ],
+  "metadata": {
+    "curated": true,
+    "source_catalog": "plugin-tests",
+    "catalog_version": 1,
+    "source_descriptor_sha256": "fb85f7864632010473f5ff088f19da4fb5f8f9351df31c645e79deec7537080d",
+    "download_date": "2026-09-18",
+    "inventory_complete": true,
+    "recursive_file_count": 5,
+    "total_size_bytes": 2915944,
+    "visualization_view_kind": "series",
+    "visualization_plugin_id": "viz-fcs-window",
+    "visualization_entry_file": "sample001-digital-values.fcs",
+    "sample_note": "完整FlowCal官方FCS3.0原件保留。当前阅读器不支持24位整数，因此提供全33024事件×8通道的float64原始数字值容器；原事件顺序和数字值不变。派生文件的零指数只声明float存储，不能用作原仪器线性化校准。",
+    "provenance": [
+      {
+        "path": "sample001.fcs",
+        "size": 796672,
+        "sha256": "f0794d5d0b0ff2936e4008baad42b00214904a0ba26b3d59d60b84162ff34c52",
+        "role": "data",
+        "url": "https://raw.githubusercontent.com/taborlab/FlowCal/0212f417a53b2fc76658d83b751b892f2d05f175/examples/FCFiles/sample001.fcs"
+      },
+      {
+        "path": "sample001-digital-values.fcs",
+        "size": 2114253,
+        "sha256": "96da8cfd1997baa7f3c141eca643e3502350352563d36cdb3562309d00bdafc2",
+        "role": "data",
+        "derived_from": [
+          "sample001.fcs"
+        ]
+      },
+      {
+        "path": "LICENSE.txt",
+        "size": 1116,
+        "sha256": "e5eebb8c216efad43e5d10f191c4ce8f777f65898855c0eb271ec94543f23941",
+        "role": "documentation",
+        "url": "https://raw.githubusercontent.com/taborlab/FlowCal/0212f417a53b2fc76658d83b751b892f2d05f175/license.txt"
+      },
+      {
+        "path": "GENERATION_SPEC.json",
+        "size": 1189,
+        "sha256": "266f58f4837497f2bdc5e041fa3b672906a4cb934a20008a33f92e3032072336",
+        "role": "documentation",
+        "origin": {
+          "kind": "generated_fixture",
+          "generator": "backend/scripts/plugin_samples_bio.py",
+          "generator_sha256": "5ec25b14053c29d7f0b6ec7443f4994eec9d05eb448b8d3c302289488e3098c1",
+          "description": "数据生成/格式转换参数记录；不是上游下载文件。"
+        }
+      }
+    ],
+    "publisher": "Rice University Tabor Lab / FlowCal",
+    "source_url": "https://flowcal.readthedocs.io/en/latest/python_tutorial/read.html",
+    "license": "MIT (official FlowCal bundled example)",
+    "license_url": "https://raw.githubusercontent.com/taborlab/FlowCal/0212f417a53b2fc76658d83b751b892f2d05f175/license.txt",
+    "license_details": "官方MIT仓库随软件分发的FCFiles示例，保留license.txt原文及原始例子路径；此处按官方功能样例收录，不声称所有外部流式实验数据均受MIT覆盖。",
+    "authors": [
+      "John Sexton",
+      "Brian Landry",
+      "Sebastian Castillo-Hair"
+    ],
+    "source_version": "Git commit 0212f417a53b2fc76658d83b751b892f2d05f175",
+    "sample_scope": "完整FlowCal官方FCS3.0原件保留。当前阅读器不支持24位整数，因此提供全33024事件×8通道的float64原始数字值容器；原事件顺序和数字值不变。派生文件的零指数只声明float存储，不能用作原仪器线性化校准。",
+    "transformation": "源FCS每值3字节uint24按原$BYTEORD逐值无损变成float64 FCS3.1，保留事件顺序/通道名/原量程；$PnE设0,0是浮点存储约束，原指数在GENERATION_SPEC及源FCS保留。未应用源指数/增益、补偿、门控、掩码、标定或物理单位换算。派生文件只代表原始编码数字值，不是MESF或线性荧光强度。",
+    "sample_kind": "official_fixture",
+    "test_steps": [
+      "打开sample001-digital-values.fcs而非24-bit原件，检查33024事件和8通道。",
+      "选择scatter、channels=[0,1]、event_offset=0、event_count=256；显示原始数字值，不能自动作原仪器线性化或MESF解释。"
+    ]
+  },
+  "files": [
+    {
+      "path": "GENERATION_SPEC.json",
+      "size": 1189,
+      "sha256": "266f58f4837497f2bdc5e041fa3b672906a4cb934a20008a33f92e3032072336",
+      "role": "documentation",
+      "content_type": "application/json"
+    },
+    {
+      "path": "LICENSE.txt",
+      "size": 1116,
+      "sha256": "e5eebb8c216efad43e5d10f191c4ce8f777f65898855c0eb271ec94543f23941",
+      "role": "documentation",
+      "content_type": "text/plain"
+    },
+    {
+      "path": "SOURCE.md",
+      "size": 2714,
+      "sha256": "7ee403ae73ae8ba80125a10fd7844334b755f72f47abde701db3901a3d0efc2b",
+      "role": "documentation",
+      "content_type": "text/markdown"
+    },
+    {
+      "path": "sample001-digital-values.fcs",
+      "size": 2114253,
+      "sha256": "96da8cfd1997baa7f3c141eca643e3502350352563d36cdb3562309d00bdafc2",
+      "role": "data",
+      "content_type": "application/vnd.isac.fcs"
+    },
+    {
+      "path": "sample001.fcs",
+      "size": 796672,
+      "sha256": "f0794d5d0b0ff2936e4008baad42b00214904a0ba26b3d59d60b84162ff34c52",
+      "role": "data",
+      "content_type": "application/vnd.isac.fcs"
+    }
+  ]
+}

@@ -1,0 +1,108 @@
+{
+  "dataset_id": "viz-noaa-climatology-envi",
+  "external_id": "viz-noaa-climatology-envi",
+  "data_center_id": "reviewed-visualization-plugin-tests",
+  "data_center_name": "逐插件可视化测试样例",
+  "name": "插件样例｜NOAA 月气温气候态 ENVI 栅格",
+  "description": "将 NOAA/NCEP 1991–2020 月气候态完整 12×73×144 气温数组无损重编码为 ENVI BSQ float32。12 个 band 是月份不是光谱波段；数值单位 °C，空间显示按行列索引。",
+  "domain": "geoscience",
+  "data_type": "hdr, img, nc",
+  "temporal_coverage": "",
+  "spatial_coverage": "",
+  "tags": [
+    "插件测试样例",
+    "viz-envi-window",
+    "scientific_derived",
+    "image",
+    "geoscience"
+  ],
+  "metadata": {
+    "curated": true,
+    "source_catalog": "plugin-tests",
+    "catalog_version": 1,
+    "source_descriptor_sha256": "dd850de2580e96f7ae8ad1c31dbe5101668984a321e86b33d85c7a3b811ef9c5",
+    "download_date": "2026-09-18",
+    "inventory_complete": true,
+    "recursive_file_count": 4,
+    "total_size_bytes": 1164306,
+    "visualization_view_kind": "image",
+    "visualization_plugin_id": "viz-envi-window",
+    "visualization_entry_file": "monthly_air.hdr",
+    "sample_note": "12 个日历月完整气候态；原 NC 同包保留。ENVI 只承载数值与存储维度，未捏造光谱波长、地图变换或 CRS；不代表逐日/逐年时间序列。",
+    "provenance": [
+      {
+        "path": "air.sig995.mon.ltm.1991-2020.nc",
+        "size": 657356,
+        "sha256": "31e6f601fd8e1ecc0bd63e9907ae9e0f931fe675c397ab608abe191b15576619",
+        "url": "https://downloads.psl.noaa.gov/Datasets/ncep.reanalysis.derived/surface/air.sig995.mon.ltm.1991-2020.nc",
+        "role": "data"
+      },
+      {
+        "path": "monthly_air.hdr",
+        "size": 131,
+        "sha256": "7a8643e18e53dd909096dc5a3dd6ea6c3d660676741a39afe4a3d682ceab9d47",
+        "derived_from": [
+          "air.sig995.mon.ltm.1991-2020.nc"
+        ],
+        "role": "data"
+      },
+      {
+        "path": "monthly_air.img",
+        "size": 504576,
+        "sha256": "f1d46c2e06636edad99583ce4982742b7f8a706e545212dfa1e7bd7b8a2e8fac",
+        "derived_from": [
+          "air.sig995.mon.ltm.1991-2020.nc"
+        ],
+        "role": "data"
+      }
+    ],
+    "publisher": "NOAA/OAR/PSL 与 NCEP/NCAR",
+    "source_url": "https://psl.noaa.gov/data/gridded/data.ncep.reanalysis.html",
+    "license": "U.S. Public Domain (NOAA-produced data)",
+    "license_url": "https://psl.noaa.gov/disclaimer/",
+    "license_details": "NOAA/PSL 政府自产数据除另有标注者外属公有领域；须注明 NOAA/OAR/PSL 与原数据集，不暗示官方背书。派生格式不是官方新产品。",
+    "authors": [
+      "NOAA/OAR/PSL",
+      "NCEP/NCAR"
+    ],
+    "source_version": "1991–2020 monthly long-term means, downloaded 2026-09-18",
+    "sample_scope": "12 个日历月完整气候态；原 NC 同包保留。ENVI 只承载数值与存储维度，未捏造光谱波长、地图变换或 CRS；不代表逐日/逐年时间序列。",
+    "transformation": "derive_basic.py：原 air[:] 全部 float32 值逐项相等，按 little-endian BSQ 写 504576B IMG 与 HDR；未缩放、插值或丢弃层。",
+    "sample_kind": "scientific_derived",
+    "test_steps": [
+      "打开 monthly_air.hdr，选择 viz-envi-window（同目录 monthly_air.img 自动配对）。",
+      "图像选 band 0、x=0、y=0、width=128、height=73，读取窗口。",
+      "应显示 73×128 个一月气温原值（°C）；可选 x=72、y=36、band_start=0、band_count=12 查看月气候态序列，横轴 band 索引不是波长。"
+    ]
+  },
+  "files": [
+    {
+      "path": "SOURCE.md",
+      "size": 2243,
+      "sha256": "2770d56f118de36173c502191da6b9d8d5249c4bb4d8727b7369e8b706bccad1",
+      "role": "documentation",
+      "content_type": "text/markdown"
+    },
+    {
+      "path": "air.sig995.mon.ltm.1991-2020.nc",
+      "size": 657356,
+      "sha256": "31e6f601fd8e1ecc0bd63e9907ae9e0f931fe675c397ab608abe191b15576619",
+      "role": "data",
+      "content_type": "application/x-netcdf"
+    },
+    {
+      "path": "monthly_air.hdr",
+      "size": 131,
+      "sha256": "7a8643e18e53dd909096dc5a3dd6ea6c3d660676741a39afe4a3d682ceab9d47",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "monthly_air.img",
+      "size": 504576,
+      "sha256": "f1d46c2e06636edad99583ce4982742b7f8a706e545212dfa1e7bd7b8a2e8fac",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    }
+  ]
+}

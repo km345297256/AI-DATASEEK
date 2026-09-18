@@ -1,0 +1,88 @@
+{
+  "dataset_id": "viz-plugin-rdkit-cis",
+  "external_id": "viz-plugin-rdkit-cis",
+  "data_center_id": "reviewed-visualization-plugin-tests",
+  "data_center_name": "逐插件可视化测试样例",
+  "name": "插件测试·RDKit 二维顺式结构官方样本",
+  "description": "RDKit 官方测试库的 cis.sdf，包含一个 C2H2BrF 分子；用于二维键型和分子信息查看，非药效或实验测量数据。",
+  "domain": "chemistry",
+  "data_type": "sdf",
+  "temporal_coverage": "",
+  "spatial_coverage": "",
+  "tags": [
+    "插件测试样例",
+    "viz-rdkit",
+    "official_fixture",
+    "image",
+    "chemistry"
+  ],
+  "metadata": {
+    "curated": true,
+    "source_catalog": "plugin-tests",
+    "catalog_version": 1,
+    "source_descriptor_sha256": "cd686d4eb55016e1edf7debe500b6e5a9be41d086b50fbb541a124aae4314707",
+    "download_date": "2026-09-18",
+    "inventory_complete": true,
+    "recursive_file_count": 3,
+    "total_size_bytes": 3866,
+    "visualization_view_kind": "image",
+    "visualization_plugin_id": "viz-rdkit",
+    "visualization_entry_file": "cis.sdf",
+    "sample_note": "完整 cis.sdf 单分子；4 个显式原子、3 条键，氢按分子定义隐式处理。",
+    "provenance": [
+      {
+        "path": "cis.sdf",
+        "size": 565,
+        "sha256": "bb78bd9ead6f2fadada9204e561d6c4643b40f17330ae5034a2287641eafe4b0",
+        "role": "data",
+        "url": "https://raw.githubusercontent.com/rdkit/rdkit/20331b5101183089580840759c3ddf11a73efe31/rdkit/Chem/test_data/cis.sdf"
+      },
+      {
+        "path": "LICENSE.txt",
+        "size": 1580,
+        "sha256": "daeb8d194502cbcf34c05c39541a0d02be65bc9bada5b891c1974cd24e9fca30",
+        "role": "documentation",
+        "url": "https://raw.githubusercontent.com/rdkit/rdkit/20331b5101183089580840759c3ddf11a73efe31/license.txt"
+      }
+    ],
+    "publisher": "rdkit/rdkit",
+    "source_url": "https://github.com/rdkit/rdkit/blob/20331b5101183089580840759c3ddf11a73efe31/rdkit/Chem/test_data/cis.sdf",
+    "license": "BSD-3-Clause",
+    "license_url": "https://raw.githubusercontent.com/rdkit/rdkit/20331b5101183089580840759c3ddf11a73efe31/license.txt",
+    "license_details": "官方仓库测试/文档文件，按随附仓库许可保留版权与许可全文。此处标注为官方格式测试样本，不宣称是独立同行评审实验数据。",
+    "authors": [
+      "RDKit contributors"
+    ],
+    "source_version": "Git commit 20331b5101183089580840759c3ddf11a73efe31",
+    "sample_scope": "完整 cis.sdf 单分子；4 个显式原子、3 条键，氢按分子定义隐式处理。",
+    "transformation": "原始公开测试文件未改写。",
+    "sample_kind": "official_fixture",
+    "test_steps": [
+      "打开 cis.sdf，在视图选择器选择 viz-rdkit。",
+      "确认无格式错误且数值/结构按样本范围显示；不执行拟合或外部请求。"
+    ]
+  },
+  "files": [
+    {
+      "path": "LICENSE.txt",
+      "size": 1580,
+      "sha256": "daeb8d194502cbcf34c05c39541a0d02be65bc9bada5b891c1974cd24e9fca30",
+      "role": "documentation",
+      "content_type": "text/plain"
+    },
+    {
+      "path": "SOURCE.md",
+      "size": 1721,
+      "sha256": "6ff6b81c05d1289d097ef4d137d83e276db9f3d131afb7dec409dcbf646bc2a8",
+      "role": "documentation",
+      "content_type": "text/markdown"
+    },
+    {
+      "path": "cis.sdf",
+      "size": 565,
+      "sha256": "bb78bd9ead6f2fadada9204e561d6c4643b40f17330ae5034a2287641eafe4b0",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    }
+  ]
+}

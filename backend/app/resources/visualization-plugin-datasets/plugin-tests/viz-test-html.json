@@ -1,0 +1,88 @@
+{
+  "dataset_id": "viz-test-html",
+  "external_id": "viz-test-html",
+  "data_center_id": "reviewed-visualization-plugin-tests",
+  "data_center_name": "逐插件可视化测试样例",
+  "name": "插件测试 · HTML 文档 · Palmer 企鹅格式转换",
+  "description": "静态网页展示344行观测，无脚本、外部资源。由同一份CC0科学观测转换，不增删记录；原CSV保留。",
+  "domain": "documents",
+  "data_type": "csv, html",
+  "temporal_coverage": "",
+  "spatial_coverage": "",
+  "tags": [
+    "插件测试样例",
+    "html",
+    "scientific_derived",
+    "document",
+    "documents"
+  ],
+  "metadata": {
+    "curated": true,
+    "source_catalog": "plugin-tests",
+    "catalog_version": 1,
+    "source_descriptor_sha256": "1522652ee24d664cbb4cfbd542a8542d0e57725339458266248a823e905624c9",
+    "download_date": "2026-09-18",
+    "inventory_complete": true,
+    "recursive_file_count": 3,
+    "total_size_bytes": 57882,
+    "visualization_view_kind": "document",
+    "visualization_plugin_id": "html",
+    "visualization_entry_file": "penguins.html",
+    "sample_note": "静态网页展示344行观测，无脚本、外部资源。由同一份CC0科学观测转换，不增删记录；原CSV保留。",
+    "provenance": [
+      {
+        "path": "penguins.csv",
+        "size": 15241,
+        "sha256": "f204db2c753b0937caac3cb35258562c14f073e4bbc76be24b4c51ce22767a93",
+        "url": "https://raw.githubusercontent.com/allisonhorst/palmerpenguins/8957207b78d6ccd1b4654a9dd9c9041b657478ab/inst/extdata/penguins.csv"
+      },
+      {
+        "path": "penguins.html",
+        "size": 40972,
+        "sha256": "e0ece445b84a6456d1509b639d63853f42dede6d571307b6e77a34d150c04eeb",
+        "derived_from": [
+          "penguins.csv"
+        ]
+      }
+    ],
+    "publisher": "Palmer Station LTER / palmerpenguins",
+    "source_url": "https://github.com/allisonhorst/palmerpenguins",
+    "license": "CC0-1.0",
+    "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "license_details": "CC0-1.0；用于可视化测试，样本性质为 scientific_derived。",
+    "authors": [
+      "Palmer Station LTER / palmerpenguins"
+    ],
+    "source_version": "2026-09-18 已审查快照",
+    "sample_scope": "静态网页展示344行观测，无脚本、外部资源。由同一份CC0科学观测转换，不增删记录；原CSV保留。",
+    "transformation": "backend/scripts/plugin_samples_tables.py：数字字段按单位转数值；NA仅在数据库/JSON/Arrow转null，HTML/MD保持原文本。344行8列19缺失，未填充。",
+    "sample_kind": "scientific_derived",
+    "test_steps": [
+      "选择文件 penguins.html，再选择插件 html",
+      "静态网页展示344行观测，无脚本、外部资源"
+    ]
+  },
+  "files": [
+    {
+      "path": "SOURCE.md",
+      "size": 1669,
+      "sha256": "effc02798df732b836d73eebc09f34df9b95ffd91e19f109fd94d6aaf44d4c93",
+      "role": "documentation",
+      "content_type": "text/markdown"
+    },
+    {
+      "path": "penguins.csv",
+      "size": 15241,
+      "sha256": "f204db2c753b0937caac3cb35258562c14f073e4bbc76be24b4c51ce22767a93",
+      "role": "data",
+      "content_type": "text/csv"
+    },
+    {
+      "path": "penguins.html",
+      "size": 40972,
+      "sha256": "e0ece445b84a6456d1509b639d63853f42dede6d571307b6e77a34d150c04eeb",
+      "role": "data",
+      "content_type": "text/html"
+    }
+  ]
+}

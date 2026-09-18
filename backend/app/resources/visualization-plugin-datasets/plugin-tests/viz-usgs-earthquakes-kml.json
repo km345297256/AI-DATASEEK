@@ -1,0 +1,91 @@
+{
+  "dataset_id": "viz-usgs-earthquakes-kml",
+  "external_id": "viz-usgs-earthquakes-kml",
+  "data_center_id": "reviewed-visualization-plugin-tests",
+  "data_center_name": "逐插件可视化测试样例",
+  "name": "插件样例｜USGS 2024 强震 KML 点图层",
+  "description": "USGS 2024 年 M≥6 的 99 个地震事件，以同一观测目录生成安全 KML 点图层，保留事件 ID 和原经纬度；完整属性保留在同包 GeoJSON。震源深度不作为三维高度。",
+  "domain": "geoscience",
+  "data_type": "geojson, kml",
+  "temporal_coverage": "",
+  "spatial_coverage": "",
+  "tags": [
+    "插件测试样例",
+    "viz-geoformats",
+    "scientific_derived",
+    "map",
+    "geoscience"
+  ],
+  "metadata": {
+    "curated": true,
+    "source_catalog": "plugin-tests",
+    "catalog_version": 1,
+    "source_descriptor_sha256": "f11909de8169943858b89a69abf67233e7ba8aa666b4b1fc906d93c97990b3f2",
+    "download_date": "2026-09-18",
+    "inventory_complete": true,
+    "recursive_file_count": 3,
+    "total_size_bytes": 96947,
+    "visualization_view_kind": "map",
+    "visualization_plugin_id": "viz-geoformats",
+    "visualization_entry_file": "usgs-2024-m6.kml",
+    "sample_note": "catalog=us，2024-01-01 至 2025-01-01，M≥6、eventtype=earthquake，99 点。KML 仅事件 ID 与 WGS84 二维坐标，无外部样式、网络链接或 HTML。",
+    "provenance": [
+      {
+        "path": "usgs-2024-m6-original.geojson",
+        "size": 84499,
+        "sha256": "b08833bbc9bfb467fdaf808825553840443d91793a0a807b638e86422d1cc36f",
+        "url": "https://earthquake.usgs.gov/fdsnws/event/1/query?format=geojson&starttime=2024-01-01T00:00:00&endtime=2025-01-01T00:00:00&minmagnitude=6&eventtype=earthquake&catalog=us&orderby=time-asc",
+        "role": "data"
+      },
+      {
+        "path": "usgs-2024-m6.kml",
+        "size": 10422,
+        "sha256": "c9e24b74d6666ad3cb5a6f845ab77c7be60e6bc76b8d2e63416e6fdbe36730ba",
+        "derived_from": [
+          "usgs-2024-m6-original.geojson"
+        ],
+        "role": "data"
+      }
+    ],
+    "publisher": "U.S. Geological Survey",
+    "source_url": "https://earthquake.usgs.gov/fdsnws/event/1/",
+    "license": "U.S. Public Domain (USGS-produced data)",
+    "license_url": "https://www.usgs.gov/information-policies-and-instructions/copyrights-and-credits",
+    "license_details": "USGS 自产观测数据适用美国公有领域政策；保留机构、网络/目录及镜像来源署名，不将第三方图片或商标扩展解释为公有领域。",
+    "authors": [
+      "U.S. Geological Survey"
+    ],
+    "source_version": "2024 fixed historical query; snapshot 2026-09-18",
+    "sample_scope": "catalog=us，2024-01-01 至 2025-01-01，M≥6、eventtype=earthquake，99 点。KML 仅事件 ID 与 WGS84 二维坐标，无外部样式、网络链接或 HTML。",
+    "transformation": "derive_basic.py 从完整官方 GeoJSON 原样选 ID、lon、lat 写入 KML；省略深度而非错当高度；不筛选/插值/合成观测点，原所有属性保留。",
+    "sample_kind": "scientific_derived",
+    "test_steps": [
+      "打开 usgs-2024-m6.kml，选择 viz-geoformats。",
+      "应为 WGS84 99 个点，可缩放/平移；无外部底图请求。",
+      "检查跨日期变更线的点，不将震源深度视作高度。"
+    ]
+  },
+  "files": [
+    {
+      "path": "SOURCE.md",
+      "size": 2026,
+      "sha256": "b10602111a273bbd326140090b6576abd4e5b79135adb79b76505dcb130fa3ca",
+      "role": "documentation",
+      "content_type": "text/markdown"
+    },
+    {
+      "path": "usgs-2024-m6-original.geojson",
+      "size": 84499,
+      "sha256": "b08833bbc9bfb467fdaf808825553840443d91793a0a807b638e86422d1cc36f",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "usgs-2024-m6.kml",
+      "size": 10422,
+      "sha256": "c9e24b74d6666ad3cb5a6f845ab77c7be60e6bc76b8d2e63416e6fdbe36730ba",
+      "role": "data",
+      "content_type": "application/vnd.google-earth.kml+xml"
+    }
+  ]
+}

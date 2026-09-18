@@ -1,0 +1,88 @@
+{
+  "dataset_id": "viz-test-duckdb-table",
+  "external_id": "viz-test-duckdb-table",
+  "data_center_id": "reviewed-visualization-plugin-tests",
+  "data_center_name": "逐插件可视化测试样例",
+  "name": "插件测试 · DuckDB 只读数据库 · Palmer 企鹅格式转换",
+  "description": "选择 penguins，344条、8列；SQL NULL保留，读文件不执行源SQL。由同一份CC0科学观测转换，不增删记录；原CSV保留。",
+  "domain": "tabular",
+  "data_type": "csv, duckdb",
+  "temporal_coverage": "",
+  "spatial_coverage": "",
+  "tags": [
+    "插件测试样例",
+    "viz-duckdb-table",
+    "scientific_derived",
+    "table",
+    "tabular"
+  ],
+  "metadata": {
+    "curated": true,
+    "source_catalog": "plugin-tests",
+    "catalog_version": 1,
+    "source_descriptor_sha256": "ccd1d69d35ec0a1c4124f75a669b78145fec499e910dae3887bb40d47732ca17",
+    "download_date": "2026-09-18",
+    "inventory_complete": true,
+    "recursive_file_count": 3,
+    "total_size_bytes": 553579,
+    "visualization_view_kind": "table",
+    "visualization_plugin_id": "viz-duckdb-table",
+    "visualization_entry_file": "penguins.duckdb",
+    "sample_note": "选择 penguins，344条、8列；SQL NULL保留，读文件不执行源SQL。由同一份CC0科学观测转换，不增删记录；原CSV保留。",
+    "provenance": [
+      {
+        "path": "penguins.csv",
+        "size": 15241,
+        "sha256": "f204db2c753b0937caac3cb35258562c14f073e4bbc76be24b4c51ce22767a93",
+        "url": "https://raw.githubusercontent.com/allisonhorst/palmerpenguins/8957207b78d6ccd1b4654a9dd9c9041b657478ab/inst/extdata/penguins.csv"
+      },
+      {
+        "path": "penguins.duckdb",
+        "size": 536576,
+        "sha256": "dd1eec5d6b575e01b1b5ad4398e0c47bbcabf1ef6a5c2ef4d6dcf52054d2e271",
+        "derived_from": [
+          "penguins.csv"
+        ]
+      }
+    ],
+    "publisher": "Palmer Station LTER / palmerpenguins",
+    "source_url": "https://github.com/allisonhorst/palmerpenguins",
+    "license": "CC0-1.0",
+    "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "license_details": "CC0-1.0；用于可视化测试，样本性质为 scientific_derived。",
+    "authors": [
+      "Palmer Station LTER / palmerpenguins"
+    ],
+    "source_version": "2026-09-18 已审查快照",
+    "sample_scope": "选择 penguins，344条、8列；SQL NULL保留，读文件不执行源SQL。由同一份CC0科学观测转换，不增删记录；原CSV保留。",
+    "transformation": "backend/scripts/plugin_samples_tables.py：数字字段按单位转数值；NA仅在数据库/JSON/Arrow转null，HTML/MD保持原文本。344行8列19缺失，未填充。",
+    "sample_kind": "scientific_derived",
+    "test_steps": [
+      "选择文件 penguins.duckdb，再选择插件 viz-duckdb-table",
+      "选择 penguins，344条、8列；SQL NULL保留，读文件不执行源SQL"
+    ]
+  },
+  "files": [
+    {
+      "path": "SOURCE.md",
+      "size": 1762,
+      "sha256": "7ccea282165566cca4921cd1112a02ae5ad76a190e50152e6517fec8965ec687",
+      "role": "documentation",
+      "content_type": "text/markdown"
+    },
+    {
+      "path": "penguins.csv",
+      "size": 15241,
+      "sha256": "f204db2c753b0937caac3cb35258562c14f073e4bbc76be24b4c51ce22767a93",
+      "role": "data",
+      "content_type": "text/csv"
+    },
+    {
+      "path": "penguins.duckdb",
+      "size": 536576,
+      "sha256": "dd1eec5d6b575e01b1b5ad4398e0c47bbcabf1ef6a5c2ef4d6dcf52054d2e271",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    }
+  ]
+}

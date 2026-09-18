@@ -1,0 +1,91 @@
+{
+  "dataset_id": "viz-noaa-gfs-grib",
+  "external_id": "viz-noaa-gfs-grib",
+  "data_center_id": "reviewed-visualization-plugin-tests",
+  "data_center_name": "逐插件可视化测试样例",
+  "name": "插件样例｜NOAA GFS 东亚 2 米气温 GRIB2",
+  "description": "NOAA GFS 2026-09-16 00Z 的 f000 2 米温度原场，100–110°E、30–40°N 的 1° 格网，11×11=121 点，单位 K。为当前 WMO-only reader 生成只清除未用本地表声明的副本，保留原件。",
+  "domain": "geoscience",
+  "data_type": "grib2",
+  "temporal_coverage": "",
+  "spatial_coverage": "",
+  "tags": [
+    "插件测试样例",
+    "viz-grib-window",
+    "scientific_derived",
+    "image",
+    "geoscience"
+  ],
+  "metadata": {
+    "curated": true,
+    "source_catalog": "plugin-tests",
+    "catalog_version": 1,
+    "source_descriptor_sha256": "37fdce1bda629a3325b2422aeb09da2d2ff60f8725c1bd1207f7d3287d46f431",
+    "download_date": "2026-09-18",
+    "inventory_complete": true,
+    "recursive_file_count": 3,
+    "total_size_bytes": 2820,
+    "visualization_view_kind": "image",
+    "visualization_plugin_id": "viz-grib-window",
+    "visualization_entry_file": "gfs-20260916-00-2mt-wmo.grib2",
+    "sample_note": "仅 1 条 GRIB2 消息、2 m 温度、121 格点、forecast_time=0；不是完整 GFS、实时预报或经过业务质量控制的独立产品。NOMADS 滚动目录可能过期，精确原件和 hash 已固定。",
+    "provenance": [
+      {
+        "path": "gfs-20260916-00-2mt-original.grib2",
+        "size": 300,
+        "sha256": "819eec85f08882ad10361d2fc72bca6a0ae6d9b3f9c1accec21be51622dbe9c0",
+        "url": "https://nomads.ncep.noaa.gov/cgi-bin/filter_gfs_1p00.pl?file=gfs.t00z.pgrb2.1p00.f000&lev_2_m_above_ground=on&var_TMP=on&subregion=&leftlon=100&rightlon=110&toplat=40&bottomlat=30&dir=%2Fgfs.20260916%2F00%2Fatmos",
+        "role": "data"
+      },
+      {
+        "path": "gfs-20260916-00-2mt-wmo.grib2",
+        "size": 300,
+        "sha256": "d9571b5f65baa1d6ea6471243186b66d284477d82f4de17a77a8042ebfd9a8e2",
+        "derived_from": [
+          "gfs-20260916-00-2mt-original.grib2"
+        ],
+        "role": "data"
+      }
+    ],
+    "publisher": "NOAA/NCEP/NOMADS",
+    "source_url": "https://nomads.ncep.noaa.gov/cgi-bin/filter_gfs_1p00.pl",
+    "license": "U.S. Public Domain (NOAA-produced data)",
+    "license_url": "https://psl.noaa.gov/disclaimer/",
+    "license_details": "NOAA/PSL 政府自产数据除另有标注者外属公有领域；须注明 NOAA/OAR/PSL 与原数据集，不暗示官方背书。派生格式不是官方新产品。",
+    "authors": [
+      "NOAA/NCEP"
+    ],
+    "source_version": "GFS 2026-09-16 00Z f000 1 degree; query snapshot 2026-09-18",
+    "sample_scope": "仅 1 条 GRIB2 消息、2 m 温度、121 格点、forecast_time=0；不是完整 GFS、实时预报或经过业务质量控制的独立产品。NOMADS 滚动目录可能过期，精确原件和 hash 已固定。",
+    "transformation": "derive_mesh_grib.py 用 ecCodes 验证 discipline/category/number=(0,0,0)，surface=(103,2)，将未用 localTablesVersion 从 1 改为 0。二进制仅第 26 字节变化；121 个解码值、所有经纬度逐项完全一致，未换算 K、未插值。",
+    "sample_kind": "scientific_derived",
+    "test_steps": [
+      "打开 gfs-20260916-00-2mt-wmo.grib2，选择 viz-grib-window 并读取目录。",
+      "选择第一条 2t 消息，ROI x=0、y=0、width=11、height=11。",
+      "应为 121 个 2 m 气温值，K，不应误标 °C；经度 100–110、纬度 30–40，时效 0。"
+    ]
+  },
+  "files": [
+    {
+      "path": "SOURCE.md",
+      "size": 2220,
+      "sha256": "8c8af8644134c858b7cd11906669895ac38c488db9b2e5fee21e56c63b38576f",
+      "role": "documentation",
+      "content_type": "text/markdown"
+    },
+    {
+      "path": "gfs-20260916-00-2mt-original.grib2",
+      "size": 300,
+      "sha256": "819eec85f08882ad10361d2fc72bca6a0ae6d9b3f9c1accec21be51622dbe9c0",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "gfs-20260916-00-2mt-wmo.grib2",
+      "size": 300,
+      "sha256": "d9571b5f65baa1d6ea6471243186b66d284477d82f4de17a77a8042ebfd9a8e2",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    }
+  ]
+}

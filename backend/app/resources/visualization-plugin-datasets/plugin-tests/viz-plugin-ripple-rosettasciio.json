@@ -1,0 +1,138 @@
+{
+  "dataset_id": "viz-plugin-ripple-rosettasciio",
+  "external_id": "viz-plugin-ripple-rosettasciio",
+  "data_center_id": "reviewed-visualization-plugin-tests",
+  "data_center_name": "逐插件可视化测试样例",
+  "name": "插件测试·RosettaSciIO Ripple 谱像官方样本",
+  "description": "RosettaSciIO 官方合成格式测试的 2×3×4 float32 谱像，数值为 0..23；保留原始 RPL/RAW 并提供明确 little-endian 头的兼容副本。不是实际电子显微实验。",
+  "domain": "image_science",
+  "data_type": "raw, rpl",
+  "temporal_coverage": "",
+  "spatial_coverage": "",
+  "tags": [
+    "插件测试样例",
+    "viz-ripple-window",
+    "official_fixture",
+    "image",
+    "image_science"
+  ],
+  "metadata": {
+    "curated": true,
+    "source_catalog": "plugin-tests",
+    "catalog_version": 1,
+    "source_descriptor_sha256": "94d947aff2c2b29c195af848e9de2cff6c28a2cec5e108ee9c2fd217a8a306cb",
+    "download_date": "2026-09-18",
+    "inventory_complete": true,
+    "recursive_file_count": 6,
+    "total_size_bytes": 38784,
+    "visualization_view_kind": "image",
+    "visualization_plugin_id": "viz-ripple-window",
+    "visualization_entry_file": "ripple_little_endian.rpl",
+    "sample_note": "完整 24 个官方测试值；原头多字节 float32 却写 dont-care，严格插件拒绝。逐值验证 RAW 的 little-endian 解码等于 0..23 后，仅修正字节序字段。人工尺度单位 m/eV 是来源测试元数据，不能解读为真实仪器标定。",
+    "provenance": [
+      {
+        "path": "test_ripple_sdim-1_ndim-2_float32.rpl",
+        "size": 394,
+        "sha256": "58c38f3974b6eb8f5f6d64a4cf65f22b4016c3235fefa4b948d47fadd802b35f",
+        "role": "data",
+        "url": "https://raw.githubusercontent.com/hyperspy/rosettasciio/bc254db14cd7d4d23169b11aeb622a0a7eac1fbe/rsciio/tests/data/ripple/test_ripple_sdim-1_ndim-2_float32.rpl"
+      },
+      {
+        "path": "test_ripple_sdim-1_ndim-2_float32.raw",
+        "size": 96,
+        "sha256": "45a99655901702d55ab6284a18aed6a5e16677181d16c7a7517b68c2ae2c0c7a",
+        "role": "data",
+        "url": "https://raw.githubusercontent.com/hyperspy/rosettasciio/bc254db14cd7d4d23169b11aeb622a0a7eac1fbe/rsciio/tests/data/ripple/test_ripple_sdim-1_ndim-2_float32.raw"
+      },
+      {
+        "path": "ripple_little_endian.rpl",
+        "size": 398,
+        "sha256": "da334a052c28531bacd18ed6d604cf3dd9e2b69214c63e2bc218f05b7f02fe77",
+        "role": "data",
+        "derived_from": [
+          "test_ripple_sdim-1_ndim-2_float32.rpl",
+          "test_ripple_sdim-1_ndim-2_float32.raw"
+        ]
+      },
+      {
+        "path": "ripple_little_endian.raw",
+        "size": 96,
+        "sha256": "45a99655901702d55ab6284a18aed6a5e16677181d16c7a7517b68c2ae2c0c7a",
+        "role": "data",
+        "derived_from": [
+          "test_ripple_sdim-1_ndim-2_float32.raw"
+        ]
+      },
+      {
+        "path": "COPYING.txt",
+        "size": 35151,
+        "sha256": "e79e9c8a0c85d735ff98185918ec94ed7d175efc377012787aebcf3b80f0d90b",
+        "role": "documentation",
+        "url": "https://raw.githubusercontent.com/hyperspy/rosettasciio/bc254db14cd7d4d23169b11aeb622a0a7eac1fbe/COPYING.txt"
+      }
+    ],
+    "publisher": "hyperspy/rosettasciio",
+    "source_url": "https://github.com/hyperspy/rosettasciio/blob/bc254db14cd7d4d23169b11aeb622a0a7eac1fbe/rsciio/tests/data/ripple/test_ripple_sdim-1_ndim-2_float32.rpl",
+    "license": "GPL-3.0 (repository COPYING)",
+    "license_url": "https://raw.githubusercontent.com/hyperspy/rosettasciio/bc254db14cd7d4d23169b11aeb622a0a7eac1fbe/COPYING.txt",
+    "license_details": "官方仓库测试/文档文件，按随附仓库许可保留版权与许可全文。此处标注为官方格式测试样本，不宣称是独立同行评审实验数据。",
+    "authors": [
+      "RosettaSciIO contributors"
+    ],
+    "source_version": "Git commit bc254db14cd7d4d23169b11aeb622a0a7eac1fbe",
+    "sample_scope": "完整 24 个官方测试值；原头多字节 float32 却写 dont-care，严格插件拒绝。逐值验证 RAW 的 little-endian 解码等于 0..23 后，仅修正字节序字段。人工尺度单位 m/eV 是来源测试元数据，不能解读为真实仪器标定。",
+    "transformation": {
+      "generator": "backend/scripts/plugin_samples_chem.py",
+      "changes": "RAW 原字节完整复制；RPL 唯一修改 byte-order=dont-care 为 little-endian。名称重新配对，便于应用授权同名 RAW。"
+    },
+    "sample_kind": "official_fixture",
+    "test_steps": [
+      "打开 ripple_little_endian.rpl，在视图选择器选择 viz-ripple-window。",
+      "确认无格式错误且数值/结构按样本范围显示；不执行拟合或外部请求。"
+    ]
+  },
+  "files": [
+    {
+      "path": "COPYING.txt",
+      "size": 35151,
+      "sha256": "e79e9c8a0c85d735ff98185918ec94ed7d175efc377012787aebcf3b80f0d90b",
+      "role": "documentation",
+      "content_type": "text/plain"
+    },
+    {
+      "path": "SOURCE.md",
+      "size": 2649,
+      "sha256": "4c1bdddec167d5d35cf84932a31c2bec09c9f607aede2ad8dec7a9687ee8de3a",
+      "role": "documentation",
+      "content_type": "text/markdown"
+    },
+    {
+      "path": "ripple_little_endian.raw",
+      "size": 96,
+      "sha256": "45a99655901702d55ab6284a18aed6a5e16677181d16c7a7517b68c2ae2c0c7a",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "ripple_little_endian.rpl",
+      "size": 398,
+      "sha256": "da334a052c28531bacd18ed6d604cf3dd9e2b69214c63e2bc218f05b7f02fe77",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "test_ripple_sdim-1_ndim-2_float32.raw",
+      "size": 96,
+      "sha256": "45a99655901702d55ab6284a18aed6a5e16677181d16c7a7517b68c2ae2c0c7a",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "test_ripple_sdim-1_ndim-2_float32.rpl",
+      "size": 394,
+      "sha256": "58c38f3974b6eb8f5f6d64a4cf65f22b4016c3235fefa4b948d47fadd802b35f",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    }
+  ]
+}

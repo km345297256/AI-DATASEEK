@@ -1,0 +1,122 @@
+{
+  "dataset_id": "viz-xugrid-netherlands",
+  "external_id": "viz-xugrid-netherlands",
+  "data_center_id": "reviewed-visualization-plugin-tests",
+  "data_center_name": "逐插件可视化测试样例",
+  "name": "插件样例｜Xugrid 荷兰高程三角网子集",
+  "description": "Deltares/Xugrid 官方荷兰地表高程样本的前 512 个真实三角形（627 个原节点），高程单位原件声明 m NAP。按原拓扑选择，不插值；原数据未明示节点 CRS，保留未知。",
+  "domain": "geoscience",
+  "data_type": "nc",
+  "temporal_coverage": "",
+  "spatial_coverage": "",
+  "tags": [
+    "插件测试样例",
+    "viz-ugrid-window",
+    "scientific_derived",
+    "map",
+    "geoscience"
+  ],
+  "metadata": {
+    "curated": true,
+    "source_catalog": "plugin-tests",
+    "catalog_version": 1,
+    "source_descriptor_sha256": "d9c63e1432cea575e1b782f1f5b81175538ccd8ea69f25c81ddd7876f9953aec",
+    "download_date": "2026-09-18",
+    "inventory_complete": true,
+    "recursive_file_count": 5,
+    "total_size_bytes": 268993,
+    "visualization_view_kind": "map",
+    "visualization_plugin_id": "viz-ugrid-window",
+    "visualization_entry_file": "elevation_nl_512faces.nc",
+    "sample_note": "原件 5248 面/2790 点完整保留；兼容入口选前 512 面，627 个涉及节点。当前 reader 上限 2048 面/4096 点保持不变。原节点坐标无 units/CRS 明示；高程 m NAP，非椭球高。",
+    "provenance": [
+      {
+        "path": "elevation_nl_original.nc",
+        "size": 228053,
+        "sha256": "b6e33c3c08d0cc762c28113096a857221d3ae57a899eaf394856aa448bfe9d12",
+        "url": "https://raw.githubusercontent.com/Deltares/xugrid/fae62b62b9ee7c4d32dcdb5f2eb27efef82e2b2a/data/elevation_nl.nc",
+        "role": "data"
+      },
+      {
+        "path": "elevation_nl_512faces.nc",
+        "size": 26968,
+        "sha256": "aa3fbbe24aed6f88eb3ff4730286111b02dc9e5fb4f344a6cc3085dff8b9c16f",
+        "derived_from": [
+          "elevation_nl_original.nc"
+        ],
+        "role": "data"
+      },
+      {
+        "path": "subset-index.json",
+        "size": 10405,
+        "sha256": "823df65c46b34e26dc183a350f5fb64391794ea60d15aa0e46c96b2fa1872845",
+        "derived_from": [
+          "elevation_nl_original.nc"
+        ],
+        "role": "documentation"
+      },
+      {
+        "path": "LICENSE.txt",
+        "size": 1059,
+        "sha256": "d1aaaf0c41e480a095c01b6d272c3f58cd869d2fe3f01d05b0f41599a3fb9910",
+        "url": "https://raw.githubusercontent.com/Deltares/xugrid/fae62b62b9ee7c4d32dcdb5f2eb27efef82e2b2a/LICENSE",
+        "role": "documentation"
+      }
+    ],
+    "publisher": "Deltares / Xugrid contributors",
+    "source_url": "https://github.com/Deltares/xugrid/blob/fae62b62b9ee7c4d32dcdb5f2eb27efef82e2b2a/data/elevation_nl.nc",
+    "license": "MIT",
+    "license_url": "https://github.com/Deltares/xugrid/blob/fae62b62b9ee7c4d32dcdb5f2eb27efef82e2b2a/LICENSE",
+    "license_details": "依据 Xugrid 官方仓库 MIT 许可分发，保留 Copyright (c) Deltares 和完整许可；属官方科学示例数据的明确子集，不宣称完整国家高程或测绘权威产品。",
+    "authors": [
+      "Deltares",
+      "Xugrid contributors"
+    ],
+    "source_version": "Xugrid fae62b62b9ee7c4d32dcdb5f2eb27efef82e2b2a",
+    "sample_scope": "原件 5248 面/2790 点完整保留；兼容入口选前 512 面，627 个涉及节点。当前 reader 上限 2048 面/4096 点保持不变。原节点坐标无 units/CRS 明示；高程 m NAP，非椭球高。",
+    "transformation": "derive_mesh_grib.py：选原面 0..511，按原节点索引稳定重编号；节点坐标、三角形关联及 elevation 全相等；将原 unit='m NAP' 写为 units，增加明确 mesh/location 关联。subset-index.json 保存原节点/面索引。未重投影或插值。",
+    "sample_kind": "scientific_derived",
+    "test_steps": [
+      "打开 elevation_nl_512faces.nc，选择 viz-ugrid-window。",
+      "网格选 mesh，字段选 elevation，读取网格。",
+      "显示 512 个三角形、627 个节点及原始高程；未知 CRS 不自动投影到经纬度。"
+    ]
+  },
+  "files": [
+    {
+      "path": "LICENSE.txt",
+      "size": 1059,
+      "sha256": "d1aaaf0c41e480a095c01b6d272c3f58cd869d2fe3f01d05b0f41599a3fb9910",
+      "role": "documentation",
+      "content_type": "text/plain"
+    },
+    {
+      "path": "SOURCE.md",
+      "size": 2508,
+      "sha256": "60bc524c3355a7c6d41ea7d3f99da7df22a0366d9cca0dfe8e3a149274584bcc",
+      "role": "documentation",
+      "content_type": "text/markdown"
+    },
+    {
+      "path": "elevation_nl_512faces.nc",
+      "size": 26968,
+      "sha256": "aa3fbbe24aed6f88eb3ff4730286111b02dc9e5fb4f344a6cc3085dff8b9c16f",
+      "role": "data",
+      "content_type": "application/x-netcdf"
+    },
+    {
+      "path": "elevation_nl_original.nc",
+      "size": 228053,
+      "sha256": "b6e33c3c08d0cc762c28113096a857221d3ae57a899eaf394856aa448bfe9d12",
+      "role": "data",
+      "content_type": "application/x-netcdf"
+    },
+    {
+      "path": "subset-index.json",
+      "size": 10405,
+      "sha256": "823df65c46b34e26dc183a350f5fb64391794ea60d15aa0e46c96b2fa1872845",
+      "role": "documentation",
+      "content_type": "application/json"
+    }
+  ]
+}

@@ -1,0 +1,88 @@
+{
+  "dataset_id": "viz-test-dbf-penguins",
+  "external_id": "viz-test-dbf-penguins",
+  "data_center_id": "reviewed-visualization-plugin-tests",
+  "data_center_name": "逐插件可视化测试样例",
+  "name": "插件测试 · DBF 只读表格 · Palmer 企鹅",
+  "description": "完整344条企鹅观测的dBASE III兼容副本，8列。字段名缩短并保留单位映射：bill_len/bill_dep为mm，flipper_mm为mm，mass_g为g；数值NA为空，文本NA保持原字符串。原CSV保留，不删除或补造观测。",
+  "domain": "tabular",
+  "data_type": "csv, dbf",
+  "temporal_coverage": "",
+  "spatial_coverage": "",
+  "tags": [
+    "插件测试样例",
+    "viz-dbf-table",
+    "scientific_derived",
+    "table",
+    "tabular"
+  ],
+  "metadata": {
+    "curated": true,
+    "source_catalog": "plugin-tests",
+    "catalog_version": 1,
+    "source_descriptor_sha256": "a5956f35ab5cb9bfa28a87cf163a0964bc974335cab46e7fbf12ca84183ea447",
+    "download_date": "2026-09-18",
+    "inventory_complete": true,
+    "recursive_file_count": 3,
+    "total_size_bytes": 40694,
+    "visualization_view_kind": "table",
+    "visualization_plugin_id": "viz-dbf-table",
+    "visualization_entry_file": "penguins.dbf",
+    "sample_note": "344条、8列，原始十进制精度不变；只演示支持的dBASE III子集，不代表任意DBF方言均兼容。",
+    "provenance": [
+      {
+        "path": "penguins.csv",
+        "size": 15241,
+        "sha256": "f204db2c753b0937caac3cb35258562c14f073e4bbc76be24b4c51ce22767a93",
+        "url": "https://raw.githubusercontent.com/allisonhorst/palmerpenguins/8957207b78d6ccd1b4654a9dd9c9041b657478ab/inst/extdata/penguins.csv"
+      },
+      {
+        "path": "penguins.dbf",
+        "size": 23682,
+        "sha256": "0dfb2636e737afde6d578d7f5dc6d6c9caa61e296dfd364c41babbbcfcdac0fe",
+        "derived_from": [
+          "penguins.csv"
+        ]
+      }
+    ],
+    "publisher": "Palmer Station LTER / palmerpenguins",
+    "source_url": "https://github.com/allisonhorst/palmerpenguins",
+    "license": "CC0-1.0",
+    "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "license_details": "CC0-1.0；用于可视化测试，样本性质为 scientific_derived。",
+    "authors": [
+      "Palmer Station LTER / palmerpenguins"
+    ],
+    "source_version": "2026-09-18 已审查快照",
+    "sample_scope": "344条、8列，原始十进制精度不变；只演示支持的dBASE III子集，不代表任意DBF方言均兼容。",
+    "transformation": "backend/scripts/plugin_samples_dbf.py：固定dBASE III字段映射，原始数值文本保持，数值NA映射空字段；所有344条记录保留。",
+    "sample_kind": "scientific_derived",
+    "test_steps": [
+      "预览 penguins.dbf，选择 viz-dbf-table",
+      "点击读取数据库分页，检查物种、长度、体重及NA/空值；切换下一页"
+    ]
+  },
+  "files": [
+    {
+      "path": "SOURCE.md",
+      "size": 1771,
+      "sha256": "876f4dcca1029c4a0d420ce5d53069cccba9a3661272185b39673cde904fb3a5",
+      "role": "documentation",
+      "content_type": "text/markdown"
+    },
+    {
+      "path": "penguins.csv",
+      "size": 15241,
+      "sha256": "f204db2c753b0937caac3cb35258562c14f073e4bbc76be24b4c51ce22767a93",
+      "role": "data",
+      "content_type": "text/csv"
+    },
+    {
+      "path": "penguins.dbf",
+      "size": 23682,
+      "sha256": "0dfb2636e737afde6d578d7f5dc6d6c9caa61e296dfd364c41babbbcfcdac0fe",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    }
+  ]
+}

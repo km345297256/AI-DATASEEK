@@ -1,0 +1,174 @@
+{
+  "dataset_id": "viz-bio-alignments-and-tracks",
+  "external_id": "viz-bio-alignments-and-tracks",
+  "data_center_id": "reviewed-visualization-plugin-tests",
+  "data_center_name": "逐插件可视化测试样例",
+  "name": "原创基因组阅读器功能样例：SAM/BED/BLAST",
+  "description": "原创合成chr_demo（长度5000）、5条SAM比对、3条BED特征和2条BLAST12列记录；不是人类/动物个体测序，不是实际BLAST运行结果。",
+  "domain": "sequence",
+  "data_type": "bed, blast6, sam, sizes",
+  "temporal_coverage": "",
+  "spatial_coverage": "",
+  "tags": [
+    "插件测试样例",
+    "viz-alignment-browser",
+    "project_fixture",
+    "map",
+    "sequence"
+  ],
+  "metadata": {
+    "curated": true,
+    "source_catalog": "plugin-tests",
+    "catalog_version": 1,
+    "source_descriptor_sha256": "49a67b044743b07601c447d68216843c4857e05de82436bdfd0ab804c66d14f5",
+    "download_date": "2026-09-18",
+    "inventory_complete": true,
+    "recursive_file_count": 7,
+    "total_size_bytes": 4299,
+    "visualization_view_kind": "map",
+    "visualization_plugin_id": "viz-alignment-browser",
+    "visualization_entry_file": "synthetic-alignments.sam",
+    "sample_note": "原创合成chr_demo（长度5000）、5条SAM比对、3条BED特征和2条BLAST12列记录；不是人类/动物个体测序，不是实际BLAST运行结果。",
+    "provenance": [
+      {
+        "path": "synthetic-alignments.sam",
+        "size": 479,
+        "sha256": "70e414a93e7e4936cc221e64f11681e9bd7b457170da08ce6e368718fae66601",
+        "role": "data",
+        "origin": {
+          "kind": "generated_fixture",
+          "generator": "backend/scripts/plugin_samples_bio.py",
+          "generator_sha256": "5ec25b14053c29d7f0b6ec7443f4994eec9d05eb448b8d3c302289488e3098c1",
+          "description": "原创合成chr_demo（长度5000）、5条SAM比对、3条BED特征和2条BLAST12列记录；不是人类/动物个体测序，不是实际BLAST运行结果。"
+        }
+      },
+      {
+        "path": "synthetic-features.bed",
+        "size": 99,
+        "sha256": "12419d12c81b7c9f0a539ea697ecd2b3f15e339d0e12ab922b385a27d715028e",
+        "role": "data",
+        "origin": {
+          "kind": "generated_fixture",
+          "generator": "backend/scripts/plugin_samples_bio.py",
+          "generator_sha256": "5ec25b14053c29d7f0b6ec7443f4994eec9d05eb448b8d3c302289488e3098c1",
+          "description": "原创合成chr_demo（长度5000）、5条SAM比对、3条BED特征和2条BLAST12列记录；不是人类/动物个体测序，不是实际BLAST运行结果。"
+        }
+      },
+      {
+        "path": "demo.chrom.sizes",
+        "size": 14,
+        "sha256": "33bfc9044fa58958ff2cb26787c46de9530a66baeae00c7b0f5d5335462ac2ef",
+        "role": "data",
+        "origin": {
+          "kind": "generated_fixture",
+          "generator": "backend/scripts/plugin_samples_bio.py",
+          "generator_sha256": "5ec25b14053c29d7f0b6ec7443f4994eec9d05eb448b8d3c302289488e3098c1",
+          "description": "原创合成chr_demo（长度5000）、5条SAM比对、3条BED特征和2条BLAST12列记录；不是人类/动物个体测序，不是实际BLAST运行结果。"
+        }
+      },
+      {
+        "path": "synthetic-hits.blast6",
+        "size": 125,
+        "sha256": "0c8b27bc35eb7e8c24cc9980866b226c0636b62f8f98416afbb62e4a68aaedfa",
+        "role": "data",
+        "origin": {
+          "kind": "generated_fixture",
+          "generator": "backend/scripts/plugin_samples_bio.py",
+          "generator_sha256": "5ec25b14053c29d7f0b6ec7443f4994eec9d05eb448b8d3c302289488e3098c1",
+          "description": "原创合成chr_demo（长度5000）、5条SAM比对、3条BED特征和2条BLAST12列记录；不是人类/动物个体测序，不是实际BLAST运行结果。"
+        }
+      },
+      {
+        "path": "LICENSE.txt",
+        "size": 1066,
+        "sha256": "991f0bde5249ee6aad0a5a597197c7a7f6024abd2650516fcd7a83d908234115",
+        "role": "documentation",
+        "origin": {
+          "kind": "generated_fixture",
+          "generator": "backend/scripts/plugin_samples_bio.py",
+          "generator_sha256": "5ec25b14053c29d7f0b6ec7443f4994eec9d05eb448b8d3c302289488e3098c1",
+          "description": "项目 MIT 许可证原文的本地副本。"
+        }
+      },
+      {
+        "path": "GENERATION_SPEC.json",
+        "size": 177,
+        "sha256": "2a58aca6c6c16c3ccda894aa28fc77623385f63eec78e7fb01f4893e119d8d2d",
+        "role": "documentation",
+        "origin": {
+          "kind": "generated_fixture",
+          "generator": "backend/scripts/plugin_samples_bio.py",
+          "generator_sha256": "5ec25b14053c29d7f0b6ec7443f4994eec9d05eb448b8d3c302289488e3098c1",
+          "description": "数据生成/格式转换参数记录；不是上游下载文件。"
+        }
+      }
+    ],
+    "publisher": "AI-DataSeek 原创功能测试样例",
+    "source_url": "https://github.com/km345297256/AI-DATASEEK",
+    "license": "MIT (project-generated fixture)",
+    "license_url": "https://github.com/km345297256/AI-DATASEEK/blob/v2/LICENSE",
+    "license_details": "本项目原创算法生成的功能样例，按项目 MIT 许可提供；不是来自医院、受试者或真实实验的观测。保留随附项目 LICENSE.txt。",
+    "authors": [
+      "AI-DataSeek contributors"
+    ],
+    "source_version": "original deterministic fixture 2026-09-18",
+    "sample_scope": "原创合成chr_demo（长度5000）、5条SAM比对、3条BED特征和2条BLAST12列记录；不是人类/动物个体测序，不是实际BLAST运行结果。",
+    "sample_kind": "project_fixture",
+    "test_steps": [
+      "SAM选择reference=0,start=100,end=180，观察匹配、插入、缺失与成对关系。",
+      "BED选择chr_demo区间0–500；IGV需要粘贴demo.chrom.sizes正文chr_demo TAB 5000。",
+      "BLAST文件有正向与反向命中，数值仅为功能测试；不推断真实同源关系。"
+    ]
+  },
+  "files": [
+    {
+      "path": "GENERATION_SPEC.json",
+      "size": 177,
+      "sha256": "2a58aca6c6c16c3ccda894aa28fc77623385f63eec78e7fb01f4893e119d8d2d",
+      "role": "documentation",
+      "content_type": "application/json"
+    },
+    {
+      "path": "LICENSE.txt",
+      "size": 1066,
+      "sha256": "991f0bde5249ee6aad0a5a597197c7a7f6024abd2650516fcd7a83d908234115",
+      "role": "documentation",
+      "content_type": "text/plain"
+    },
+    {
+      "path": "SOURCE.md",
+      "size": 2339,
+      "sha256": "f29fb223309a53ae222ed0f33d5340d948e3e3f29a5650f848f199a35003abcd",
+      "role": "documentation",
+      "content_type": "text/markdown"
+    },
+    {
+      "path": "demo.chrom.sizes",
+      "size": 14,
+      "sha256": "33bfc9044fa58958ff2cb26787c46de9530a66baeae00c7b0f5d5335462ac2ef",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "synthetic-alignments.sam",
+      "size": 479,
+      "sha256": "70e414a93e7e4936cc221e64f11681e9bd7b457170da08ce6e368718fae66601",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "synthetic-features.bed",
+      "size": 99,
+      "sha256": "12419d12c81b7c9f0a539ea697ecd2b3f15e339d0e12ab922b385a27d715028e",
+      "role": "data",
+      "content_type": "application/vnd.realvnc.bed"
+    },
+    {
+      "path": "synthetic-hits.blast6",
+      "size": 125,
+      "sha256": "0c8b27bc35eb7e8c24cc9980866b226c0636b62f8f98416afbb62e4a68aaedfa",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    }
+  ]
+}

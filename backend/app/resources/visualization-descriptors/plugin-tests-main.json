@@ -1,0 +1,931 @@
+[
+  {
+    "dataset_id": "viz-test-sqlite-table",
+    "name": "插件测试 · SQLite 只读表格 · Palmer 企鹅格式转换",
+    "description": "选择 penguins，344条、8列；翻到下一页，bill_length_mm可画当前页数值图。由同一份CC0科学观测转换，不增删记录；原CSV保留。",
+    "plugin_id": "viz-sqlite-table",
+    "view_kind": "table",
+    "domain": "tabular",
+    "publisher": "Palmer Station LTER / palmerpenguins",
+    "source_url": "https://github.com/allisonhorst/palmerpenguins",
+    "license": "CC0-1.0",
+    "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "license_details": "CC0-1.0；用于可视化测试，样本性质为 scientific_derived。",
+    "authors": [
+      "Palmer Station LTER / palmerpenguins"
+    ],
+    "source_version": "2026-09-18 已审查快照",
+    "sample_scope": "选择 penguins，344条、8列；翻到下一页，bill_length_mm可画当前页数值图。由同一份CC0科学观测转换，不增删记录；原CSV保留。",
+    "sample_kind": "scientific_derived",
+    "test_steps": [
+      "选择文件 penguins.sqlite，再选择插件 viz-sqlite-table",
+      "选择 penguins，344条、8列；翻到下一页，bill_length_mm可画当前页数值图"
+    ],
+    "files": [
+      {
+        "path": "penguins.csv",
+        "size": 15241,
+        "sha256": "f204db2c753b0937caac3cb35258562c14f073e4bbc76be24b4c51ce22767a93",
+        "url": "https://raw.githubusercontent.com/allisonhorst/palmerpenguins/8957207b78d6ccd1b4654a9dd9c9041b657478ab/inst/extdata/penguins.csv"
+      },
+      {
+        "path": "penguins.sqlite",
+        "size": 28672,
+        "sha256": "afe910d6c27f67cb53f9c12afc859340ac0ee7cbeeaa294b8b8f4a3b51cf1c72",
+        "derived_from": [
+          "penguins.csv"
+        ]
+      }
+    ],
+    "transformation": "backend/scripts/plugin_samples_tables.py：数字字段按单位转数值；NA仅在数据库/JSON/Arrow转null，HTML/MD保持原文本。344行8列19缺失，未填充。",
+    "entry_file": "penguins.sqlite"
+  },
+  {
+    "dataset_id": "viz-test-duckdb-table",
+    "name": "插件测试 · DuckDB 只读数据库 · Palmer 企鹅格式转换",
+    "description": "选择 penguins，344条、8列；SQL NULL保留，读文件不执行源SQL。由同一份CC0科学观测转换，不增删记录；原CSV保留。",
+    "plugin_id": "viz-duckdb-table",
+    "view_kind": "table",
+    "domain": "tabular",
+    "publisher": "Palmer Station LTER / palmerpenguins",
+    "source_url": "https://github.com/allisonhorst/palmerpenguins",
+    "license": "CC0-1.0",
+    "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "license_details": "CC0-1.0；用于可视化测试，样本性质为 scientific_derived。",
+    "authors": [
+      "Palmer Station LTER / palmerpenguins"
+    ],
+    "source_version": "2026-09-18 已审查快照",
+    "sample_scope": "选择 penguins，344条、8列；SQL NULL保留，读文件不执行源SQL。由同一份CC0科学观测转换，不增删记录；原CSV保留。",
+    "sample_kind": "scientific_derived",
+    "test_steps": [
+      "选择文件 penguins.duckdb，再选择插件 viz-duckdb-table",
+      "选择 penguins，344条、8列；SQL NULL保留，读文件不执行源SQL"
+    ],
+    "files": [
+      {
+        "path": "penguins.csv",
+        "size": 15241,
+        "sha256": "f204db2c753b0937caac3cb35258562c14f073e4bbc76be24b4c51ce22767a93",
+        "url": "https://raw.githubusercontent.com/allisonhorst/palmerpenguins/8957207b78d6ccd1b4654a9dd9c9041b657478ab/inst/extdata/penguins.csv"
+      },
+      {
+        "path": "penguins.duckdb",
+        "size": 536576,
+        "sha256": "dd1eec5d6b575e01b1b5ad4398e0c47bbcabf1ef6a5c2ef4d6dcf52054d2e271",
+        "derived_from": [
+          "penguins.csv"
+        ]
+      }
+    ],
+    "transformation": "backend/scripts/plugin_samples_tables.py：数字字段按单位转数值；NA仅在数据库/JSON/Arrow转null，HTML/MD保持原文本。344行8列19缺失，未填充。",
+    "entry_file": "penguins.duckdb"
+  },
+  {
+    "dataset_id": "viz-test-columnar-window",
+    "name": "插件测试 · Parquet / Arrow 分块表格 · Palmer 企鹅格式转换",
+    "description": "344行、8列，6个行组；选择列并分页，仅读取窗口。由同一份CC0科学观测转换，不增删记录；原CSV保留。",
+    "plugin_id": "viz-columnar-window",
+    "view_kind": "table",
+    "domain": "tabular",
+    "publisher": "Palmer Station LTER / palmerpenguins",
+    "source_url": "https://github.com/allisonhorst/palmerpenguins",
+    "license": "CC0-1.0",
+    "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "license_details": "CC0-1.0；用于可视化测试，样本性质为 scientific_derived。",
+    "authors": [
+      "Palmer Station LTER / palmerpenguins"
+    ],
+    "source_version": "2026-09-18 已审查快照",
+    "sample_scope": "344行、8列，6个行组；选择列并分页，仅读取窗口。由同一份CC0科学观测转换，不增删记录；原CSV保留。",
+    "sample_kind": "scientific_derived",
+    "test_steps": [
+      "选择文件 penguins.parquet，再选择插件 viz-columnar-window",
+      "344行、8列，6个行组；选择列并分页，仅读取窗口"
+    ],
+    "files": [
+      {
+        "path": "penguins.csv",
+        "size": 15241,
+        "sha256": "f204db2c753b0937caac3cb35258562c14f073e4bbc76be24b4c51ce22767a93",
+        "url": "https://raw.githubusercontent.com/allisonhorst/palmerpenguins/8957207b78d6ccd1b4654a9dd9c9041b657478ab/inst/extdata/penguins.csv"
+      },
+      {
+        "path": "penguins.parquet",
+        "size": 18079,
+        "sha256": "f1e590a8c43e3404958ec02d7c0715c95bc4c7880f08285cade0a3f82709d56c",
+        "derived_from": [
+          "penguins.csv"
+        ]
+      }
+    ],
+    "transformation": "backend/scripts/plugin_samples_tables.py：数字字段按单位转数值；NA仅在数据库/JSON/Arrow转null，HTML/MD保持原文本。344行8列19缺失，未填充。",
+    "entry_file": "penguins.parquet"
+  },
+  {
+    "dataset_id": "viz-test-sql-dump",
+    "name": "插件测试 · SQL 转储字面量 · Palmer 企鹅格式转换",
+    "description": "静态解析 CREATE 与344条INSERT；不恢复数据库、不执行SQL。由同一份CC0科学观测转换，不增删记录；原CSV保留。",
+    "plugin_id": "viz-sql-dump",
+    "view_kind": "table",
+    "domain": "tabular",
+    "publisher": "Palmer Station LTER / palmerpenguins",
+    "source_url": "https://github.com/allisonhorst/palmerpenguins",
+    "license": "CC0-1.0",
+    "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "license_details": "CC0-1.0；用于可视化测试，样本性质为 scientific_derived。",
+    "authors": [
+      "Palmer Station LTER / palmerpenguins"
+    ],
+    "source_version": "2026-09-18 已审查快照",
+    "sample_scope": "静态解析 CREATE 与344条INSERT；不恢复数据库、不执行SQL。由同一份CC0科学观测转换，不增删记录；原CSV保留。",
+    "sample_kind": "scientific_derived",
+    "test_steps": [
+      "选择文件 penguins.sql，再选择插件 viz-sql-dump",
+      "静态解析 CREATE 与344条INSERT；不恢复数据库、不执行SQL"
+    ],
+    "files": [
+      {
+        "path": "penguins.csv",
+        "size": 15241,
+        "sha256": "f204db2c753b0937caac3cb35258562c14f073e4bbc76be24b4c51ce22767a93",
+        "url": "https://raw.githubusercontent.com/allisonhorst/palmerpenguins/8957207b78d6ccd1b4654a9dd9c9041b657478ab/inst/extdata/penguins.csv"
+      },
+      {
+        "path": "penguins.sql",
+        "size": 28600,
+        "sha256": "6ed194a90bfb83db2a3634bfcfb078cd09da218414ffa9540c628e06fce5ff23",
+        "derived_from": [
+          "penguins.csv"
+        ]
+      }
+    ],
+    "transformation": "backend/scripts/plugin_samples_tables.py：数字字段按单位转数值；NA仅在数据库/JSON/Arrow转null，HTML/MD保持原文本。344行8列19缺失，未填充。",
+    "entry_file": "penguins.sql"
+  },
+  {
+    "dataset_id": "viz-test-structured-tree",
+    "name": "插件测试 · 结构化数据树 · Palmer 企鹅格式转换",
+    "description": "展开 observations 数组，344项；JSON null对应原CSV的19个NA。由同一份CC0科学观测转换，不增删记录；原CSV保留。",
+    "plugin_id": "viz-structured-tree",
+    "view_kind": "tree",
+    "domain": "tabular",
+    "publisher": "Palmer Station LTER / palmerpenguins",
+    "source_url": "https://github.com/allisonhorst/palmerpenguins",
+    "license": "CC0-1.0",
+    "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "license_details": "CC0-1.0；用于可视化测试，样本性质为 scientific_derived。",
+    "authors": [
+      "Palmer Station LTER / palmerpenguins"
+    ],
+    "source_version": "2026-09-18 已审查快照",
+    "sample_scope": "展开 observations 数组，344项；JSON null对应原CSV的19个NA。由同一份CC0科学观测转换，不增删记录；原CSV保留。",
+    "sample_kind": "scientific_derived",
+    "test_steps": [
+      "选择文件 penguins.json，再选择插件 viz-structured-tree",
+      "展开 observations 数组，344项；JSON null对应原CSV的19个NA"
+    ],
+    "files": [
+      {
+        "path": "penguins.csv",
+        "size": 15241,
+        "sha256": "f204db2c753b0937caac3cb35258562c14f073e4bbc76be24b4c51ce22767a93",
+        "url": "https://raw.githubusercontent.com/allisonhorst/palmerpenguins/8957207b78d6ccd1b4654a9dd9c9041b657478ab/inst/extdata/penguins.csv"
+      },
+      {
+        "path": "penguins.json",
+        "size": 77769,
+        "sha256": "08f7a6edccf0330bb635ebdb6c74b76958983bd2d35b2ebc522af5593a737e31",
+        "derived_from": [
+          "penguins.csv"
+        ]
+      }
+    ],
+    "transformation": "backend/scripts/plugin_samples_tables.py：数字字段按单位转数值；NA仅在数据库/JSON/Arrow转null，HTML/MD保持原文本。344行8列19缺失，未填充。",
+    "entry_file": "penguins.json"
+  },
+  {
+    "dataset_id": "viz-test-html",
+    "name": "插件测试 · HTML 文档 · Palmer 企鹅格式转换",
+    "description": "静态网页展示344行观测，无脚本、外部资源。由同一份CC0科学观测转换，不增删记录；原CSV保留。",
+    "plugin_id": "html",
+    "view_kind": "document",
+    "domain": "documents",
+    "publisher": "Palmer Station LTER / palmerpenguins",
+    "source_url": "https://github.com/allisonhorst/palmerpenguins",
+    "license": "CC0-1.0",
+    "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "license_details": "CC0-1.0；用于可视化测试，样本性质为 scientific_derived。",
+    "authors": [
+      "Palmer Station LTER / palmerpenguins"
+    ],
+    "source_version": "2026-09-18 已审查快照",
+    "sample_scope": "静态网页展示344行观测，无脚本、外部资源。由同一份CC0科学观测转换，不增删记录；原CSV保留。",
+    "sample_kind": "scientific_derived",
+    "test_steps": [
+      "选择文件 penguins.html，再选择插件 html",
+      "静态网页展示344行观测，无脚本、外部资源"
+    ],
+    "files": [
+      {
+        "path": "penguins.csv",
+        "size": 15241,
+        "sha256": "f204db2c753b0937caac3cb35258562c14f073e4bbc76be24b4c51ce22767a93",
+        "url": "https://raw.githubusercontent.com/allisonhorst/palmerpenguins/8957207b78d6ccd1b4654a9dd9c9041b657478ab/inst/extdata/penguins.csv"
+      },
+      {
+        "path": "penguins.html",
+        "size": 40972,
+        "sha256": "e0ece445b84a6456d1509b639d63853f42dede6d571307b6e77a34d150c04eeb",
+        "derived_from": [
+          "penguins.csv"
+        ]
+      }
+    ],
+    "transformation": "backend/scripts/plugin_samples_tables.py：数字字段按单位转数值；NA仅在数据库/JSON/Arrow转null，HTML/MD保持原文本。344行8列19缺失，未填充。",
+    "entry_file": "penguins.html"
+  },
+  {
+    "dataset_id": "viz-test-markdown",
+    "name": "插件测试 · Markdown 文档 · Palmer 企鹅格式转换",
+    "description": "Markdown标题与8列表格；344条原始文本记录。由同一份CC0科学观测转换，不增删记录；原CSV保留。",
+    "plugin_id": "markdown",
+    "view_kind": "document",
+    "domain": "documents",
+    "publisher": "Palmer Station LTER / palmerpenguins",
+    "source_url": "https://github.com/allisonhorst/palmerpenguins",
+    "license": "CC0-1.0",
+    "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "license_details": "CC0-1.0；用于可视化测试，样本性质为 scientific_derived。",
+    "authors": [
+      "Palmer Station LTER / palmerpenguins"
+    ],
+    "source_version": "2026-09-18 已审查快照",
+    "sample_scope": "Markdown标题与8列表格；344条原始文本记录。由同一份CC0科学观测转换，不增删记录；原CSV保留。",
+    "sample_kind": "scientific_derived",
+    "test_steps": [
+      "选择文件 penguins.md，再选择插件 markdown",
+      "Markdown标题与8列表格；344条原始文本记录"
+    ],
+    "files": [
+      {
+        "path": "penguins.csv",
+        "size": 15241,
+        "sha256": "f204db2c753b0937caac3cb35258562c14f073e4bbc76be24b4c51ce22767a93",
+        "url": "https://raw.githubusercontent.com/allisonhorst/palmerpenguins/8957207b78d6ccd1b4654a9dd9c9041b657478ab/inst/extdata/penguins.csv"
+      },
+      {
+        "path": "penguins.md",
+        "size": 21707,
+        "sha256": "6afe4596963f4a5119c555c7f9a835b36f308f63401c4ab3aeb40b6d8d7feff7",
+        "derived_from": [
+          "penguins.csv"
+        ]
+      }
+    ],
+    "transformation": "backend/scripts/plugin_samples_tables.py：数字字段按单位转数值；NA仅在数据库/JSON/Arrow转null，HTML/MD保持原文本。344行8列19缺失，未填充。",
+    "entry_file": "penguins.md"
+  },
+  {
+    "dataset_id": "viz-test-archive-directory",
+    "name": "插件测试 · 压缩包目录 · Palmer 企鹅格式转换",
+    "description": "列出 penguins.csv 与 README.md 两个成员，不解压到宿主目录。由同一份CC0科学观测转换，不增删记录；原CSV保留。",
+    "plugin_id": "viz-archive-directory",
+    "view_kind": "table",
+    "domain": "tabular",
+    "publisher": "Palmer Station LTER / palmerpenguins",
+    "source_url": "https://github.com/allisonhorst/palmerpenguins",
+    "license": "CC0-1.0",
+    "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "license_details": "CC0-1.0；用于可视化测试，样本性质为 scientific_derived。",
+    "authors": [
+      "Palmer Station LTER / palmerpenguins"
+    ],
+    "source_version": "2026-09-18 已审查快照",
+    "sample_scope": "列出 penguins.csv 与 README.md 两个成员，不解压到宿主目录。由同一份CC0科学观测转换，不增删记录；原CSV保留。",
+    "sample_kind": "scientific_derived",
+    "test_steps": [
+      "选择文件 penguins-bundle.zip，再选择插件 viz-archive-directory",
+      "列出 penguins.csv 与 README.md 两个成员，不解压到宿主目录"
+    ],
+    "files": [
+      {
+        "path": "penguins.csv",
+        "size": 15241,
+        "sha256": "f204db2c753b0937caac3cb35258562c14f073e4bbc76be24b4c51ce22767a93",
+        "url": "https://raw.githubusercontent.com/allisonhorst/palmerpenguins/8957207b78d6ccd1b4654a9dd9c9041b657478ab/inst/extdata/penguins.csv"
+      },
+      {
+        "path": "penguins-bundle.zip",
+        "size": 6701,
+        "sha256": "99656819f02d6b16ea246d4807f11b523ca6fa433c0239b87662272b7198cc9f",
+        "derived_from": [
+          "penguins.csv"
+        ]
+      }
+    ],
+    "transformation": "backend/scripts/plugin_samples_tables.py：数字字段按单位转数值；NA仅在数据库/JSON/Arrow转null，HTML/MD保持原文本。344行8列19缺失，未填充。",
+    "entry_file": "penguins-bundle.zip"
+  },
+  {
+    "dataset_id": "viz-test-archive-members",
+    "name": "插件测试 · 归档成员文本预览 · Palmer 企鹅格式转换",
+    "description": "选择 penguins.csv 成员，显示有界文本预览；切换 README.md。由同一份CC0科学观测转换，不增删记录；原CSV保留。",
+    "plugin_id": "viz-archive-members",
+    "view_kind": "text",
+    "domain": "tabular",
+    "publisher": "Palmer Station LTER / palmerpenguins",
+    "source_url": "https://github.com/allisonhorst/palmerpenguins",
+    "license": "CC0-1.0",
+    "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "license_details": "CC0-1.0；用于可视化测试，样本性质为 scientific_derived。",
+    "authors": [
+      "Palmer Station LTER / palmerpenguins"
+    ],
+    "source_version": "2026-09-18 已审查快照",
+    "sample_scope": "选择 penguins.csv 成员，显示有界文本预览；切换 README.md。由同一份CC0科学观测转换，不增删记录；原CSV保留。",
+    "sample_kind": "scientific_derived",
+    "test_steps": [
+      "选择文件 penguins-bundle.zip，再选择插件 viz-archive-members",
+      "选择 penguins.csv 成员，显示有界文本预览；切换 README.md"
+    ],
+    "files": [
+      {
+        "path": "penguins.csv",
+        "size": 15241,
+        "sha256": "f204db2c753b0937caac3cb35258562c14f073e4bbc76be24b4c51ce22767a93",
+        "url": "https://raw.githubusercontent.com/allisonhorst/palmerpenguins/8957207b78d6ccd1b4654a9dd9c9041b657478ab/inst/extdata/penguins.csv"
+      },
+      {
+        "path": "penguins-bundle.zip",
+        "size": 6701,
+        "sha256": "99656819f02d6b16ea246d4807f11b523ca6fa433c0239b87662272b7198cc9f",
+        "derived_from": [
+          "penguins.csv"
+        ]
+      }
+    ],
+    "transformation": "backend/scripts/plugin_samples_tables.py：数字字段按单位转数值；NA仅在数据库/JSON/Arrow转null，HTML/MD保持原文本。344行8列19缺失，未填充。",
+    "entry_file": "penguins-bundle.zip"
+  },
+  {
+    "dataset_id": "viz-test-access-table",
+    "name": "插件测试 · Access 只读数据库 · Access 普通表",
+    "description": "本项目已有的原创合成兼容性测试夹具，非真实科研观测。选择 Samples 普通表；测试中文、空值、精确小数、日期，Empty为空表；不包含用户数据。",
+    "plugin_id": "viz-access-table",
+    "view_kind": "table",
+    "domain": "tabular",
+    "publisher": "AI-DataSeek 测试夹具",
+    "source_url": "https://github.com/km345297256/AI-DATASEEK",
+    "license": "MIT",
+    "license_url": "https://github.com/km345297256/AI-DATASEEK/blob/v2/LICENSE",
+    "license_details": "MIT；用于可视化测试，样本性质为 project_fixture。",
+    "authors": [
+      "AI-DataSeek 测试夹具"
+    ],
+    "source_version": "AI-DataSeek fixture snapshot fb609ed5460e9c247dc58fb2c3cb51410de27c6f",
+    "sample_scope": "本项目已有的原创合成兼容性测试夹具，非真实科研观测。选择 Samples 普通表；测试中文、空值、精确小数、日期，Empty为空表；不包含用户数据。",
+    "sample_kind": "project_fixture",
+    "test_steps": [
+      "预览主文件并选择 viz-access-table",
+      "选择 Samples 普通表；测试中文、空值、精确小数、日期，Empty为空表；不包含用户数据。"
+    ],
+    "files": [
+      {
+        "path": "synthetic-v2010.accdb",
+        "size": 368640,
+        "sha256": "e00a13460bc8ecb634405b8333d3584b09d4cfd3f0ad55af1b71c946ae2833ed",
+        "origin": {
+          "kind": "project_fixture",
+          "repository_file": "sandbox/tests/fixtures/database/synthetic-v2010.accdb",
+          "sha256": "e00a13460bc8ecb634405b8333d3584b09d4cfd3f0ad55af1b71c946ae2833ed"
+        }
+      },
+      {
+        "path": "LICENSE.txt",
+        "size": 1066,
+        "sha256": "991f0bde5249ee6aad0a5a597197c7a7f6024abd2650516fcd7a83d908234115",
+        "role": "documentation",
+        "origin": {
+          "kind": "project_fixture",
+          "repository_file": "LICENSE",
+          "sha256": "991f0bde5249ee6aad0a5a597197c7a7f6024abd2650516fcd7a83d908234115"
+        }
+      }
+    ],
+    "entry_file": "synthetic-v2010.accdb"
+  },
+  {
+    "dataset_id": "viz-test-bson",
+    "name": "插件测试 · BSON 文档记录 · BSON 原生类型",
+    "description": "本项目已有的原创合成兼容性测试夹具，非真实科研观测。展开对象/数组；int64、Decimal128 保持精度；JS和正则仅显示安全标记，不执行。",
+    "plugin_id": "viz-bson",
+    "view_kind": "tree",
+    "domain": "tabular",
+    "publisher": "AI-DataSeek 测试夹具",
+    "source_url": "https://github.com/km345297256/AI-DATASEEK",
+    "license": "MIT",
+    "license_url": "https://github.com/km345297256/AI-DATASEEK/blob/v2/LICENSE",
+    "license_details": "MIT；用于可视化测试，样本性质为 project_fixture。",
+    "authors": [
+      "AI-DataSeek 测试夹具"
+    ],
+    "source_version": "AI-DataSeek fixture snapshot fb609ed5460e9c247dc58fb2c3cb51410de27c6f",
+    "sample_scope": "本项目已有的原创合成兼容性测试夹具，非真实科研观测。展开对象/数组；int64、Decimal128 保持精度；JS和正则仅显示安全标记，不执行。",
+    "sample_kind": "project_fixture",
+    "test_steps": [
+      "预览主文件并选择 viz-bson",
+      "展开对象/数组；int64、Decimal128 保持精度；JS和正则仅显示安全标记，不执行。"
+    ],
+    "files": [
+      {
+        "path": "synthetic-pymongo-4.17.0.bson",
+        "size": 1213,
+        "sha256": "239cddebb3967003caf75cf5b20cd1de3c47b0a16df1f66481cee29a244db986",
+        "origin": {
+          "kind": "project_fixture",
+          "repository_file": "sandbox/tests/fixtures/database-records/synthetic-pymongo-4.17.0.bson",
+          "sha256": "239cddebb3967003caf75cf5b20cd1de3c47b0a16df1f66481cee29a244db986"
+        }
+      },
+      {
+        "path": "LICENSE.txt",
+        "size": 1066,
+        "sha256": "991f0bde5249ee6aad0a5a597197c7a7f6024abd2650516fcd7a83d908234115",
+        "role": "documentation",
+        "origin": {
+          "kind": "project_fixture",
+          "repository_file": "LICENSE",
+          "sha256": "991f0bde5249ee6aad0a5a597197c7a7f6024abd2650516fcd7a83d908234115"
+        }
+      }
+    ],
+    "entry_file": "synthetic-pymongo-4.17.0.bson"
+  },
+  {
+    "dataset_id": "viz-test-redis-rdb",
+    "name": "插件测试 · Redis RDB 键值记录 · Redis 7.2.7 原生快照",
+    "description": "本项目已有的原创合成兼容性测试夹具，非真实科研观测。浏览 DB 0/2，string/list/set/hash/zset；精确整数文本与 Unicode；不启动Redis、不恢复。",
+    "plugin_id": "viz-redis-rdb",
+    "view_kind": "tree",
+    "domain": "tabular",
+    "publisher": "AI-DataSeek 测试夹具",
+    "source_url": "https://github.com/km345297256/AI-DATASEEK",
+    "license": "MIT",
+    "license_url": "https://github.com/km345297256/AI-DATASEEK/blob/v2/LICENSE",
+    "license_details": "MIT；用于可视化测试，样本性质为 project_fixture。",
+    "authors": [
+      "AI-DataSeek 测试夹具"
+    ],
+    "source_version": "AI-DataSeek fixture snapshot fb609ed5460e9c247dc58fb2c3cb51410de27c6f",
+    "sample_scope": "本项目已有的原创合成兼容性测试夹具，非真实科研观测。浏览 DB 0/2，string/list/set/hash/zset；精确整数文本与 Unicode；不启动Redis、不恢复。",
+    "sample_kind": "project_fixture",
+    "test_steps": [
+      "预览主文件并选择 viz-redis-rdb",
+      "浏览 DB 0/2，string/list/set/hash/zset；精确整数文本与 Unicode；不启动Redis、不恢复。"
+    ],
+    "files": [
+      {
+        "path": "native-redis-7.2.7.rdb",
+        "size": 346,
+        "sha256": "d7853cacc4bbee20f5d632226ac309ce3b913da47a669f2bfa373426431fed69",
+        "origin": {
+          "kind": "project_fixture",
+          "repository_file": "sandbox/tests/fixtures/database-records/native-redis-7.2.7.rdb",
+          "sha256": "d7853cacc4bbee20f5d632226ac309ce3b913da47a669f2bfa373426431fed69"
+        }
+      },
+      {
+        "path": "LICENSE.txt",
+        "size": 1066,
+        "sha256": "991f0bde5249ee6aad0a5a597197c7a7f6024abd2650516fcd7a83d908234115",
+        "role": "documentation",
+        "origin": {
+          "kind": "project_fixture",
+          "repository_file": "LICENSE",
+          "sha256": "991f0bde5249ee6aad0a5a597197c7a7f6024abd2650516fcd7a83d908234115"
+        }
+      }
+    ],
+    "entry_file": "native-redis-7.2.7.rdb"
+  },
+  {
+    "dataset_id": "viz-test-mysql-sdi",
+    "name": "插件测试 · MySQL 表空间结构目录 · MySQL 8.0.46 元数据",
+    "description": "本项目已有的原创合成兼容性测试夹具，非真实科研观测。检查 measurements 表字段、主键和二级索引元数据；不是数据库行数据恢复。",
+    "plugin_id": "viz-mysql-sdi",
+    "view_kind": "table",
+    "domain": "tabular",
+    "publisher": "AI-DataSeek 测试夹具",
+    "source_url": "https://github.com/km345297256/AI-DATASEEK",
+    "license": "MIT",
+    "license_url": "https://github.com/km345297256/AI-DATASEEK/blob/v2/LICENSE",
+    "license_details": "MIT；用于可视化测试，样本性质为 project_fixture。",
+    "authors": [
+      "AI-DataSeek 测试夹具"
+    ],
+    "source_version": "AI-DataSeek fixture snapshot fb609ed5460e9c247dc58fb2c3cb51410de27c6f",
+    "sample_scope": "本项目已有的原创合成兼容性测试夹具，非真实科研观测。检查 measurements 表字段、主键和二级索引元数据；不是数据库行数据恢复。",
+    "sample_kind": "project_fixture",
+    "test_steps": [
+      "预览主文件并选择 viz-mysql-sdi",
+      "检查 measurements 表字段、主键和二级索引元数据；不是数据库行数据恢复。"
+    ],
+    "files": [
+      {
+        "path": "mysql-8.0.46.ibd",
+        "size": 131072,
+        "sha256": "ef03c988c5e6ddf489c80be3d903b783ad15cb6777bb877ff18f360b5e13f954",
+        "origin": {
+          "kind": "project_fixture",
+          "repository_file": "sandbox/tests/fixtures/physical-database/mysql-8.0.46.ibd",
+          "sha256": "ef03c988c5e6ddf489c80be3d903b783ad15cb6777bb877ff18f360b5e13f954"
+        }
+      },
+      {
+        "path": "LICENSE.txt",
+        "size": 1066,
+        "sha256": "991f0bde5249ee6aad0a5a597197c7a7f6024abd2650516fcd7a83d908234115",
+        "role": "documentation",
+        "origin": {
+          "kind": "project_fixture",
+          "repository_file": "LICENSE",
+          "sha256": "991f0bde5249ee6aad0a5a597197c7a7f6024abd2650516fcd7a83d908234115"
+        }
+      }
+    ],
+    "entry_file": "mysql-8.0.46.ibd"
+  },
+  {
+    "dataset_id": "viz-test-sst-records",
+    "name": "插件测试 · SST 物理点记录 · RocksDB 物理键值",
+    "description": "本项目已有的原创合成兼容性测试夹具，非真实科研观测。逐条浏览键值、序号、删除标记；二进制用安全表示，不执行数据库操作。",
+    "plugin_id": "viz-sst-records",
+    "view_kind": "table",
+    "domain": "tabular",
+    "publisher": "AI-DataSeek 测试夹具",
+    "source_url": "https://github.com/km345297256/AI-DATASEEK",
+    "license": "MIT",
+    "license_url": "https://github.com/km345297256/AI-DATASEEK/blob/v2/LICENSE",
+    "license_details": "MIT；用于可视化测试，样本性质为 project_fixture。",
+    "authors": [
+      "AI-DataSeek 测试夹具"
+    ],
+    "source_version": "AI-DataSeek fixture snapshot fb609ed5460e9c247dc58fb2c3cb51410de27c6f",
+    "sample_scope": "本项目已有的原创合成兼容性测试夹具，非真实科研观测。逐条浏览键值、序号、删除标记；二进制用安全表示，不执行数据库操作。",
+    "sample_kind": "project_fixture",
+    "test_steps": [
+      "预览主文件并选择 viz-sst-records",
+      "逐条浏览键值、序号、删除标记；二进制用安全表示，不执行数据库操作。"
+    ],
+    "files": [
+      {
+        "path": "rocksdb-6.11.4.sst",
+        "size": 855,
+        "sha256": "f02d53fc206bbdc4026e7be71cfc1597bd20bfa1a466127d3acb7f06ba61b6fd",
+        "origin": {
+          "kind": "project_fixture",
+          "repository_file": "sandbox/tests/fixtures/physical-database/rocksdb-6.11.4.sst",
+          "sha256": "f02d53fc206bbdc4026e7be71cfc1597bd20bfa1a466127d3acb7f06ba61b6fd"
+        }
+      },
+      {
+        "path": "LICENSE.txt",
+        "size": 1066,
+        "sha256": "991f0bde5249ee6aad0a5a597197c7a7f6024abd2650516fcd7a83d908234115",
+        "role": "documentation",
+        "origin": {
+          "kind": "project_fixture",
+          "repository_file": "LICENSE",
+          "sha256": "991f0bde5249ee6aad0a5a597197c7a7f6024abd2650516fcd7a83d908234115"
+        }
+      }
+    ],
+    "entry_file": "rocksdb-6.11.4.sst"
+  },
+  {
+    "dataset_id": "viz-test-postgres-dump",
+    "name": "插件测试 · PostgreSQL 备份目录 · PostgreSQL 18.6 原生目录",
+    "description": "本项目已有的原创合成兼容性测试夹具，非真实科研观测。浏览两张表及TABLE DATA目录；不恢复或解压数据段，不能当作行查询。",
+    "plugin_id": "viz-postgres-dump",
+    "view_kind": "table",
+    "domain": "tabular",
+    "publisher": "AI-DataSeek 测试夹具",
+    "source_url": "https://github.com/km345297256/AI-DATASEEK",
+    "license": "MIT",
+    "license_url": "https://github.com/km345297256/AI-DATASEEK/blob/v2/LICENSE",
+    "license_details": "MIT；用于可视化测试，样本性质为 project_fixture。",
+    "authors": [
+      "AI-DataSeek 测试夹具"
+    ],
+    "source_version": "AI-DataSeek fixture snapshot fb609ed5460e9c247dc58fb2c3cb51410de27c6f",
+    "sample_scope": "本项目已有的原创合成兼容性测试夹具，非真实科研观测。浏览两张表及TABLE DATA目录；不恢复或解压数据段，不能当作行查询。",
+    "sample_kind": "project_fixture",
+    "test_steps": [
+      "预览主文件并选择 viz-postgres-dump",
+      "浏览两张表及TABLE DATA目录；不恢复或解压数据段，不能当作行查询。"
+    ],
+    "files": [
+      {
+        "path": "synthetic-postgres-none.dump",
+        "size": 2017,
+        "sha256": "b2e2db08384a26283e98d0e51aca30f8a945d43f9c43426b39bf52a4a1b8261f",
+        "origin": {
+          "kind": "project_fixture",
+          "repository_file": "sandbox/tests/fixtures/database-dumps/synthetic-postgres-none.dump",
+          "sha256": "b2e2db08384a26283e98d0e51aca30f8a945d43f9c43426b39bf52a4a1b8261f"
+        }
+      },
+      {
+        "path": "LICENSE.txt",
+        "size": 1066,
+        "sha256": "991f0bde5249ee6aad0a5a597197c7a7f6024abd2650516fcd7a83d908234115",
+        "role": "documentation",
+        "origin": {
+          "kind": "project_fixture",
+          "repository_file": "LICENSE",
+          "sha256": "991f0bde5249ee6aad0a5a597197c7a7f6024abd2650516fcd7a83d908234115"
+        }
+      }
+    ],
+    "entry_file": "synthetic-postgres-none.dump"
+  },
+  {
+    "dataset_id": "viz-test-excel",
+    "name": "插件测试 · Excel 工作表预览 · UCI 建筑能效",
+    "description": "768种建筑模拟配置，8个输入特征及供暖/制冷负荷两个响应，共10列。研究原始发布工作簿，未填补末尾空白行。",
+    "plugin_id": "viz-excel",
+    "view_kind": "table",
+    "domain": "tabular",
+    "publisher": "UCI · Athanasios Tsanas / Angeliki Xifara",
+    "source_url": "https://archive.ics.uci.edu/dataset/242/energy%2Befficiency",
+    "license": "CC BY 4.0",
+    "license_url": "https://creativecommons.org/licenses/by/4.0/",
+    "license_details": "CC BY 4.0；用于可视化测试，样本性质为 scientific_original。",
+    "authors": [
+      "UCI · Athanasios Tsanas / Angeliki Xifara"
+    ],
+    "source_version": "2026-09-18 已审查快照",
+    "sample_scope": "768种建筑模拟配置，8个输入特征及供暖/制冷负荷两个响应，共10列。研究原始发布工作簿，未填补末尾空白行。",
+    "sample_kind": "scientific_original",
+    "test_steps": [
+      "预览 ENB2012_data.xlsx，选择 viz-excel",
+      "选择工作表，核对 X1–X8、Y1、Y2；切换行窗口；共有768条有效模拟记录"
+    ],
+    "files": [
+      {
+        "path": "energy-efficiency.zip",
+        "size": 76321,
+        "sha256": "499441eee27929a4b00417f58fd8c63c9cc14b8a71520cd0dd27fcb626738351",
+        "url": "https://archive.ics.uci.edu/static/public/242/energy+efficiency.zip"
+      },
+      {
+        "path": "ENB2012_data.xlsx",
+        "size": 76189,
+        "sha256": "0089fcffc1415e41e2ff63730cca5280efe54fc43d722dfde1b0aaa808e35dc4",
+        "derived_from": [
+          "energy-efficiency.zip"
+        ]
+      }
+    ],
+    "doi": "10.24432/C51307",
+    "transformation": "只提取ZIP内精确成员ENB2012_data.xlsx，工作簿未改动。",
+    "entry_file": "ENB2012_data.xlsx"
+  },
+  {
+    "dataset_id": "viz-test-docx",
+    "name": "插件测试 · DOCX 清晰阅读 · python-docx 段落和表格",
+    "description": "python-docx v1.2.0 官方格式测试夹具，非科研观测。显示官方段落/表格文档；不执行宏或外链。",
+    "plugin_id": "viz-docx",
+    "view_kind": "document",
+    "domain": "documents",
+    "publisher": "python-docx · Steve Canny",
+    "source_url": "https://github.com/python-openxml/python-docx/tree/v1.2.0/tests/test_files",
+    "license": "MIT",
+    "license_url": "https://github.com/python-openxml/python-docx/blob/v1.2.0/LICENSE",
+    "license_details": "MIT；用于可视化测试，样本性质为 official_fixture。",
+    "authors": [
+      "python-docx · Steve Canny"
+    ],
+    "source_version": "python-docx v1.2.0",
+    "sample_scope": "python-docx v1.2.0 官方格式测试夹具，非科研观测。显示官方段落/表格文档；不执行宏或外链。",
+    "sample_kind": "official_fixture",
+    "test_steps": [
+      "预览 blk-inner-content.docx，选择 viz-docx",
+      "显示官方段落/表格文档；不执行宏或外链。"
+    ],
+    "files": [
+      {
+        "path": "blk-inner-content.docx",
+        "size": 11949,
+        "sha256": "16243dd05f686d6d5fab331843691492ad78ae3eb4f13cc8686077b44718c0ba",
+        "url": "https://raw.githubusercontent.com/python-openxml/python-docx/v1.2.0/tests/test_files/blk-inner-content.docx"
+      },
+      {
+        "path": "docx-LICENSE.txt",
+        "size": 1104,
+        "sha256": "7652f271e46d0d533e9dc463f3b5fcbdcacf4d6a9c8d6b554d15efd0f37f6132",
+        "role": "documentation",
+        "url": "https://raw.githubusercontent.com/python-openxml/python-docx/v1.2.0/LICENSE"
+      }
+    ],
+    "entry_file": "blk-inner-content.docx"
+  },
+  {
+    "dataset_id": "viz-test-word",
+    "name": "插件测试 · Word 文档预览 · python-docx 段落和表格",
+    "description": "python-docx v1.2.0 官方格式测试夹具，非科研观测。显示官方段落/表格文档；不执行宏或外链。",
+    "plugin_id": "viz-word",
+    "view_kind": "document",
+    "domain": "documents",
+    "publisher": "python-docx · Steve Canny",
+    "source_url": "https://github.com/python-openxml/python-docx/tree/v1.2.0/tests/test_files",
+    "license": "MIT",
+    "license_url": "https://github.com/python-openxml/python-docx/blob/v1.2.0/LICENSE",
+    "license_details": "MIT；用于可视化测试，样本性质为 official_fixture。",
+    "authors": [
+      "python-docx · Steve Canny"
+    ],
+    "source_version": "python-docx v1.2.0",
+    "sample_scope": "python-docx v1.2.0 官方格式测试夹具，非科研观测。显示官方段落/表格文档；不执行宏或外链。",
+    "sample_kind": "official_fixture",
+    "test_steps": [
+      "预览 blk-inner-content.docx，选择 viz-word",
+      "显示官方段落/表格文档；不执行宏或外链。"
+    ],
+    "files": [
+      {
+        "path": "blk-inner-content.docx",
+        "size": 11949,
+        "sha256": "16243dd05f686d6d5fab331843691492ad78ae3eb4f13cc8686077b44718c0ba",
+        "url": "https://raw.githubusercontent.com/python-openxml/python-docx/v1.2.0/tests/test_files/blk-inner-content.docx"
+      },
+      {
+        "path": "docx-LICENSE.txt",
+        "size": 1104,
+        "sha256": "7652f271e46d0d533e9dc463f3b5fcbdcacf4d6a9c8d6b554d15efd0f37f6132",
+        "role": "documentation",
+        "url": "https://raw.githubusercontent.com/python-openxml/python-docx/v1.2.0/LICENSE"
+      }
+    ],
+    "entry_file": "blk-inner-content.docx"
+  },
+  {
+    "dataset_id": "viz-test-onlyoffice",
+    "name": "插件测试 · ONLYOFFICE 本机只读阅读 · python-docx 段落和表格",
+    "description": "python-docx v1.2.0 官方格式测试夹具，非科研观测。显示官方段落/表格文档；不执行宏或外链。需现有本机文档服务就绪；未配置时记录依赖阻碍，不改变插件开关。",
+    "plugin_id": "viz-onlyoffice",
+    "view_kind": "document",
+    "domain": "documents",
+    "publisher": "python-docx · Steve Canny",
+    "source_url": "https://github.com/python-openxml/python-docx/tree/v1.2.0/tests/test_files",
+    "license": "MIT",
+    "license_url": "https://github.com/python-openxml/python-docx/blob/v1.2.0/LICENSE",
+    "license_details": "MIT；用于可视化测试，样本性质为 official_fixture。",
+    "authors": [
+      "python-docx · Steve Canny"
+    ],
+    "source_version": "python-docx v1.2.0",
+    "sample_scope": "python-docx v1.2.0 官方格式测试夹具，非科研观测。显示官方段落/表格文档；不执行宏或外链。需现有本机文档服务就绪；未配置时记录依赖阻碍，不改变插件开关。",
+    "sample_kind": "official_fixture",
+    "test_steps": [
+      "预览 blk-inner-content.docx，选择 viz-onlyoffice",
+      "显示官方段落/表格文档；不执行宏或外链。需现有本机文档服务就绪；未配置时记录依赖阻碍，不改变插件开关。"
+    ],
+    "files": [
+      {
+        "path": "blk-inner-content.docx",
+        "size": 11949,
+        "sha256": "16243dd05f686d6d5fab331843691492ad78ae3eb4f13cc8686077b44718c0ba",
+        "url": "https://raw.githubusercontent.com/python-openxml/python-docx/v1.2.0/tests/test_files/blk-inner-content.docx"
+      },
+      {
+        "path": "docx-LICENSE.txt",
+        "size": 1104,
+        "sha256": "7652f271e46d0d533e9dc463f3b5fcbdcacf4d6a9c8d6b554d15efd0f37f6132",
+        "role": "documentation",
+        "url": "https://raw.githubusercontent.com/python-openxml/python-docx/v1.2.0/LICENSE"
+      }
+    ],
+    "entry_file": "blk-inner-content.docx"
+  },
+  {
+    "dataset_id": "viz-test-powerpoint",
+    "name": "插件测试 · PowerPoint 演示预览 · python-pptx 图表坐标轴",
+    "description": "python-pptx v1.0.2 官方图表格式测试夹具，非科研观测。静态分页预览，不要求播放动画或视频。",
+    "plugin_id": "viz-powerpoint",
+    "view_kind": "document",
+    "domain": "documents",
+    "publisher": "python-pptx · Steve Canny",
+    "source_url": "https://github.com/scanny/python-pptx/tree/v1.0.2/features/steps/test_files",
+    "license": "MIT",
+    "license_url": "https://github.com/scanny/python-pptx/blob/v1.0.2/LICENSE",
+    "license_details": "MIT；用于可视化测试，样本性质为 official_fixture。",
+    "authors": [
+      "python-pptx · Steve Canny"
+    ],
+    "source_version": "python-pptx v1.0.2",
+    "sample_scope": "python-pptx v1.0.2 官方图表格式测试夹具，非科研观测。静态分页预览，不要求播放动画或视频。",
+    "sample_kind": "official_fixture",
+    "test_steps": [
+      "预览 cht-axis-props.pptx，选择 viz-powerpoint",
+      "检查图表、标题、坐标轴；翻页及调整缩放；静态预览不播放动画"
+    ],
+    "files": [
+      {
+        "path": "cht-axis-props.pptx",
+        "size": 366536,
+        "sha256": "e5fc3cf4f639cd686d09859702346dc3a269d35eaf7a4e74e6f19ba9fe8c5fa3",
+        "url": "https://raw.githubusercontent.com/scanny/python-pptx/v1.0.2/features/steps/test_files/cht-axis-props.pptx"
+      },
+      {
+        "path": "pptx-LICENSE.txt",
+        "size": 1104,
+        "sha256": "7652f271e46d0d533e9dc463f3b5fcbdcacf4d6a9c8d6b554d15efd0f37f6132",
+        "role": "documentation",
+        "url": "https://raw.githubusercontent.com/scanny/python-pptx/v1.0.2/LICENSE"
+      }
+    ],
+    "entry_file": "cht-axis-props.pptx"
+  },
+  {
+    "dataset_id": "viz-test-dbf-penguins",
+    "name": "插件测试 · DBF 只读表格 · Palmer 企鹅",
+    "description": "完整344条企鹅观测的dBASE III兼容副本，8列。字段名缩短并保留单位映射：bill_len/bill_dep为mm，flipper_mm为mm，mass_g为g；数值NA为空，文本NA保持原字符串。原CSV保留，不删除或补造观测。",
+    "plugin_id": "viz-dbf-table",
+    "view_kind": "table",
+    "domain": "tabular",
+    "publisher": "Palmer Station LTER / palmerpenguins",
+    "source_url": "https://github.com/allisonhorst/palmerpenguins",
+    "license": "CC0-1.0",
+    "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "license_details": "CC0-1.0；用于可视化测试，样本性质为 scientific_derived。",
+    "authors": [
+      "Palmer Station LTER / palmerpenguins"
+    ],
+    "source_version": "2026-09-18 已审查快照",
+    "sample_scope": "344条、8列，原始十进制精度不变；只演示支持的dBASE III子集，不代表任意DBF方言均兼容。",
+    "sample_kind": "scientific_derived",
+    "test_steps": [
+      "预览 penguins.dbf，选择 viz-dbf-table",
+      "点击读取数据库分页，检查物种、长度、体重及NA/空值；切换下一页"
+    ],
+    "files": [
+      {
+        "path": "penguins.csv",
+        "size": 15241,
+        "sha256": "f204db2c753b0937caac3cb35258562c14f073e4bbc76be24b4c51ce22767a93",
+        "url": "https://raw.githubusercontent.com/allisonhorst/palmerpenguins/8957207b78d6ccd1b4654a9dd9c9041b657478ab/inst/extdata/penguins.csv"
+      },
+      {
+        "path": "penguins.dbf",
+        "size": 23682,
+        "sha256": "0dfb2636e737afde6d578d7f5dc6d6c9caa61e296dfd364c41babbbcfcdac0fe",
+        "derived_from": [
+          "penguins.csv"
+        ]
+      }
+    ],
+    "transformation": "backend/scripts/plugin_samples_dbf.py：固定dBASE III字段映射，原始数值文本保持，数值NA映射空字段；所有344条记录保留。",
+    "entry_file": "penguins.dbf"
+  },
+  {
+    "dataset_id": "viz-test-powerpoint-font",
+    "name": "插件测试 · PowerPoint 静态阅读 · 官方字体样例",
+    "description": "python-pptx v1.0.2官方文本字体格式测试文件；不含外链或嵌入工作簿，已通过现有隔离转换器。非科研观测。",
+    "plugin_id": "viz-powerpoint",
+    "view_kind": "document",
+    "domain": "documents",
+    "publisher": "python-pptx · Steve Canny",
+    "source_url": "https://github.com/scanny/python-pptx/tree/v1.0.2/features/steps/test_files",
+    "license": "MIT",
+    "license_url": "https://github.com/scanny/python-pptx/blob/v1.0.2/LICENSE",
+    "license_details": "MIT；用于可视化测试，样本性质为 official_fixture。",
+    "authors": [
+      "python-pptx · Steve Canny"
+    ],
+    "source_version": "python-pptx v1.0.2",
+    "sample_scope": "官方格式测试样例，测试纯文本字体、分页与缩放；静态阅读不播放动画。",
+    "sample_kind": "official_fixture",
+    "test_steps": [
+      "预览 txt-font-typeface.pptx，选择 viz-powerpoint",
+      "检查文本字体与页面缩放，无外部资源请求；静态预览不执行演示动作"
+    ],
+    "files": [
+      {
+        "path": "txt-font-typeface.pptx",
+        "size": 25817,
+        "sha256": "c1127c3fc5ca34bcca630dafdb1d78352c77ff6ed6c182679ef629bc028784c2",
+        "url": "https://raw.githubusercontent.com/scanny/python-pptx/v1.0.2/features/steps/test_files/txt-font-typeface.pptx"
+      },
+      {
+        "path": "pptx-LICENSE.txt",
+        "size": 1104,
+        "sha256": "7652f271e46d0d533e9dc463f3b5fcbdcacf4d6a9c8d6b554d15efd0f37f6132",
+        "role": "documentation",
+        "url": "https://raw.githubusercontent.com/scanny/python-pptx/v1.0.2/LICENSE"
+      }
+    ],
+    "entry_file": "txt-font-typeface.pptx"
+  }
+]

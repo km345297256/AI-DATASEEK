@@ -1,0 +1,88 @@
+{
+  "dataset_id": "viz-test-columnar-window",
+  "external_id": "viz-test-columnar-window",
+  "data_center_id": "reviewed-visualization-plugin-tests",
+  "data_center_name": "逐插件可视化测试样例",
+  "name": "插件测试 · Parquet / Arrow 分块表格 · Palmer 企鹅格式转换",
+  "description": "344行、8列，6个行组；选择列并分页，仅读取窗口。由同一份CC0科学观测转换，不增删记录；原CSV保留。",
+  "domain": "tabular",
+  "data_type": "csv, parquet",
+  "temporal_coverage": "",
+  "spatial_coverage": "",
+  "tags": [
+    "插件测试样例",
+    "viz-columnar-window",
+    "scientific_derived",
+    "table",
+    "tabular"
+  ],
+  "metadata": {
+    "curated": true,
+    "source_catalog": "plugin-tests",
+    "catalog_version": 1,
+    "source_descriptor_sha256": "18b2f14df2ccea76e6f4654fee06499ae423d3b8fa10fe23f5a01d2119559896",
+    "download_date": "2026-09-18",
+    "inventory_complete": true,
+    "recursive_file_count": 3,
+    "total_size_bytes": 35066,
+    "visualization_view_kind": "table",
+    "visualization_plugin_id": "viz-columnar-window",
+    "visualization_entry_file": "penguins.parquet",
+    "sample_note": "344行、8列，6个行组；选择列并分页，仅读取窗口。由同一份CC0科学观测转换，不增删记录；原CSV保留。",
+    "provenance": [
+      {
+        "path": "penguins.csv",
+        "size": 15241,
+        "sha256": "f204db2c753b0937caac3cb35258562c14f073e4bbc76be24b4c51ce22767a93",
+        "url": "https://raw.githubusercontent.com/allisonhorst/palmerpenguins/8957207b78d6ccd1b4654a9dd9c9041b657478ab/inst/extdata/penguins.csv"
+      },
+      {
+        "path": "penguins.parquet",
+        "size": 18079,
+        "sha256": "f1e590a8c43e3404958ec02d7c0715c95bc4c7880f08285cade0a3f82709d56c",
+        "derived_from": [
+          "penguins.csv"
+        ]
+      }
+    ],
+    "publisher": "Palmer Station LTER / palmerpenguins",
+    "source_url": "https://github.com/allisonhorst/palmerpenguins",
+    "license": "CC0-1.0",
+    "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "license_details": "CC0-1.0；用于可视化测试，样本性质为 scientific_derived。",
+    "authors": [
+      "Palmer Station LTER / palmerpenguins"
+    ],
+    "source_version": "2026-09-18 已审查快照",
+    "sample_scope": "344行、8列，6个行组；选择列并分页，仅读取窗口。由同一份CC0科学观测转换，不增删记录；原CSV保留。",
+    "transformation": "backend/scripts/plugin_samples_tables.py：数字字段按单位转数值；NA仅在数据库/JSON/Arrow转null，HTML/MD保持原文本。344行8列19缺失，未填充。",
+    "sample_kind": "scientific_derived",
+    "test_steps": [
+      "选择文件 penguins.parquet，再选择插件 viz-columnar-window",
+      "344行、8列，6个行组；选择列并分页，仅读取窗口"
+    ]
+  },
+  "files": [
+    {
+      "path": "SOURCE.md",
+      "size": 1746,
+      "sha256": "150e6be1ab56ad1989779c652fb837e154bab0125d5df09df3d4067bd95c8954",
+      "role": "documentation",
+      "content_type": "text/markdown"
+    },
+    {
+      "path": "penguins.csv",
+      "size": 15241,
+      "sha256": "f204db2c753b0937caac3cb35258562c14f073e4bbc76be24b4c51ce22767a93",
+      "role": "data",
+      "content_type": "text/csv"
+    },
+    {
+      "path": "penguins.parquet",
+      "size": 18079,
+      "sha256": "f1e590a8c43e3404958ec02d7c0715c95bc4c7880f08285cade0a3f82709d56c",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    }
+  ]
+}

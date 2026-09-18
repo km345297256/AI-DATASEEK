@@ -25,12 +25,15 @@ from app.infrastructure.models.documents import DataCenterDatasetDocument, Execu
 from app.infrastructure.storage.mongodb import get_mongodb
 
 
+REVIEWED_SOURCES = frozenset({"scidb", "tpdc", "chemdc", "ngdc", "open-science", "plugin-tests"})
+
+
 def parse_args():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--catalog", type=Path, required=True, help="Reviewed manifest directory")
     parser.add_argument("--host-root", required=True)
     parser.add_argument("--inspection-root", type=Path, required=True)
-    parser.add_argument("--source", choices=["scidb", "tpdc", "chemdc", "ngdc"])
+    parser.add_argument("--source", choices=sorted(REVIEWED_SOURCES))
     parser.add_argument("--apply", action="store_true", help="Insert verified registrations (default: validate only)")
     args = parser.parse_args()
     host = PurePosixPath(args.host_root)
@@ -102,7 +105,7 @@ async def run(args):
     for path in sorted(args.catalog.glob("*/*.json")):
         seed = CuratedDatasetSeed.model_validate_json(path.read_text(encoding="utf-8"))
         source = seed.metadata.get("source_catalog")
-        if source not in {"scidb", "tpdc", "chemdc", "ngdc"}:
+        if source not in REVIEWED_SOURCES:
             raise ValueError("Unknown reviewed catalog source")
         if args.source and source != args.source:
             continue

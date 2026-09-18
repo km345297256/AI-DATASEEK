@@ -1,0 +1,89 @@
+{
+  "dataset_id": "viz-pdal-las12",
+  "external_id": "viz-pdal-las12",
+  "data_center_id": "reviewed-visualization-plugin-tests",
+  "data_center_name": "逐插件可视化测试样例",
+  "name": "插件样例｜PDAL LAS 1.2 彩色点记录",
+  "description": "PDAL 官方 LAS 1.2 格式 3 测试样本，共 1065 条带 RGB 的点记录。文件未给出 CRS 与长度单位，预览保留原始坐标和比例因子，不擅自标为经纬度或米。",
+  "domain": "geoscience",
+  "data_type": "las",
+  "temporal_coverage": "",
+  "spatial_coverage": "",
+  "tags": [
+    "插件测试样例",
+    "viz-pointcloud-window",
+    "official_fixture",
+    "structure",
+    "geoscience"
+  ],
+  "metadata": {
+    "curated": true,
+    "source_catalog": "plugin-tests",
+    "catalog_version": 1,
+    "source_descriptor_sha256": "75fb67358c5e9f46750116361bf86e7100b8ace8a3d0bdd16faac22433052ae8",
+    "download_date": "2026-09-18",
+    "inventory_complete": true,
+    "recursive_file_count": 3,
+    "total_size_bytes": 40270,
+    "visualization_view_kind": "structure",
+    "visualization_plugin_id": "viz-pointcloud-window",
+    "visualization_entry_file": "1.2-with-color.las",
+    "sample_note": "完整 36,439 字节 LAS 测试文件，1065 条记录；场址/采集时刻/CRS 未获明示，不作调查级定位判断。",
+    "provenance": [
+      {
+        "path": "1.2-with-color.las",
+        "size": 36439,
+        "sha256": "1d3e00eae856bffa6e55778dbfc05bdedc992504c64dbf366d5fd2eb6489ee45",
+        "url": "https://raw.githubusercontent.com/PDAL/PDAL/58af674be2bcde44477ed0b51f5f0ac0a158ce8d/test/data/las/1.2-with-color.las",
+        "role": "data"
+      },
+      {
+        "path": "LICENSE.txt",
+        "size": 1896,
+        "sha256": "9ab1261b649806f4884539d5fd49d8f2c9a634762ee52f1ddd2330ef417f5cdf",
+        "url": "https://raw.githubusercontent.com/PDAL/PDAL/58af674be2bcde44477ed0b51f5f0ac0a158ce8d/LICENSE.txt",
+        "role": "documentation"
+      }
+    ],
+    "publisher": "PDAL / Hobu, Inc.",
+    "source_url": "https://github.com/PDAL/PDAL/blob/58af674be2bcde44477ed0b51f5f0ac0a158ce8d/test/data/las/1.2-with-color.las",
+    "license": "BSD-3-Clause",
+    "license_url": "https://github.com/PDAL/PDAL/blob/58af674be2bcde44477ed0b51f5f0ac0a158ce8d/LICENSE.txt",
+    "license_details": "PDAL 根许可明确适用于发行版所有未另标注文件；保留 Copyright (c) 2025 Hobu, Inc.、条款和免责声明。不是使用许可不同的 PDAL/data 仓库文件。",
+    "authors": [
+      "PDAL contributors",
+      "Hobu, Inc."
+    ],
+    "source_version": "PDAL 58af674be2bcde44477ed0b51f5f0ac0a158ce8d",
+    "sample_scope": "完整 36,439 字节 LAS 测试文件，1065 条记录；场址/采集时刻/CRS 未获明示，不作调查级定位判断。",
+    "sample_kind": "official_fixture",
+    "test_steps": [
+      "打开 1.2-with-color.las，选择 viz-pointcloud-window 并读取目录。",
+      "点起点 0，点数 1065，读取连续点窗口。",
+      "显示 1065 点及 RGB/强度/分类；缩放因子 XYZ 均 0.01，坐标单位未知，不能标为 EPSG:4326。"
+    ]
+  },
+  "files": [
+    {
+      "path": "1.2-with-color.las",
+      "size": 36439,
+      "sha256": "1d3e00eae856bffa6e55778dbfc05bdedc992504c64dbf366d5fd2eb6489ee45",
+      "role": "data",
+      "content_type": "application/octet-stream"
+    },
+    {
+      "path": "LICENSE.txt",
+      "size": 1896,
+      "sha256": "9ab1261b649806f4884539d5fd49d8f2c9a634762ee52f1ddd2330ef417f5cdf",
+      "role": "documentation",
+      "content_type": "text/plain"
+    },
+    {
+      "path": "SOURCE.md",
+      "size": 1935,
+      "sha256": "c22cbd99ed28ce7347f6645ac4ebdf0f919ee2f7a746e2a02d0cf89e4ac4d7b1",
+      "role": "documentation",
+      "content_type": "text/markdown"
+    }
+  ]
+}
