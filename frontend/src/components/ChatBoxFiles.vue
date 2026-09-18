@@ -80,7 +80,7 @@ import {
 } from '../api/file';
 import { getFileType, getFileTypeText, formatFileSize } from '../utils/fileType';
 import { useI18n } from 'vue-i18n';
-import { ref, nextTick, watch, onMounted, computed } from 'vue';
+import { ref, nextTick, watch, onMounted, onUnmounted, computed } from 'vue';
 import { X, RefreshCcw } from 'lucide-vue-next';
 import LoadingSpinnerIcon from './icons/LoadingSpinnerIcon.vue';
 const { t } = useI18n();
@@ -101,13 +101,16 @@ interface ExtendedFileInfo extends FileInfo {
 }
 
 const files = ref<ExtendedFileInfo[]>(props.attachments);
+let disposed = false;
 const fileInput = ref<HTMLInputElement>();
 const largeFileInput = ref<HTMLInputElement>();
 const scrollContainer = ref<HTMLElement>();
 
 watch(() => props.attachments, (newVal) => {
     files.value = newVal;
-});
+}, { flush: 'sync' });
+
+onUnmounted(() => { disposed = true; });
 
 // Scroll state
 const canScrollLeft = ref(false);
@@ -133,8 +136,11 @@ const handleFileSelect = async (event: Event) => {
         return;
     }
 
-    // Process each selected file
+    // A route change or submitted message replaces the attachment array. The
+    // remaining selection must stay with the composer that selected it.
+    const owner = files.value;
     for (const file of Array.from(selectedFiles)) {
+        if (disposed || files.value !== owner) break;
         await processFileUpload(file);
     }
 
@@ -150,7 +156,9 @@ const handleLargeFileSelect = async (event: Event) => {
         return;
     }
 
+    const owner = files.value;
     for (const file of Array.from(selectedFiles)) {
+        if (disposed || files.value !== owner) break;
         await processLargeFileUpload(file);
     }
 
@@ -158,6 +166,8 @@ const handleLargeFileSelect = async (event: Event) => {
 };
 
 const processFileUpload = async (file: File) => {
+    if (disposed) return;
+    const owner = files.value;
     // Create temporary file info for UI
     const tempFileInfo: ExtendedFileInfo = {
         file_id: `temp-${Date.now()}-${Math.random()}`,
@@ -177,6 +187,7 @@ const processFileUpload = async (file: File) => {
     try {
         // Upload the file
         const uploadedFile = await apiUploadFile(file);
+        if (disposed || files.value !== owner) return;
 
         // Update the file info with successful upload
         const index = files.value.findIndex(f => f.file_id === tempFileInfo.file_id);
@@ -189,6 +200,7 @@ const processFileUpload = async (file: File) => {
             };
         }
     } catch (error) {
+        if (disposed || files.value !== owner) return;
         console.error('Upload failed:', error);
 
         // Update status to failed
@@ -200,6 +212,8 @@ const processFileUpload = async (file: File) => {
 };
 
 const processLargeFileUpload = async (file: File) => {
+    if (disposed) return;
+    const owner = files.value;
     const tempFileInfo: ExtendedFileInfo = {
         file_id: `temp-large-${Date.now()}-${Math.random()}`,
         filename: file.name,
@@ -213,7 +227,10 @@ const processLargeFileUpload = async (file: File) => {
     };
 
     files.value.push(tempFileInfo);
+    const isCurrent = () => !disposed && files.value === owner
+        && owner.some(item => item.file_id === tempFileInfo.file_id);
     const updateProgress = (loadedBytes: number) => {
+        if (!isCurrent()) return;
         const index = files.value.findIndex(f => f.file_id === tempFileInfo.file_id);
         if (index !== -1) {
             files.value[index].progress = Math.min(99, (loadedBytes / file.size) * 100);
@@ -222,12 +239,14 @@ const processLargeFileUpload = async (file: File) => {
 
     try {
         const upload = await initLargeUpload(file);
+        if (!isCurrent()) return;
         const partSize = upload.part_size;
         const totalParts = Math.ceil(file.size / partSize);
         const loadedByPart = new Map<number, number>();
         const completedParts: { part_number: number; etag: string; size: number }[] = [];
         const concurrency = 3;
         let nextPartNumber = 1;
+        let uploadFailed = false;
 
         const uploadOnePart = async (partNumber: number) => {
             const start = (partNumber - 1) * partSize;
@@ -250,15 +269,18 @@ const processLargeFileUpload = async (file: File) => {
         };
 
         const worker = async () => {
-            while (nextPartNumber <= totalParts) {
+            while (isCurrent() && !uploadFailed && nextPartNumber <= totalParts) {
                 const partNumber = nextPartNumber;
                 nextPartNumber += 1;
-                await uploadOnePart(partNumber);
+                try { await uploadOnePart(partNumber); }
+                catch (error) { uploadFailed = true; throw error; }
             }
         };
 
         await Promise.all(Array.from({ length: Math.min(concurrency, totalParts) }, () => worker()));
+        if (!isCurrent()) return;
         const uploadedFile = await completeLargeUpload(upload.upload_id, completedParts);
+        if (!isCurrent()) return;
         const index = files.value.findIndex(f => f.file_id === tempFileInfo.file_id);
         if (index !== -1) {
             files.value[index] = {
@@ -270,6 +292,7 @@ const processLargeFileUpload = async (file: File) => {
             };
         }
     } catch (error) {
+        if (!isCurrent()) return;
         console.error('Large upload failed:', error);
         const index = files.value.findIndex(f => f.file_id === tempFileInfo.file_id);
         if (index !== -1) {
@@ -286,9 +309,10 @@ const removeFile = (fileId: string) => {
 };
 
 const retryUpload = async (fileInfo: ExtendedFileInfo) => {
-    if (!fileInfo.file) {
+    if (disposed || !fileInfo.file || fileInfo.status === 'uploading') {
         return;
     }
+    const owner = files.value;
 
     // Reset status to uploading
     fileInfo.status = 'uploading';
@@ -301,6 +325,7 @@ const retryUpload = async (fileInfo: ExtendedFileInfo) => {
                 return null;
             })()
             : await apiUploadFile(fileInfo.file);
+        if (disposed || files.value !== owner) return;
 
         if (!uploadedFile) {
             removeFile(fileInfo.file_id);
@@ -317,6 +342,7 @@ const retryUpload = async (fileInfo: ExtendedFileInfo) => {
             };
         }
     } catch (error) {
+        if (disposed || files.value !== owner) return;
         console.error('Retry upload failed:', error);
         fileInfo.status = 'failed';
     }
@@ -372,12 +398,14 @@ onMounted(() => {
 });
 
 const isAllUploaded = computed(() => {
-    return files.value.every(file => file.status === 'success');
+    return files.value.every(file => file.status === 'success'
+        || (!file.status && !!file.file_id && !file.file_id.startsWith('temp-')));
 });
 
 const handleFileClick = (file: ExtendedFileInfo) => {
-    if (file.status === 'success') {
-        showFilePanel(file);
+    if (file.status === 'success' || (!file.status && !!file.file_id && !file.file_id.startsWith('temp-'))) {
+        showFilePanel(file, files.value.filter(item => item.status === 'success'
+            || (!item.status && !!item.file_id && !item.file_id.startsWith('temp-'))));
     }
 };
 

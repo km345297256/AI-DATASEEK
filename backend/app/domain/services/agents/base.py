@@ -2,6 +2,7 @@ import logging
 import asyncio
 import hashlib
 import json
+import math
 import re
 import time
 import uuid
@@ -48,12 +49,19 @@ from app.domain.utils.tool_response_protocol import textual_tool_envelope_reason
 from app.domain.services.token_usage_service import TokenUsageService
 from app.domain.services.execution_identity import private_identity_hmac
 from app.domain.services.analysis_progress import AnalysisProgressGuard
+from app.domain.services.analysis_program_dispatch import saved_program_redirect
+from app.domain.services.analysis_program_diagnostics import program_diagnostic_read_digest
+from app.domain.services.program_execution import (
+    resolved_program_path, trusted_program_execution_feedback,
+    trusted_program_prelaunch_failure, trusted_program_prerequisites,
+)
 from app.domain.services.analysis_recovery import current_analysis_recovery
 from app.domain.utils.message_text import NON_SUBSTANTIVE_MESSAGE_PATTERN, is_non_substantive_message_text
 from app.domain.services.execution_evidence import ToolExecutionLedger, tool_execution_scope
 from app.domain.services.model_runtime import (
     USAGE_RECORDED_KEY, flush_memory_changes, memory_checkpoint, model_call_role,
     note_memory_change, current_analysis_budget, record_model_retry,
+    ModelProviderTimeout, model_request_timeout,
 )
 from app.domain.models.model_trace import ScheduledModelRetry
 from app.domain.services.model_retry import model_retry_decision
@@ -67,7 +75,7 @@ class LLMServiceUnavailableError(RuntimeError):
 
 def _is_retryable_llm_error(error: Exception) -> bool:
     """Return whether an OpenAI-compatible model call may safely be retried."""
-    if isinstance(error, (APIConnectionError, httpx.NetworkError, httpx.TimeoutException)):
+    if isinstance(error, (ModelProviderTimeout, APIConnectionError, httpx.NetworkError, httpx.TimeoutException)):
         return True
     if isinstance(error, APIStatusError):
         status_code = getattr(error, "status_code", None)
@@ -132,8 +140,8 @@ class BaseAgent(ABC):
     }
     MAX_RETAINED_TOOL_ARGUMENT_BYTES = 8 * 1024
     # Specialized agents can terminate a narrowly classified tool request with
-    # one bounded, tool-free synthesis turn.  The ordinary agent loop remains
-    # unchanged for multi-step analysis tasks.
+    # one logical tool-free synthesis turn. Physical provider timeouts retry
+    # within that turn; the ordinary multi-step analysis loop is unchanged.
     TOOL_FREE_COMPLETION_TIMEOUT_SECONDS = 30.0
     TOOL_FREE_COMPLETION_MAX_TOKENS: Optional[int] = 1024
     RUNTIME_INSTALL_COMMAND_PATTERN = re.compile(
@@ -450,8 +458,8 @@ class BaseAgent(ABC):
     ) -> Optional[str]:
         """Request one terminal synthesis turn for a verified tool batch.
 
-        Returning an instruction opts a specialized agent into a single model
-        call with tools disabled.  This is intentionally separate from
+        Returning an instruction opts a specialized agent into one logical
+        request with tools disabled and ordinary transport retries. This differs from
         ``_completion_from_tool_batch``: that hook is deterministic, whereas
         this hook lets the model turn bounded evidence into a user-facing
         answer without reopening the tool loop.
@@ -466,6 +474,8 @@ class BaseAgent(ABC):
 
     def _terminal_response_problem(self, message: AIMessage) -> str | None:
         """Execution-only terminal gate; native calls keep their normal dispatch."""
+        if message.invalid_tool_calls:
+            return "invalid_tool_calls"
         if message.tool_calls:
             return None
         return textual_tool_envelope_reason(message.content)
@@ -887,10 +897,29 @@ class BaseAgent(ABC):
                     presentation=tool_presentation,
                 )
 
+                program_path = resolved_program_path(tool, tool_call) if function_name == "program_run" else None
+                if program_path:
+                    # Observe actual prerequisites before evaluating a prior
+                    # failed launch. A later not_started receipt and newly
+                    # created/corrected source are not a repeat of old work.
+                    prerequisites = await trusted_program_prerequisites(tool, tool_call)
+                    if prerequisites:
+                        self._analysis_progress.record_program_prerequisites(path=program_path, **prerequisites)
+                    else:
+                        self._analysis_progress.invalidate_program_prerequisites(path=program_path)
+                    prelaunch = trusted_program_prelaunch_failure(tool, tool_call, self._tool_execution_ledger)
+                    if prelaunch:
+                        self._analysis_progress.record_program_prelaunch_failure(
+                            call={**tool_call, "id": prelaunch["tool_call_id"]},
+                            path=prelaunch["script_path"], operation_id=prelaunch["operation_id"],
+                        )
                 blocked_reason = self._blocked_runtime_install_reason(tool_call)
                 blocked_code = "tool_permission_denied"
                 if not blocked_reason:
-                    blocked_reason = self._analysis_progress.before_call(tool_call)
+                    blocked_reason = saved_program_redirect(tool_call)
+                    blocked_code = "program_execution_required"
+                if not blocked_reason:
+                    blocked_reason = self._analysis_progress.before_call(tool_call, program_path=program_path)
                     blocked_code = "analysis_no_progress_loop"
                 if (not blocked_reason and self._tool_execution_ledger.summary()["pending_execution"]
                         and not resolved_tool_is_read_only(tool)
@@ -905,7 +934,7 @@ class BaseAgent(ABC):
                                           "Use confirmed read-only evidence to report the unresolved state.")
                         blocked_code = "tool_execution_unknown"
                 if blocked_reason:
-                    self._analysis_progress.record_blocked(tool_call, blocked_reason)
+                    self._analysis_progress.record_blocked(tool_call, blocked_reason, program_path=program_path)
                     self._record_tool_failure({"error_code": blocked_code, "side_effect_state": "not_started"})
                     logger.warning(
                         "Blocked analysis operation from agent=%s tool=%s",
@@ -943,7 +972,22 @@ class BaseAgent(ABC):
                 self._analysis_progress.record(tool_call, succeeded=self._tool_result_succeeded(tool_result),
                     read_only=resolved_tool_is_read_only(tool),
                     result_digest=private_identity_hmac({"purpose": "analysis-result/v1", "content": str(tool_result.content)[:65536]}),
+                    program_path=program_path,
                     confirmed_execution=bool(call_evidence["tracked_operation_count"] and call_evidence["execution_confirmed"]))
+                if program_path:
+                    feedback = trusted_program_execution_feedback(tool, tool_call, tool_result, self._tool_execution_ledger)
+                    if feedback:
+                        self._analysis_progress.record_program_execution(
+                            path=feedback["script_path"], operation_id=feedback["operation_id"],
+                            source_digest=feedback["source_digest"], returncode=feedback["returncode"],
+                            failure_fingerprint=feedback.get("failure_fingerprint"),
+                            call=tool_call, diagnostic=feedback.get("diagnostic"),
+                        )
+                diagnostic_digest = program_diagnostic_read_digest(tool, tool_call, tool_result)
+                if diagnostic_digest:
+                    self._analysis_progress.record_program_diagnostic(
+                        path=tool_call["args"]["file"], content_digest=diagnostic_digest,
+                    )
                 if (self._tool_result_succeeded(tool_result) and call_evidence.get("has_observable_pending")
                         and resolved_tool_can_observe_pending(tool, tool_call, self._tool_execution_ledger)):
                     self._analysis_progress.record_observation()
@@ -1011,8 +1055,8 @@ class BaseAgent(ABC):
             )
             if tool_free_instruction is not None:
                 # A successful capability already produced the required
-                # evidence.  Give the model exactly one opportunity to turn it
-                # into the user-facing result, with no tools bound; on timeout,
+                # evidence. Give the model one logical synthesis request, with
+                # transport retries and no tools bound; on exhausted retries,
                 # invalid output, or provider failure, preserve the verified
                 # evidence through the specialized deterministic fallback.
                 failure_reason: Optional[str] = None
@@ -1021,20 +1065,19 @@ class BaseAgent(ABC):
                     tool_responses,
                 )
                 try:
-                    async with asyncio.timeout(self.TOOL_FREE_COMPLETION_TIMEOUT_SECONDS):
-                        message = await self.ask_with_messages(
-                            [
-                                *completion_tool_responses,
-                                HumanMessage(content=tool_free_instruction),
-                            ],
-                            format,
-                            allow_tools=False,
-                            max_tokens=self.TOOL_FREE_COMPLETION_MAX_TOKENS,
-                        )
+                    message = await self._ask_without_tools(
+                        [
+                            *completion_tool_responses,
+                            HumanMessage(content=tool_free_instruction),
+                        ],
+                        format,
+                        request_timeout=self.TOOL_FREE_COMPLETION_TIMEOUT_SECONDS,
+                        max_tokens=self.TOOL_FREE_COMPLETION_MAX_TOKENS,
+                    )
                 except asyncio.TimeoutError:
                     failure_reason = "finalization_timeout"
                     logger.warning(
-                        "Agent %s terminal tool synthesis exceeded %.1fs after %d tool batch(es)",
+                        "Agent %s terminal synthesis watchdog expired (per-request timeout %.1fs) after %d tool batch(es)",
                         self.name,
                         self.TOOL_FREE_COMPLETION_TIMEOUT_SECONDS,
                         iterations,
@@ -1105,16 +1148,15 @@ class BaseAgent(ABC):
                     "If the deliverable is incomplete, describe the concrete blocker and remaining gaps."
                 ))
                 try:
-                    async with asyncio.timeout(self.FINALIZATION_TIMEOUT_SECONDS):
-                        message = await self.ask_with_messages(
-                            [*tool_responses, final_instruction],
-                            format,
-                            allow_tools=False,
-                        )
+                    message = await self._ask_without_tools(
+                        [*tool_responses, final_instruction],
+                        format,
+                        request_timeout=self.FINALIZATION_TIMEOUT_SECONDS,
+                    )
                 except asyncio.TimeoutError:
                     self._set_execution_outcome("finalization_timeout")
                     logger.warning(
-                        "Agent %s no-tool finalization exceeded %.1fs after %d batches",
+                        "Agent %s no-tool finalization watchdog expired (per-request timeout %.1fs) after %d batches",
                         self.name,
                         self.FINALIZATION_TIMEOUT_SECONDS,
                         iterations,
@@ -1232,6 +1274,47 @@ class BaseAgent(ABC):
         self.memory.roll_back()
         await self._persist_memory()
 
+    def _no_tool_synthesis_watchdog_seconds(self, request_timeout: float) -> float:
+        """Bound a logical request without cancelling its legal transport retries.
+
+        Only the governed driver exposes a per-physical-request timeout. Other
+        injected adapters retain a single watchdog; claiming they can retry a
+        timed-out request here would bypass the audited transport boundary.
+        This is not an analysis/task deadline and never reopens execution tools.
+        """
+        if not self._uses_model_driver():
+            return request_timeout
+        attempts = max(1, getattr(self, "_llm_retry_attempts", self.max_retries))
+        retry_maximum = getattr(self, "_llm_retry_max_seconds", 8.0)
+        retry_maximum = retry_maximum if math.isfinite(retry_maximum) and retry_maximum >= 0 else 0.0
+        store_timeout = get_settings().model_trace_store_timeout_seconds
+        # Each physical request may store admission and terminal traces; a
+        # failed attempt also stores its retry schedule. Allow final memory IO
+        # outside those traces, rather than expiring during the first attempt.
+        return (attempts * request_timeout + (attempts - 1) * retry_maximum
+                + (3 * attempts + 1) * store_timeout + 5.0)
+
+    async def _ask_without_tools(
+        self,
+        messages: List[Dict[str, Any]],
+        format: Optional[str] = None,
+        *,
+        request_timeout: float,
+        max_tokens: Optional[int] = None,
+    ) -> AIMessage:
+        """Synthesize existing evidence, retrying only physical model requests.
+
+        A slow provider call must become a retryable ``ModelProviderTimeout``
+        inside the driver, not cancellation of the entire synthesis/retry loop.
+        Cancellation still propagates, and an independent outer watchdog keeps
+        a stuck adapter, history store or callback from hanging indefinitely.
+        """
+        with model_request_timeout(request_timeout):
+            async with asyncio.timeout(self._no_tool_synthesis_watchdog_seconds(request_timeout)):
+                return await self.ask_with_messages(
+                    messages, format, allow_tools=False, max_tokens=max_tokens,
+                )
+
     async def ask_with_messages(
         self,
         messages: List[Dict[str, Any]],
@@ -1260,7 +1343,10 @@ class BaseAgent(ABC):
         runnable = self._model.bind(**bind_kwargs)
         if self.bind_tools and allow_tools:
             runnable = runnable.bind_tools(self.get_tools())
-        chain = runnable | RobustJsonParser.from_llm(self._model)
+        # A no-tool synthesis must reject forbidden native calls, not spend
+        # additional model requests repairing their arguments into executable
+        # calls. This also keeps one physical request per transport attempt.
+        chain = runnable | RobustJsonParser.from_llm(self._model) if allow_tools else runnable
 
         stored_messages = self.memory.get_messages()
         checkpoint = memory_checkpoint(stored_messages)

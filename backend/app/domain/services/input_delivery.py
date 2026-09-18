@@ -79,12 +79,50 @@ class InputDeliveryService:
 
     async def _require_live(self, session_id: str, key: str, *, states=None) -> AcceptedInput:
         record = await self.repository.get(session_id, key)
+        if (record is not None and record.admission.state in (states or {"claimed", "running"})
+                and record.admission.runtime_id == self.runtime_id
+                and record.admission.lease_expires_at is not None
+                and record.admission.lease_expires_at <= datetime.now(UTC)):
+            # A VM suspension or wall-clock jump can outpace the heartbeat even
+            # though the original coroutine is still alive. Continue that exact
+            # attempt only if its ownership has not been fenced/reaped. Never
+            # dispatch or reconstruct execution from an expired durable record.
+            renewed = await self._renew_local_lease(record)
+            record = renewed or await self.repository.get(session_id, key)
         if (record is None or record.admission.state not in (states or {"claimed", "running"})
                 or record.admission.runtime_id != self.runtime_id
+                or not self._local_owns(record)
                 or record.admission.lease_expires_at is None
                 or record.admission.lease_expires_at <= datetime.now(UTC)):
             raise InputLeaseLost()
         return record
+
+    def _local_owns(self, record: AcceptedInput) -> bool:
+        local = self._local.get((record.session_id, record.key))
+        return bool(local is not None and local.live()
+                    and record.admission.runtime_id == self.runtime_id
+                    and local.record.admission.attempts == record.admission.attempts
+                    and record.admission.task_id == (local.task.id if local.task is not None else None))
+
+    async def _renew_local_lease(self, record: AcceptedInput) -> AcceptedInput | None:
+        local = self._local.get((record.session_id, record.key))
+        if (not self._local_owns(record)
+                or record.admission.state not in {"claimed", "running"}
+                or not await self.repository.authorized(record)):
+            return None
+        # transition is a CAS over revision, state and runtime_id. A competing
+        # reaper, cancellation or replacement wins by changing that revision;
+        # a stale owner cannot undo it. No state or attempt count is changed.
+        was_expired = (record.admission.lease_expires_at is not None
+                       and record.admission.lease_expires_at <= datetime.now(UTC))
+        updated = await self.repository.transition(record,
+            {"lease_expires_at": datetime.now(UTC) + self._lease})
+        if updated is not None:
+            local.record = updated
+            if was_expired:
+                logger.info("Accepted input local lease renewed after delayed heartbeat state=%s",
+                            record.admission.state)
+        return updated
 
     async def prepare_event(self, session_id: str, key: str, event) -> None:
         await self._require_live(session_id, key)
@@ -125,8 +163,8 @@ class InputDeliveryService:
                     local.cancel()
                     self._local.pop(identity, None)
                     continue
-                if local.live() and record.admission.lease_expires_at > now:
-                    await self.repository.transition(record, {"lease_expires_at": now + self._lease}, require_live=True)
+                if local.live():
+                    await self._renew_local_lease(record)
             for record in await self.repository.candidates(now):
                 if record.admission.state in {"claimed", "running"}:
                     kind = await self.repository.terminal_kind(record)

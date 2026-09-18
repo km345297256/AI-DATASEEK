@@ -210,9 +210,10 @@ async def test_stop_cancels_a_bootstrap_before_it_can_accept_new_work(paused_at)
     service = service_for(repository, inputs, old_task)
     service._input_delivery = InputDeliveryService(inputs, repository)
     if paused_at == "attachment_lookup":
-        async def lookup(*_args):
-            return await pause()
-        service._resolve_message_attachments = AsyncMock(side_effect=lookup)
+        async def lookup(*_args, **_kwargs):
+            await pause()
+            return [], []
+        service._prepare_input_selection = AsyncMock(side_effect=lookup)
 
     bootstrap = service._track_chat_bootstrap(asyncio.create_task(service._bootstrap_durable_input(
         repository.session, "user", "new question", None, None, None, None, None, False, "client",

@@ -5,7 +5,16 @@ from app.domain.external.browser import Browser
 class Sandbox(Protocol):
     """Sandbox service gateway interface"""
 
+    async def program_preflight(self, exec_dir: str, script_path: str) -> ToolResult:
+        """Privately observe stable launch prerequisites without executing."""
+        ...
+
     supports_execution_receipts: bool = False
+
+    async def exec_program(self, session_id: str, exec_dir: str, script_path: str,
+                           args: list[str]) -> ToolResult:
+        """Launch an immutable Python source snapshot directly, without a shell."""
+        ...
 
     async def exec_command_tracked(self, session_id: str, exec_dir: str, command: str,
                                    operation_id: str) -> ToolResult:
@@ -248,8 +257,10 @@ class Sandbox(Protocol):
         """Read-only output-content receipts; unavailable is never validation success."""
         ...
 
-    async def analysis_fingerprints(self, paths: list[str]) -> ToolResult:
-        """Bounded source/output hashes; incomplete receipts forbid automatic resume."""
+    async def analysis_fingerprints(
+        self, paths: list[str], *, approved_upload_paths: list[str] | None = None,
+    ) -> ToolResult:
+        """Bounded hashes; uploads require the controller's exact authorized paths."""
         ...
 
     async def file_upload(

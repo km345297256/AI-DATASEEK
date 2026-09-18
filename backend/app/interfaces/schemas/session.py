@@ -29,6 +29,7 @@ class ChatRequest(BaseModel):
     resume_from: Optional[str] = Field(default=None, pattern=r"^[0-9a-f]{32}$")
     agent_profile_id: Optional[str] = None
     attachments: Optional[List[dict]] = None
+    input_file_ids: Optional[List[str]] = None
     skills: Optional[List[str]] = None
     mcp_servers: Optional[List[str]] = None
     dataset_ids: Optional[List[str]] = None
@@ -46,7 +47,7 @@ class ChatRequest(BaseModel):
             if not self.client_message_id or not self.client_message_id.strip():
                 raise ValueError("A continuation requires a new client_message_id")
             if ((self.message or "").strip() or self.agent_profile_id or self.attachments
-                    or self.skills or self.mcp_servers or self.dataset_ids):
+                    or self.skills or self.mcp_servers or self.dataset_ids or self.input_file_ids is not None):
                 raise ValueError("A continuation cannot change the original task or execution scope")
         return self
 

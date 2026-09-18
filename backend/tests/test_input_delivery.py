@@ -224,10 +224,19 @@ async def test_two_runtimes_have_one_claim_winner_and_stale_worker_cannot_start(
     repository = MemoryInputs()
     record = await pending(repository)
     a, b = InputDeliveryService(repository, repository), InputDeliveryService(repository, repository)
-    first, second = await asyncio.gather(a.claim(record), b.claim(record))
+
+    async def claim_and_bind(service):
+        claimed = await service.claim(record)
+        if claimed is not None:
+            # Match production: the claimant stays alive through dispatch.
+            # A finished bootstrap coroutine must not acquire a task later.
+            await service.bind(claimed, FakeTask())
+        return claimed
+
+    first, second = await asyncio.gather(claim_and_bind(a), claim_and_bind(b))
     assert (first is None) != (second is None)
     winner, loser = (a, b) if first else (b, a)
-    await winner.bind(first or second, FakeTask())
+    assert (await repository.get("session", record.key)).admission.runtime_id == winner.runtime_id
     with pytest.raises(InputLeaseLost):
         await loser.start("session", record.event, FakeTask())
 

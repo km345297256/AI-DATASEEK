@@ -118,6 +118,17 @@ defineExpose({
     -ms-overflow-style: none
 }
 
+/* The scroll region is keyboard reachable, but mouse focus must not paint a
+   browser-default blue frame around the entire page. Keep a quiet keyboard
+   focus marker scoped to this region; child controls retain their own rings. */
+.simplebar-content-wrapper:focus {
+    outline: 0;
+}
+
+.simplebar-content-wrapper:focus-visible {
+    box-shadow: inset 0 0 0 1px var(--border-dark, #737373);
+}
+
 .simplebar-content-wrapper::-webkit-scrollbar,
 .simplebar-hide-scrollbar::-webkit-scrollbar {
     display: none;

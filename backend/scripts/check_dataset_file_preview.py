@@ -7,8 +7,11 @@ never changed. Run inside the existing backend environment.
 from __future__ import annotations
 
 import asyncio
+import hashlib
+from io import BytesIO
 import json
 import os
+from pathlib import Path
 from urllib.parse import quote
 
 import httpx
@@ -44,6 +47,11 @@ async def main():
                 ("open-noaa-air-climatology", ".nc", "netcdf-map", "map"),
                 ("nasa-hst-fos", ".fits", "fits-image", "image"),
                 ("open-natural-earth-countries", ".shp", "shapefile", "sidecars"),
+                ("open-uci-concrete", ".xls", "viz-excel", "workbook"),
+                ("ncbi-lambda-reference", ".fasta", "viz-sequence-browser", "sequence"),
+                ("pdb-crambin", ".pdb", "molecular", "molecule"),
+                ("mendeley-calcium-carbonate", ".xrdml", "viz-diffraction", "diffraction"),
+                ("plos-reproducible-research", ".pdf", "viz-pdfjs", "pdf"),
             ]
             for dataset_id, extension, plugin_id, mode in examples:
                 assert plugin_id in enabled, "An acceptance capability is disabled; no preference is changed"
@@ -80,6 +88,48 @@ async def main():
                         response.raise_for_status()
                         assert len(response.content) == resource["size"]
                         assert response.headers["x-visualization-plugin"] == plugin_id
+                elif mode in {"workbook", "sequence", "diffraction"}:
+                    result = await api("POST", file_endpoint + "/visualization", json={
+                        "plugin_id": plugin_id, "operation": "preview"})
+                    payload = result["payload"]
+                    if mode == "workbook":
+                        assert payload["choices"]["sheets"] and payload["table"]["rows"]
+                    elif mode == "sequence":
+                        assert payload["choices"]["records"][0]["length"] == 48502
+                        window = await api("POST", file_endpoint + "/visualization", json={
+                            "plugin_id": plugin_id, "operation": "preview", "kind": "table",
+                            "version": result["version"], "options": {
+                                "record": 0, "start": 1, "count": 50, "motif": "", "quality_encoding": None}})
+                        local_source = Path(__file__).resolve().parents[1] / "app/resources/datasets" / dataset_id / source["path"]
+                        bases = "".join(line.strip() for line in local_source.read_text().splitlines()
+                                        if not line.startswith(">"))
+                        assert window["payload"]["sequence"]["bases"] == bases[:50]
+                    else:
+                        assert payload["choices"]["scans"]
+                        result = await api("POST", file_endpoint + "/visualization", json={
+                            "plugin_id": plugin_id, "operation": "preview", "kind": "series",
+                            "version": result["version"], "options": {"scan": 0}})
+                        payload = result["payload"]
+                        assert payload["series"] and payload["series"][0]["x"]
+                        assert len(payload["series"][0]["x"]) == len(payload["series"][0]["y"])
+                elif mode in {"molecule", "pdf"}:
+                    if mode == "molecule":
+                        result = await api("POST", file_endpoint + "/visualization", json={
+                            "plugin_id": plugin_id, "operation": "prepare"})
+                        assert result["kind"] == "molecule" and result["payload"]["source_format"] == "pdb"
+                    response = await client.post(file_endpoint + "/visualization", json={
+                        "plugin_id": plugin_id, "operation": "bytes"})
+                    response.raise_for_status()
+                    assert len(response.content) == source["size"]
+                    assert response.headers["x-visualization-plugin"] == plugin_id
+                    # Compare actual delivered bytes with the bundled, audited source.
+                    local_source = Path(__file__).resolve().parents[1] / "app/resources/datasets" / dataset_id / source["path"]
+                    assert hashlib.sha256(response.content).digest() == hashlib.sha256(local_source.read_bytes()).digest()
+                    if mode == "pdf":
+                        from pypdf import PdfReader
+                        assert len(PdfReader(BytesIO(response.content)).pages) == 4
+                    else:
+                        assert any(line.startswith(b"ATOM  ") for line in response.content.splitlines())
                 else:
                     response = await client.post(file_endpoint + "/visualization", json={"plugin_id": plugin_id, "operation": "bytes"})
                     response.raise_for_status()

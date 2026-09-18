@@ -5,6 +5,7 @@ from types import SimpleNamespace
 import pytest
 
 from app.domain.models.dataset import DatasetFile, MountedDataset
+from app.domain.models.analysis_input import assign_upload_namespace, build_analysis_inputs, upload_runtime_path
 from app.domain.models.file import FileInfo
 from app.domain.models.message import Message
 from app.domain.models.plan import ExecutionStatus, Plan, Step
@@ -44,14 +45,16 @@ class Sandbox:
 
     def __init__(self):
         self.calls = []
+        self.upload_authorizations = []
         self.records = {
             SOURCE: {"path": SOURCE, "size": 16, "sha256": "a" * 64},
             OUTPUT: {"path": OUTPUT, "size": 32, "sha256": "b" * 64},
         }
         self.response = None
 
-    async def analysis_fingerprints(self, paths):
+    async def analysis_fingerprints(self, paths, *, approved_upload_paths=None):
         self.calls.append(list(paths))
+        self.upload_authorizations.append(list(approved_upload_paths or []))
         return self.response or ToolResult(success=True, data={"version": 1, "files": [deepcopy(self.records[path]) for path in paths], "errors": []})
 
 
@@ -294,3 +297,140 @@ def test_unused_global_defaults_do_not_change_fully_overridden_effective_model(s
     assert configuration_digest(session) == original
     assert len(original) == 64
     assert "profile-key" not in original and "profile.invalid" not in original
+
+
+async def upload_checkpoint_fixture(*, ready=False, requires_artifacts=None):
+    repository, sandbox = Repository(), Sandbox()
+    infos = assign_upload_namespace([FileInfo(file_id="input-a", filename="table.csv", size=16)])
+    infos[0].file_path = upload_runtime_path(infos[0])
+    source = infos[0].file_path
+    sandbox.records[source] = {"path": source, "size": 16, "sha256": "c" * 64}
+    message = Message(message="Visualize the submitted data", attachments=[source],
+        attachment_file_ids=["input-a"], attachment_file_infos=infos,
+        analysis_inputs=build_analysis_inputs([], infos), controller_requires_artifacts=requires_artifacts)
+    token = await save_checkpoint(repository, sandbox, "session-a", "owner-a", message,
+        Plan(steps=[Step(id="plot", success=False)]),
+        source_fingerprints=[sandbox.records[source]], records=[], delivered=[],
+        reason_code="artifacts_missing", source_seq=1)
+    if ready:
+        repository.checkpoint["claimed_by"] = "client-a"
+        message.resume_from = token
+        message.client_message_id = "client-a"
+        message._accepted_event_seq = 10
+        message.message = ""
+    return repository, sandbox, message, token
+
+
+@pytest.mark.asyncio
+async def test_upload_continuation_binds_exact_manifest_and_fingerprints():
+    repository, sandbox, message, token = await upload_checkpoint_fixture(ready=True)
+    assert token
+    assert repository.checkpoint["analysis_input_manifest"] == message.analysis_inputs.model_dump(mode="json")
+    assert source_paths(message) == message.attachments
+    assert sandbox.upload_authorizations == [message.attachments]
+    checkpoint = await prepare_continuation(repository, sandbox, "session-a", "owner-a", message)
+    assert checkpoint and message.message == "Visualize the submitted data"
+    assert sandbox.upload_authorizations == [message.attachments, message.attachments]
+
+
+@pytest.mark.asyncio
+async def test_continuation_restores_the_sealed_original_output_contract():
+    repository, sandbox, message, _ = await upload_checkpoint_fixture(ready=True, requires_artifacts=True)
+    assert repository.checkpoint["controller_requires_artifacts"] is True
+    # A fresh advisory routing decision cannot weaken the original goal during
+    # a verified continuation. A genuinely new turn uses its own contract.
+    message.controller_requires_artifacts = False
+    await prepare_continuation(repository, sandbox, "session-a", "owner-a", message)
+    assert message.controller_requires_artifacts is True
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("change", ["identity", "path", "size", "manifest", "missing_info", "extra_path", "duplicate"])
+async def test_changed_upload_membership_or_identity_never_resumes(change):
+    repository, sandbox, message, _ = await upload_checkpoint_fixture(ready=True)
+    if change == "identity":
+        message.attachment_file_ids = ["another-file"]
+    elif change == "path":
+        message.attachment_file_infos[0].file_path = "/home/ubuntu/output/impostor.csv"
+    elif change == "size":
+        message.attachment_file_infos[0].size = 17
+    elif change == "manifest":
+        source = message.analysis_inputs.sources[0]
+        changed = source.files[0].model_copy(update={"logical_path": "renamed.csv"})
+        message.analysis_inputs = message.analysis_inputs.model_copy(update={
+            "sources": (source.model_copy(update={"files": (changed,)}),),
+        })
+    elif change == "missing_info":
+        message.attachment_file_infos = []
+    elif change == "extra_path":
+        message.attachments.append("/home/ubuntu/inputs/" + "a" * 24 + "/extra.csv")
+    elif change == "duplicate":
+        message.attachment_file_infos.append(message.attachment_file_infos[0])
+    calls = len(sandbox.calls)
+    with pytest.raises(ValueError):
+        await prepare_continuation(repository, sandbox, "session-a", "owner-a", message)
+    assert len(sandbox.calls) == calls
+    assert message._resume_checkpoint is None
+
+
+@pytest.mark.asyncio
+async def test_same_size_upload_replacement_is_detected_by_content_hash():
+    repository, sandbox, message, _ = await upload_checkpoint_fixture(ready=True)
+    sandbox.records[message.attachments[0]]["sha256"] = "d" * 64
+    with pytest.raises(ValueError, match="源数据"):
+        await prepare_continuation(repository, sandbox, "session-a", "owner-a", message)
+    assert message._resume_checkpoint is None
+
+
+@pytest.mark.asyncio
+async def test_upload_snapshot_never_authorizes_an_unlisted_file_or_arbitrary_root():
+    _, sandbox, message, _ = await upload_checkpoint_fixture()
+    path = message.attachments[0]
+    calls = len(sandbox.calls)
+    assert await fingerprints(sandbox, [path]) is None
+    assert await fingerprints(sandbox, [path], approved_upload_paths=["/home/ubuntu/private"]) is None
+    assert await fingerprints(sandbox, [path], approved_upload_paths=[path.replace("table.csv", "other.csv")]) is None
+    assert len(sandbox.calls) == calls
+    assert await fingerprints(sandbox, [path], approved_upload_paths=[path])
+
+
+@pytest.mark.asyncio
+async def test_changed_upload_bytes_cannot_create_new_checkpoint():
+    repository, sandbox, message, _ = await upload_checkpoint_fixture()
+    repository.checkpoint = None
+    original = deepcopy(sandbox.records[message.attachments[0]])
+    sandbox.records[message.attachments[0]]["sha256"] = "e" * 64
+    token = await save_checkpoint(repository, sandbox, "session-a", "owner-a", message,
+        Plan(steps=[Step(id="plot", success=False)]), source_fingerprints=[original],
+        records=[], delivered=[], reason_code="artifacts_missing", source_seq=2)
+    assert token is None and repository.checkpoint is None
+
+
+@pytest.mark.parametrize("target", ["input.nc", "dataset-a/input.nc", SOURCE])
+def test_controller_catalog_names_resolve_only_inside_registered_scope(target):
+    message = input_message()
+    message.controller_target_files = [target]
+    assert source_paths(message) == [SOURCE]
+
+
+def test_ambiguous_controller_target_does_not_pick_first_file():
+    message = input_message()
+    message.datasets[0].files.extend([DatasetFile(path="another/input.nc")])
+    message.controller_target_files = ["input.nc"]
+    assert source_paths(message) == []
+
+
+def test_upload_target_always_snapshots_the_whole_authorized_group():
+    infos = assign_upload_namespace([
+        FileInfo(file_id="shape", filename="map.shp", size=16),
+        FileInfo(file_id="attributes", filename="map.dbf", size=32),
+    ])
+    for info in infos:
+        info.file_path = upload_runtime_path(info)
+    message = Message(attachments=[item.file_path for item in infos],
+        attachment_file_ids=[item.file_id for item in infos], attachment_file_infos=infos,
+        analysis_inputs=build_analysis_inputs([], infos))
+    for target in ["map.shp", message.analysis_inputs.files[0].logical_path,
+                   "/".join(infos[0].file_path.split("/")[-2:])]:
+        message.controller_target_files = [target]
+        assert source_paths(message) == sorted(message.attachments)

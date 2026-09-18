@@ -1,3 +1,6 @@
+import json
+from unittest.mock import AsyncMock
+
 import httpx
 import pytest
 
@@ -28,7 +31,8 @@ async def test_artifact_validation_adapter_uses_batch_read_only_api():
 
 @pytest.mark.parametrize("failure", ["404", "500", "timeout", "not_json", "bad_version", "missing_files"])
 @pytest.mark.asyncio
-async def test_missing_validation_never_falls_back_to_existence(failure):
+async def test_missing_validation_never_falls_back_to_existence(failure, monkeypatch):
+    monkeypatch.setattr("app.infrastructure.external.sandbox.docker_sandbox.asyncio.sleep", AsyncMock())
     calls = []
     def respond(request):
         calls.append(request.url.path)
@@ -48,7 +52,7 @@ async def test_missing_validation_never_falls_back_to_existence(failure):
     assert result.success is False
     assert result.data == {"version": 1, "code": "validation_unavailable", "files": []}
     assert "private" not in result.model_dump_json()
-    assert calls == ["/api/v1/file/validate-artifacts"]
+    assert calls == ["/api/v1/file/validate-artifacts"] * (3 if failure in {"500", "timeout"} else 1)
 
 
 @pytest.mark.parametrize("mode", ["valid", "partial", "404", "timeout", "malformed"])
@@ -79,3 +83,21 @@ async def test_analysis_fingerprints_have_no_legacy_fallback(mode):
     elif mode not in {"valid"}:
         assert result.data["code"] == "snapshot_unavailable"
     assert calls == ["/api/v1/file/analysis-fingerprints"]
+
+
+@pytest.mark.asyncio
+async def test_upload_fingerprint_adapter_preserves_the_exact_controller_allowlist():
+    path = "/home/ubuntu/inputs/" + "a" * 24 + "/measurements.csv"
+    payloads = []
+    def respond(request):
+        payloads.append(json.loads(request.content))
+        return httpx.Response(200, json={"success": True, "data": {
+            "version": 1, "files": [{"path": path, "size": 4, "sha256": "b" * 64}], "errors": [],
+        }})
+    sandbox = DockerSandbox.__new__(DockerSandbox)
+    sandbox.base_url = "http://sandbox.test"
+    async with httpx.AsyncClient(transport=httpx.MockTransport(respond)) as client:
+        sandbox.client = client
+        result = await sandbox.analysis_fingerprints([path], approved_upload_paths=[path])
+    assert result.success is True
+    assert payloads == [{"paths": [path], "approved_upload_paths": [path]}]

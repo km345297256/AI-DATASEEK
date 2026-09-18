@@ -121,7 +121,8 @@ async def test_continuation_restores_scope_before_durable_admission_and_gates_or
     assert record.event.message == CONTINUATION_MESSAGE
     assert record.event.metadata == {"resume_from": TOKEN, "client_message_id": "resume-client",
         "skills": ["original-skill"], "mcp_servers": ["original-mcp"], "mcp_access_all": False,
-        "dataset_ids": ["registered"]}
+        "dataset_ids": ["registered"], "requested_input_file_ids": None,
+        "analysis_input_file_ids": [], "analysis_input_files": []}
     assert "private" not in record.event.model_dump_json()
     request = service._dataset_request_resolver.resolve.await_args.kwargs
     assert request["question"] == repository.checkpoint["goal"]

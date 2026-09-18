@@ -55,6 +55,67 @@ class _EchoToolkit(BaseToolkit):
         return ToolResult(success=True, data={"value": value})
 
 
+class _BindingRegressionToolkit(BaseToolkit):
+    name: str = "binding-regression"
+    body_calls: int = 0
+
+    @tool
+    async def reserved_parameter(self, args: list[str] | None = None) -> ToolResult:
+        """Reproduce framework rewriting a reserved public parameter name."""
+        self.body_calls += 1
+        return ToolResult(success=True)
+
+    @tool
+    async def body_type_error(self, value: str) -> ToolResult:
+        """Fail after the actual tool body has started."""
+        self.body_calls += 1
+        raise TypeError("private body failure must not imply no execution")
+
+
+@pytest.mark.asyncio
+async def test_schema_callable_mismatch_is_proven_not_started_in_agent_pipeline():
+    toolkit = _BindingRegressionToolkit()
+    resolved = toolkit.get_tool("reserved_parameter")
+    # The regression originates in the model-visible schema, not a made-up
+    # invalid request. Its generated field is accepted by JSON validation.
+    schema = resolved.args_schema.model_json_schema()
+    assert "v__args" in schema["properties"]
+    agent = object.__new__(BaseAgent)
+    agent.name = "binding-regression"
+    agent.max_retries = 0
+    agent.retry_interval = 0
+    agent.toolkits = [toolkit]
+    agent.ask = AsyncMock(return_value=AIMessage(content="", tool_calls=[{
+        "name": "reserved_parameter", "args": {"v__args": ["sample"]}, "id": "binding-call",
+    }]))
+    agent.ask_with_messages = AsyncMock(return_value=AIMessage(content="done"))
+
+    events = [event async for event in agent.execute("run")]
+    failure = next(event.function_result for event in events
+                   if isinstance(event, ToolEvent) and event.function_result is not None)
+    assert failure.success is False
+    assert failure.data["error_code"] == "tool_signature_mismatch"
+    assert failure.data["side_effect_state"] == "not_started"
+    assert failure.data["retryable"] is False
+    assert toolkit.body_calls == 0
+    assert agent._tool_execution_ledger.summary()["pending_execution"] is False
+
+
+@pytest.mark.asyncio
+async def test_type_error_inside_tool_body_still_has_unknown_side_effects():
+    toolkit = _BindingRegressionToolkit()
+    agent = object.__new__(BaseAgent)
+    agent.max_retries = 0
+    agent.retry_interval = 0
+    result = await agent.invoke_tool(toolkit.get_tool("body_type_error"), {
+        "name": "body_type_error", "id": "body-call", "args": {"value": "sample"},
+    })
+    assert toolkit.body_calls == 1
+    assert result.artifact.data["side_effect_state"] == "unknown"
+    assert result.artifact.data["error_code"] == "tool_execution_error"
+    assert "private body failure" not in result.content
+
+
 @pytest.mark.asyncio
 async def test_tool_execution_pipeline_runs_stages_without_rewriting_call():
     events: list[str] = []

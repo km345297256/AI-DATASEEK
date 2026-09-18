@@ -4,6 +4,7 @@ import test from 'node:test';
 import ts from 'typescript';
 import { ref } from 'vue';
 import { useAnalysisProgress } from '../src/composables/useAnalysisProgress.ts';
+import { useAnalysisSession } from '../src/composables/useAnalysisSession.ts';
 import { isAnalysisProgressEvent, isAnalysisProgressMessage } from '../src/utils/analysisProgress.ts';
 import { acceptAgentEvent, createAgentEventCursor } from '../src/utils/agentEventCursor.ts';
 import { projectHistoryMessages, prependHistoricalMessages } from '../src/utils/sessionHistory.ts';
@@ -31,6 +32,10 @@ function pageHandler(page, name, scope) {
 }
 
 function harness(page) {
+  if (page !== 'SharePage') {
+    const scope = useAnalysisSession({ api: {} });
+    return { scope, receive: scope.handleEvent };
+  }
   const scope = {
     ...useAnalysisProgress(), isAnalysisProgressEvent, isAnalysisProgressMessage,
     acceptAgentEvent, eventCursor: createAgentEventCursor(), messages: ref([]), timelineRevision: ref(0),
@@ -147,7 +152,9 @@ test('each page renders the shared transient state outside ChatMessage and clear
   for (const page of ['ChatPage', 'DatasetSeekPage', 'SharePage']) {
     const source = readFileSync(new URL(`../src/pages/${page}.vue`, import.meta.url), 'utf8');
     assert.match(source, /analysisProgress \|\|/);
-    assert.match(source, /onUnmounted\(\(\) => \{[\s\S]*?clearAnalysisProgress\(\)/);
+    assert.match(source, page === 'SharePage'
+      ? /onUnmounted\(\(\) => \{[\s\S]*?clearAnalysisProgress\(\)/
+      : /onUnmounted\(\(\) => \{[\s\S]*?analysisSession\.dispose\(\)/);
   }
 });
 

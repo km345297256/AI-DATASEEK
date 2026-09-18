@@ -358,100 +358,20 @@
             <button v-if="hasMoreHistory" type="button" :disabled="isLoadingEarlierHistory" class="mx-auto rounded-lg px-4 py-2 text-sm text-[var(--text-secondary)] disabled:opacity-50" @click="loadEarlierHistory">
               {{ isLoadingEarlierHistory ? '正在加载历史记录…' : '加载更早的对话' }}
             </button>
-            <template v-for="(message, index) in messages" :key="messageKey(message)">
-              <div
-                v-if="message.type !== 'step' || shouldShowStep(index)"
-                :data-message-key="messageKey(message)"
-                class="dataset-chat-message min-w-0 max-w-full"
-              >
-                <ChatMessage
-                  :message="message"
-                  :session-id="sessionId || undefined"
-                  :hide-header="isConsecutiveAssistant(messages, index)"
-                  :show-assistant-actions="!isLoading && isLatestAssistantMessage(messages, index)"
-                  :allow-analysis-resume="canResumeAnalysis(index)"
-                  @resumeAnalysis="resumeAnalysis(index)"
-                  :task-summary-expanded="isTaskSummaryExpanded(message)"
-                  :show-product-button="!isLoading && isLatestAssistantMessage(messages, index)"
-                  @toolClick="handleToolClick"
-                  @jupyterOpened="handleJupyterOpened"
-                  @taskSummaryToggle="toggleTaskSummary(message)"
-                  @showProduct="productDialogVisible = true"
-                />
-              </div>
-              <div
-                v-if="imageArtifacts(message).length"
-                class="mb-3 mt-1 overflow-hidden rounded-xl border border-[var(--border-main)] bg-[var(--background-menu-white)]"
-              >
-                <div class="flex items-center justify-between border-b border-[var(--border-main)] px-3.5 py-2.5">
-                  <div class="flex items-center gap-2 text-xs font-medium">
-                    <ImageIcon class="size-3.5 text-[#2b7659]" />
-                    可视化成果
-                  </div>
-                  <span class="text-[10px] text-[var(--text-tertiary)]">点击图片查看与下载</span>
-                </div>
-                <div class="grid gap-3 p-3" :class="imageArtifacts(message).length > 1 ? 'sm:grid-cols-2' : 'grid-cols-1'">
-                  <button
-                    v-for="file in imageArtifacts(message)"
-                    :key="file.file_id"
-                    type="button"
-                    class="group/artifact overflow-hidden rounded-lg border border-[var(--border-main)] bg-[var(--background-gray-main)] text-left"
-                    @click="showFilePanel(file, attachmentFiles(message))"
-                  >
-                    <img
-                      v-if="artifactPreviewUrl(file)"
-                      :src="artifactPreviewUrl(file)"
-                      :alt="file.filename"
-                      class="max-h-[520px] w-full bg-white object-contain transition-transform duration-200 group-hover/artifact:scale-[1.01]"
-                    />
-                    <div class="flex items-center justify-between gap-3 px-3 py-2 text-xs">
-                      <span class="truncate font-medium">{{ file.filename }}</span>
-                      <span class="shrink-0 text-[var(--text-tertiary)]">查看成果</span>
-                    </div>
-                  </button>
-                </div>
-              </div>
-            </template>
-            <div
-              v-if="completionAdvice && completionAdvice.recommendations.length && !isLoading"
-              class="mt-4 rounded-xl border border-[var(--border-main)] bg-[var(--background-menu-white)] p-4"
-            >
-              <div class="mb-2 text-sm font-medium">推荐追问</div>
-              <div class="flex flex-col gap-2 text-sm text-[var(--text-secondary)]">
-                <button
-                  v-for="(item, index) in completionAdvice.recommendations"
-                  :key="`${item}-${index}`"
-                  type="button"
-                  :disabled="isLoading"
-                  class="group flex w-full items-center justify-between gap-3 rounded-lg bg-[var(--background-gray-main)] px-3 py-2 text-left transition-colors hover:bg-[var(--fill-tsp-white-dark)] disabled:cursor-not-allowed disabled:opacity-60"
-                  @click="askSuggestion(item)"
-                >
-                  <span class="min-w-0 flex-1">{{ item }}</span>
-                  <ChevronRight class="size-4 shrink-0 text-[var(--icon-tertiary)] transition-transform group-hover:translate-x-0.5 group-hover:text-[var(--icon-secondary)]" />
-                </button>
-              </div>
-              <div v-if="completionAdvice.is_skill_candidate && completionAdvice.skill_reason" class="mt-3 text-xs text-[var(--text-tertiary)]">
-                {{ completionAdvice.skill_reason }}
-              </div>
-            </div>
-            <button
-              v-if="completionAdvice?.shapefile_preview_available && !isLoading"
-              type="button"
-              class="mt-3 flex w-full items-center justify-between gap-3 rounded-lg border border-[var(--border-main)] bg-[var(--background-menu-white)] px-4 py-3 text-left text-sm transition-colors hover:border-[#6b927f] hover:bg-[#f6faf8] dark:hover:bg-[#27342f]"
-              @click="openShapefilePreview"
-            >
-              <span>是否进行Shapefile可视化</span>
-              <ChevronRight class="size-4 shrink-0 text-[var(--icon-tertiary)]" />
-            </button>
-            <button
-              v-if="completionAdvice?.molecular_preview_available && !isLoading"
-              type="button"
-              class="mt-3 flex w-full items-center justify-between gap-3 rounded-lg border border-[var(--border-main)] bg-[var(--background-menu-white)] px-4 py-3 text-left text-sm transition-colors hover:border-[#6b927f] hover:bg-[#f6faf8] dark:hover:bg-[#27342f]"
-              @click="openMolecularPreview"
-            >
-              <span>是否进行分子结构3D可视化</span>
-              <ChevronRight class="size-4 shrink-0 text-[var(--icon-tertiary)]" />
-            </button>
+            <AnalysisConversation
+              :messages="messages"
+              :message-key="messageKey"
+              :session-id="sessionId"
+              :is-loading="isLoading"
+              :completion-advice="completionAdvice"
+              :can-resume-analysis="canResumeAnalysis"
+              allow-products
+              @resumeAnalysis="resumeAnalysis"
+              @toolClick="handleToolClick"
+              @jupyterOpened="handleJupyterOpened"
+              @showProduct="productDialogVisible = true"
+              @followUp="askSuggestion"
+            />
             <button
               v-if="showNcViewSuggestion"
               type="button"
@@ -479,7 +399,7 @@
             :rows="1"
             :is-running="isLoading"
             :attachments="datasetChatAttachments"
-            :disabled="isLoading || isRestoringHistory || !dataset"
+            :disabled="catalogLoading || isLoading || isRestoringHistory || !dataset"
             :show-file-actions="false"
             :show-mcp-actions="false"
             :placeholder="DATASET_CHAT_PLACEHOLDER"
@@ -529,12 +449,11 @@
 </template>
 
 <script setup lang="ts">
-import { findAnalysisTool, mergeAnalysisToolEvent } from '@/utils/analysisJob';
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 import { RouterLink, useRoute } from 'vue-router';
-import { Check, ChevronDown, ChevronRight, CircleAlert, Clock3, Copy, Database, Download, Eye, FileText, Folder, FolderOpen, History, Image as ImageIcon, LoaderCircle, PackageOpen, PanelLeftClose, PanelLeftOpen, Pencil, Plus, RefreshCw, Trash2, X } from 'lucide-vue-next';
+import { Check, ChevronDown, ChevronRight, CircleAlert, Clock3, Copy, Database, Download, Eye, FileText, Folder, FolderOpen, History, LoaderCircle, PackageOpen, PanelLeftClose, PanelLeftOpen, Pencil, Plus, RefreshCw, Trash2, X } from 'lucide-vue-next';
 import ChatBox from '@/components/ChatBox.vue';
-import ChatMessage from '@/components/ChatMessage.vue';
+import AnalysisConversation from '@/components/AnalysisConversation.vue';
 import FilePanel from '@/components/FilePanel.vue';
 import SessionFileList from '@/components/SessionFileList.vue';
 import DataProductDialog from '@/components/DataProductDialog.vue';
@@ -543,32 +462,24 @@ import VersionBadge from '@/components/VersionBadge.vue';
 import SettingsDialog from '@/components/settings/SettingsDialog.vue';
 import AgentSelector from '@/components/AgentSelector.vue';
 import ToolPanel from '@/components/ToolPanel.vue';
-import { createSession, getSessionHistory, chatWithSession, stopSession, createClientMessageId } from '@/api/agent';
-import { continuationAttempt, resumableAnalysisOutcome } from '@/utils/analysisOutcome';
-import type { AnalysisContinuationAttempt } from '@/types/analysisOutcome';
-import { createMessageKey, isLegacyPlanProgressMessage, prependHistoricalMessages, projectHistoryMessages } from '@/utils/sessionHistory';
-import { isAnalysisProgressEvent, isAnalysisProgressMessage } from '@/utils/analysisProgress';
-import { useAnalysisProgress } from '@/composables/useAnalysisProgress';
-import type { SSECallbacks } from '@/api/client';
+import * as agentApi from '@/api/agent';
+import { useAnalysisSession } from '@/composables/useAnalysisSession';
 import { API_CONFIG } from '@/api/client';
 import { deleteDatasetDataProduct, downloadDatasetDataProduct, generateDatasetSuggestedQuestions, getDataCenterDataset, listDatasetChatSessions, listDatasetDataProducts, updateDatasetDataProduct, type DataCenterDataset, type DataCenterDatasetFile, type DataProduct, type DataProductFile, type DatasetChatSession } from '@/api/dataset';
 import { createFileSignedUrl } from '@/api/file';
-import { prepareShapefilePreview, type FileInfo } from '@/api/file';
+import type { FileInfo } from '@/api/file';
 import { getSkillPreferences } from '@/api/skill';
 import { useAgentProfile } from '@/composables/useAgentProfile';
 import { useFilePanel } from '@/composables/useFilePanel';
 import { useDatasetFilePreview } from '@/composables/useDatasetFilePreview';
-import { EVENT_SKILL_PREFERENCES_UPDATED } from '@/constants/event';
+import { EVENT_SKILL_PREFERENCES_UPDATED, EVENT_REFRESH_SESSION_LIST } from '@/constants/event';
 import { DATASET_CHAT_PLACEHOLDER, buildDatasetChatCapabilities } from '@/utils/datasetCapabilitySelection';
 import { isPlaceholderAssistantMessage } from '@/utils/datasetResultPresentation';
 import { copyToClipboard } from '@/utils/dom';
 import { eventBus } from '@/utils/eventBus';
 import { showErrorToast, showSuccessToast } from '@/utils/toast';
-import { completeRunningSteps, failRunningSteps, findCurrentTurnRunningStep, findCurrentTurnStep, insertTaskExecutionSummary, isLatestAssistantMessage } from '@/utils/chatTimeline';
-import { acceptAgentEvent, createAgentEventCursor, resetAgentEventCursor } from '@/utils/agentEventCursor';
-import { isConsecutiveAssistant, type AttachmentsContent, type Message, type MessageContent, type StepContent, type ToolContent } from '@/types/message';
-import type { AgentSSEEvent, CompletionAdviceData, DoneEventData, ErrorEventData, MessageEventData, PlanEventData, StepEventData, TitleEventData, ToolEventData } from '@/types/event';
-import { SessionStatus } from '@/types/response';
+import { findCurrentTurnRunningStep } from '@/utils/chatTimeline';
+import type { MessageContent, ToolContent } from '@/types/message';
 
 const DATASET_STORAGE_KEY_PREFIX = 'ai-dataseek:dataset-seek:session';
 
@@ -578,7 +489,7 @@ const profileDomainMismatch = computed(() => {
   const preset = selectedProfile.value?.tool_runtime?.preset_id;
   return Boolean(dataset.value?.domain && preset && preset !== 'general' && preset !== dataset.value.domain);
 });
-const { showFilePanel, hideFilePanel, beginFilePreview } = useFilePanel();
+const { showFilePanel, hideFilePanel } = useFilePanel();
 const dataset = ref<DataCenterDataset>();
 const datasetPreview = useDatasetFilePreview(() => dataset.value, () => { mobileCatalogOpen.value = false; });
 const dataProducts = ref<DataProduct[]>([]);
@@ -608,27 +519,7 @@ const copiedDatasetFilePath = ref<string | null>(null);
 const catalogLoading = ref(true);
 const inputMessage = ref('');
 const datasetChatAttachments: FileInfo[] = [];
-const selectedSkills = ref<string[]>([]);
 const autoEnabledSkillNames = ref(new Set<string>());
-const messages = ref<Message[]>([]);
-const analysisContinuation = ref<AnalysisContinuationAttempt | null>(null);
-const sessionId = ref<string | null>(null);
-const sessionCreatedAt = ref<number | null>(null);
-const expandedTaskSummaries = ref(new Set<number>());
-const lastEventId = ref<string>();
-const lastEventSeq = ref<number>();
-const eventCursor = createAgentEventCursor();
-const isLoading = ref(false);
-const taskStartedAtMs = ref<number>();
-const loadingStatus = ref('');
-const { analysisProgress, updateAnalysisProgress, beginAnalysisProgress, clearAnalysisProgress } = useAnalysisProgress();
-const connectionNotice = ref('');
-const hasMoreHistory = ref(false);
-const isLoadingEarlierHistory = ref(false);
-const isRestoringHistory = ref(false);
-const historyBeforeSeq = ref<number>();
-const timelineRevision = ref(0);
-const messageKey = createMessageKey();
 const mobileCatalogOpen = ref(false);
 const catalogCollapsed = ref(false);
 const desktopCatalogViewport = ref(false);
@@ -637,32 +528,48 @@ const catalogToggleLabel = computed(() => catalogPanelCollapsed.value ? '展开�
 const suggestedQuestions = ref<string[]>([]);
 const suggestedQuestionsLoading = ref(false);
 const suggestedQuestionsError = ref('');
-const completionAdvice = ref<CompletionAdviceData>();
-const shapefilePreviewLoading = ref(false);
 const historyOpen = ref(false);
 const historyMenuRef = ref<HTMLElement>();
 const historyLoading = ref(false);
 const historySessions = ref<DatasetChatSession[]>([]);
 const timelineRef = ref<HTMLElement>();
 const timelineContentRef = ref<HTMLElement>();
-const shouldFollowTimeline = ref(true);
-const currentPlan = ref<PlanEventData>();
-const lastTool = ref<ToolContent>();
-const lastNoMessageTool = ref<ToolContent>();
 const toolPanel = ref<InstanceType<typeof ToolPanel>>();
 const toolPanelRealTime = ref(true);
-let cancelChat: (() => void) | null = null;
-let conversationGeneration = 0;
-let viewDisposed = false;
-let historyRequest: AbortController | undefined;
+const analysisSession = useAnalysisSession({
+  api: agentApi,
+  getViewport: () => timelineRef.value,
+  onNewTurn: closeToolPanel,
+  onReset: () => { hideFilePanel(); closeToolPanel(); },
+  onTerminal: () => { void refreshHistory(); eventBus.emit(EVENT_REFRESH_SESSION_LIST); },
+  onHistoryError: () => showErrorToast('历史记录加载失败，请重试。'),
+  onSessionCreated: session => localStorage.setItem(datasetStorageKey(), session.session_id),
+  onSessionRestored: session => {
+    localStorage.setItem(datasetStorageKey(), session.session_id);
+    selectedSkills.value = [...new Set(selectedSkills.value.filter(name => !autoEnabledSkillNames.value.has(name.trim().toLocaleLowerCase())))];
+  },
+});
+const { sessionId, sessionCreatedAt, messages, isLoading, connectionNotice, analysisProgress, loadingStatus,
+  hasMoreHistory, isLoadingHistory: isLoadingEarlierHistory, isRestoringHistory, timelineRevision,
+  follow: shouldFollowTimeline, lastNoMessageTool, selectedSkills,
+  completionAdvice, messageKey, canResumeAnalysis, resumeAnalysis, loadEarlierHistory, stop } = analysisSession;
 let timelineResizeObserver: ResizeObserver | null = null;
 let datasetSummaryResizeObserver: ResizeObserver | null = null;
 let desktopCatalogMediaQuery: MediaQueryList | null = null;
 let datasetFileCopyTimer: ReturnType<typeof setTimeout> | null = null;
+let datasetLoadGeneration = 0;
+let datasetViewDisposed = false;
+let datasetViewReady = false;
+
+function isCurrentDatasetLoad(generation: number) {
+  return !datasetViewDisposed && generation === datasetLoadGeneration;
+}
 
 async function loadDataProducts() {
   if (!selectedDatasetId.value) return;
-  dataProducts.value = await listDatasetDataProducts(selectedDatasetId.value).catch(() => []);
+  const generation = datasetLoadGeneration;
+  const products = await listDatasetDataProducts(selectedDatasetId.value).catch(() => []);
+  if (isCurrentDatasetLoad(generation)) dataProducts.value = products;
 }
 
 function toggleProduct(productId: string) {
@@ -966,17 +873,6 @@ function handleCatalogViewportChange(event: MediaQueryListEvent) {
   desktopCatalogViewport.value = event.matches;
 }
 
-function startUserTurn() {
-  beginAnalysisProgress();
-  closeToolPanel();
-  shouldFollowTimeline.value = true;
-  failRunningSteps(messages.value, false);
-  currentPlan.value = undefined;
-  lastTool.value = undefined;
-  lastNoMessageTool.value = undefined;
-  completionAdvice.value = undefined;
-}
-
 function closeToolPanel() {
   toolPanel.value?.hideToolPanel();
   toolPanelRealTime.value = false;
@@ -1005,160 +901,44 @@ function jumpToLatestTool() {
   );
 }
 
-function handleMessage(data: MessageEventData) {
-  if (isAnalysisProgressMessage(data)) return;
-  if (data.role === 'user') startUserTurn();
-  if (
-    data.role === 'assistant'
-    && (isLegacyPlanProgressMessage(data.content) || isPlaceholderAssistantMessage(data.content))
-  ) return;
-  messages.value.push({ type: data.role, content: { ...data } as MessageContent });
-  if (data.attachments?.length) {
-    messages.value.push({ type: 'attachments', content: { ...data } as AttachmentsContent });
-  }
-}
-
-function handleTool(data: ToolEventData) {
-  const tool = { ...data } as ToolContent;
-  const existingTool = findAnalysisTool(messages.value, tool.tool_call_id);
-  if (existingTool) Object.assign(existingTool, mergeAnalysisToolEvent(existingTool, tool));
-  else {
-    const runningStep = findCurrentTurnRunningStep(messages.value);
-    if (runningStep) runningStep.tools.push(tool);
-    else messages.value.push({ type: 'tool', content: tool });
-    lastTool.value = tool;
-  }
-  if (tool.name !== 'message' && (!existingTool || lastTool.value?.tool_call_id === tool.tool_call_id)) {
-    lastNoMessageTool.value = lastTool.value;
-  }
-}
-
-function handleStep(data: StepEventData) {
-  const existing = findCurrentTurnStep(messages.value, data.id);
-  if (existing) {
-    Object.assign(existing, { status: data.status, description: data.description });
-    if (data.status === 'completed' || data.status === 'failed') existing.ended_at = data.timestamp;
-  } else if (data.status === 'running') {
-    messages.value.push({ type: 'step', content: { ...data, started_at: data.timestamp, tools: [] } as StepContent });
-  }
-}
-
-function handleEvent(event: AgentSSEEvent) {
-  if (!acceptAgentEvent(eventCursor, event)) return;
-  updateAnalysisProgress(event);
-  if (!isAnalysisProgressEvent(event)) timelineRevision.value += 1;
-  if (event.event === 'message') handleMessage(event.data as MessageEventData);
-  else if (event.event === 'tool') handleTool(event.data as ToolEventData);
-  else if (event.event === 'step') handleStep(event.data as StepEventData);
-  else if (event.event === 'plan') currentPlan.value = event.data as PlanEventData;
-  else if (event.event === 'error') {
-    const data = event.data as ErrorEventData;
-    messages.value.push({ type: 'assistant', content: { content: data.error, timestamp: data.timestamp } as MessageContent });
-    failRunningSteps(messages.value);
-    isLoading.value = false;
-    taskStartedAtMs.value = undefined;
-  } else if (event.event === 'done') {
-    isLoading.value = false;
-    completeRunningSteps(messages.value, event.data.timestamp);
-    const elapsedMs = taskStartedAtMs.value === undefined
-      ? undefined
-      : performance.now() - taskStartedAtMs.value;
-    insertTaskExecutionSummary(messages.value, event.data.timestamp, elapsedMs);
-    taskStartedAtMs.value = undefined;
-    completionAdvice.value = (event.data as DoneEventData).advice;
-  } else if (event.event === 'wait') {
-    isLoading.value = false;
-    taskStartedAtMs.value = undefined;
-  }
-  else if (event.event === 'title') void (event.data as TitleEventData);
-  if (event.data.event_id) lastEventId.value = event.data.event_id;
-  lastEventSeq.value = eventCursor.lastSeq;
-  if (event.event === 'done' || event.event === 'wait' || event.event === 'error') {
-    void refreshHistory();
-  }
-}
-
-function attachmentFiles(message: Message): FileInfo[] {
-  if (message.type !== 'attachments') return [];
-  return (message.content as AttachmentsContent).attachments || [];
-}
-
-function imageArtifacts(message: Message): FileInfo[] {
-  if (message.type !== 'attachments' || (message.content as AttachmentsContent).role !== 'assistant') return [];
-  return attachmentFiles(message).filter(file => /\.(png|jpe?g|gif|webp|svg)$/i.test(file.filename));
-}
-
-function artifactPreviewUrl(file: FileInfo): string {
-  if (!file.file_url) return '';
-  if (/^https?:\/\//i.test(file.file_url)) return file.file_url;
-  return `${API_CONFIG.host}${file.file_url}`;
-}
-
-async function openShapefilePreview() {
-  if (shapefilePreviewLoading.value) return;
-  const outputFiles = messages.value.flatMap(message => message.type === 'attachments' && (message.content as AttachmentsContent).role === 'assistant' ? attachmentFiles(message) : []);
-  const candidates = outputFiles.filter(file => /\.(?:shp|zip|rar)$/i.test(file.filename));
-  const source = candidates[candidates.length - 1];
-  if (!source) return;
-  const previewRequest = beginFilePreview();
-  shapefilePreviewLoading.value = true;
-  try {
-    if (/\.shp$/i.test(source.filename)) {
-      const stem = source.filename.replace(/\.[^.]+$/, '').toLowerCase();
-      previewRequest.show(source, outputFiles.filter(file => file.filename.replace(/\.[^.]+$/, '').toLowerCase() === stem));
-      return;
-    }
-    const prepared = await prepareShapefilePreview(source.file_id);
-    const files = prepared.layers.flatMap(layer => layer.components);
-    const layer = prepared.layers.find(item => item.complete) || prepared.layers[0];
-    const selected = layer?.components.find(file => /\.shp$/i.test(file.filename));
-    if (selected) previewRequest.show(selected, files);
-  } catch (error) {
-    if (previewRequest.isCurrent()) showErrorToast(error instanceof Error ? error.message : 'Shapefile预览准备失败');
-  } finally {
-    shapefilePreviewLoading.value = false;
-  }
-}
-
-function openMolecularPreview() {
-  const outputFiles = messages.value.flatMap(message => message.type === 'attachments' && (message.content as AttachmentsContent).role === 'assistant' ? attachmentFiles(message) : []);
-  const candidates = outputFiles.filter(file => /\.(?:cif|pdb|ent|mol|sdf|xyz|mol2|vasp)$/i.test(file.filename) || /(?:^|[\\/])(poscar|contcar)$/i.test(file.filename));
-  const source = candidates[candidates.length - 1];
-  if (source) showFilePanel(source, candidates);
-}
-
 async function loadSuggestedQuestions() {
   if (!selectedDatasetId.value || suggestedQuestionsLoading.value) return;
+  const generation = datasetLoadGeneration;
   suggestedQuestionsLoading.value = true;
   suggestedQuestionsError.value = '';
   suggestedQuestions.value = [];
   try {
     const response = await generateDatasetSuggestedQuestions(selectedDatasetId.value);
+    if (!isCurrentDatasetLoad(generation)) return;
     const normalized = Array.isArray(response)
       ? [...new Set(response.map((question) => question.trim()).filter(Boolean))]
       : [];
     if (normalized.length !== 4) throw new Error('Suggested question response must contain exactly four unique questions');
     suggestedQuestions.value = normalized;
   } catch (error) {
+    if (!isCurrentDatasetLoad(generation)) return;
     console.error('Failed to generate dataset suggested questions', error);
     suggestedQuestionsError.value = '推荐问题生成失败，请稍后重试';
   } finally {
-    suggestedQuestionsLoading.value = false;
+    if (isCurrentDatasetLoad(generation)) suggestedQuestionsLoading.value = false;
   }
 }
 
 async function refreshHistory() {
+  const generation = datasetLoadGeneration;
   if (!selectedDatasetId.value) {
     historySessions.value = [];
     return;
   }
   historyLoading.value = true;
   try {
-    historySessions.value = await listDatasetChatSessions(selectedDatasetId.value);
+    const sessions = await listDatasetChatSessions(selectedDatasetId.value);
+    if (isCurrentDatasetLoad(generation)) historySessions.value = sessions;
   } catch (error) {
+    if (!isCurrentDatasetLoad(generation)) return;
     console.error('Failed to load dataset chat history', error);
   } finally {
-    historyLoading.value = false;
+    if (isCurrentDatasetLoad(generation)) historyLoading.value = false;
   }
 }
 
@@ -1201,20 +981,6 @@ function formatSessionCreatedAt(timestamp: number) {
   return sameDay ? `今天 ${value}` : value;
 }
 
-function taskSummaryBefore(stepIndex: number) {
-  for (let index = stepIndex - 1; index >= 0; index -= 1) {
-    const message = messages.value[index];
-    if (message.type === 'user') return undefined;
-    if (message.type === 'task-summary') return message;
-  }
-  return undefined;
-}
-
-function shouldShowStep(index: number) {
-  const summary = taskSummaryBefore(index);
-  return !summary || expandedTaskSummaries.value.has(summary.content.timestamp);
-}
-
 const hasRunningStep = computed(() => Boolean(findCurrentTurnRunningStep(messages.value)));
 const showNcViewSuggestion = computed(() => Boolean(
   dataset.value?.ncViewUrl
@@ -1222,29 +988,6 @@ const showNcViewSuggestion = computed(() => Boolean(
   && messages.value.some((message) => message.type === 'assistant'
     && !isPlaceholderAssistantMessage((message.content as MessageContent).content)),
 ));
-
-function isTaskSummaryExpanded(message: Message) {
-  return message.type === 'task-summary' && expandedTaskSummaries.value.has(message.content.timestamp);
-}
-
-function toggleTaskSummary(message: Message) {
-  if (message.type !== 'task-summary') return;
-  const next = new Set(expandedTaskSummaries.value);
-  if (next.has(message.content.timestamp)) next.delete(message.content.timestamp);
-  else next.add(message.content.timestamp);
-  expandedTaskSummaries.value = next;
-}
-
-async function ensureSession(generation: number) {
-  if (sessionId.value) return sessionId.value;
-  loadingStatus.value = '正在创建数据分析会话...';
-  const session = await createSession(selectedProfileId.value);
-  if (generation !== conversationGeneration) return null;
-  sessionId.value = session.session_id;
-  sessionCreatedAt.value = session.created_at;
-  localStorage.setItem(datasetStorageKey(), session.session_id);
-  return session.session_id;
-}
 
 function setAutoEnabledSkillNames(names: string[]) {
   const normalized = new Set(names.map((name) => name.trim().toLocaleLowerCase()));
@@ -1272,130 +1015,12 @@ async function loadAutoEnabledSkillNames() {
 async function submit() {
   const question = inputMessage.value.trim();
   const selected = dataset.value;
-  if (!question || !selected || isLoading.value || isRestoringHistory.value || viewDisposed) return;
-  analysisContinuation.value = null;
-  const generation = ++conversationGeneration;
-  historyRequest?.abort();
-  isLoadingEarlierHistory.value = false;
-  cancelChat?.();
-  cancelChat = null;
-  connectionNotice.value = '';
+  if (!question || !selected || catalogLoading.value || isLoading.value || isRestoringHistory.value) return;
+  const capabilities = buildDatasetChatCapabilities(selected.dataset_id, selectedSkills.value);
   inputMessage.value = '';
-  startUserTurn();
-  messages.value.push({ type: 'user', content: { content: question, timestamp: Math.floor(Date.now() / 1000) } as MessageContent });
-  taskStartedAtMs.value = performance.now();
-  isLoading.value = true;
-  loadingStatus.value = '正在关联数据集...';
-  try {
-    const activeSessionId = await ensureSession(generation);
-    if (!activeSessionId || generation !== conversationGeneration) return;
-    const capabilities = buildDatasetChatCapabilities(selected.dataset_id, selectedSkills.value);
-    const cancel = await chatWithSession(
-      activeSessionId,
-      question,
-      lastEventId.value,
-      lastEventSeq.value,
-      capabilities.attachments,
-      capabilities.skills,
-      capabilities.mcpServers,
-      selectedProfileId.value,
-      conversationCallbacks(generation),
-      capabilities.datasetIds,
-    );
-    if (generation !== conversationGeneration) { cancel(); return; }
-    cancelChat = cancel;
-    loadingStatus.value = 'DataSeek 正在读取数据集...';
-  } catch (error: any) {
-    if (generation !== conversationGeneration) return;
-    console.error(error);
-    isLoading.value = false;
-    clearAnalysisProgress();
-    taskStartedAtMs.value = undefined;
-    loadingStatus.value = '';
-    messages.value.push({ type: 'assistant', content: { content: `数据探查启动失败：${error?.message || '未知错误'}`, timestamp: Math.floor(Date.now() / 1000) } as MessageContent });
-    showErrorToast(error?.message || '数据探查启动失败');
-  }
-}
-
-function canResumeAnalysis(index: number) {
-  return Boolean(!viewDisposed && sessionId.value && !isLoading.value && !isRestoringHistory.value
-    && !cancelChat && resumableAnalysisOutcome(messages.value, index));
-}
-
-async function resumeAnalysis(index: number) {
-  if (!canResumeAnalysis(index) || !sessionId.value) return;
-  const outcome = resumableAnalysisOutcome(messages.value, index);
-  if (!outcome?.resume_from) return;
-  const activeSessionId = sessionId.value;
-  const attempt = continuationAttempt(
-    analysisContinuation.value, activeSessionId, outcome.resume_from, createClientMessageId,
-  );
-  analysisContinuation.value = attempt;
-  beginAnalysisProgress();
-  const generation = ++conversationGeneration;
-  historyRequest?.abort();
-  isLoadingEarlierHistory.value = false;
-  cancelChat?.();
-  cancelChat = null;
-  connectionNotice.value = '';
-  taskStartedAtMs.value = performance.now();
-  isLoading.value = true;
-  shouldFollowTimeline.value = true;
-  loadingStatus.value = '正在继续未完成部分…';
-  try {
-    // The server restores the original objective and capabilities from the checkpoint.
-    const cancel = await chatWithSession(
-      activeSessionId, '', lastEventId.value, lastEventSeq.value, [], [], [], null,
-      conversationCallbacks(generation), undefined, attempt.clientMessageId, attempt.resumeFrom,
-    );
-    if (viewDisposed || generation !== conversationGeneration) { cancel(); return; }
-    cancelChat = cancel;
-  } catch (error) {
-    if (viewDisposed || generation !== conversationGeneration) return;
-    isLoading.value = false;
-    clearAnalysisProgress();
-    taskStartedAtMs.value = undefined;
-    loadingStatus.value = '';
-    connectionNotice.value = '续作连接未能建立，可重试继续或刷新页面确认任务状态。';
-  }
-}
-
-function conversationCallbacks(generation: number): SSECallbacks<AgentSSEEvent['data']> {
-  const current = () => !viewDisposed && generation === conversationGeneration;
-  return {
-    onOpen: () => {
-      if (!current()) return;
-      connectionNotice.value = '';
-      loadingStatus.value = 'DataSeek 正在读取数据集...';
-    },
-    onRetry: ({ attempt, maxAttempts }) => {
-      if (!current()) return;
-      isLoading.value = true;
-      connectionNotice.value = `连接中断，正在恢复（${attempt}/${maxAttempts}）…`;
-    },
-    onMessage: ({ event, data }) => {
-      if (current()) handleEvent({ event: event as AgentSSEEvent['event'], data });
-    },
-    onClose: () => {
-      if (!current()) return;
-      isLoading.value = false;
-      clearAnalysisProgress();
-      taskStartedAtMs.value = undefined;
-      loadingStatus.value = '';
-      connectionNotice.value = '';
-      cancelChat = null;
-    },
-    onError: (error) => {
-      if (!current()) return;
-      isLoading.value = false;
-      clearAnalysisProgress();
-      taskStartedAtMs.value = undefined;
-      loadingStatus.value = '';
-      connectionNotice.value = error.message;
-      cancelChat = null;
-      // Only a server error event (or an explicit stop) can fail running steps.
-    },
-  };
+  await analysisSession.send({ message: question, files: capabilities.attachments,
+    skills: capabilities.skills, mcpServers: capabilities.mcpServers,
+    agentProfileId: selectedProfileId.value, datasetIds: capabilities.datasetIds });
 }
 
 function askSuggestion(question: string) {
@@ -1403,113 +1028,13 @@ function askSuggestion(question: string) {
   void submit();
 }
 
-function clearConversationState() {
-  hideFilePanel();
-  beginAnalysisProgress();
-  analysisContinuation.value = null;
-  conversationGeneration += 1;
-  historyRequest?.abort();
-  hasMoreHistory.value = false;
-  isLoadingEarlierHistory.value = false;
-  historyBeforeSeq.value = undefined;
-  isRestoringHistory.value = false;
-  closeToolPanel();
-  shouldFollowTimeline.value = true;
-  lastEventId.value = undefined;
-  lastEventSeq.value = undefined;
-  resetAgentEventCursor(eventCursor);
-  messages.value = [];
-  expandedTaskSummaries.value = new Set();
-  currentPlan.value = undefined;
-  lastTool.value = undefined;
-  lastNoMessageTool.value = undefined;
-  isLoading.value = false;
-  taskStartedAtMs.value = undefined;
-  loadingStatus.value = '';
-  connectionNotice.value = '';
-  completionAdvice.value = undefined;
-}
-
 async function loadConversation(targetSessionId: string) {
-  if (viewDisposed) return;
-  cancelChat?.();
-  cancelChat = null;
-  clearConversationState();
-  const generation = conversationGeneration;
-  const request = new AbortController();
-  historyRequest = request;
-  isRestoringHistory.value = true;
-  selectedSkills.value = [];
   try {
-    const session = await getSessionHistory(targetSessionId, undefined, request.signal);
-    if (generation !== conversationGeneration) return;
-    hasMoreHistory.value = session.has_more && session.next_before_seq != null;
-    historyBeforeSeq.value = session.next_before_seq ?? undefined;
-    sessionId.value = session.session_id;
-    sessionCreatedAt.value = session.created_at;
-    localStorage.setItem(datasetStorageKey(), session.session_id);
-    let restoredSkills: string[] = [];
-    for (const event of session.events) {
-      if (event.event === 'message') {
-        const message = event.data as MessageEventData;
-        if (message.role === 'user') {
-          restoredSkills = (message.metadata?.skills || []).filter(
-            (name) => !autoEnabledSkillNames.value.has(name.trim().toLocaleLowerCase()),
-          );
-        }
-      }
-      handleEvent(event);
-    }
-    selectedSkills.value = [...new Set(restoredSkills)];
-    if (session.status === SessionStatus.RUNNING || session.status === SessionStatus.PENDING) {
-      isLoading.value = true;
-      const cancel = await chatWithSession(session.session_id, '', lastEventId.value, lastEventSeq.value, [], [], [], selectedProfileId.value,
-        conversationCallbacks(generation), dataset.value ? [dataset.value.dataset_id] : []);
-      if (generation === conversationGeneration) cancelChat = cancel;
-      else cancel();
-    } else {
-      isLoading.value = false;
-      clearAnalysisProgress();
-    }
+    await analysisSession.restore(targetSessionId);
   } catch (error) {
-    if (request.signal.aborted || generation !== conversationGeneration) return;
-    console.error('Failed to restore dataset chat session', error);
     localStorage.removeItem(datasetStorageKey());
-    sessionId.value = null;
-    sessionCreatedAt.value = null;
-    selectedSkills.value = [];
-    clearConversationState();
+    analysisSession.reset();
     throw error;
-  } finally {
-    if (generation === conversationGeneration) isRestoringHistory.value = false;
-  }
-}
-
-async function loadEarlierHistory() {
-  const activeSessionId = sessionId.value;
-  const beforeSeq = historyBeforeSeq.value;
-  if (!activeSessionId || !beforeSeq || isLoadingEarlierHistory.value || viewDisposed) return;
-  const generation = conversationGeneration;
-  const request = new AbortController();
-  historyRequest?.abort();
-  historyRequest = request;
-  isLoadingEarlierHistory.value = true;
-  shouldFollowTimeline.value = false;
-  try {
-    const page = await getSessionHistory(activeSessionId, beforeSeq, request.signal);
-    if (request.signal.aborted || generation !== conversationGeneration) return;
-    const viewport = timelineRef.value;
-    const oldHeight = viewport?.scrollHeight ?? 0;
-    const oldTop = viewport?.scrollTop ?? 0;
-    messages.value = prependHistoricalMessages(projectHistoryMessages(page.events, true), messages.value);
-    hasMoreHistory.value = page.has_more && page.next_before_seq != null && page.next_before_seq < beforeSeq;
-    historyBeforeSeq.value = hasMoreHistory.value ? page.next_before_seq! : undefined;
-    await nextTick();
-    if (viewport && generation === conversationGeneration) viewport.scrollTop = oldTop + viewport.scrollHeight - oldHeight;
-  } catch (error) {
-    if (!request.signal.aborted && generation === conversationGeneration) showErrorToast('历史记录加载失败，请重试。');
-  } finally {
-    if (generation === conversationGeneration) isLoadingEarlierHistory.value = false;
   }
 }
 
@@ -1528,36 +1053,62 @@ async function openHistorySession(targetSessionId: string) {
 }
 
 function newConversationFromHistory() {
-  cancelChat?.();
-  cancelChat = null;
   historyOpen.value = false;
   localStorage.removeItem(datasetStorageKey());
-  sessionId.value = null;
-  sessionCreatedAt.value = null;
-  selectedSkills.value = [];
-  clearConversationState();
+  analysisSession.reset();
 }
 
-async function stop() {
-  clearAnalysisProgress();
-  const generation = ++conversationGeneration;
-  historyRequest?.abort();
-  isLoadingEarlierHistory.value = false;
-  cancelChat?.();
-  cancelChat = null;
-  isLoading.value = false;
-  loadingStatus.value = '';
-  connectionNotice.value = '';
-  try {
-    if (sessionId.value) await stopSession(sessionId.value);
-  } catch {
-    if (generation === conversationGeneration) connectionNotice.value = '停止请求未能确认，请刷新页面检查任务状态。';
+async function loadRouteDataset(routeId: string | string[]) {
+  const generation = ++datasetLoadGeneration;
+  analysisSession.reset();
+  dataset.value = undefined;
+  selectedDatasetId.value = '';
+  dataProducts.value = [];
+  historySessions.value = [];
+  historyOpen.value = false;
+  historyLoading.value = false;
+  inputMessage.value = '';
+  suggestedQuestions.value = [];
+  suggestedQuestionsLoading.value = false;
+  suggestedQuestionsError.value = '';
+  productDialogVisible.value = false;
+  productFileMoveVisible.value = false;
+  movingProduct.value = undefined;
+  movingProductFile.value = undefined;
+  editingProductId.value = null;
+  expandedProductIds.value = new Set();
+  expandedProductDirectories.value = new Set();
+  ncViewVisible.value = false;
+  catalogLoading.value = true;
+  const id = Array.isArray(routeId) ? routeId[0] : routeId;
+  if (!id) {
+    catalogLoading.value = false;
+    showErrorToast('缺少数据集参数，请重新提交');
     return;
   }
-  if (generation !== conversationGeneration) return;
-  taskStartedAtMs.value = undefined;
-  failRunningSteps(messages.value);
+  try {
+    const loaded = await getDataCenterDataset(id);
+    if (!isCurrentDatasetLoad(generation)) return;
+    dataset.value = loaded;
+    selectedDatasetId.value = loaded.dataset_id;
+    await loadDataProducts();
+    if (!isCurrentDatasetLoad(generation)) return;
+    void loadSuggestedQuestions();
+    await refreshHistory();
+    if (!isCurrentDatasetLoad(generation)) return;
+    await restoreConversation();
+  } catch (error: any) {
+    if (isCurrentDatasetLoad(generation)) showErrorToast(error?.message || '无法读取数据集');
+  } finally {
+    if (isCurrentDatasetLoad(generation)) catalogLoading.value = false;
+  }
 }
+
+// Vue reuses this page when only :datasetId changes. Invalidate the old
+// conversation and pending catalog reads before accepting the new scope.
+watch(() => route.params.datasetId, (id) => {
+  if (datasetViewReady && !datasetViewDisposed) void loadRouteDataset(id);
+}, { flush: 'sync' });
 
 onMounted(async () => {
   eventBus.on(EVENT_SKILL_PREFERENCES_UPDATED, handleSkillPreferencesUpdated);
@@ -1575,33 +1126,16 @@ onMounted(async () => {
   }
   await refreshProfiles().catch(() => undefined);
   await loadAutoEnabledSkillNames();
-  const routeDatasetId = Array.isArray(route.params.datasetId) ? route.params.datasetId[0] : route.params.datasetId;
-  if (!routeDatasetId) {
-    catalogLoading.value = false;
-    showErrorToast('缺少数据集参数，请重新提交');
-    return;
-  }
-  try {
-    dataset.value = await getDataCenterDataset(routeDatasetId);
-    selectedDatasetId.value = dataset.value.dataset_id;
-    await loadDataProducts();
-    void loadSuggestedQuestions();
-  } catch (error: any) {
-    showErrorToast(error?.message || '无法读取数据集');
-  } finally {
-    catalogLoading.value = false;
-  }
-  await refreshHistory();
-  await restoreConversation();
+  if (datasetViewDisposed) return;
+  datasetViewReady = true;
+  await loadRouteDataset(route.params.datasetId);
 });
 
 onUnmounted(() => {
-  viewDisposed = true;
-  clearAnalysisProgress();
-  historyRequest?.abort();
-  conversationGeneration += 1;
+  datasetViewDisposed = true;
+  datasetLoadGeneration += 1;
+  analysisSession.dispose();
   document.title = 'DataSeek';
-  cancelChat?.();
   eventBus.off(EVENT_SKILL_PREFERENCES_UPDATED, handleSkillPreferencesUpdated);
   document.removeEventListener('pointerdown', handleHistoryPointerDown);
   if (datasetFileCopyTimer) clearTimeout(datasetFileCopyTimer);

@@ -32,6 +32,17 @@ def test_execution_prompt_prefers_bounded_shell_and_preinstalled_archives():
     assert "Runtime dependency installation is forbidden" in prompt
 
 
+def test_custom_program_policy_separates_validation_execution_and_delivery():
+    prompt = _rendered_prompts()[1]
+    for required in ("program_run", "script_path", "own exit code", "literal `argv`",
+                     "representative actual records", "not just leading comments",
+                     "--validate-only", "rows seen/accepted/rejected", "assertions",
+                     "same failure recurs", "citation repair must not rerun analysis"):
+        assert required in prompt
+    assert "one `shell_run` call" not in prompt
+    assert "a zero exit code alone does not prove scientific correctness" in prompt
+
+
 def test_analysis_prompts_forbid_runtime_dependency_installation_and_advertise_raster_stack():
     system_prompt, execution_prompt = _rendered_prompts()
     for command in ("apt", "pip", "uv add", "npm install"):

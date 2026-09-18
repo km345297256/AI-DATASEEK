@@ -2,6 +2,7 @@ import asyncio
 import json
 import logging
 import shlex
+import httpx
 from typing import Any, Awaitable, Callable, ClassVar, Optional
 from app.domain.external.sandbox import Sandbox
 from app.domain.services.tools.base import BaseToolkit
@@ -15,6 +16,9 @@ _MAX_BOUNDED_TIMEOUT_SECONDS = 120
 _OUTER_DEADLINE_RESERVE_SECONDS = 0.5
 _SANDBOX_WAIT_TRANSPORT_GRACE_SECONDS = 1
 _PROCESS_CANCELLATION_TIMEOUT_SECONDS = 5
+_PROGRAM_LAUNCH_TIMEOUT_SECONDS = 30
+_PROGRAM_OBSERVATION_GRACE_SECONDS = 5
+_PROGRAM_RETRY_DELAY_SECONDS = 1
 
 class ShellToolkit(BaseToolkit):
     """Shell tool class, providing Shell interaction related functions"""
@@ -86,7 +90,7 @@ class ShellToolkit(BaseToolkit):
         command: str,
         timeout_seconds: int = 30,
     ) -> ToolResult:
-        """Run a bounded non-interactive command and wait once for its result. Prefer this for inspection, extraction, scripts, and data processing that should finish promptly.
+        """Run a bounded shell command and wait once for its result. Use for inspection and utilities; run custom Python analysis with program_run so shell pipelines cannot mask its exit status.
 
         Args:
             id: Unique identifier of the target shell session
@@ -100,6 +104,148 @@ class ShellToolkit(BaseToolkit):
             command=command,
             timeout_seconds=timeout_seconds,
         )
+
+    @tool(parse_docstring=True)
+    async def program_run(
+        self, id: str, exec_dir: str, script_path: str,
+        argv: list[str] | None = None, timeout_seconds: int = 30,
+    ) -> ToolResult:
+        """Execute a saved Python .py analysis program directly and return its own exit code, exact source version and structured failure diagnostic. Use this for custom parsing, analysis and plotting. Arguments are literal strings, never shell syntax. The output display retains a bounded head and tail with an omission marker, not complete stdout; save required evidence to files. Never add head/tail shell pipelines. A successful process still requires validation of the data and deliverables.
+
+        Args:
+            id: Unique identifier of the target process session
+            exec_dir: Absolute working directory inside the sandbox
+            script_path: Absolute path of the saved Python .py program inside the sandbox
+            argv: Optional literal command-line arguments passed to the program
+            timeout_seconds: Status observation window in seconds, clamped to 1-120. A running analysis continues across windows until completion or cancellation; this is not a total runtime limit.
+        """
+        from app.domain.services.program_execution import program_command
+        arguments = argv or []
+        return await self._run_analysis_program(
+            id=id, exec_dir=exec_dir, command=program_command(script_path, arguments),
+            timeout_seconds=timeout_seconds,
+            launch=lambda: self.sandbox.exec_program(id, exec_dir, script_path, arguments),
+        )
+
+    async def _run_analysis_program(
+        self, *, id: str, exec_dir: str, command: str, timeout_seconds: int,
+        launch: Callable[[], Awaitable[ToolResult]],
+    ) -> ToolResult:
+        """Launch once; bounded observation windows never kill useful work.
+
+        The real adapter pins every wait/view/kill to the original private
+        operation receipt. A lost response permits observation, never relaunch.
+        """
+        from app.domain.services.execution_evidence import current_shell_attempt
+
+        poll_seconds = max(1, min(timeout_seconds, _MAX_BOUNDED_TIMEOUT_SECONDS))
+        uses_receipts = getattr(self.sandbox, "supports_execution_receipts", False) is True
+        previous = current_shell_attempt(self.sandbox, id) if uses_receipts else None
+        attempt = None
+
+        def launched_attempt():
+            current = current_shell_attempt(self.sandbox, id) if uses_receipts else None
+            return current if current is not previous else None
+
+        # If cancellation arrives before a new operation is registered, do not
+        # accidentally terminate an earlier process reusing this shell name.
+        dispose, kill_once = self._process_cancellation(
+            id, should_cancel=lambda: not uses_receipts or launched_attempt() is not None,
+        )
+
+        def unknown() -> ToolResult:
+            return ToolResult(success=False, message="Program execution state could not be confirmed; it was not restarted",
+                              data={"session_id": id, "command": command, "status": "unknown", "returncode": None,
+                                    "error_code": "program_execution_unconfirmed"})
+
+        async def pause() -> None:
+            await asyncio.sleep(_PROGRAM_RETRY_DELAY_SECONDS)
+
+        try:
+            try:
+                async with asyncio.timeout(_PROGRAM_LAUNCH_TIMEOUT_SECONDS):
+                    result = await launch()
+            except (TimeoutError, httpx.TransportError, ConnectionError):
+                # A launch timeout is ambiguous. Only an already registered
+                # private operation gives us an identity to observe safely.
+                attempt = launched_attempt()
+                if attempt is None:
+                    return unknown()
+                result = None
+            attempt = launched_attempt()
+            if result is not None:
+                data = self._result_data(result)
+                if data.get("status") != "running":
+                    if data.get("status") != "completed":
+                        return result if not result.success else unknown()
+                    if type(data.get("returncode")) is not int:
+                        return unknown()
+                    if not uses_receipts:
+                        return result
+                    if attempt is not None and attempt.confirmed:
+                        if attempt.receipt.state != "exited" or attempt.receipt.returncode != data["returncode"]:
+                            return unknown()
+                        return result
+
+            while True:
+                if uses_receipts:
+                    if attempt is None or launched_attempt() is not attempt or attempt.observation_block_reason:
+                        return unknown()
+                observed_at = asyncio.get_running_loop().time()
+                try:
+                    async with asyncio.timeout(poll_seconds + _PROGRAM_OBSERVATION_GRACE_SECONDS):
+                        waited = await self.sandbox.wait_for_process(id, poll_seconds)
+                except (TimeoutError, httpx.TransportError, ConnectionError):
+                    # Retrying a read cannot duplicate the running analysis.
+                    await pause()
+                    continue
+                except Exception:
+                    return unknown()
+                data = self._result_data(waited)
+                status = data.get("status")
+                if status == "running" and data.get("returncode") is None:
+                    if asyncio.get_running_loop().time() - observed_at < _PROGRAM_RETRY_DELAY_SECONDS:
+                        await pause()
+                    continue
+                if status != "completed" or type(data.get("returncode")) is not int:
+                    return unknown()
+                if uses_receipts:
+                    if attempt.observation_block_reason:
+                        return unknown()
+                    if not attempt.confirmed and not attempt.query_in_flight:
+                        # The generic finalization reconciler deliberately has
+                        # a small failure budget. A still-owned running program
+                        # can continue safe reads after a transient outage.
+                        attempt.query_in_flight = True
+                        attempt.reconciliation_queries += 1
+                        try:
+                            async with asyncio.timeout(_PROGRAM_OBSERVATION_GRACE_SECONDS):
+                                receipt = await attempt.query()
+                            if receipt.success:
+                                attempt.observe(receipt.data)
+                        except (TimeoutError, httpx.TransportError, ConnectionError):
+                            pass
+                        except Exception:
+                            return unknown()
+                        finally:
+                            attempt.query_in_flight = False
+                        if attempt.observation_block_reason:
+                            return unknown()
+                    if not attempt.confirmed:
+                        # The leader can exit before child processes finish.
+                        # Keep the same job active until the whole tree is quiet.
+                        await pause()
+                        continue
+                    if attempt.receipt.state != "exited" or attempt.receipt.returncode != data["returncode"]:
+                        return unknown()
+                return await self._completed_command_result(
+                    id=id, command=command, returncode=data["returncode"], retry_observation=True,
+                )
+        except asyncio.CancelledError:
+            await self._kill_after_bounded_timeout(kill_once, reason="cancelled")
+            raise
+        finally:
+            dispose()
 
     @tool(parse_docstring=True)
     async def dataset_unpack(
@@ -683,13 +829,14 @@ class ShellToolkit(BaseToolkit):
         exec_dir: str,
         command: str,
         timeout_seconds: int,
+        launch: Callable[[], Awaitable[ToolResult]] | None = None,
     ) -> ToolResult:
         timeout_seconds = max(
             1,
             min(timeout_seconds, _MAX_BOUNDED_TIMEOUT_SECONDS),
         )
         dispose_cancellation, kill_once = self._process_cancellation(id)
-        exec_result = await self.sandbox.exec_command(id, exec_dir, command)
+        exec_result = await launch() if launch is not None else await self.sandbox.exec_command(id, exec_dir, command)
         exec_data = self._result_data(exec_result)
         if exec_data.get("status") != "running":
             dispose_cancellation()
@@ -732,14 +879,29 @@ class ShellToolkit(BaseToolkit):
                 timeout_seconds=timeout_seconds,
             )
 
-        returncode = wait_data.get("returncode")
-        try:
-            view_result = await self.sandbox.view_shell(id)
-        except Exception:
-            # Process completion and output transport are different facts.
-            # The private execution ledger retains independent terminal proof;
-            # fetching a lost output must never re-execute the command.
-            view_result = ToolResult(success=False, message="Command output is unavailable")
+        result = await self._completed_command_result(id=id, command=command, returncode=wait_data.get("returncode"))
+        dispose_cancellation()
+        return result
+
+    async def _completed_command_result(
+        self, *, id: str, command: str, returncode: int | None, retry_observation: bool = False,
+    ) -> ToolResult:
+        while True:
+            try:
+                async with asyncio.timeout(_PROGRAM_OBSERVATION_GRACE_SECONDS):
+                    view_result = await self.sandbox.view_shell(id)
+                break
+            except (TimeoutError, httpx.TransportError, ConnectionError):
+                if retry_observation:
+                    await asyncio.sleep(_PROGRAM_RETRY_DELAY_SECONDS)
+                    continue
+                view_result = ToolResult(success=False, message="Command output is unavailable")
+                break
+            except Exception:
+                # Output transport is separate from terminal process proof.
+                # Never re-execute a command to recover missing output.
+                view_result = ToolResult(success=False, message="Command output is unavailable")
+                break
         view_data = self._result_data(view_result)
         succeeded = returncode == 0 and view_result.success
         output_unavailable = not view_result.success
@@ -758,22 +920,26 @@ class ShellToolkit(BaseToolkit):
                 "status": "completed",
                 "returncode": returncode,
                 "output": view_data.get("output", ""),
+                **({"program_execution": view_data["program_execution"]}
+                   if isinstance(view_data.get("program_execution"), dict) else {}),
                 **({"error_code": "shell_output_unavailable", "output_available": False}
                    if output_unavailable else {}),
             },
         )
-        dispose_cancellation()
         return result
 
     def _process_cancellation(
         self,
         session_id: str,
+        *, should_cancel: Callable[[], bool] | None = None,
     ) -> tuple[Callable[[], None], Callable[[str], Awaitable[None]]]:
         """Return one idempotent kill callback tied to the current invocation."""
         kill_task: asyncio.Task[Any] | None = None
 
         async def kill_once(_reason: str) -> None:
             nonlocal kill_task
+            if should_cancel is not None and not should_cancel():
+                return
             if kill_task is None:
                 kill_task = asyncio.create_task(
                     self.sandbox.kill_process(session_id),
@@ -789,10 +955,11 @@ class ShellToolkit(BaseToolkit):
     @staticmethod
     async def _kill_after_bounded_timeout(
         kill_once: Callable[[str], Awaitable[None]],
+        *, reason: str = "bounded_timeout",
     ) -> None:
         try:
             async with asyncio.timeout(_PROCESS_CANCELLATION_TIMEOUT_SECONDS):
-                await kill_once("bounded_timeout")
+                await kill_once(reason)
         except asyncio.CancelledError:
             raise
         except Exception as error:

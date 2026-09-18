@@ -1,14 +1,45 @@
 from fastapi import APIRouter
+import asyncio
+import threading
 from app.schemas.shell import (
     ShellExecRequest, ShellViewRequest, ShellWaitRequest,
     ShellWriteToProcessRequest, ShellKillProcessRequest,
     ShellOperationStatusRequest,
+    ProgramExecRequest,
+    ProgramPreflightRequest,
 )
 from app.schemas.response import Response
 from app.services.shell import shell_service
+from app.services.program import probe_program_prerequisites
 from app.core.exceptions import BadRequestException
 
 router = APIRouter()
+
+
+@router.post("/program-preflight", response_model=Response)
+async def program_preflight(request: ProgramPreflightRequest):
+    """Observe startup prerequisites without creating a process or receipt."""
+    cancelled = threading.Event()
+    try:
+        result = await asyncio.to_thread(probe_program_prerequisites, request.exec_dir,
+                                         request.script_path, cancelled=cancelled)
+        return Response(success=True, data=result)
+    finally:
+        cancelled.set()
+
+
+@router.post("/program", response_model=Response)
+async def exec_program(request: ProgramExecRequest):
+    result = await shell_service.exec_program(
+        request.id, request.exec_dir, request.script_path, request.args,
+        operation_id=request.operation_id,
+    )
+    succeeded = result.status != "completed" or result.returncode == 0
+    return Response(success=succeeded,
+                    message=("Program is running" if result.status == "running" else
+                             "Program completed successfully" if succeeded else
+                             f"Program failed with return code: {result.returncode}"),
+                    data=result.model_dump())
 
 @router.post("/exec", response_model=Response)
 async def exec_command(request: ShellExecRequest):

@@ -20,6 +20,8 @@ _PRIVATE_FILE_METADATA_KEYS = {
     "localpath",
     "sourcepath",
     "userid",
+    "analysisinputnamespace",
+    "analysisinputfilename",
 }
 _WINDOWS_ABSOLUTE_PATH = re.compile(
     r"(?<![A-Za-z0-9_])[A-Za-z]:[\\/][^\s'\"`<>]+"
@@ -201,10 +203,16 @@ class FileInfoResponse(BaseModel):
     async def from_file_info(cls, file_info: FileInfo) -> "FileInfoResponse":
         from app.interfaces.dependencies import get_file_service
         file_service = get_file_service()
-        file_url = await file_service.create_signed_url(
-            file_info.file_id,
-            file_info.user_id,
-        )
+        try:
+            file_url = await file_service.create_signed_url(
+                file_info.file_id,
+                file_info.user_id,
+            )
+        except (FileNotFoundError, PermissionError):
+            # A historical attachment can expire or lose authorization. Keep
+            # its path-safe historical identity, never mint a bypass URL or
+            # reuse a stale URL, and do not make the entire conversation fail.
+            return cls.public_from_file_info(file_info).model_copy(update={"file_url": None})
         return cls.public_from_file_info(file_info, file_url=file_url)
 
 

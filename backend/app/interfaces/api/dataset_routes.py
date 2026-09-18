@@ -6,14 +6,15 @@ from pathlib import PurePosixPath
 import zipfile
 import asyncio
 
-from app.application.errors.exceptions import ForbiddenError, UpstreamServiceError
+from app.application.errors.exceptions import BadRequestError, ForbiddenError, NotFoundError, UpstreamServiceError
 from app.application.services.data_center_dataset_service import DataCenterDatasetService
 from app.application.services.dataset_suggested_question_service import DatasetSuggestedQuestionService
 from app.application.services.data_product_service import DataProductService
 from app.application.services.dataset_file_preview import DatasetFilePreviewRequest
-from app.application.services.file_preview import PreviewVersionChanged
+from app.application.services.file_preview import PreviewVersionChanged, preview_version
 from app.core.config import get_settings
 from app.domain.models.user import User, UserRole
+from app.domain.services.data_product_paths import product_relative_path
 from app.infrastructure.external.sso_client import resolve_sso_uid
 from app.application.services.agent_service import AgentService
 from app.interfaces.dependencies import get_agent_service, get_current_user
@@ -37,6 +38,28 @@ from app.interfaces.schemas.file import FileInfoResponse
 
 
 router = APIRouter(prefix="/datasets", tags=["datasets"])
+_PRODUCT_DOWNLOAD_CHUNK_BYTES = 1024 * 1024
+
+
+async def _write_product_archive_chunk(destination, data: bytes) -> None:
+    # Compression and spool rollover may be expensive. Keep them off the API
+    # event loop, and finish an active write before cancellation closes the ZIP.
+    task = asyncio.create_task(asyncio.to_thread(destination.write, data))
+    try:
+        await asyncio.shield(task)
+    except asyncio.CancelledError:
+        try:
+            await task
+        finally:
+            raise
+
+
+def _product_archive_chunks(archive):
+    try:
+        while chunk := archive.read(_PRODUCT_DOWNLOAD_CHUNK_BYTES):
+            yield chunk
+    finally:
+        archive.close()
 
 
 @router.post("/{dataset_id}/files/preview", response_model=APIResponse[DatasetFilePreviewResponse])
@@ -280,22 +303,50 @@ async def download_dataset_data_product(
     product = await DataProductService().get(product_id, current_user.id)
     if product.dataset_id != dataset_id:
         raise ForbiddenError("Data product does not belong to this dataset")
-    archive = SpooledTemporaryFile(max_size=32 * 1024 * 1024, mode="w+b")
+    try:
+        paths = [product_relative_path(item.relative_path) for item in product.files]
+    except ValueError:
+        raise BadRequestError("Data product contains an invalid file path") from None
+    if len(paths) != len(set(paths)):
+        raise BadRequestError("Data product contains duplicate file paths")
+    path_set = set(paths)
+    if any(str(parent) in path_set for path in paths for parent in PurePosixPath(path).parents):
+        raise BadRequestError("Data product file paths conflict with a directory")
     storage = get_file_storage()
-    with zipfile.ZipFile(archive, "w", compression=zipfile.ZIP_DEFLATED) as bundle:
-        for item in product.files:
-            path = PurePosixPath(item.relative_path)
-            if path.is_absolute() or ".." in path.parts:
-                continue
-            stream, _ = await storage.download_file(item.file_id, current_user.id)
-            try:
-                bundle.writestr(path.as_posix(), stream.read())
-            finally:
-                stream.close()
-    archive.seek(0)
+    archive = SpooledTemporaryFile(max_size=32 * 1024 * 1024, mode="w+b")
+    try:
+        with zipfile.ZipFile(archive, "w", compression=zipfile.ZIP_DEFLATED) as bundle:
+            for item, path in zip(product.files, paths):
+                offset = 0
+                version = None
+                with bundle.open(path, "w", force_zip64=True) as destination:
+                    while True:
+                        data, info = await storage.download_file_range(
+                            item.file_id, current_user.id,
+                            offset=offset, length=_PRODUCT_DOWNLOAD_CHUNK_BYTES,
+                        )
+                        current_version = preview_version(info)
+                        if version is not None and current_version != version:
+                            raise HTTPException(status_code=409, detail="Data product file changed during download")
+                        version = current_version
+                        expected = min(_PRODUCT_DOWNLOAD_CHUNK_BYTES, info.size - offset)
+                        if expected < 0 or len(data) != expected:
+                            raise HTTPException(status_code=409, detail="Data product file is incomplete")
+                        if data:
+                            await _write_product_archive_chunk(destination, data)
+                            offset += len(data)
+                        if offset == info.size:
+                            break
+        archive.seek(0)
+    except FileNotFoundError:
+        archive.close()
+        raise NotFoundError("Data product file was not found") from None
+    except BaseException:
+        archive.close()
+        raise
     filename = f"{product.product_id}-v{product.version}.zip"
     return StreamingResponse(
-        archive,
+        _product_archive_chunks(archive),
         media_type="application/zip",
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
         background=BackgroundTask(archive.close),

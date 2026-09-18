@@ -7,6 +7,7 @@ from typing import Any
 from app.application.errors.exceptions import BadRequestError, NotFoundError
 from app.domain.models.data_product import DataProduct, DataProductFile
 from app.domain.models.file import FileInfo
+from app.domain.services.data_product_paths import product_relative_path
 from app.domain.external.file import FileStorage
 from app.infrastructure.external.file.factory import get_file_storage
 from app.infrastructure.models.documents import DataProductDocument
@@ -87,11 +88,22 @@ class DataProductService:
         allowed = {str(item.file_id): item for item in files if item.file_id}
         if not selected_file_ids:
             raise BadRequestError("At least one product file must be selected")
+        if len(selected_file_ids) != len(set(selected_file_ids)):
+            raise BadRequestError("Product files must be selected only once")
         unknown = set(selected_file_ids) - set(allowed)
         if unknown:
             raise BadRequestError("Selected file is not part of this task")
         if primary_file_id and primary_file_id not in selected_file_ids:
             raise BadRequestError("Primary file must be selected")
+        try:
+            selected_paths = [product_relative_path(_relative(allowed[file_id])) for file_id in selected_file_ids]
+        except ValueError:
+            raise BadRequestError("Selected file has an invalid product path") from None
+        path_set = set(selected_paths)
+        if len(selected_paths) != len(path_set) or any(
+            str(parent) in path_set for path in path_set for parent in PurePosixPath(path).parents
+        ):
+            raise BadRequestError("Selected product file paths must be unique and cannot conflict with directories")
         previous = await DataProductDocument.find(
             {"dataset_id": dataset_id, "name": name.strip(), "created_by": user_id}
         ).sort("-version").first_or_none()
@@ -99,7 +111,7 @@ class DataProductService:
         product_files: list[DataProductFile] = []
         uploaded_file_ids: list[str] = []
         try:
-            for file_id in selected_file_ids:
+            for file_id, relative_path in zip(selected_file_ids, selected_paths):
                 source = allowed[file_id]
                 stream, _ = await self._file_storage.download_file(file_id, user_id)
                 try:
@@ -112,7 +124,7 @@ class DataProductService:
                             "data_product": True,
                             "source_session_id": session_id,
                             "source_file_id": file_id,
-                            "relative_path": _relative(source),
+                            "relative_path": relative_path,
                         },
                     )
                 finally:
@@ -123,7 +135,7 @@ class DataProductService:
                 product_files.append(DataProductFile(
                     file_id=stored.file_id,
                     filename=source.filename or "file",
-                    relative_path=_relative(source),
+                    relative_path=relative_path,
                     role=_role(source),
                     content_type=source.content_type,
                     size=int(source.size or 0),
@@ -181,31 +193,49 @@ class DataProductService:
             raise NotFoundError("Data product not found")
         if not name.strip():
             raise BadRequestError("Product name cannot be empty")
-        item.name = name.strip()
-        item.description = description.strip()
-        item.generation_method = generation_method.strip() or "agent_tool"
-        item.created_by = created_by.strip()
         existing = {str(file.get("file_id")): file for file in item.files}
         cleaned_files = []
         cleaned_dirs = []
+        seen_ids = set()
+        seen_paths = set()
         for directory in directories:
-            normalized = str(directory).replace("\\", "/").strip(" /")
-            if normalized and ".." not in PurePosixPath(normalized).parts and normalized not in cleaned_dirs:
+            try:
+                normalized = product_relative_path(directory)
+            except ValueError:
+                raise BadRequestError("Invalid product directory path") from None
+            if normalized not in cleaned_dirs:
                 cleaned_dirs.append(normalized)
         for value in files:
             file_id = str(value.get("file_id", ""))
             if file_id not in existing:
                 raise BadRequestError("Product file is not part of this product")
-            relative = str(value.get("relative_path") or existing[file_id].get("relative_path") or existing[file_id].get("filename") or "").replace("\\", "/").strip("/")
+            try:
+                relative = product_relative_path(str(value.get("relative_path") or existing[file_id].get("relative_path") or existing[file_id].get("filename") or ""))
+            except ValueError:
+                raise BadRequestError("Invalid product file path") from None
             path = PurePosixPath(relative)
-            if not relative or path.is_absolute() or ".." in path.parts:
-                raise BadRequestError("Invalid product file path")
+            if file_id in seen_ids or relative in seen_paths:
+                raise BadRequestError("Product files and paths must be unique")
+            seen_ids.add(file_id)
+            seen_paths.add(relative)
             updated = dict(existing[file_id]); updated["relative_path"] = relative; updated["is_primary"] = bool(value.get("is_primary", False))
             cleaned_files.append(updated)
             parent = str(path.parent)
             if parent not in ("", ".") and parent not in cleaned_dirs: cleaned_dirs.append(parent)
         if not cleaned_files:
             raise BadRequestError("A product must contain at least one visible file")
+        if any(str(parent) in seen_paths for path in seen_paths for parent in PurePosixPath(path).parents):
+            raise BadRequestError("Product file paths conflict with a directory")
+        if seen_paths.intersection(cleaned_dirs) or any(
+            str(parent) in seen_paths for directory in cleaned_dirs for parent in PurePosixPath(directory).parents
+        ):
+            raise BadRequestError("Product file paths conflict with a directory")
+        if sum(file["is_primary"] for file in cleaned_files) > 1:
+            raise BadRequestError("A product can have only one primary file")
+        item.name = name.strip()
+        item.description = description.strip()
+        item.generation_method = generation_method.strip() or "agent_tool"
+        item.created_by = created_by.strip()
         item.files = cleaned_files
         item.directories = sorted(cleaned_dirs)
         if getattr(item, "owner_id", None) is None: item.owner_id = user_id

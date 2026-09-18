@@ -132,6 +132,7 @@ export const chatWithSession = async (
   datasetIds?: string[],
   clientMessageId?: string,
   resumeFrom?: string,
+  inputFileIds?: string[],
 ): Promise<() => void> => {
   const effectiveClientMessageId = message || resumeFrom
     ? clientMessageId || createClientMessageId()
@@ -149,6 +150,7 @@ export const chatWithSession = async (
       skills,
       mcp_servers: mcpServers,
       dataset_ids: datasetIds,
+      input_file_ids: inputFileIds,
     }),
     client_message_id: effectiveClientMessageId,
   });
@@ -219,6 +221,18 @@ export async function getSessionFiles(sessionId: string, options: SessionFileSor
   const response = await apiClient.get<ApiResponse<FileInfo[]>>(
     `/sessions/${sessionId}/files`,
     { params: options }
+  );
+  return response.data.data;
+}
+
+export interface SessionAnalysisInputs {
+  files: FileInfo[];
+  selected_file_ids: string[];
+}
+
+export async function getSessionAnalysisInputs(sessionId: string, signal?: AbortSignal): Promise<SessionAnalysisInputs> {
+  const response = await apiClient.get<ApiResponse<SessionAnalysisInputs>>(
+    `/sessions/${encodeURIComponent(sessionId)}/analysis-inputs`, { signal },
   );
   return response.data.data;
 }

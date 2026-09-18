@@ -1,7 +1,7 @@
 """
 Shell business model definitions
 """
-from typing import Literal, Optional, List
+from typing import Any, Literal, Optional, List
 from pydantic import BaseModel, ConfigDict, Field, StrictBool, StrictInt, field_validator, model_validator
 
 
@@ -58,6 +58,7 @@ class ShellExecResult(BaseModel):
     returncode: Optional[int] = Field(None, description="Process return code, only has value when status is completed")
     output: Optional[str] = Field(None, description="Command execution output, only has value when status is completed")
     execution_receipt: Optional[ShellExecutionReceipt] = None
+    program_execution: Optional[dict[str, Any]] = None
 
 
 class ShellViewResult(BaseModel):
@@ -65,6 +66,7 @@ class ShellViewResult(BaseModel):
     output: str = Field(..., description="Shell session output content")
     session_id: str = Field(..., description="Shell session ID")
     console: Optional[List[ConsoleRecord]] = Field(None, description="Console command records")
+    program_execution: Optional[dict[str, Any]] = None
 
 
 class ShellWaitResult(BaseModel):

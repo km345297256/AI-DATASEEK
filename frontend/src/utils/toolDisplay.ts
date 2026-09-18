@@ -156,7 +156,7 @@ export const resolveToolFunction = (tool: Pick<ToolContent, 'name' | 'function'>
 export const resolveToolName = (tool: Pick<ToolContent, 'name' | 'function'>): string => {
   if (TOOLKIT_NAMES.has(tool.name)) return tool.name;
   const functionName = resolveToolFunction(tool);
-  if (functionName.startsWith('shell_') || functionName.startsWith('dataset_')) return 'shell';
+  if (functionName.startsWith('shell_') || functionName.startsWith('dataset_') || functionName === 'program_run') return 'shell';
   if (functionName.startsWith('file_')) return 'file';
   if (functionName.startsWith('browser_')) return 'browser';
   if (functionName.startsWith('info_')) return 'info';
@@ -209,6 +209,10 @@ export const getToolDisplayDetail = (tool: ToolContent): ToolDisplayDetail => {
 
   if (functionName === 'shell_exec' || functionName === 'shell_run' || functionName === 'dataset_analysis_run') {
     detail = safeStringArg(args, 'command');
+  } else if (functionName === 'program_run') {
+    // Script arguments may carry data or credentials; the timeline needs only
+    // the public sandbox script identity. Full details remain sanitized.
+    detail = displaySandboxPath(safeStringArg(args, 'script_path'));
   } else if (functionName === 'shell_wait') {
     const session = safeStringArg(args, 'id') || safeStringArg(args, 'shell');
     const seconds = safeStringArg(args, 'seconds');

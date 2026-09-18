@@ -538,6 +538,7 @@ async def chat(
             event_id=request.event_id or http_request.headers.get("last-event-id"),
             event_seq=request.event_seq,
             attachments=request.attachments,
+            input_file_ids=request.input_file_ids,
             skills=effective_skills,
             mcp_servers=effective_mcp_servers,
             dataset_ids=request.dataset_ids or [],
@@ -568,6 +569,35 @@ async def chat(
                 )
 
     return EventSourceResponse(event_generator())
+
+
+@router.get("/{session_id}/analysis-inputs", response_model=APIResponse[dict])
+async def get_analysis_inputs(
+    session_id: str,
+    current_user: User = Depends(get_current_user),
+    agent_service: AgentService = Depends(get_agent_service),
+    file_service = Depends(get_file_service),
+) -> APIResponse[dict]:
+    """Session-scoped input provenance, distinct from all generated session files."""
+    from app.domain.services.analysis_input_selection import session_input_state
+    session = await agent_service.get_session(session_id, current_user.id)
+    if session is None:
+        raise NotFoundError("Session not found")
+    events = await agent_service.get_session_events(session_id, current_user.id)
+    files, selected = session_input_state(events)
+    public_files = []
+    for item in files:
+        # Event history proves input provenance, never present-day authority.
+        current = await file_service.get_file_info(item.file_id, current_user.id)
+        if current is None:
+            continue
+        url = await file_service.create_signed_url(item.file_id, current_user.id)
+        public_files.append(FileInfoResponse.public_from_file_info(current, file_url=url).model_dump(mode="json"))
+    available = {item["file_id"] for item in public_files}
+    return APIResponse.success({
+        "files": public_files,
+        "selected_file_ids": [item for item in selected if item in available],
+    })
 
 @router.post("/{session_id}/shell")
 async def view_shell(

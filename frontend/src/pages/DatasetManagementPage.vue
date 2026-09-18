@@ -1,7 +1,7 @@
 <template>
   <main class="flex h-full min-w-0 w-full flex-col bg-[var(--background-gray-main)] text-[var(--text-primary)]">
     <header class="mobile-safe-top flex shrink-0 items-start gap-3 border-b border-[var(--border-main)] px-4 py-5 sm:px-7">
-      <button v-if="!isLeftPanelShow" class="icon-action sm:hidden" aria-label="打开导航" @click="toggleLeftPanel"><PanelLeft class="size-5" /></button>
+      <button v-if="!isLeftPanelShow" class="icon-action sm:!hidden" aria-label="打开导航" @click="toggleLeftPanel"><PanelLeft class="size-5" /></button>
       <div class="min-w-0 flex-1">
         <h1 class="text-2xl font-semibold tracking-tight">数据集管理</h1>
         <p class="mt-1.5 text-sm leading-6 text-[var(--text-secondary)]">从开放数据开始探索，或登记自己的本地数据。</p>

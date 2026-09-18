@@ -17,7 +17,9 @@ export interface BaseContent {
 
 export interface MessageContent extends BaseContent {
   content: string;
+  attachments?: FileInfo[];
   metadata?: {
+    step_id?: string;
     analysis_outcome?: NonNullable<MessageEventData['metadata']>['analysis_outcome'];
     analysis_progress?: NonNullable<MessageEventData['metadata']>['analysis_progress'];
     skills?: string[];
@@ -38,6 +40,7 @@ export interface ToolContent extends BaseContent {
   analysis_job?: AnalysisJobView | null;
   tool_approval?: ToolApprovalView | null;
   status: "calling" | "called";
+  execution_status?: 'succeeded' | 'failed' | null;
 }
 
 export interface StepContent extends BaseContent {

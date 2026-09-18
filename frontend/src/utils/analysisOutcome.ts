@@ -102,6 +102,8 @@ const REASON_LABELS: Record<string, string> = {
   completed: '本次分析已完成。',
   artifacts_missing: '部分要求的成果还未完成。',
   artifact_validation_failed: '部分文件尚未通过内容检查，暂不能计为已完成成果。',
+  answer_validation_unavailable: '本次结果说明尚未完成证据核验，暂不能作为已确认结论。',
+  analytical_requirements_missing: '部分要求的分析内容尚未完成。',
   validation_unavailable: '暂时无法核验成果内容，完成情况尚未确认。',
   delivery_failed: '部分成果文件尚未成功交付。',
   tool_budget_exhausted: '本轮工具执行额度已用尽。',
@@ -119,7 +121,7 @@ const REASON_LABELS: Record<string, string> = {
   missing_artifacts: '部分要求的成果尚未生成。',
   missing_deliverables: '部分要求的成果尚未生成。',
   incomplete_analysis: '本次分析还有未完成的部分。',
-  execution_interrupted: '分析执行中断，已完成的结果仍保留。',
+  execution_interrupted: '本次分析执行已中断。',
   model_unavailable: '模型服务暂时不可用。',
   model_budget_exceeded: '本次分析已达到处理预算。',
   model_protocol_error: '模型返回的结果未通过完整性校验。',
@@ -127,11 +129,23 @@ const REASON_LABELS: Record<string, string> = {
 };
 
 /** Do not render arbitrary diagnostic text, paths or provider output. */
-export function analysisOutcomeReason(outcome: AnalysisOutcome): string {
+export function analysisOutcomeReason(outcome: AnalysisOutcome, hasDeliveredFiles = false): string {
   if (analysisOutcomeIsComplete(outcome)) return '本次分析已完成。';
   if (['completed', 'requirements_satisfied'].includes(outcome.reason_code)) return '本次分析仍有待完成项。';
-  return (Object.prototype.hasOwnProperty.call(REASON_LABELS, outcome.reason_code) ? REASON_LABELS[outcome.reason_code] : undefined)
+  const reason = (Object.prototype.hasOwnProperty.call(REASON_LABELS, outcome.reason_code) ? REASON_LABELS[outcome.reason_code] : undefined)
     ?? '本次分析尚未完成，具体原因暂未确认。';
+  return hasDeliveredFiles && ['answer_validation_unavailable', 'execution_interrupted'].includes(outcome.reason_code)
+    ? `${reason}本次已交付的文件仍可使用。` : reason;
+}
+
+/** Final assistant message attachments are published deliveries for this response.
+ * Never infer delivery from prose, source files, or another turn's attachments.
+ */
+export function hasDeliveredAnalysisFiles(message: Message): boolean {
+  if (message.type !== 'assistant') return false;
+  const files = (message.content as MessageContent).attachments;
+  return Array.isArray(files) && files.some(file => file && typeof file.file_id === 'string'
+    && file.file_id.trim().length > 0 && typeof file.filename === 'string' && file.filename.trim().length > 0);
 }
 
 export function analysisOutcomeTitle(outcome: AnalysisOutcome): string {

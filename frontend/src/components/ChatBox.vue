@@ -23,9 +23,10 @@
                     </button>
                 </div>
             </div>
+            <div class="chat-box-entry" :class="{ 'chat-box-entry--compact': compactComposer }">
             <div
-                class="overflow-y-auto"
-                :class="compactComposer ? 'min-h-10 pl-[52px] pr-[52px]' : 'pl-4 pr-2'">
+                class="chat-box-editor min-w-0 overflow-y-auto"
+                :class="compactComposer ? 'min-h-10' : 'pl-4 pr-2'">
                 <textarea
                     ref="textareaRef"
                     class="flex w-full flex-1 rounded-md border-0 border-input bg-transparent p-0 pt-[1px] text-[15px] shadow-none placeholder:text-[var(--text-disable)] focus-visible:outline-none focus-visible:ring-0 focus-visible:ring-offset-0 disabled:cursor-not-allowed disabled:opacity-50"
@@ -37,12 +38,9 @@
                     @input="handleInput"
                     @keydown="handleKeydown" :placeholder="placeholder || t('Give AI-DataSeek a task to work on...')"></textarea>
             </div>
-            <footer
-                class="flex w-full flex-row justify-between px-2 sm:px-3"
-                :class="compactComposer ? 'pointer-events-none absolute inset-x-0 bottom-2 sm:bottom-3' : ''">
+            <footer class="chat-box-footer flex w-full flex-row justify-between px-2 sm:px-3">
                 <div
-                    class="flex items-center gap-1 pr-1 sm:gap-2 sm:pr-2"
-                    :class="compactComposer ? 'pointer-events-auto' : ''">
+                    class="chat-box-actions-start flex items-center gap-1 sm:gap-2">
                     <div ref="actionMenuRef" class="relative">
                         <button
                             type="button"
@@ -156,7 +154,7 @@
                         </span>
                     </button>
                 </div>
-                <div class="flex gap-2" :class="compactComposer ? 'pointer-events-auto' : ''">
+                <div class="chat-box-actions-end flex gap-2">
                     <button v-if="!isRunning || sendEnabled || hideStopButton"
                         type="button"
                         class="whitespace-nowrap text-sm font-medium focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 text-primary-foreground hover:bg-primary/90 p-0 w-10 h-10 sm:w-8 sm:h-8 rounded-full flex items-center justify-center transition-colors hover:opacity-90"
@@ -175,6 +173,7 @@
                     </button>
                 </div>
             </footer>
+            </div>
         </div>
         <SkillDialog v-model:open="skillDialogOpen" v-model:selected-skills="selectedSkills" />
         <MCPDialog v-if="showMcpActions" v-model:open="mcpDialogOpen" v-model:selected-servers="selectedMcpServers" />
@@ -264,8 +263,9 @@ const sendEnabled = computed(() => {
     if (props.disabled) return false;
     const hasFiles = (props.attachments?.length ?? 0) > 0;
     const allUploaded = chatBoxFileListRef.value?.isAllUploaded ?? true;
+    if (hasFiles && !allUploaded) return false;
     if (props.allowSendFilesOnly) {
-        return hasTextInput.value || (hasFiles && allUploaded);
+        return hasTextInput.value || hasFiles;
     }
     return hasTextInput.value && (!hasFiles || allUploaded);
 });
@@ -471,3 +471,30 @@ onUnmounted(() => {
     eventBus.off(EVENT_SKILL_PREFERENCES_UPDATED, handleSkillPreferencesUpdated);
 });
 </script>
+
+<style scoped>
+.chat-box-entry {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    gap: 12px;
+}
+
+/* Buttons participate in layout, including the optional MCP action. */
+.chat-box-entry--compact {
+    display: grid;
+    grid-template-columns: max-content minmax(0, 1fr) max-content;
+    align-items: center;
+    gap: 8px;
+    padding: 0 12px;
+}
+
+.chat-box-entry--compact > .chat-box-editor { grid-column: 2; grid-row: 1; }
+.chat-box-entry--compact > .chat-box-footer { display: contents; }
+.chat-box-entry--compact .chat-box-actions-start { grid-column: 1; grid-row: 1; }
+.chat-box-entry--compact .chat-box-actions-end { grid-column: 3; grid-row: 1; }
+
+@media (max-width: 639px) {
+    .chat-box-entry--compact { gap: 6px; padding: 0 8px; }
+}
+</style>

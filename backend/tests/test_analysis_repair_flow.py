@@ -62,6 +62,14 @@ def scenario(rounds, requirements, *, unknown=False, model_error=False, cancel_a
     agent.reset_context = AsyncMock()
     agent.compact_memory = AsyncMock()
     agent._parse_json = AsyncMock(side_effect=json.loads)
+    # This harness tests execution/delivery repair, not answer entailment. Its
+    # synthetic measured-result draft is explicitly authenticated here; answer
+    # grounding regressions override this boundary with the real review service.
+    async def verified_fixture_answer(**arguments):
+        from app.domain.services.analysis_answer_review import AnswerReviewResult
+        return AnswerReviewResult(arguments["draft"], "verified", {"source_count": 1})
+
+    agent.review_delivery_answer = AsyncMock(side_effect=verified_fixture_answer)
 
     async def execute(prompt, **_kwargs):
         index = len(state["prompts"])

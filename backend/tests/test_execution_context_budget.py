@@ -155,352 +155,49 @@ async def test_execution_step_passes_bounded_structured_prior_results_after_rese
     assert "/home/ubuntu/output/profile.json" in requests[0]
     assert "Render the requested chart" in requests[0]
     assert current.result == "new result"
+    assert "<answer_evidence_contract>" in requests[0]
+    assert "explicitly attribute it to that earlier verified result" in requests[0]
 
 
-@pytest.mark.asyncio
-@pytest.mark.skip(reason="superseded: dataset fast paths now use the agent tool loop")
-async def test_dataset_fast_path_compiles_one_program_instead_of_using_iteration_budget():
-    agent = object.__new__(ExecutionAgent)
-    agent.reset_context = AsyncMock()
-    captured: dict[str, object] = {}
-
-    async def fake_compiled(request, *, message, target_files=None):
-        captured["request"] = request
-        captured["target_files"] = target_files
-        yield MessageEvent(message='{"success":true,"result":"done","attachments":[]}')
-    agent._execute_compiled_dataset_analysis = fake_compiled
-    step = Step(
-        id="dataset-fast-path",
-        description="Analyze mounted dataset",
-        inputs={
-            "execution_mode": "dataset_fast_path",
-            "dataset_intent": "analysis",
-            "requested_dimensions": [
-                "comparison",
-                "quantitative_metrics",
-                "limitations",
-            ],
-            "user_question": "比较各区域平均降水并说明数据限制",
-            "execution_guidance": "必须使用实际字段计算，不得只复述文件名。",
-            "allow_terminal_quicklook": False,
-        },
-    )
-
-    _events = [
-        event
-        async for event in agent.execute_step(
-            Plan(steps=[step]),
-            step,
-            Message(message="比较各区域平均降水并说明数据限制"),
-        )
-    ]
-
-    assert "比较各区域平均降水并说明数据限制" in captured["request"]
-    assert "必须使用实际字段计算" in captured["request"]
-    assert '"required_dimension_checklist":["comparison","quantitative_metrics","limitations"]' in captured["request"]
-    assert "check coverage of every requested analytical dimension" in captured["request"]
-    assert "single aggregate layer" in captured["request"]
-    assert "Do not create or reread a file solely" in captured["request"]
+@pytest.mark.parametrize("source", ["registered", "upload", "general"])
+@pytest.mark.parametrize("question", [
+    "列出文件名和列名即可，不生成文件。",
+    "解释上一轮已经确认的结果。",
+    "What are the observed fields?",
+])
+def test_factual_and_historical_answers_do_not_require_boilerplate_or_claim_new_execution(source, question):
+    message = Message(message=question,
+        datasets=[_preview_dataset(path="records.dat")] if source == "registered" else [],
+        attachments=["/home/ubuntu/inputs/" + "a" * 24 + "/records.dat"] if source == "upload" else [])
+    step = Step(description="Answer the requested facts", inputs={"artifact_policy": "optional",
+        "requested_dimensions": ["question_answering"], "user_question": question})
+    contract = ExecutionAgent._render_dataset_execution_contract(
+        Plan(goal=question, steps=[step]), step, message,
+        dataset_intent="analysis", dataset_fast_path=source != "general")
+    assert "For simple factual questions or explanations of prior results" in contract
+    assert "do not append method or limitation sections merely to follow a reporting template" in contract
+    assert "Include methods and limitations only when requested" in contract
+    assert "supplied host-reviewed result for the same authorized inputs" in contract
+    assert "explicitly attribute it to that earlier verified result" in contract
+    assert "unless a current tool result proves that action" in contract
+    assert "perform the smallest authorized inspection needed" in contract
+    assert "Historical results do not satisfy a new execution or delivery requirement" in contract
+    assert "followed by compact evidence, method, and limitations" not in contract
 
 
-@pytest.mark.asyncio
-@pytest.mark.skip(reason="superseded: dataset fast paths now use the agent tool loop")
-async def test_dataset_required_artifact_uses_compiled_program_contract():
-    agent = object.__new__(ExecutionAgent)
-    agent.reset_context = AsyncMock()
-    captured: dict[str, object] = {}
-
-    async def fake_compiled(request, *, message, target_files=None):
-        captured["request"] = request
-        captured["target_files"] = target_files
-        yield MessageEvent(message='{"success":true,"result":"done","attachments":["/home/ubuntu/output/chart.png"]}')
-
-    agent._execute_compiled_dataset_analysis = fake_compiled
-    step = Step(
-        id="dataset-plot",
-        description="Render the requested chart",
-        inputs={
-            "execution_mode": "dataset_fast_path",
-            "dataset_intent": "visualization",
-            "artifact_policy": "required",
-            "require_downloadable_result": True,
-            "requested_dimensions": ["visualization"],
-            "user_question": "绘制指定指标的趋势图",
-        },
-    )
-
-    _events = [
-        event
-        async for event in agent.execute_step(
-            Plan(language="zh", steps=[step]),
-            step,
-            Message(message="绘制指定指标的趋势图"),
-        )
-    ]
-
-    assert "Prioritize the requested artifact before optional investigation" in captured["request"]
-    assert "Do not postpone plotting or export" in captured["request"]
+def test_concise_answer_contract_preserves_quantitative_evidence_and_required_delivery():
+    step = Step(inputs={"artifact_policy": "required", "requested_dimensions": ["metric", "visualization"]})
+    message = Message(message="计算新的统计量并生成图表", datasets=[_preview_dataset(path="records.dat")])
+    contract = ExecutionAgent._render_dataset_execution_contract(
+        Plan(goal=message.message, steps=[step]), step, message,
+        dataset_intent="visualization", dataset_fast_path=True)
+    assert "Base quantitative claims on actual mounted-file evidence" in contract
+    assert "return only paths that actually exist" in contract
+    assert "New execution, new calculations and current file availability or delivery require current " in contract
+    assert "successful tool and file-validation evidence" in contract
+    assert "Historical results do not satisfy a new execution or delivery requirement" in contract
 
 
-@pytest.mark.asyncio
-async def test_multi_file_scope_reaches_compiler_without_unrelated_inventory():
-    agent = object.__new__(ExecutionAgent)
-    agent.format = None
-    agent.ask_with_messages = AsyncMock(return_value=AIMessage(content='{"python_code":"print(1)"}'))
-    agent._parse_json = AsyncMock(return_value={"python_code": "print(1)"})
-    selected = ["data/a.nc", "data/b.nc"]
-    dataset = MountedDataset(
-        dataset_id="tds_multi",
-        name="Multi-file dataset",
-        data_center_id="center",
-        data_center_name="Center",
-        sandbox_path="/home/ubuntu/datasets/tds_multi",
-        files=[
-            DatasetFile(path="data/a.nc", size=1),
-            DatasetFile(path="data/b.nc", size=2),
-            DatasetFile(path="data/unrelated.nc", size=3),
-        ],
-    )
-
-    await agent._compile_dataset_analysis_program(
-        "joint analysis",
-        Message(message="joint analysis", datasets=[dataset]),
-        output_dir="/home/ubuntu/output/test",
-        result_path="/home/ubuntu/output/test/result.json",
-        target_files=selected,
-    )
-
-    prompt = agent.ask_with_messages.await_args.args[0][0].content
-    datasets_payload = json.loads(prompt.split("DATASETS:\n", 1)[1].split("\n\nFAILURE_CONTEXT:", 1)[0])
-    assert [item["path"] for item in datasets_payload[0]["files"]] == selected
-    assert datasets_payload[0]["scope_restricted_to_targets"] is True
-    assert "unrelated.nc" not in prompt
-    assert "write_json(path, payload)" in prompt
-    assert "Do not call any other undeclared helper function" in prompt
-    assert "recursively inspect that entry's `sandbox_path`" in prompt
-
-
-@pytest.mark.asyncio
-async def test_compiled_dataset_analysis_runs_once_and_returns_validated_result():
-    agent = object.__new__(ExecutionAgent)
-    agent.ask_with_messages = AsyncMock(
-        return_value=AIMessage(content='{"python_code":"from pathlib import Path\\nimport json\\nPath(\\\"/home/ubuntu/output/result.json\\\").write_text(\\\"{}\\\")"}')
-    )
-    agent._parse_json = AsyncMock(return_value={"python_code": "print('analysis')"})
-    agent.get_tool = lambda name: SimpleNamespace(
-        toolkit=SimpleNamespace(name="shell"),
-        name=name,
-    ) if name == "shell_run" else None
-    result_payload = {"success": True, "result": "已完成绘图", "attachments": ["/home/ubuntu/output/chart.png"]}
-    agent.invoke_tool = AsyncMock(return_value=ToolMessage(
-        tool_call_id="",
-        name="shell_run",
-        content=json.dumps(result_payload, ensure_ascii=False),
-        artifact=ToolResult(
-            success=True,
-            message="Command completed successfully",
-            data={"status": "completed", "returncode": 0, "output": json.dumps(result_payload, ensure_ascii=False)},
-        ),
-    ))
-
-    events = [
-        event
-        async for event in agent._execute_compiled_dataset_analysis(
-            "绘制降水空间分布图",
-            message=Message(message="绘制降水空间分布图", datasets=[_preview_dataset()]),
-        )
-    ]
-
-    assert agent.invoke_tool.await_count == 1
-    assert [event.function_name for event in events if isinstance(event, ToolEvent)] == [
-        "dataset_analysis_run",
-        "dataset_analysis_run",
-    ]
-    final = next(event for event in events if isinstance(event, MessageEvent))
-    assert json.loads(final.message) == result_payload
-
-
-@pytest.mark.asyncio
-async def test_compiled_dataset_spill_message_excludes_preview_and_locator():
-    agent = object.__new__(ExecutionAgent)
-    agent.ask_with_messages = AsyncMock(
-        return_value=AIMessage(content='{"python_code":"print(1)"}')
-    )
-    agent._parse_json = AsyncMock(return_value={"python_code": "print('analysis')"})
-    agent.get_tool = lambda name: SimpleNamespace(
-        toolkit=SimpleNamespace(name="shell"),
-        name=name,
-    ) if name == "shell_run" else None
-    private_result = "Authorization: Bearer private-token /Users/alice/data.csv"
-    result_payload = {
-        "success": True,
-        "result": private_result,
-        "attachments": ["/home/ubuntu/output/chart.png"],
-    }
-    projected = ToolResult(
-        success=True,
-        data={"spill": SpillArtifactNotice(
-            status="stored",
-            reference=SpillArtifactRef(
-                locator="spill://artifact/0123456789abcdef0123456789abcdef",
-                byte_count=100_000,
-                sha256="a" * 64,
-                media_type="text/plain; charset=utf-8",
-                retrieval_hint="Use spill_artifact_read.",
-            ),
-            preview=private_result,
-            original_bytes=100_000,
-            retained_bytes=len(private_result.encode("utf-8")),
-            omitted_bytes=100_000 - len(private_result.encode("utf-8")),
-        ).model_dump(mode="python")},
-    )
-    rendered = json.dumps(result_payload, ensure_ascii=False)
-    agent.invoke_tool = AsyncMock(return_value=ToolMessage(
-        tool_call_id="",
-        name="shell_run",
-        content=projected.model_dump_json(),
-        artifact=ToolResult(
-            success=True,
-            data={"status": "completed", "returncode": 0, "output": rendered},
-        ),
-        additional_kwargs={SPILL_PROJECTION_KEY: projected},
-    ))
-
-    events = [
-        event
-        async for event in agent._execute_compiled_dataset_analysis(
-            "绘制降水空间分布图",
-            message=Message(message="绘制降水空间分布图", datasets=[_preview_dataset()]),
-        )
-    ]
-
-    final = next(event for event in events if isinstance(event, MessageEvent))
-    assert "private-token" not in final.message
-    assert "/Users/alice" not in final.message
-    assert "spill://artifact/" not in final.message
-    assert json.loads(final.message)["attachments"] == [
-        "/home/ubuntu/output/chart.png"
-    ]
-
-
-def _compiled_tool_result(payload: dict, *, output: str | None = None) -> ToolMessage:
-    rendered = output if output is not None else json.dumps(payload, ensure_ascii=False)
-    return ToolMessage(
-        tool_call_id="",
-        name="shell_run",
-        content=rendered,
-        artifact=ToolResult(
-            success=bool(payload.get("success", True)),
-            message="Command completed",
-            data={
-                "status": "completed",
-                "returncode": 0 if payload.get("success", True) else 1,
-                "output": rendered,
-            },
-        ),
-    )
-
-
-@pytest.mark.asyncio
-async def test_compiled_dataset_analysis_repairs_runner_failure_once():
-    agent = object.__new__(ExecutionAgent)
-    agent._compile_dataset_analysis_program = AsyncMock(
-        side_effect=[
-            SimpleNamespace(python_code="raise RuntimeError('first run')"),
-            SimpleNamespace(python_code="print('repaired')"),
-        ]
-    )
-    agent.get_tool = lambda name: SimpleNamespace(
-        toolkit=SimpleNamespace(name="shell"), name=name
-    ) if name == "shell_run" else None
-    agent.invoke_tool = AsyncMock(side_effect=[
-        _compiled_tool_result({"success": False}, output="runner failed: syntax error"),
-        _compiled_tool_result({
-            "success": True,
-            "result": "修复后完成分析",
-            "attachments": [],
-        }),
-    ])
-
-    events = [
-        event
-        async for event in agent._execute_compiled_dataset_analysis(
-            "分析数据并绘图",
-            message=Message(message="分析数据并绘图", datasets=[_preview_dataset()]),
-        )
-    ]
-
-    assert agent.invoke_tool.await_count == 2
-    assert agent._compile_dataset_analysis_program.await_count == 2
-    final = [event for event in events if isinstance(event, MessageEvent)][-1]
-    assert json.loads(final.message)["result"] == "修复后完成分析"
-
-
-@pytest.mark.asyncio
-async def test_compiled_dataset_analysis_recompiles_after_compile_failure():
-    agent = object.__new__(ExecutionAgent)
-    agent._compile_dataset_analysis_program = AsyncMock(
-        side_effect=[
-            ValueError("invalid compiler JSON"),
-            SimpleNamespace(python_code="print('valid')"),
-        ]
-    )
-    agent.get_tool = lambda name: SimpleNamespace(
-        toolkit=SimpleNamespace(name="shell"), name=name
-    ) if name == "shell_run" else None
-    agent.invoke_tool = AsyncMock(return_value=_compiled_tool_result({
-        "success": True,
-        "result": "编译重试后完成",
-        "attachments": [],
-    }))
-
-    events = [
-        event
-        async for event in agent._execute_compiled_dataset_analysis(
-            "分析数据",
-            message=Message(message="分析数据", datasets=[_preview_dataset()]),
-        )
-    ]
-
-    assert agent._compile_dataset_analysis_program.await_count == 2
-    agent.invoke_tool.assert_awaited_once()
-    assert json.loads(
-        next(event.message for event in events if isinstance(event, MessageEvent))
-    )["success"] is True
-
-
-@pytest.mark.asyncio
-async def test_compiled_dataset_analysis_business_failure_is_terminal():
-    agent = object.__new__(ExecutionAgent)
-    agent._compile_dataset_analysis_program = AsyncMock(
-        return_value=SimpleNamespace(python_code="print('valid')")
-    )
-    agent.get_tool = lambda name: SimpleNamespace(
-        toolkit=SimpleNamespace(name="shell"), name=name
-    ) if name == "shell_run" else None
-    agent.invoke_tool = AsyncMock(return_value=_compiled_tool_result({
-        "success": False,
-        "result": "数据不足，无法计算相关性",
-        "attachments": [],
-    }))
-
-    events = [
-        event
-        async for event in agent._execute_compiled_dataset_analysis(
-            "计算相关性",
-            message=Message(message="计算相关性", datasets=[_preview_dataset()]),
-        )
-    ]
-
-    agent.invoke_tool.assert_awaited_once()
-    agent._compile_dataset_analysis_program.assert_awaited_once()
-    final = next(event for event in events if isinstance(event, MessageEvent))
-    payload = json.loads(final.message)
-    assert payload == {
-        "success": False,
-        "result": "数据不足，无法计算相关性",
-        "attachments": [],
-    }
 
 
 @pytest.mark.asyncio
@@ -2063,7 +1760,7 @@ async def test_required_catalog_export_falls_back_instead_of_dropping_artifact()
         fallback_calls.append((args, kwargs))
         yield MessageEvent(message="exported")
 
-    agent._execute_compiled_dataset_analysis = fallback
+    agent._execute_dataset_general_analysis = fallback
     dataset = MountedDataset(
         dataset_id="tds_catalog",
         name="Catalog dataset",

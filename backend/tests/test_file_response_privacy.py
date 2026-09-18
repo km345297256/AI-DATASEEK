@@ -116,6 +116,25 @@ async def test_message_sse_attachment_uses_path_safe_file_response(monkeypatch):
     assert mapped.data.attachments[0].file_url.startswith("/api/v1/files/file-123")
 
 
+@pytest.mark.asyncio
+@pytest.mark.parametrize("error", [FileNotFoundError, PermissionError])
+async def test_unavailable_history_attachment_does_not_break_history_or_bypass_authorization(monkeypatch, error):
+    from app.interfaces import dependencies
+
+    class StubFileService:
+        async def create_signed_url(self, file_id, user_id=None):
+            assert (file_id, user_id) == ("file-123", "user-private")
+            raise error("private storage details")
+
+    monkeypatch.setattr(dependencies, "get_file_service", lambda: StubFileService())
+    attachment = _private_file().model_copy(update={"file_url": "/api/v1/files/file-123?signature=expired"})
+    mapped = await EventMapper.event_to_sse_event(MessageEvent(message="historical answer", attachments=[attachment]))
+    assert mapped.data.content == "historical answer"
+    assert mapped.data.attachments[0].file_url is None
+    assert "private storage details" not in mapped.model_dump_json()
+    _assert_public_file_payload(mapped.data.attachments[0].model_dump())
+
+
 class StubAgentService:
     def __init__(self, file_info: FileInfo):
         self.file_info = file_info

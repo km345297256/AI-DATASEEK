@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
-import ts from 'typescript';
+import { useAnalysisSession } from '../src/composables/useAnalysisSession.ts';
 import {
   readAnalysisOutcome, analysisOutcomeReason, analysisOutcomeMissing, analysisOutcomeTitle,
   resumableAnalysisOutcome, continuationAttempt,
@@ -100,45 +100,44 @@ test('history projection preserves outcome metadata exactly like live message ev
   assert.equal(resumableAnalysisOutcome(messages, 0).resume_from, token);
 });
 
-function chatHandlers(overrides = {}) {
-  const page = source('../src/pages/ChatPage.vue');
-  const handlers = page.slice(page.indexOf('const canResumeAnalysis ='), page.indexOf('const chat = async'));
-  const state = {
-    viewDisposed: false, sessionId: { value: 'session-a' }, isLoading: { value: false },
-    isRestoringHistory: { value: false }, cancelCurrentChat: { value: null },
-    messages: { value: [assistant()] }, analysisContinuation: { value: null },
-    ...overrides,
-  };
+function chatHandlers() {
   const requests = [];
-  const chat = (...request) => { state.isLoading.value = true; requests.push(request); };
-  const compiled = ts.transpileModule(handlers + '\nreturn { canResumeAnalysis, resumeAnalysis };', {
-    compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.None },
-  }).outputText;
   let ids = 0;
-  const dependencies = { ...state, continuationAttempt, resumableAnalysisOutcome, agentApi: { createClientMessageId: () => `id-${++ids}` }, chat };
-  const api = new Function(...Object.keys(dependencies), compiled)(...Object.values(dependencies));
-  return { ...api, state, requests };
+  const session = useAnalysisSession({ api: {
+    createClientMessageId: () => `id-${++ids}`,
+    chatWithSession: async (...request) => { requests.push(request); return () => {}; },
+  } });
+  session.sessionId.value = 'session-a';
+  session.messages.value = [assistant()];
+  return { ...session, requests };
 }
 
-test('actual chat click handler blocks double-click and retries ambiguous failure with the same identity', () => {
+test('shared continuation blocks double-click and retries ambiguous failure with the same identity', async () => {
   const harness = chatHandlers();
-  harness.resumeAnalysis(0);
-  harness.resumeAnalysis(0);
+  const pending = harness.resumeAnalysis(0);
+  await harness.resumeAnalysis(0);
+  await pending;
   assert.equal(harness.requests.length, 1);
-  assert.deepEqual(harness.requests[0].slice(0, 5), ['', [], [], [], null]);
-  assert.equal(harness.requests[0][5].resumeFrom, token);
-  assert.equal(harness.requests[0][5].sessionId, 'session-a');
-  harness.state.isLoading.value = false;
-  harness.resumeAnalysis(0);
+  assert.equal(harness.requests[0][1], '');
+  assert.deepEqual(harness.requests[0].slice(4, 8), [[], [], [], null]);
+  assert.equal(harness.requests[0][11], token);
+  assert.equal(harness.requests[0][12], undefined);
+  harness.requests[0][8].onError(new Error('ambiguous'));
+  await harness.resumeAnalysis(0);
   assert.equal(harness.requests.length, 2);
-  assert.equal(harness.requests[0][5].clientMessageId, harness.requests[1][5].clientMessageId);
+  assert.equal(harness.requests[0][10], harness.requests[1][10]);
 });
 
-test('actual chat click handler rejects disposed, restoring, running and already connected views', () => {
-  for (const overrides of [{ viewDisposed: true }, { isLoading: { value: true } }, { isRestoringHistory: { value: true } }, { cancelCurrentChat: { value: () => {} } }]) {
-    const harness = chatHandlers(overrides);
-    harness.resumeAnalysis(0);
-    assert.equal(harness.requests.length, 0);
+test('shared continuation rejects disposed, restoring, running and connected views', async () => {
+  for (const kind of ['disposed', 'restoring', 'running', 'connected']) {
+    const harness = chatHandlers();
+    if (kind === 'disposed') harness.dispose();
+    if (kind === 'restoring') harness.isRestoringHistory.value = true;
+    if (kind === 'running') harness.isLoading.value = true;
+    if (kind === 'connected') { await harness.resumeAnalysis(0); harness.isLoading.value = false; }
+    const count = harness.requests.length;
+    await harness.resumeAnalysis(0);
+    assert.equal(harness.requests.length, count);
   }
 });
 
@@ -151,13 +150,14 @@ test('shared views render status but cannot emit a continuation from the UI', ()
   assert.doesNotMatch(shared, /resumeAnalysis|allow-analysis-resume/);
 });
 
-test('dataset continuation sends only the checkpoint command to the existing session and guards late callbacks', () => {
-  const page = source('../src/pages/DatasetSeekPage.vue');
-  const handler = page.slice(page.indexOf('async function resumeAnalysis('), page.indexOf('function conversationCallbacks('));
-  assert.match(handler, /activeSessionId, '', lastEventId\.value, lastEventSeq\.value, \[\], \[\], \[\], null/);
-  assert.match(handler, /undefined, attempt\.clientMessageId, attempt\.resumeFrom/);
-  assert.match(handler, /if \(viewDisposed \|\| generation !== conversationGeneration\) \{ cancel\(\); return; \}/);
-  assert.doesNotMatch(handler, /createSession\(|ensureSession\(|buildDatasetChatCapabilities\(|inputMessage\.value\s*=|messages\.value\.push/);
+test('both entries use the checkpoint-only shared continuation handler', () => {
+  for (const page of ['ChatPage', 'DatasetSeekPage']) {
+    assert.match(source(`../src/pages/${page}.vue`), /canResumeAnalysis, resumeAnalysis/);
+  }
+  const controller = source('../src/composables/useAnalysisSession.ts');
+  const handler = controller.slice(controller.indexOf('async function resumeAnalysis('), controller.indexOf('function reset()'));
+  assert.match(handler, /connect\(revision, undefined, attempt\)/);
+  assert.doesNotMatch(handler, /createSession\(|messages\.value\.push/);
 });
 
 test('API treats continuation as a new idempotent command without current UI capability overrides', () => {

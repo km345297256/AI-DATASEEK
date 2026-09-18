@@ -249,25 +249,26 @@ test('application router installs the shared lifecycle independently of layout m
 
 test('same-page conversation reset closes previews before clearing the previous task', () => {
   const page = source('../src/pages/DatasetSeekPage.vue');
-  const reset = page.slice(page.indexOf('function clearConversationState()'), page.indexOf('async function loadConversation('));
-  assert.match(reset, /function clearConversationState\(\)\s*\{\s*hideFilePanel\(\)/);
+  const controller = source('../src/composables/useAnalysisSession.ts');
+  assert.match(page, /onReset: \(\) => \{ hideFilePanel\(\)/);
+  const reset = controller.slice(controller.indexOf('function reset()'), controller.indexOf('async function restore('));
+  assert.ok(reset.indexOf('options.onReset?.()') < reset.indexOf('messages.value = []'));
   const load = page.slice(page.indexOf('async function loadConversation('), page.indexOf('async function restoreConversation('));
-  assert.ok(load.indexOf('clearConversationState()') >= 0);
-  assert.ok(load.indexOf('clearConversationState()') < load.indexOf('await getSessionHistory('));
-  const fresh = page.slice(page.indexOf('function newConversationFromHistory()'), page.indexOf('async function stop()'));
-  assert.match(fresh, /clearConversationState\(\)/);
+  assert.match(load, /analysisSession\.restore\(targetSessionId\)/);
+  const fresh = page.slice(page.indexOf('function newConversationFromHistory()'), page.indexOf('onMounted(async'));
+  assert.match(fresh, /analysisSession\.reset\(\)/);
 });
 
 test('async shapefile preparation captures its request before awaiting and uses guarded completion', () => {
-  const page = source('../src/pages/DatasetSeekPage.vue');
+  const page = source('../src/components/AnalysisConversation.vue');
   const start = page.indexOf('async function openShapefilePreview(');
   assert.ok(start >= 0);
   const preview = page.slice(start, page.indexOf('function openMolecularPreview(', start));
-  const capture = preview.indexOf('const previewRequest = beginFilePreview()');
+  const capture = preview.indexOf('const request = beginFilePreview()');
   const preparation = preview.indexOf('await prepareShapefilePreview(');
   assert.ok(capture >= 0 && preparation > capture);
-  assert.match(preview.slice(preparation), /if \(selected\) previewRequest\.show\(selected, files\)/);
-  assert.match(preview, /if \(previewRequest\.isCurrent\(\)\) showErrorToast/);
+  assert.match(preview.slice(preparation), /if \(selected\) request\.show\(selected, layer!\.components\)/);
+  assert.match(preview, /if \(request\.isCurrent\(\) && currentSession === props\.sessionId\) showErrorToast/);
   assert.doesNotMatch(preview, /\bshowFilePanel\(/);
 });
 

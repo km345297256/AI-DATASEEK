@@ -4,6 +4,30 @@ from app.services.file import FileService
 
 
 @pytest.mark.asyncio
+async def test_bounded_preview_does_not_decode_unread_trailing_file_data(tmp_path):
+    path = tmp_path / "large-mixed-encoding.csv"
+    prefix = "station,value\n北京,12\n"
+    with path.open("wb") as stream:
+        stream.write(prefix.encode("utf-8"))
+        stream.write(b"x" * (2 * 1024 * 1024))
+        stream.write(b"\xff")
+
+    result = await FileService().read_file(str(path), max_length=len(prefix))
+
+    assert result.content == prefix + "(truncated)"
+
+
+@pytest.mark.asyncio
+async def test_bounded_preview_does_not_mark_exact_limit_as_truncated(tmp_path):
+    path = tmp_path / "exact.txt"
+    path.write_text("北京,12\n", encoding="utf-8")
+
+    result = await FileService().read_file(str(path), max_length=6)
+
+    assert result.content == "北京,12\n"
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize(
     "original",
     [

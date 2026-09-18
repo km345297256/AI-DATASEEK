@@ -7,6 +7,7 @@ from unittest.mock import AsyncMock
 import pytest
 
 from app.domain.models.file import FileInfo
+from app.domain.models.event import MessageEvent
 from app.domain.services.agent_task_runner import AgentTaskRunner
 
 
@@ -110,3 +111,45 @@ async def test_pin_for_another_path_does_not_freeze_repairable_file():
     result = await runner._sync_file_to_storage(PATH)
     assert objects[result.file_id] == repaired
     runner._file_storage.upload_file.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_later_turn_can_replace_working_path_without_deleting_historical_attachment():
+    runner, old, objects, files, repaired = storage_runner()
+    runner._list_sandbox_artifacts = AsyncMock(return_value=[PATH])
+    runner._session_repository.find_by_id = AsyncMock(return_value=SimpleNamespace(files=[old]))
+    await runner._capture_artifact_baseline()
+    # Per-step review state is reset for a new input; historical object
+    # retention must not depend on that transient state.
+    runner._analysis_preserved_file_ids = set()
+    result = await runner._sync_file_to_storage(PATH)
+    assert result.file_id != old.file_id
+    assert objects[old.file_id] == b"value\n10\n"
+    assert objects[result.file_id] == repaired
+    assert files == {result.file_id: result}
+    runner._file_storage.delete_file.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_missing_history_lookup_never_authorizes_storage_cleanup():
+    runner, old, objects, _, repaired = storage_runner()
+    runner._list_sandbox_artifacts = AsyncMock(return_value=[])
+    runner._session_repository.find_by_id = AsyncMock(side_effect=RuntimeError("history unavailable"))
+    await runner._capture_artifact_baseline()
+    result = await runner._sync_file_to_storage(PATH)
+    assert objects[old.file_id] == b"value\n10\n" and objects[result.file_id] == repaired
+    runner._file_storage.delete_file.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_persisted_attachment_is_retained_for_next_input_in_the_same_worker():
+    runner, old, objects, _, repaired = storage_runner()
+    runner._session_repository.add_event = AsyncMock()
+    runner._durable_event_projection = lambda event: event
+    runner._bound_event_payload = lambda event: event
+    task = SimpleNamespace(output_stream=SimpleNamespace(put=AsyncMock(return_value="event-id")))
+    await runner._put_and_add_event(task, MessageEvent(message="delivered", attachments=[old]))
+    runner._analysis_preserved_file_ids = set()
+    result = await runner._sync_file_to_storage(PATH)
+    assert objects[old.file_id] == b"value\n10\n" and objects[result.file_id] == repaired
+    runner._file_storage.delete_file.assert_not_awaited()

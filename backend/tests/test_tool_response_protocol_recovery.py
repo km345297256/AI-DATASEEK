@@ -132,6 +132,7 @@ def make_agent(monkeypatch, responses, *, guard=None, agent_type=BaseAgent):
             return value
 
         runnable.bind_tools.side_effect = bind_tools
+        runnable.ainvoke = invoke
         runnable.__or__.return_value = SimpleNamespace(ainvoke=invoke)
         return runnable
 

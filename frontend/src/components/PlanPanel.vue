@@ -1,5 +1,5 @@
 <template>
-  <div class="[&:not(:empty)]:pb-2 bg-[var(--background-gray-main)] rounded-[22px_22px_0px_0px]">
+  <div :data-plan-status="presentation.status" class="[&:not(:empty)]:pb-2 bg-[var(--background-gray-main)] rounded-[22px_22px_0px_0px]">
     <div v-if="isExpanded"
       class="border border-black/8 dark:border-[var(--border-main)] bg-[var(--background-menu-white)] rounded-[16px] sm:rounded-[12px] shadow-[0px_0px_1px_0px_rgba(0,_0,_0,_0.05),_0px_8px_32px_0px_rgba(0,_0,_0,_0.04)] z-99 flex flex-col py-4">
       <div class="flex px-4 mb-4 w-full">
@@ -21,16 +21,19 @@
             </div>
           </div>
           <div class="max-h-[min(calc(100vh-360px),400px)] overflow-y-auto">
-            <div v-for="step in plan.steps" :key="step.id"
+            <div v-for="step in presentation.steps" :key="step.id" :data-plan-step-status="step.displayStatus"
               class="flex items-start gap-2.5 w-full px-4 py-2 truncate">
-              <StepSuccessIcon v-if="step.status === 'completed'" />
-              <CircleX v-else-if="step.status === 'failed'" class="relative top-[2px] flex-shrink-0 text-[var(--function-error)]" :size="16" />
+              <StepSuccessIcon v-if="step.displayStatus === 'completed'" />
+              <CircleAlert v-else-if="step.displayStatus === 'partial'" class="relative top-[2px] flex-shrink-0 text-amber-600" :size="16" />
+              <CircleX v-else-if="step.displayStatus === 'failed'" class="relative top-[2px] flex-shrink-0 text-[var(--function-error)]" :size="16" />
+              <CirclePause v-else-if="step.displayStatus === 'stopped'" class="relative top-[2px] flex-shrink-0 text-[var(--icon-tertiary)]" :size="16" />
               <Clock v-else class="relative top-[2px] flex-shrink-0" :size="16" />
               <div class="flex flex-col w-full gap-[2px] truncate">
                 <div class="text-sm truncate" :title="step.description"
                   style="color: var(--text-primary);">
                   {{ step.description }}
                 </div>
+                <span class="text-xs text-[var(--text-tertiary)]">{{ t(PLAN_STATUS_LABELS[step.displayStatus]) }}</span>
               </div>
             </div>
           </div>
@@ -43,8 +46,10 @@
         <div class="w-full" style="height: 36px; --offset: -36px;">
           <div class="w-full">
             <div class="flex items-start gap-2.5 w-full px-4 py-2 truncate">
-              <StepSuccessIcon v-if="isCompleted" />
-              <CircleX v-else-if="hasFailedStep" class="relative top-[2px] flex-shrink-0 text-[var(--function-error)]" :size="16" />
+              <StepSuccessIcon v-if="presentation.status === 'completed'" />
+              <CircleAlert v-else-if="presentation.status === 'partial'" class="relative top-[2px] flex-shrink-0 text-amber-600" :size="16" />
+              <CircleX v-else-if="presentation.status === 'failed'" class="relative top-[2px] flex-shrink-0 text-[var(--function-error)]" :size="16" />
+              <CirclePause v-else-if="presentation.status === 'stopped'" class="relative top-[2px] flex-shrink-0 text-[var(--icon-tertiary)]" :size="16" />
               <Clock v-else class="relative top-[2px] flex-shrink-0" :size="16" />
               <div class="flex flex-col w-full gap-[2px] truncate">
                 <div class="text-sm truncate" :title="currentStep" style="color: var(--text-tertiary);">
@@ -67,15 +72,18 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue';
 import { useI18n } from 'vue-i18n';
-import { ChevronUp, ChevronDown, Clock, CircleX } from 'lucide-vue-next';
+import { ChevronUp, ChevronDown, Clock, CircleX, CircleAlert, CirclePause } from 'lucide-vue-next';
 import StepSuccessIcon from './icons/StepSuccessIcon.vue';
 import type { PlanEventData } from '../types/event';
+import type { Message } from '../types/message';
+import { PLAN_STATUS_LABELS, presentPlan } from '../utils/planPresentation';
 
 interface Props {
   plan: PlanEventData;
+  messages?: Message[];
 }
 
-const props = defineProps<Props>();
+const props = withDefaults(defineProps<Props>(), { messages: () => [] });
 
 const { t } = useI18n();
 
@@ -85,31 +93,11 @@ const togglePanel = () => {
   isExpanded.value = !isExpanded.value;
 };
 
-const planProgress = computed((): string => {
-  const finishedSteps = props.plan?.steps.filter(step => isTerminalStep(step.status)).length ?? 0;
-  return `${finishedSteps} / ${props.plan?.steps.length ?? 1}`;
-});
-
-const isCompleted = computed((): boolean => {
-  return props.plan?.steps.every(step => step.status === 'completed') ?? false;
-});
-
-const hasFailedStep = computed((): boolean => {
-  return props.plan?.steps.some(step => step.status === 'failed') ?? false;
-});
-
-const currentStep = computed((): string => {
-  for (const step of props.plan?.steps ?? []) {
-    if (step.status === 'running' || step.status === 'pending') {
-      return step.description;
-    }
-  }
-  return t('Task Completed');
-});
-
-const isTerminalStep = (status: string): boolean => {
-  return status === 'completed' || status === 'failed';
-};
+const presentation = computed(() => presentPlan(props.plan, props.messages));
+const planProgress = computed(() => t('Completed Steps', {
+  completed: presentation.value.completed, total: presentation.value.total,
+}));
+const currentStep = computed(() => presentation.value.activeDescription || t(presentation.value.label));
 </script>
 
 <style scoped>

@@ -15,7 +15,7 @@
             <div class="max-w-[100%] text-ellipsis overflow-hidden whitespace-nowrap text-[13px]"
               :title="toolInfo.functionArg ? `${toolInfo.function} ${toolInfo.functionArg}` : toolInfo.function">
               <div class="flex items-center">
-                {{ toolInfo.function }}<span v-if="toolInfo.functionArgPreview"
+                {{ label || toolInfo.function }}<span v-if="toolInfo.functionArgPreview"
                   class="flex-1 min-w-0 rounded-[6px] px-1 ml-1 relative top-[0px] text-[12px] font-mono max-w-full text-ellipsis overflow-hidden whitespace-nowrap text-[var(--text-tertiary)]"><code>{{ toolInfo.functionArgPreview }}</code></span>
                 <button
                   v-if="toolInfo.functionArgExpandable"
@@ -32,6 +32,7 @@
                 <span v-if="summary" class="ml-2 rounded-full bg-[var(--fill-tsp-white-light)] px-2 py-[1px] text-[11px] text-[var(--text-tertiary)]">
                   {{ summary }}
                 </span>
+                <span v-if="tool.execution_status === 'failed'" class="ml-2 text-[11px] text-amber-700">执行失败</span>
                 <span v-if="collapsedCount > 1" class="ml-1 rounded-full border border-[var(--border-main)] px-1.5 py-[1px] text-[11px] text-[var(--text-tertiary)]">
                   x{{ collapsedCount }}
                 </span>
@@ -64,6 +65,7 @@ import { useRelativeTime } from "../composables/useTime";
 const props = withDefaults(defineProps<{
   tool: ToolContent;
   summary?: string;
+  label?: string;
   collapsedCount?: number;
 }>(), {
   collapsedCount: 1,

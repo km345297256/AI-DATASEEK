@@ -13,8 +13,138 @@ from scripts.dataset_quicklook import (
     Limits,
     QuicklookError,
     _quicklook_evidence,
+    _read_delimited,
     generate_quicklook,
 )
+
+
+@pytest.mark.parametrize("encoding", ["utf-8-sig", "utf-16", "utf-16-be", "utf-32", "gb18030"])
+def test_delimited_preserves_chinese_headers_and_values(tmp_path, encoding):
+    source = tmp_path / "observations.csv"
+    data = "站点,温度\n北京,12\n上海,18\n".encode(encoding)
+    if encoding == "utf-16-be":
+        data = b"\xfe\xff" + data
+    source.write_bytes(data)
+    frame, _ = _read_delimited(source, "csv", Limits())
+    assert list(frame.columns) == ["站点", "温度"]
+    assert frame["站点"].tolist() == ["北京", "上海"]
+    assert frame["温度"].tolist() == [12, 18]
+
+
+def test_delimited_duplicate_headers_do_not_collide_with_explicit_suffixes(tmp_path):
+    source = tmp_path / "duplicate.csv"
+    source.write_text("a,a,a_2,a_2_2\n1,2,3,4\n", encoding="utf-8")
+    manifest = generate_quicklook(source, tmp_path / "output", Limits(max_plots=0))
+    columns = manifest["datasets"][0]["table"]["columns"]
+    assert len({column["name"] for column in columns}) == 4
+    assert [column["statistics"]["mean"] for column in columns] == [1, 2, 3, 4]
+
+
+@pytest.mark.parametrize("encoding", ["utf-8", "utf-16", "utf-32", "gb18030"])
+def test_delimited_byte_budget_never_profiles_a_partial_quoted_record(tmp_path, encoding):
+    source = tmp_path / "multiline.csv"
+    prefix = '站点,温度\n北京,12\n"第一行\n第二'
+    source.write_bytes((prefix + '行",99\n上海,18\n').encode(encoding))
+    frame, metadata = _read_delimited(
+        source, "csv", Limits(max_text_bytes=len(prefix.encode(encoding)) - 1)
+    )
+    assert frame["站点"].tolist() == ["北京"]
+    assert frame["温度"].tolist() == [12]
+    assert metadata["byte_truncated"] is True
+
+
+def test_delimited_wide_table_declares_column_truncation(tmp_path):
+    source = tmp_path / "wide.csv"
+    source.write_text("x,y,z\n1,2,3\n", encoding="utf-8")
+    manifest = generate_quicklook(source, tmp_path / "output", Limits(max_columns=2, max_plots=0))
+    dataset = manifest["datasets"][0]
+    assert dataset["table"]["columns_profiled"] == 2
+    assert dataset["table"]["truncated"] is True
+    assert dataset["read"]["column_truncated"] is True
+
+
+def test_delimited_blank_lines_do_not_create_phantom_missing_records(tmp_path):
+    source = tmp_path / "blank-lines.csv"
+    source.write_text("\n\nx,y\n1,2\n\n3,4\n\n", encoding="utf-8")
+    frame, _ = _read_delimited(source, "csv", Limits())
+    assert frame.shape == (2, 2)
+    assert frame["x"].tolist() == [1, 3]
+
+
+def test_delimited_rejects_unterminated_quoted_record_in_complete_input(tmp_path):
+    source = tmp_path / "broken.csv"
+    source.write_text('x,y\n1,"unfinished\n', encoding="utf-8")
+    with pytest.raises(QuicklookError, match="record"):
+        _read_delimited(source, "csv", Limits())
+
+
+def test_delimited_complete_multiline_record_preserves_quotes_and_final_row(tmp_path):
+    source = tmp_path / "quoted.csv"
+    source.write_text('station,value\r\n"first\nsecond ""quoted""",12\r\nlast,18', encoding="utf-8")
+    frame, metadata = _read_delimited(source, "csv", Limits())
+    assert frame["station"].tolist() == ['first\nsecond "quoted"', "last"]
+    assert frame["value"].tolist() == [12, 18]
+    assert metadata["byte_truncated"] is False
+
+
+@pytest.mark.parametrize("tail", ['3,"unfinished\n', '3,' + 'x' * 150_000 + '\n'])
+def test_delimited_row_budget_does_not_parse_unsampled_records(tmp_path, tail):
+    source = tmp_path / "bounded.csv"
+    source.write_text("x,y\n1,2\n" + tail, encoding="utf-8")
+    frame, metadata = _read_delimited(source, "csv", Limits(max_rows_per_table=1))
+    assert frame.to_numpy().tolist() == [[1, 2]]
+    assert metadata["row_truncated"] is True
+
+
+def test_delimited_trailing_blank_lines_do_not_claim_truncated_rows(tmp_path):
+    source = tmp_path / "bounded.csv"
+    source.write_text("x,y\n1,2\n\n\n", encoding="utf-8")
+    frame, metadata = _read_delimited(source, "csv", Limits(max_rows_per_table=1))
+    assert len(frame) == 1
+    assert metadata["row_truncated"] is False
+
+
+def test_delimited_rejects_extra_fields_instead_of_discarding_measurements(tmp_path):
+    source = tmp_path / "extra.csv"
+    source.write_text("x,y\n1,2,3\n", encoding="utf-8")
+    with pytest.raises(QuicklookError, match="more columns"):
+        _read_delimited(source, "csv", Limits())
+
+
+@pytest.mark.parametrize("data", [b"", b"\xff\xfe\x41", b"x,y\n1,\x00\n"])
+def test_delimited_empty_or_invalid_unicode_fails_without_publishing_output(tmp_path, data):
+    source = tmp_path / "invalid.csv"
+    source.write_bytes(data)
+    output = tmp_path / "output"
+    with pytest.raises(QuicklookError):
+        generate_quicklook(source, output, Limits(max_plots=0))
+    assert not output.exists()
+    assert not list(tmp_path.glob(".output.tmp-*"))
+
+
+@pytest.mark.parametrize("shape", [(1, 100_000), (100_000, 1), (2, 100_000)])
+def test_narrow_raster_sample_respects_pixel_budget(tmp_path, shape):
+    import rasterio
+    from rasterio.transform import from_origin
+    source = tmp_path / "narrow.tif"
+    height, width = shape
+    with rasterio.open(source, "w", driver="GTiff", width=width, height=height,
+                       count=1, dtype="float32", transform=from_origin(100, 40, .01, .01)) as raster:
+        raster.write(np.ones(shape, dtype="float32"), 1)
+    manifest = generate_quicklook(source, tmp_path / "output", Limits(max_raster_pixels=100, max_plots=0))
+    assert manifest["datasets"][0]["sampling"]["pixels_per_band"] <= 100
+
+
+@pytest.mark.parametrize("format", ["NETCDF3_CLASSIC", "NETCDF3_64BIT_OFFSET", "NETCDF3_64BIT_DATA"])
+def test_netcdf_classic_quicklook_uses_a_compatible_reader(tmp_path, format):
+    xr = pytest.importorskip("xarray")
+    source = tmp_path / "classic.nc"
+    xr.Dataset({"temperature": ("station", [10., 15., 20.])}).to_netcdf(
+        source, engine="netcdf4", format=format,
+    )
+    manifest = generate_quicklook(source, tmp_path / "output", Limits(max_plots=0))
+    assert manifest["datasets"][0]["sampled_variable"] == "temperature"
+    assert manifest["datasets"][0]["sampled_values"] == 3
 
 
 def _artifact_paths(output: Path, manifest: dict) -> list[Path]:

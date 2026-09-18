@@ -20,6 +20,8 @@ LABELS = DELIVERABLE_LABELS
 REASONS = {
     "artifacts_missing": "部分要求的成果还未完成。",
     "artifact_validation_failed": "部分文件尚未通过内容检查，暂不能计为已完成成果。",
+    "answer_validation_unavailable": "本次结果说明尚未完成证据核验，暂不能作为已确认结论。",
+    "analytical_requirements_missing": "部分要求的分析内容尚未完成。",
     "validation_unavailable": "暂时无法核验成果内容，完成情况尚未确认。",
     "delivery_failed": "部分成果文件尚未成功交付。",
     "tool_budget_exhausted": "本轮工具执行额度已用尽。",
@@ -44,6 +46,11 @@ def artifact_kind(path: str) -> str | None:
 
 
 def requirements_for_step(step, message) -> list[DeliverableRequirement]:
+    from app.domain.services.analysis_request_contract import current_artifact_requirement
+    if current_artifact_requirement(message) is False:
+        # A later router/model step cannot turn a current read-only request into
+        # a new chart obligation, including after earlier turns produced files.
+        return []
     declared = list(getattr(step, "deliverables", []) or [])
     requirements = [DeliverableRequirement.model_validate(item) for item in declared]
     intent = (step.inputs or {}).get("dataset_intent")
@@ -87,7 +94,9 @@ def _value(item: Any, key: str, default=None):
 def _matches(requirement: DeliverableRequirement, kind: str, path: Any) -> bool:
     return bool((kind == requirement.kind or (requirement.kind == "any" and kind != "code"))
                 and (not requirement.formats or (isinstance(path, str)
-                    and PurePosixPath(path).suffix.lower().lstrip(".") in requirement.formats)))
+                    and PurePosixPath(path).suffix.lower().lstrip(".") in requirement.formats))
+                and (not requirement.output_paths or path in requirement.output_paths
+                     or requirement.min_count > len(requirement.output_paths)))
 
 
 def _inspect_records(records, delivered, validation_available, *, _selected_deliveries=None):
@@ -166,12 +175,15 @@ def verified_deliveries(records: list[dict], delivered, *, validation_available:
 def _missing_requirements(requirements, accepted):
     # Each delivered artifact satisfies at most one count slot. Augmenting
     # paths handle overlaps (e.g. any + image) without greedy false failures.
-    slots = [index for index, requirement in enumerate(requirements) for _ in range(requirement.min_count)]
+    slots = [(index, path) for index, requirement in enumerate(requirements)
+             for path in [*requirement.output_paths,
+                          *([None] * (requirement.min_count - len(requirement.output_paths)))]]
     choices = []
-    for index in slots:
+    for index, required_path in slots:
         requirement = requirements[index]
         choices.append([position for position, item in enumerate(accepted)
-                        if _matches(requirement, item["kind"], item["path"])])
+                        if _matches(requirement, item["kind"], item["path"])
+                        and (required_path is None or item["path"] == required_path)])
     assigned = {}
     def assign(slot, visited):
         for position in choices[slot]:
@@ -185,13 +197,18 @@ def _missing_requirements(requirements, accepted):
     for slot in sorted(range(len(slots)), key=lambda value: len(choices[value])):
         assign(slot, set())
     fulfilled = [0] * len(requirements)
+    fulfilled_paths = [set() for _ in requirements]
     for slot in assigned.values():
-        fulfilled[slots[slot]] += 1
+        index, path = slots[slot]
+        fulfilled[index] += 1
+        if path is not None:
+            fulfilled_paths[index].add(path)
     missing = []
     for index, requirement in enumerate(requirements):
         if fulfilled[index] < requirement.min_count:
             missing.append(requirement.model_copy(update={
                 "min_count": requirement.min_count - fulfilled[index], "label": LABELS[requirement.kind],
+                "output_paths": [path for path in requirement.output_paths if path not in fulfilled_paths[index]],
             }))
     return missing
 
@@ -322,6 +339,15 @@ def outcome_message(outcome: AnalysisOutcome, *, delivered_count: int = 0,
         lines.append(f"已交付并保留 {delivered_count} 个文件。")
     if outcome.missing:
         lines.append("待完成：" + "、".join(f"{LABELS[item.kind]} × {item.min_count}" for item in outcome.missing) + "。")
+    missing_names = list(dict.fromkeys(issue.artifact_name for issue in outcome.issues
+                                      if issue.blocking and issue.reason_code == "missing_artifact"))
+    if missing_names:
+        def quoted_name(name):
+            fence = "`" * (max((len(match.group()) for match in re.finditer(r"`+", name)), default=0) + 1)
+            return f"{fence} {name} {fence}" if "`" in name else f"`{name}`"
+        # These names come from exact required-path validation, never from an
+        # executor's attachment claims. They are absent outputs, not downloads.
+        lines.append("尚未生成的所需文件：" + "、".join(quoted_name(name) for name in missing_names[:8]) + "。")
     if (not complete and outcome.can_resume and isinstance(outcome.resume_from, str)
             and re.fullmatch(r"[a-f0-9]{32}", outcome.resume_from)):
         lines.append("可点击“继续未完成部分”，从本任务的已保存进度继续。")

@@ -201,6 +201,7 @@ def test_manifest_admission_is_explicit_and_fail_closed():
         credentials=[{"slot": "token", "provider": "example"}],
     ).eligible is False
     assert _spec("shell_run").eligible is False
+    assert _spec("program_run").eligible is False
     assert _spec(plugin="mcp").eligible is False
 
 

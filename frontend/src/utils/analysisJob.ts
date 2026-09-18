@@ -23,6 +23,7 @@ export const mergeAnalysisToolEvent = (current: ToolContent, incoming: ToolConte
   analysis_job: newerAnalysisJob(current.analysis_job, incoming.analysis_job),
   tool_approval: newerToolApproval(current.tool_approval, incoming.tool_approval),
   status: current.status === 'called' ? 'called' : incoming.status,
+  execution_status: incoming.execution_status ?? current.execution_status,
   // Lifecycle-only events must not erase the result that arrived just before them.
   content: incoming.content ?? current.content,
   presentation: incoming.presentation ?? current.presentation,

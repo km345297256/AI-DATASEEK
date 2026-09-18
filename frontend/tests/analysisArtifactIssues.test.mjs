@@ -103,7 +103,8 @@ test('successful required delivery stays completed while auxiliary failures rend
   const html = await renderNotice(value, true);
   assert.match(html, /已完成/);
   assert.match(html, /附加文件问题/);
-  assert.match(html, /不影响已完成的所需成果/);
+  assert.match(html, /以下文件未计入本次交付/);
+  assert.doesNotMatch(html, /不影响已完成的所需成果/);
   assert.match(html, /附加说明.json/);
   assert.match(html, /JSON 语法不合法/);
   assert.match(html, /optional.py/);

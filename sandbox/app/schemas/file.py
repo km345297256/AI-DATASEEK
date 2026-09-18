@@ -62,3 +62,5 @@ class ArtifactValidationRequest(BaseModel):
 class AnalysisFingerprintsRequest(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
     paths: list[Annotated[str, Field(min_length=1, max_length=4096)]] = Field(min_length=1, max_length=64)
+    # Private controller authorization, not a caller-chosen filesystem root.
+    approved_upload_paths: list[Annotated[str, Field(min_length=1, max_length=4096)]] = Field(default_factory=list, max_length=64)

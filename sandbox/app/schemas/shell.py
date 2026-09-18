@@ -28,6 +28,19 @@ class ShellOperationStatusRequest(BaseModel):
     operation_id: str = Field(pattern=r"^[0-9a-f]{32}$", strict=True)
 
 
+class ProgramExecRequest(BaseModel):
+    id: str = Field(min_length=1, strict=True)
+    exec_dir: str = Field(min_length=1, strict=True)
+    script_path: str = Field(min_length=1, strict=True)
+    args: list[str] = Field(default_factory=list, max_length=256)
+    operation_id: Optional[str] = Field(None, pattern=r"^[0-9a-f]{32}$", strict=True)
+
+
+class ProgramPreflightRequest(BaseModel):
+    exec_dir: str = Field(min_length=1, strict=True)
+    script_path: str = Field(min_length=1, strict=True)
+
+
 class ShellViewRequest(BaseModel):
     """Shell session content view request model"""
     id: str = Field(..., description="Unique identifier of the target shell session")

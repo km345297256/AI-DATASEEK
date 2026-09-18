@@ -75,6 +75,9 @@ class Settings(BaseSettings):
     llm_retry_attempts: int = 4
     llm_retry_base_seconds: float = 1.0
     llm_retry_max_seconds: float = 8.0
+    # Independent, read-only answer review requests may retry transient model
+    # timeouts. This is one provider request, not a cumulative analysis quota.
+    answer_review_request_timeout_seconds: float = Field(default=60.0, ge=1.0, le=300.0)
     # Once the bounded tool budget is exhausted, the Agent gets one tool-free
     # turn to synthesize the evidence it already collected. Keep this separate
     # from provider/network retries and from the dataset quicklook synthesis

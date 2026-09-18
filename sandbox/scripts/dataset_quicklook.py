@@ -10,12 +10,14 @@ same safe recursive extractor shipped with the sandbox.
 from __future__ import annotations
 
 import argparse
+import codecs
 import csv
 from contextlib import ExitStack
 from dataclasses import asdict, dataclass
 from datetime import date, datetime
 import hashlib
 import io
+from itertools import islice
 import json
 import math
 import os
@@ -259,15 +261,24 @@ def _json_value(value: Any) -> Any:
 
 
 def _unique_names(values: Iterable[Any], maximum: int) -> list[str]:
+    bases = [
+        (str(value).strip() if value is not None else "") or f"column_{index + 1}"
+        for index, value in enumerate(islice(values, maximum))
+    ]
+    reserved = set(bases)
+    used: set[str] = set()
     result: list[str] = []
     counts: dict[str, int] = {}
-    for index, raw_value in enumerate(values):
-        if index >= maximum:
-            break
-        base = str(raw_value).strip() if raw_value is not None else ""
-        base = base or f"column_{index + 1}"
-        counts[base] = counts.get(base, 0) + 1
-        result.append(base if counts[base] == 1 else f"{base}_{counts[base]}")
+    for base in bases:
+        name = base
+        if name in used:
+            number = counts.get(base, 1) + 1
+            while f"{base}_{number}" in reserved or f"{base}_{number}" in used:
+                number += 1
+            counts[base] = number
+            name = f"{base}_{number}"
+        used.add(name)
+        result.append(name)
     return result
 
 
@@ -366,10 +377,24 @@ def _profile_frame(
     }
 
 
-def _decode_text(data: bytes) -> tuple[str, str]:
+def _decode_text(data: bytes, *, truncated: bool = False) -> tuple[str, str]:
+    # A byte budget may end inside a character. An incremental decoder buffers
+    # that suffix instead of misidentifying otherwise valid UTF-8 as GB18030.
+    def decode(encoding: str) -> str:
+        return codecs.getincrementaldecoder(encoding)().decode(data, final=not truncated)
+
+    for signatures, encoding in (
+        ((codecs.BOM_UTF32_LE, codecs.BOM_UTF32_BE), "utf-32"),
+        ((codecs.BOM_UTF16_LE, codecs.BOM_UTF16_BE), "utf-16"),
+    ):
+        if data.startswith(signatures):
+            try:
+                return decode(encoding), encoding
+            except UnicodeError as exc:
+                raise QuicklookError("delimited file has invalid Unicode encoding") from exc
     for encoding in ("utf-8-sig", "utf-8", "gb18030"):
         try:
-            return data.decode(encoding), encoding
+            return decode(encoding), encoding
         except UnicodeDecodeError:
             pass
     return data.decode("latin-1", errors="replace"), "latin-1"
@@ -380,11 +405,15 @@ def _read_delimited(path: Path, kind: str, limits: Limits) -> tuple[pd.DataFrame
         raw = stream.read(limits.max_text_bytes + 1)
     byte_truncated = len(raw) > limits.max_text_bytes
     raw = raw[: limits.max_text_bytes]
+    text, encoding = _decode_text(raw, truncated=byte_truncated)
+    if "\x00" in text:
+        raise QuicklookError("delimited file contains unsupported null characters")
     if byte_truncated:
-        boundary = max(raw.rfind(b"\n"), raw.rfind(b"\r"))
-        if boundary > 0:
-            raw = raw[: boundary + 1]
-    text, encoding = _decode_text(raw)
+        # Trim physical lines after decoding (UTF-16/32 newlines are multibyte).
+        # strict csv parsing below also discards a quoted record spanning the
+        # boundary, so partial observations never become statistical evidence.
+        boundary = max(text.rfind("\n"), text.rfind("\r"))
+        text = text[: boundary + 1]
     if not text.strip():
         raise QuicklookError("delimited file is empty")
 
@@ -394,21 +423,38 @@ def _read_delimited(path: Path, kind: str, limits: Limits) -> tuple[pd.DataFrame
             delimiter = csv.Sniffer().sniff(text[:16_384], delimiters=",\t;|").delimiter
         except csv.Error:
             pass
-    reader = csv.reader(io.StringIO(text), delimiter=delimiter)
+    text_stream = io.StringIO(text, newline="")
+    reader = csv.reader(text_stream, delimiter=delimiter, strict=True)
     try:
-        raw_header = next(reader)
+        raw_header = next(row for row in reader if row)
     except StopIteration as exc:
         raise QuicklookError("delimited file has no header") from exc
+    except csv.Error as exc:
+        raise QuicklookError("delimited file has an incomplete or invalid header record") from exc
     header = _unique_names(raw_header, limits.max_columns)
     if not header:
         raise QuicklookError("delimited file has no columns")
 
     rows: list[list[Any]] = []
     row_truncated = False
-    for row in reader:
+    while True:
         if len(rows) >= limits.max_rows_per_table:
-            row_truncated = True
+            # Inspect only whether content remains: parsing another record can
+            # fail on an unsampled malformed or oversized field.
+            row_truncated = any(line.strip("\r\n") for line in text_stream)
             break
+        try:
+            row = next(reader)
+        except StopIteration:
+            break
+        except csv.Error as exc:
+            if byte_truncated and str(exc) == "unexpected end of data":
+                break
+            raise QuicklookError("delimited file has an invalid record") from exc
+        if not row:
+            continue
+        if len(row) > len(raw_header):
+            raise QuicklookError("delimited record has more columns than its header")
         selected = row[: len(header)]
         rows.append(selected + [None] * (len(header) - len(selected)))
     frame = _normalize_frame(pd.DataFrame(rows, columns=header), limits)
@@ -419,6 +465,7 @@ def _read_delimited(path: Path, kind: str, limits: Limits) -> tuple[pd.DataFrame
         "bytes_total": path.stat().st_size,
         "byte_truncated": byte_truncated,
         "row_truncated": row_truncated,
+        "column_truncated": len(raw_header) > limits.max_columns,
     }
 
 
@@ -639,7 +686,10 @@ def _netcdf_profile_and_plot(
 ) -> dict[str, Any]:
     """Profile one NetCDF file with bounded reads and one representative chart."""
     try:
-        dataset = xr.open_dataset(candidate.path, engine="h5netcdf", chunks={})
+        with candidate.path.open("rb") as stream:
+            signature = stream.read(4)
+        engine = "netcdf4" if signature in {b"CDF\x01", b"CDF\x02", b"CDF\x05"} else "h5netcdf"
+        dataset = xr.open_dataset(candidate.path, engine=engine, chunks={})
     except Exception as exc:
         raise QuicklookError(f"无法读取 NetCDF 文件: {type(exc).__name__}: {exc}") from exc
     try:
@@ -717,7 +767,16 @@ def _netcdf_profile_and_plot(
 def _scaled_shape(height: int, width: int, maximum_pixels: int) -> tuple[int, int]:
     pixels = max(1, height * width)
     scale = max(1.0, math.sqrt(pixels / maximum_pixels))
-    return max(1, int(height / scale)), max(1, int(width / scale))
+    sampled_height = max(1, int(height / scale))
+    sampled_width = max(1, int(width / scale))
+    # Clamping a thin dimension to one can exceed the product budget by orders
+    # of magnitude. Cap the other dimension after that clamp.
+    if sampled_height * sampled_width > maximum_pixels:
+        if sampled_width >= sampled_height:
+            sampled_width = max(1, maximum_pixels // sampled_height)
+        else:
+            sampled_height = max(1, maximum_pixels // sampled_width)
+    return sampled_height, sampled_width
 
 
 def _declared_nodata_value(value: Any) -> Any:
@@ -1557,7 +1616,8 @@ def _analyze_table_candidate(
         profile = _profile_frame(
             frame,
             rows_total=None,
-            truncated=read_metadata["byte_truncated"] or read_metadata["row_truncated"],
+            truncated=(read_metadata["byte_truncated"] or read_metadata["row_truncated"]
+                       or read_metadata["column_truncated"]),
         )
         result = {
             "path": candidate.display_path,

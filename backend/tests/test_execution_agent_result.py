@@ -902,6 +902,7 @@ def _agent_with_model_chain(side_effect, *, retry_attempts: int = 3):
     runnable = MagicMock()
     chain = MagicMock()
     chain.ainvoke = AsyncMock(side_effect=side_effect)
+    runnable.ainvoke = chain.ainvoke
     runnable.bind_tools.return_value = runnable
     runnable.__or__.return_value = chain
     model.bind.return_value = runnable

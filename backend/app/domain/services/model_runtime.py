@@ -8,6 +8,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import math
 import time
 from contextlib import contextmanager
 from contextvars import ContextVar
@@ -37,6 +38,10 @@ class ModelBudgetStopped(asyncio.CancelledError):
         if scope is not None:
             scope.ledger.stopped_code = code
         super().__init__("Model execution stopped at its configured runtime boundary")
+
+
+class ModelProviderTimeout(TimeoutError):
+    """One configured provider request timed out, not the analysis task."""
 
 
 class ModelTraceStore(Protocol):
@@ -95,6 +100,8 @@ _FAILED_ATTEMPT_ATTRIBUTE = "_dataseek_failed_model_attempt"
 
 _SCOPE: ContextVar[ModelExecutionScope | None] = ContextVar("model_execution_scope", default=None)
 _ROLE: ContextVar[tuple[str, str | None]] = ContextVar("model_call_role", default=("auxiliary", None))
+_REQUEST_TIMEOUT: ContextVar[float | None] = ContextVar("model_provider_request_timeout", default=None)
+_RESPONSE_VALIDATOR: ContextVar[Callable[[Any], Any] | None] = ContextVar("model_response_validator", default=None)
 _ANALYSIS_BUDGET: ContextVar[Any] = ContextVar("analysis_budget", default=None)
 
 
@@ -144,6 +151,54 @@ def model_call_role(role: str):
         yield
     finally:
         _ROLE.reset(token)
+
+
+@contextmanager
+def model_request_timeout(seconds: float):
+    """Set a caller-owned timeout inside the physical request audit boundary.
+
+    Most callers leave this unset. Timing out outside the driver instead would
+    turn a provider timeout into user cancellation and lose its retry trace.
+    """
+    if isinstance(seconds, bool) or not isinstance(seconds, (int, float)) or not math.isfinite(seconds) or seconds <= 0:
+        raise ValueError("Provider request timeout must be positive and finite")
+    token = _REQUEST_TIMEOUT.set(float(seconds))
+    try:
+        yield
+    finally:
+        _REQUEST_TIMEOUT.reset(token)
+
+
+@contextmanager
+def model_response_validation(validator: Callable[[Any], Any]):
+    """Run a trusted, synchronous response parser inside the request audit.
+
+    Only a JSON decoding failure is a transport protocol failure. Other
+    parser/schema errors propagate without changing a successful transport
+    into a retryable failure. No response content or parser error text is
+    persisted, and no private receipt is attached to the returned message.
+    """
+    if not callable(validator):
+        raise TypeError("A response validator must be callable")
+    token = _RESPONSE_VALIDATOR.set(validator)
+    try:
+        yield
+    finally:
+        _RESPONSE_VALIDATOR.reset(token)
+
+
+async def _invoke_provider(invoke, messages, max_output_tokens):
+    seconds = _REQUEST_TIMEOUT.get()
+    if seconds is None:
+        return await invoke(messages, max_output_tokens)
+    window = asyncio.timeout(seconds)
+    try:
+        async with window:
+            return await invoke(messages, max_output_tokens)
+    except TimeoutError:
+        if window.expired():
+            raise ModelProviderTimeout("provider_request_timeout") from None
+        raise
 
 
 def _message_payload(messages) -> list:
@@ -217,7 +272,7 @@ async def record_model_retry(error: Exception, schedule: ScheduledModelRetry) ->
             or scope.ledger.stopped_code
             or (trace.user_id, trace.session_id, trace.task_id) != (scope.user_id, scope.session_id, scope.task_id)
             or trace.kind != "model_request" or trace.status != "failed"
-            or trace.error_code != "provider_error"):
+            or trace.error_code not in {"provider_error", "provider_timeout", "invalid_json"}):
         raise ModelBudgetStopped("runtime_closed")
     updated = trace.model_copy(update={"scheduled_retry": schedule}, deep=True)
     await _store(scope, updated)
@@ -331,23 +386,24 @@ async def invoke_model_request(*, messages, tool_schemas=(), response_format=Non
             deadline_window = asyncio.timeout(remaining)
             try:
                 async with deadline_window:
-                    message = await invoke(prepared.messages, max_output_tokens)
+                    message = await _invoke_provider(invoke, prepared.messages, max_output_tokens)
             except TimeoutError:
                 if deadline_window.expired():
                     raise ModelBudgetStopped("analysis_budget_deadline_exceeded") from None
                 raise
         else:
-            message = await invoke(prepared.messages, max_output_tokens)
+            message = await _invoke_provider(invoke, prepared.messages, max_output_tokens)
     except BaseException as error:
         trace.timings.provider_call_ms = (time.perf_counter() - phase_started) * 1000
         trace.status = "cancelled" if isinstance(error, asyncio.CancelledError) else "failed"
         trace.error_code = (error.code if isinstance(error, ModelBudgetStopped) else
-                            "cancelled" if isinstance(error, asyncio.CancelledError) else "provider_error")
+                            "cancelled" if isinstance(error, asyncio.CancelledError) else
+                            "provider_timeout" if isinstance(error, ModelProviderTimeout) else "provider_error")
         trace.usage_source = "reservation"
         trace.finished_at = datetime.now(UTC)
         await _store(scope, trace)
         if (isinstance(error, Exception) and scope is not None and scope.store is not None
-                and trace.error_code == "provider_error"):
+                and trace.error_code in {"provider_error", "provider_timeout"}):
             # Exceptions never cross the API boundary here. Only a typed
             # internal marker may authorize a later same-owner trace update.
             try:
@@ -381,7 +437,16 @@ async def invoke_model_request(*, messages, tool_schemas=(), response_format=Non
     else:
         trace.usage_source = "reservation"
     trace.timings.usage_settlement_ms = (time.perf_counter() - phase_started) * 1000
-    trace.status = "succeeded"
+    validation_error = None
+    validator = _RESPONSE_VALIDATOR.get()
+    if validator is not None:
+        try:
+            validator(message)
+        except Exception as error:
+            validation_error = error
+    invalid_json = isinstance(validation_error, json.JSONDecodeError)
+    trace.status = "failed" if invalid_json else "succeeded"
+    trace.error_code = "invalid_json" if invalid_json else None
     trace.finished_at = datetime.now(UTC)
     await _store(scope, trace)
     if durable_settlement_failed:
@@ -400,4 +465,11 @@ async def invoke_model_request(*, messages, tool_schemas=(), response_format=Non
         message.additional_kwargs[USAGE_RECORDED_KEY] = True
     logger.info("model_request role=%s provider=%s input_estimate=%d output_reserve=%d compacted=%d usage_source=%s",
                 role, trace.provider, trace.input_tokens_after, max_output_tokens, len(trace.compactions), trace.usage_source)
+    if validation_error is not None:
+        if invalid_json and scope is not None and scope.store is not None:
+            # The host parser runs while the exact driver's owner and trace
+            # are still available. Public/model-supplied metadata can never
+            # bind an unrelated successful request to this protocol retry.
+            setattr(validation_error, _FAILED_ATTEMPT_ATTRIBUTE, _FailedModelAttempt(scope, trace))
+        raise validation_error
     return message

@@ -384,7 +384,13 @@ class ToolTimeoutInterceptor(ToolExecutionInterceptor):
                 retryable=retryable,
             ) from error
 
-    def _resolve_timeout_seconds(self, context: ToolExecutionContext) -> float:
+    def _resolve_timeout_seconds(self, context: ToolExecutionContext) -> float | None:
+        from app.domain.services.program_execution import is_trusted_program_tool
+        # Only this exact core implementation owns bounded launch/status I/O,
+        # single-operation polling and cooperative cancellation. A plugin or
+        # caller-supplied execution contract never grants an unlimited await.
+        if not context.metadata.get("plugin") and is_trusted_program_tool(context.tool):
+            return None
         configured = _contract_value(context, "timeout_seconds")
         if configured is None:
             configured = getattr(context.tool, "timeout_seconds", None)

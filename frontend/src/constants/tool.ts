@@ -5,6 +5,7 @@ export const TOOL_FUNCTION_MAP: {[key: string]: string} = {
   // Shell tools
   "shell_exec": "Executing command",
   "shell_run": "Executing command",
+  "program_run": "Running analysis program",
   "shell_view": "Viewing command output",
   "shell_wait": "Waiting for command completion",
   "shell_write_to_process": "Writing data to process",
@@ -91,6 +92,7 @@ export const TOOL_FUNCTION_MAP: {[key: string]: string} = {
 export const TOOL_FUNCTION_CALLED_MAP: {[key: string]: string} = {
   "shell_exec": "Command execution finished",
   "shell_run": "Command execution finished",
+  "program_run": "Analysis program execution finished",
   "shell_view": "Command output updated",
   "shell_wait": "Command wait finished",
   "shell_write_to_process": "Process input sent",
@@ -112,6 +114,7 @@ export const TOOL_FUNCTION_CALLED_MAP: {[key: string]: string} = {
 export const TOOL_FUNCTION_ARG_MAP: {[key: string]: string} = {
   "shell_exec": "command",
   "shell_run": "command",
+  "program_run": "script_path",
   "shell_view": "shell",
   "shell_wait": "shell",
   "shell_write_to_process": "input",

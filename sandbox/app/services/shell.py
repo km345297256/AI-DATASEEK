@@ -14,6 +14,7 @@ import re
 import signal
 import threading
 import time
+import sys
 from collections import OrderedDict
 from dataclasses import dataclass
 from typing import Dict, Any, Optional, List
@@ -22,6 +23,9 @@ from app.models.shell import (
     ShellWriteResult, ShellKillResult, ShellTask, ConsoleRecord, ShellExecutionReceipt
 )
 from app.core.exceptions import AppException, ResourceNotFoundException, BadRequestException
+from app.services.program import (
+    BOOTSTRAP, append_program_output, prepare_program, program_command, program_feedback,
+)
 
 # Set up logger
 logger = logging.getLogger(__name__)
@@ -404,6 +408,30 @@ class ShellService:
 
         process_group = self._capture_created_process_group(process)
         setattr(process, "_dataseek_process_group", process_group)
+        return process
+
+    async def _create_program_process(self, exec_dir: str, script_path: str,
+                                      args: list[str], *, receipt_record=None) -> asyncio.subprocess.Process:
+        snapshot, diagnostics, metadata = prepare_program(script_path, args)
+        try:
+            if receipt_record is not None:
+                receipt_record.creation_attempted = True
+            process = await asyncio.create_subprocess_exec(
+                sys.executable, "-c", BOOTSTRAP, str(snapshot.fileno()),
+                str(diagnostics.fileno()), script_path, *args,
+                cwd=exec_dir, stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.STDOUT, stdin=asyncio.subprocess.PIPE,
+                start_new_session=True,
+                pass_fds=(snapshot.fileno(), diagnostics.fileno()), limit=1024 * 1024,
+            )
+        except BaseException:
+            diagnostics.close()
+            raise
+        finally:
+            snapshot.close()
+        setattr(process, "_dataseek_process_group", self._capture_created_process_group(process))
+        setattr(process, "_dataseek_program_execution", metadata)
+        setattr(process, "_dataseek_program_diagnostics", diagnostics)
         return process
 
     def _read_linux_process_identity(self, pid: int) -> Optional[Dict[str, Any]]:
@@ -793,13 +821,26 @@ class ShellService:
         if not shell:
             return
 
+        program_output = None
+        if getattr(process, "_dataseek_program_execution", None):
+            previous, truncated = getattr(process, "_dataseek_program_output", ("", False))
+            program_output, truncated = append_program_output(previous, output, truncated)
+            setattr(process, "_dataseek_program_output", (program_output, truncated))
+
         if shell.get("process") is process:
-            shell["output"] += output
+            if program_output is None:
+                shell["output"] += output
+            else:
+                shell["output"] = program_output
+                shell["output_truncated"] = truncated
 
         if console_record is not None and any(
             record is console_record for record in shell.get("console", [])
         ):
-            console_record.output += output
+            if program_output is None:
+                console_record.output += output
+            else:
+                console_record.output = program_output
 
     async def _start_output_reader(
         self,
@@ -883,7 +924,16 @@ class ShellService:
                 type(e).__name__,
             )
 
-    async def exec_command(self, session_id: str, exec_dir: Optional[str], command: str, *, credentials: Optional[Dict[str, str]] = None, operation_id: Optional[str] = None) -> ShellExecResult:
+    async def exec_program(self, session_id: str, exec_dir: str, script_path: str,
+                           args: list[str], *, operation_id: Optional[str] = None) -> ShellExecResult:
+        if not os.path.isabs(exec_dir):
+            raise BadRequestException("Program working directory must be absolute")
+        return await self.exec_command(
+            session_id, exec_dir, program_command(script_path, args),
+            operation_id=operation_id, _program=(script_path, args),
+        )
+
+    async def exec_command(self, session_id: str, exec_dir: Optional[str], command: str, *, credentials: Optional[Dict[str, str]] = None, operation_id: Optional[str] = None, _program: Optional[tuple[str, list[str]]] = None) -> ShellExecResult:
         """
         Asynchronously execute a command in the specified shell session
         """
@@ -938,15 +988,19 @@ class ShellService:
                 )
 
                 await self._wait_for_output_reader(session_id, old_process)
+                program_feedback(previous_shell)
 
             # A release/kill during replacement can avoid spawning altogether.
             if not self._exec_can_continue(session_id, operation):
                 raise RuntimeError("Shell session was cancelled before process creation")
 
-            if receipt_record is not None:
+            if receipt_record is not None and _program is None:
                 receipt_record.creation_attempted = True
-            process = (await self._create_process(command, exec_dir, credentials=credentials)
-                       if credentials else await self._create_process(command, exec_dir))
+            if _program is not None:
+                process = await self._create_program_process(exec_dir, *_program, receipt_record=receipt_record)
+            else:
+                process = (await self._create_process(command, exec_dir, credentials=credentials)
+                           if credentials else await self._create_process(command, exec_dir))
             if receipt_record is not None:
                 receipt_record.process = process
                 receipt_record.process_identity = id(process)
@@ -969,6 +1023,8 @@ class ShellService:
                 "output": "",
                 "console": console_history,
                 "operation_id": operation_id,
+                "program_execution": getattr(process, "_dataseek_program_execution", None),
+                "program_diagnostics": getattr(process, "_dataseek_program_diagnostics", None),
             }
 
             if not self._publish_exec_shell(
@@ -985,6 +1041,7 @@ class ShellService:
                     timeout_seconds=self.KILL_PROCESS_TERMINATION_GRACE_SECONDS,
                     process_group=shell.get("process_group"),
                 )
+                program_feedback(shell)
                 raise RuntimeError("Shell session was cancelled during process creation")
 
             shell["reader_task"] = asyncio.create_task(
@@ -1018,6 +1075,7 @@ class ShellService:
                         returncode=wait_result.returncode,
                         output=view_result.output,
                         execution_receipt=self._execution_receipt(receipt_record) if receipt_record else None,
+                        program_execution=program_feedback(shell),
                     )
             except Exception as e:
                 # Other exceptions, ignore and continue
@@ -1038,6 +1096,7 @@ class ShellService:
                 command=command,
                 status="running",
                 execution_receipt=self._execution_receipt(receipt_record) if receipt_record else None,
+                program_execution=program_feedback(shell),
             )
         except Exception as e:
             logger.error("Command execution failed error_type=%s", type(e).__name__)
@@ -1078,7 +1137,8 @@ class ShellService:
         return ShellViewResult(
             output=clean_output,
             session_id=session_id,
-            console=console
+            console=console,
+            program_execution=program_feedback(shell),
         )
 
     def get_console_records(self, session_id: str) -> List[ConsoleRecord]:
@@ -1281,6 +1341,8 @@ class ShellService:
                 type(error).__name__,
             )
             raise AppException(message="Failed to release shell session") from error
+
+        program_feedback(shell)
 
         # The id is private to one plugin invocation. Identity-check before
         # deletion in case a future caller accidentally attempts reuse.

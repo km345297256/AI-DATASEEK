@@ -12,11 +12,14 @@
       <div class="mobile-safe-top flex min-h-[52px] items-center px-3 flex-shrink-0">
         <div class="flex justify-between w-full px-1 pt-2">
           <div class="relative flex">
-            <div
+            <button
+              type="button"
+              :aria-label="t('Close navigation')"
+              :aria-expanded="true"
               class="flex h-11 w-11 items-center justify-center cursor-pointer hover:bg-[var(--fill-tsp-gray-main)] rounded-lg sm:h-7 sm:w-7 sm:rounded-md"
               @click="toggleLeftPanel">
               <PanelLeft class="h-5 w-5 text-[var(--icon-secondary)]" />
-            </div>
+            </button>
           </div>
         </div>
       </div>
@@ -159,11 +162,14 @@
       class="hidden h-full flex-col gap-2 overflow-visible rounded-r-xl border border-[var(--border-main)] bg-[var(--background-nav)] px-1 py-2 shadow-[0px_8px_32px_0px_rgba(0,0,0,0.16),0px_0px_0px_1px_rgba(0,0,0,0.06)] sm:flex"
       style="width: 52px;">
       <div class="flex items-center justify-center">
-        <div
+        <button
+          type="button"
+          :aria-label="t('Open navigation')"
+          :aria-expanded="false"
           class="flex h-10 w-10 items-center justify-center cursor-pointer rounded-md hover:bg-[var(--fill-tsp-gray-main)]"
           @click="toggleLeftPanel">
           <PanelLeft class="h-5 w-5 rotate-180 text-[var(--icon-secondary)]" />
-        </div>
+        </button>
       </div>
       <div class="flex flex-col gap-2">
         <button class="flex h-11 w-11 items-center justify-center rounded-lg hover:bg-[var(--fill-tsp-white-light)]" :class="route.path === '/' ? 'bg-[var(--fill-tsp-white-main)]' : ''" @click="handleNewTaskClick" :title="t('New Task')">

@@ -124,6 +124,7 @@ class AgentService:
         llm_overrides: Optional[dict] = None,
         client_message_id: Optional[str] = None,
         resume_from: Optional[str] = None,
+        input_file_ids: Optional[List[str]] = None,
     ) -> AsyncGenerator[AgentEvent, None]:
         logger.info(
             "Starting chat session=%s message_chars=%d",
@@ -146,6 +147,7 @@ class AgentService:
             llm_overrides=llm_overrides,
             client_message_id=client_message_id,
             resume_from=resume_from,
+            input_file_ids=input_file_ids,
         ):
             logger.debug(
                 "Received agent event type=%s id=%s",

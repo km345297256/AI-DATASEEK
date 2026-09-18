@@ -63,7 +63,7 @@ class ModelTraceView(BaseModel):
     actual_output_tokens: int | None = Field(default=None, ge=0)
     actual_total_tokens: int | None = Field(default=None, ge=0)
     usage_source: Literal["provider", "reservation", "none"] = "none"
-    error_code: Literal["context_budget_exceeded", "task_token_budget_exceeded", "task_call_budget_exceeded", "analysis_budget_deadline_exceeded", "provider_error", "cancelled", "runtime_closed", "trace_store_unavailable"] | None = None
+    error_code: Literal["context_budget_exceeded", "task_token_budget_exceeded", "task_call_budget_exceeded", "analysis_budget_deadline_exceeded", "provider_error", "provider_timeout", "invalid_json", "cancelled", "runtime_closed", "trace_store_unavailable"] | None = None
     request_hmac_before: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
     request_hmac_after: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
     compactions: list[CompactionRecord] = Field(default_factory=list, max_length=256)

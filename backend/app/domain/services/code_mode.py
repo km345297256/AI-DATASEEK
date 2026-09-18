@@ -35,6 +35,7 @@ _FORBIDDEN_TOOL_NAMES = frozenset({
     "catalog_load",
     "catalog_search",
     "shell_run",
+    "program_run",
 })
 _FORBIDDEN_TOOL_PREFIXES = (
     "agent_",

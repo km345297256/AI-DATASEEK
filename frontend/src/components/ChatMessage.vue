@@ -103,6 +103,7 @@
     <AnalysisOutcomeNotice
       v-if="analysisOutcome"
       :outcome="analysisOutcome"
+      :has-delivered-files="hasDeliveredAnalysisFiles(message)"
       :allow-resume="allowAnalysisResume && !isShare && !safetyReview"
       @resume="$emit('resumeAnalysis')"
     />
@@ -142,18 +143,24 @@
           style="height: calc(100% + 14px);"></div>
       </div>
       <div class="flex flex-col gap-3 flex-1 min-w-0 overflow-hidden pt-2">
-        <div v-for="(item, index) in displayTools" :key="`${item.tool.tool_call_id}-${index}`" class="flex flex-col gap-2">
+        <div v-for="item in displayTools" :key="item.key" class="flex flex-col gap-2">
           <ToolUse
             :tool="item.tool"
             :summary="item.summary"
-            :collapsed-count="item.count"
+            :label="item.count > 1 ? '文件修订' : undefined"
             @click="handleToolClick(item.panelTool)"
           />
           <DeclarativeToolCard v-if="item.tool.status === 'called'" :tool="item.tool" />
           <ToolApprovalCard v-if="item.tool.tool_approval" :initial="item.tool.tool_approval" :session-id="sessionId" :is-share="isShare" />
-          <div v-if="item.count > 1" class="ml-2 text-[12px] text-[var(--text-tertiary)]">
-            已折叠 {{ item.count }} 次连续文件写入，点击可查看最后一次写入详情。
-          </div>
+          <details v-if="item.count > 1" class="ml-2 text-[12px] text-[var(--text-tertiary)]">
+            <summary class="cursor-pointer">展开 {{ item.count }} 次修改记录（运行与核验单独显示）</summary>
+            <div class="mt-2 flex flex-col gap-2">
+              <div v-for="(revision, revisionIndex) in item.revisions" :key="revision.tool_call_id" class="flex flex-col gap-1">
+                <span>第 {{ revisionIndex + 1 }} 次 · {{ toolOperationState(revision) }} · {{ new Date(revision.timestamp * 1000).toLocaleTimeString('zh-CN', { timeZone: 'Asia/Shanghai', hour12: false }) }}</span>
+                <ToolUse :tool="revision" @click="handleToolClick(revision)" />
+              </div>
+            </div>
+          </details>
         </div>
       </div>
     </div>
@@ -183,7 +190,8 @@ import { useRelativeTime } from '../composables/useTime';
 import AttachmentsMessage from './AttachmentsMessage.vue';
 import TaskExecutionSummary from './TaskExecutionSummary.vue';
 import AnalysisOutcomeNotice from './AnalysisOutcomeNotice.vue';
-import { readAnalysisOutcome } from '../utils/analysisOutcome';
+import { hasDeliveredAnalysisFiles, readAnalysisOutcome } from '../utils/analysisOutcome';
+import { buildToolTimeline, toolOperationState } from '../utils/toolTimeline';
 import { copyToClipboard } from '../utils/dom';
 import ToolApprovalCard from './ToolApprovalCard.vue';
 import { stripHiddenDatasetResultNotices } from '../utils/datasetResultPresentation';
@@ -401,69 +409,7 @@ const toolContent = computed(() => props.message.content as ToolContent);
 const attachmentsContent = computed(() => props.message.content as AttachmentsContent);
 const taskSummaryContent = computed(() => props.message.content as TaskSummaryContent);
 
-type DisplayToolItem = {
-  tool: ToolContent;
-  panelTool: ToolContent;
-  count: number;
-  summary?: string;
-};
-
-const fileMutationFunctions = new Set(['file_write', 'file_str_replace']);
-
-const getToolFilePath = (tool: ToolContent): string => {
-  return tool.args?.file || '';
-};
-
-const shouldGroupFileMutation = (previous: ToolContent, current: ToolContent): boolean => {
-  if (previous.name !== 'file' || current.name !== 'file') return false;
-  if (!fileMutationFunctions.has(previous.function) || !fileMutationFunctions.has(current.function)) return false;
-  const previousFile = getToolFilePath(previous);
-  return !!previousFile && previousFile === getToolFilePath(current);
-};
-
-const createGroupedTool = (tools: ToolContent[]): DisplayToolItem => {
-  const latest = tools[tools.length - 1];
-  const first = tools[0];
-  const filePath = getToolFilePath(latest);
-  return {
-    tool: {
-      ...latest,
-      tool_call_id: `${first.tool_call_id}-group-${tools.length}`,
-      function: 'file_write',
-      args: { ...latest.args, file: filePath },
-      timestamp: latest.timestamp,
-    },
-    panelTool: latest,
-    count: tools.length,
-    summary: `连续写入 ${tools.length} 次`,
-  };
-};
-
-const displayTools = computed<DisplayToolItem[]>(() => {
-  const items: DisplayToolItem[] = [];
-  let group: ToolContent[] = [];
-
-  const flushGroup = () => {
-    if (group.length === 0) return;
-    items.push(group.length > 1 ? createGroupedTool(group) : { tool: group[0], panelTool: group[0], count: 1 });
-    group = [];
-  };
-
-  for (const tool of stepContent.value.tools || []) {
-    if (group.length === 0) {
-      group.push(tool);
-      continue;
-    }
-    if (shouldGroupFileMutation(group[group.length - 1], tool)) {
-      group.push(tool);
-    } else {
-      flushGroup();
-      group.push(tool);
-    }
-  }
-  flushGroup();
-  return items;
-});
+const displayTools = computed(() => buildToolTimeline(stepContent.value.tools || []));
 
 // Control content expand/collapse state
 const { relativeTime } = useRelativeTime();

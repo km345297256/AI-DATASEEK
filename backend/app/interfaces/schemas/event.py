@@ -16,6 +16,7 @@ from app.domain.models.event import (
     MAX_EVENT_SEQUENCE,
 )
 from app.domain.models.spill import SpillArtifactNotice
+from app.domain.models.tool_result import ToolResult
 from app.domain.models.analysis_job import AnalysisJobView
 from app.domain.models.tool_approval import ToolApprovalView
 from app.domain.services.tools.spill_projection import (
@@ -101,7 +102,8 @@ class MessageSSEEvent(BaseSSEEvent):
                 role=event.role,
                 content=event.message,
                 attachments=[await FileInfoResponse.from_file_info(attachment) for attachment in event.attachments] if event.attachments else None,
-                metadata=event.metadata,
+                metadata={key: value for key, value in (event.metadata or {}).items()
+                          if key not in {"analysis_input_files"}} if event.metadata is not None else None,
             )
         )
 
@@ -109,6 +111,7 @@ class ToolEventData(BaseEventData):
     tool_call_id: str
     name: str
     status: ToolStatus
+    execution_status: Optional[Literal["succeeded", "failed"]] = None
     function: str
     args: Dict[str, Any]
     content: Optional[ToolContent] = None
@@ -127,6 +130,13 @@ class ToolSSEEvent(BaseSSEEvent):
 
     @classmethod
     async def from_event_async(cls, event: ToolEvent) -> Self:
+        result = event.function_result
+        success = result.success if isinstance(result, ToolResult) else (
+            result.get("success") if isinstance(result, dict) else None
+        )
+        execution_status = None
+        if event.status == ToolStatus.CALLED and type(success) is bool:
+            execution_status = "succeeded" if success else "failed"
         content = event.tool_content
         if isinstance(content, BrowserToolContent):
             from app.interfaces.dependencies import get_file_service
@@ -158,6 +168,7 @@ class ToolSSEEvent(BaseSSEEvent):
                 tool_call_id=event.tool_call_id,
                 name=event.tool_name,
                 status=event.status,
+                execution_status=execution_status,
                 function=event.function_name,
                 args=safe_args if isinstance(safe_args, dict) else {},
                 content=safe_content,

@@ -41,6 +41,7 @@ export interface ToolEventData extends BaseEventData {
   tool_call_id: string;
   name: string;
   status: "calling" | "called";
+  execution_status?: 'succeeded' | 'failed' | null;
   function: string;
   args: {[key: string]: any};
   content?: any;
@@ -61,6 +62,7 @@ export interface MessageEventData extends BaseEventData {
     role: "user" | "assistant";
     attachments?: FileInfo[];
     metadata?: {
+      step_id?: string;
       analysis_outcome?: import('./analysisOutcome').AnalysisOutcome;
       analysis_progress?: { stage?: string } | null;
       skills?: string[];

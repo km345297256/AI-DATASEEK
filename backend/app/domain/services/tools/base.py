@@ -17,7 +17,7 @@ from app.domain.services.tools.pipeline import (
     ToolExecutionDisposer,
     ToolExecutionPipeline,
 )
-from app.domain.services.tools.tool_contract import result_failed
+from app.domain.services.tools.tool_contract import ToolContractError, result_failed
 
 
 _ACTIVE_TOOL_EXECUTION: ContextVar[
@@ -73,10 +73,22 @@ class Tool(BaseTool):
             self.execution_contract = ToolExecutionDescriptor.model_validate(declaration).model_dump(mode="json")
         self._tool = tool
 
+    def _bind_executable(self, executable: Callable, arguments: dict[str, Any]) -> None:
+        # A valid public JSON schema may still disagree with the underlying
+        # Python callable (for example a framework-renamed reserved argument).
+        # Prove this before entering the body. Do not catch TypeError around
+        # actual execution: the body may already have performed a write.
+        try:
+            inspect.signature(executable).bind(self.toolkit, **arguments)
+        except (TypeError, ValueError):
+            raise ToolContractError([], code="tool_signature_mismatch") from None
+
     def _run(self, **kwargs: Any) -> Any:
+        self._bind_executable(self._tool.func, kwargs)
         return self._tool.func(self.toolkit, **kwargs)
 
     async def _arun(self, **kwargs: Any) -> Any:
+        self._bind_executable(self._tool.coroutine, kwargs)
         return await self._tool.coroutine(self.toolkit, **kwargs)
 
     async def ainvoke(self, input: Any, config: Any = None, **kwargs: Any) -> ToolMessage:

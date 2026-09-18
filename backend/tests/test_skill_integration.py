@@ -1641,8 +1641,11 @@ async def test_agent_task_runner_syncs_non_seekable_storage_stream_to_sandbox():
     file_info = await runner._sync_file_to_sandbox("minio:file-1")
 
     assert file_info is not None
-    assert file_info.file_path == "/home/ubuntu/upload/数据文件.md"
-    assert sandbox.uploaded == (b"hello", "/home/ubuntu/upload/数据文件.md", "数据文件.md")
+    from app.domain.models.analysis_input import upload_runtime_path
+    assert file_info.file_path == upload_runtime_path(file_info)
+    assert file_info.file_path.startswith("/home/ubuntu/inputs/")
+    assert file_info.file_path.endswith("/数据文件.md")
+    assert sandbox.uploaded == (b"hello", file_info.file_path, "数据文件.md")
 
 
 @pytest.mark.asyncio

@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import hashlib
 import os
+import re
 import stat
 import threading
 import time
@@ -11,6 +12,7 @@ from pathlib import Path
 from app.services.artifact_manifest import _identity, _open_output
 
 ANALYSIS_ROOTS = (Path("/home/ubuntu/datasets"), Path("/home/ubuntu/output"))
+UPLOAD_ROOT = Path("/home/ubuntu/inputs")
 MAX_PATHS = 64
 MAX_BATCH_BYTES = 128 * 1024 * 1024
 CHUNK_BYTES = 1024 * 1024
@@ -58,12 +60,37 @@ def _fingerprint(path: str, root: Path, cancelled: threading.Event,
         return {"path": path, "size": size, "sha256": digest.hexdigest()}
 
 
+def _authorized_upload(path: str, approved_upload_paths: set[str], root: Path) -> bool:
+    """Only a controller-authorized, canonical file in an identity namespace.
+
+    This API is not a general hashing endpoint: upload access requires the exact
+    path supplied by the backend after ownership/identity validation. Never add
+    the entire upload directory to the normal snapshot roots.
+    """
+    if (path not in approved_upload_paths or not isinstance(path, str)
+            or "\\" in path or any(ord(char) < 32 for char in path)):
+        return False
+    candidate = Path(path)
+    if str(candidate) != path or ".." in candidate.parts or not candidate.is_relative_to(root):
+        return False
+    relative = candidate.relative_to(root)
+    return len(relative.parts) == 2 and bool(re.fullmatch(r"[0-9a-f]{24}", relative.parts[0]))
+
+
 def fingerprint_analysis_files(paths: list[str], *, roots: tuple[Path, ...] = ANALYSIS_ROOTS,
+                                approved_upload_paths: list[str] | None = None,
+                                upload_root: Path = UPLOAD_ROOT,
                                 cancelled: threading.Event | None = None,
                                 deadline: float | None = None) -> dict:
-    """Hash only registered-mount/output roots; no caller-selected root or body."""
+    """Hash mounted inputs/outputs or exact authorized uploads; return no body."""
     if not paths or len(paths) > MAX_PATHS:
         raise ValueError("invalid_snapshot_path_count")
+    if (approved_upload_paths is not None
+            and (not isinstance(approved_upload_paths, list)
+                 or len(approved_upload_paths) > MAX_PATHS
+                 or any(not isinstance(path, str) for path in approved_upload_paths))):
+        raise ValueError("invalid_upload_authorization")
+    approved_uploads = set(approved_upload_paths or [])
     cancelled = cancelled or threading.Event()
     deadline = time.monotonic() + BATCH_TIMEOUT_SECONDS if deadline is None else deadline
     byte_budget = [MAX_BATCH_BYTES]
@@ -73,6 +100,8 @@ def fingerprint_analysis_files(paths: list[str], *, roots: tuple[Path, ...] = AN
             _check(cancelled, deadline)
             candidate = Path(path)
             root = next((root for root in roots if candidate != root and candidate.is_relative_to(root)), None)
+            if root is None and _authorized_upload(path, approved_uploads, upload_root):
+                root = upload_root
             if root is None or ".." in candidate.parts:
                 raise _SnapshotFailure("unavailable_or_unsafe_path")
             files.append(_fingerprint(path, root, cancelled, deadline, byte_budget))

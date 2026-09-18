@@ -7,7 +7,7 @@
           <div class="h-8 relative z-20 overflow-hidden flex gap-2 items-center min-w-0 flex-1">
             <div class="relative flex items-center">
               <button type="button" @click="toggleLeftPanel" v-if="!isLeftPanelShow"
-                class="flex h-11 w-11 items-center justify-center cursor-pointer rounded-lg hover:bg-[var(--fill-tsp-gray-main)] sm:h-7 sm:w-7 sm:rounded-md"
+                class="flex h-11 w-11 items-center justify-center cursor-pointer rounded-lg hover:bg-[var(--fill-tsp-gray-main)] sm:hidden"
                 :aria-label="$t('Open navigation')">
                 <PanelLeft class="size-5 text-[var(--icon-secondary)]" />
               </button>
@@ -29,7 +29,7 @@
             {{ $t('Hello') }}, {{ currentUser?.fullname }}
             <br />
             <span class="text-[var(--text-tertiary)]">
-              {{ $t('What can I do for you?') }}
+              上传数据，开始分析
             </span>
           </span>
         </div>
@@ -46,7 +46,12 @@
               @submit="handleSubmit"
               :isRunning="false"
               :attachments="attachments"
+              :disabled="isSubmitting"
+              allow-send-files-only
+              submit-on-enter
+              placeholder="描述分析需求，或上传文件先了解数据"
             />
+            <p class="mt-2 px-3 text-xs leading-5 text-[var(--text-tertiary)]">只上传文件时，将先概览内容、结构与可分析方向；资料仅关联本次会话，不会自动加入数据集管理。</p>
           </div>
         </div>
       </div>
@@ -72,6 +77,7 @@ import { useFilePanel } from '../composables/useFilePanel';
 import { useAuth } from '../composables/useAuth';
 import { useAgentProfile } from '../composables/useAgentProfile';
 import { savePendingChat } from '../composables/usePendingChat';
+import { uploadAnalysisPrompt } from '../utils/analysisInputs';
 
 const { t } = useI18n();
 const router = useRouter();
@@ -90,26 +96,33 @@ onMounted(() => {
 })
 
 const handleSubmit = async () => {
-  if (message.value.trim() && !isSubmitting.value) {
+  const files = attachments.value.map((file: FileInfo) => ({
+    file_id: file.file_id,
+    filename: file.filename,
+    content_type: file.content_type,
+    size: file.size,
+    upload_date: file.upload_date,
+  }));
+  const question = uploadAnalysisPrompt(message.value, files);
+  if (question && !isSubmitting.value) {
+    // Freeze the whole first-turn request before awaiting session creation.
+    // A late upload or changed selection must not alter the submitted scope.
+    const pendingChat = {
+      message: question,
+      skills: [...selectedSkills.value],
+      mcpServers: [...selectedMcpServers.value],
+      agentProfileId: selectedProfile.value?.id ?? null,
+      files,
+    };
     isSubmitting.value = true;
 
     try {
       // Create new Agent
-      const session = await createSession(selectedProfile.value?.id ?? null);
+      const session = await createSession(pendingChat.agentProfileId);
       const sessionId = session.session_id;
       savePendingChat({
+        ...pendingChat,
         sessionId,
-        message: message.value,
-        skills: selectedSkills.value,
-        mcpServers: selectedMcpServers.value,
-        agentProfileId: selectedProfile.value?.id ?? null,
-        files: attachments.value.map((file: FileInfo) => ({
-          file_id: file.file_id,
-          filename: file.filename,
-          content_type: file.content_type,
-          size: file.size,
-          upload_date: file.upload_date
-        })),
       });
 
       // Navigate to new route with session_id, passing initial message via state

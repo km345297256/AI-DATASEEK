@@ -7,7 +7,7 @@ from datetime import datetime, UTC
 from pathlib import PurePosixPath
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from app.domain.services.flows.base import BaseFlow
-from app.domain.services.execution_history import ExecutionHistory
+from app.domain.services.execution_history import ExecutionHistory, reviewed_history_steps
 from app.domain.models.message import Message
 from typing import Any, AsyncGenerator, Optional
 from enum import Enum
@@ -69,6 +69,7 @@ from app.core.config import get_settings
 from app.domain.models.agent_profile import AgentSubAgentConfig, default_subagents
 from app.application.services.data_center_dataset_service import render_dataset_context
 from app.domain.models.dataset import DatasetFile
+from app.domain.models.analysis_input import render_upload_context, analysis_catalog_sources
 from app.domain.models.spill import SpillArtifactOwner
 
 logger = logging.getLogger(__name__)
@@ -793,11 +794,13 @@ class PlanActFlow(BaseFlow):
         self.session_context = self._render_session_context(
             events,
             current_user_message=message.message,
+            dataset_ids={item.dataset_id for item in message.datasets},
+            input_file_ids=set(message.attachment_file_ids),
         )
-        self.dataset_context = render_dataset_context(message.datasets)
+        self.dataset_context = render_dataset_context(message.datasets) + render_upload_context(message.analysis_inputs)
         catalog_toolkit = getattr(self, "dataset_catalog_toolkit", None)
         if catalog_toolkit is not None:
-            catalog_toolkit.set_datasets(message.datasets)
+            catalog_toolkit.set_datasets(self._analysis_catalog_sources(message))
         if is_skill_create_request(message.message):
             self._dataset_fast_path_active = False
             async for event in self._run_skill_create_command():
@@ -1066,19 +1069,50 @@ class PlanActFlow(BaseFlow):
         Files from earlier successful steps count towards this final check.
         Replanning cannot silently discard the front-controller checklist.
         """
-        if not self.plan or not self.plan.steps or not message.deliverables:
+        from app.domain.services.analysis_request_contract import current_artifact_requirement
+        if not self.plan or not self.plan.steps:
+            return
+        if current_artifact_requirement(message) is False:
+            for step in self.plan.steps:
+                step.deliverables = []
+                step.inputs.update(artifact_policy="optional", require_downloadable_result=False)
+            return
+        if not message.deliverables:
             return
         final = self.plan.steps[-1]
-        mandatory = [item.model_copy(deep=True) for item in message.deliverables]
-        # Keep additional planner requirements, but do not count the same
-        # requirement twice merely because two planning stages declared it.
-        for requirement in final.deliverables:
-            match = next((item for item in mandatory if item.kind == requirement.kind
-                          and set(item.formats) == set(requirement.formats)), None)
+        # A type/count floor and a specific planned chart are not two separate
+        # files. Preserve distinct analytical commitments first, then add only
+        # the generic slots still needed to satisfy the original count floor.
+        # This also keeps repeated binding/replanning idempotent.
+        groups = {}
+        for requirement in [*message.deliverables, *final.deliverables]:
+            key = (requirement.kind, tuple(sorted(requirement.formats)))
+            group = groups.setdefault(key, {"floor": None, "specific": []})
+            if not requirement.objective and not requirement.output_paths:
+                floor = group["floor"]
+                if floor is None or requirement.min_count > floor.min_count:
+                    group["floor"] = requirement.model_copy(deep=True)
+                continue
+            match = next((item for item in group["specific"]
+                          if item.objective == requirement.objective), None)
             if match is None:
-                mandatory.append(requirement)
+                group["specific"].append(requirement.model_copy(deep=True))
             else:
-                match.min_count = max(match.min_count, requirement.min_count)
+                paths = list(dict.fromkeys([*match.output_paths, *requirement.output_paths]))
+                replacement = type(match).model_validate({**match.model_dump(), "output_paths": paths,
+                    "min_count": max(match.min_count, requirement.min_count, len(paths))})
+                group["specific"][group["specific"].index(match)] = replacement
+        mandatory = []
+        for group in groups.values():
+            specific, floor = group["specific"], group["floor"]
+            residual = (floor.min_count if floor else 0) - sum(item.min_count for item in specific)
+            if residual > 0:
+                if len(specific) == 1:
+                    # Preserve the compact single-contract form where possible.
+                    specific[0] = specific[0].model_copy(update={"min_count": floor.min_count})
+                else:
+                    mandatory.append(floor.model_copy(update={"min_count": residual}))
+            mandatory.extend(specific)
         final.deliverables = mandatory
 
     @staticmethod
@@ -1139,7 +1173,7 @@ class PlanActFlow(BaseFlow):
         the execution agent with the authoritative mounted manifest.
         """
         return bool(
-            message.datasets
+            (message.datasets or (message.analysis_inputs and message.analysis_inputs.files))
             and not getattr(self, "_domain_agents", {})
             and "execution" in self._enabled_subagents()
             and not is_skill_create_request(message.message)
@@ -1149,17 +1183,31 @@ class PlanActFlow(BaseFlow):
         )
 
     @staticmethod
+    def _analysis_catalog_sources(message: Message):
+        # These upload views are request-local metadata adapters only. They are
+        # never registered, persisted as datasets, or used for mount allocation.
+        return analysis_catalog_sources(message)
+
+    @staticmethod
     def _create_dataset_fast_path_plan(message: Message) -> Plan:
+        from app.domain.services.analysis_request_contract import current_artifact_requirement
+        artifact_requirement = current_artifact_requirement(message)
         dataset_name = next(
-            (dataset.name.strip() for dataset in message.datasets if dataset.name.strip()),
-            "dataset",
+            (dataset.name.strip() for dataset in PlanActFlow._analysis_catalog_sources(message) if dataset.name.strip()),
+            "分析资料",
         )
         target_files = PlanActFlow._resolve_dataset_file_references(message)[
             :PlanActFlow.MAX_TARGET_FILES
         ]
         target_file = target_files[0] if len(target_files) == 1 else None
         dataset_intent = PlanActFlow._dataset_request_intent(message.message)
-        if target_file and PlanActFlow._is_file_preview_request(
+        if artifact_requirement is False and dataset_intent == "visualization":
+            dataset_intent = "analysis"
+        if not message.datasets and dataset_intent == "catalog_description":
+            # Upload filenames/technical metadata cannot establish scientific
+            # purpose. Inspect the supplied file instead of inventing provenance.
+            dataset_intent = "analysis"
+        if target_file and not message.deliverables and PlanActFlow._is_file_preview_request(
             message.message,
             target_file,
             classified_intent=dataset_intent,
@@ -1201,7 +1249,7 @@ class PlanActFlow(BaseFlow):
             "catalog_metadata": {
                 "description": "读取数据集目录元数据并回答用户问题",
                 "instruction": (
-                    "仅使用数据中心已验证的登记清单回答总大小、文件数量和格式分组；"
+                    "仅使用当前输入的已验证清单回答总大小、文件数量和格式分组；"
                     "不读取或推断文件内容，不暴露宿主机真实路径。登记清单不完整时必须回退到挂载数据检查。"
                 ),
                 "include_archive_tree": False,
@@ -1232,12 +1280,16 @@ class PlanActFlow(BaseFlow):
         requested_dimensions = PlanActFlow._dataset_requested_dimensions(
             message.message
         )
+        if artifact_requirement is False:
+            requested_dimensions = [item for item in requested_dimensions if item != "visualization"] or ["question_answering"]
         if dataset_intent == "file_preview":
             requested_dimensions = ["file_preview"]
         explicit_artifact_request = PlanActFlow._requests_downloadable_result(
             message.message
         )
-        if explicit_artifact_request or dataset_intent == "visualization":
+        if artifact_requirement is False:
+            artifact_policy = "optional"
+        elif artifact_requirement is True or explicit_artifact_request or dataset_intent == "visualization":
             artifact_policy = "required"
         elif dataset_intent in {"file_preview", "visualization"}:
             artifact_policy = "capability"
@@ -1330,7 +1382,8 @@ class PlanActFlow(BaseFlow):
         rule. Ambiguous requests remain normal model-assisted analysis, so an
         unrelated user question is never silently converted into visualization.
         """
-        normalized = " ".join((user_message or "").casefold().split())
+        from app.domain.services.analysis_request_contract import affirmative_request_text
+        normalized = affirmative_request_text(user_message)
         file_structure_markers = (
             "包含哪些文件",
             "都有哪些文件",
@@ -1478,7 +1531,7 @@ class PlanActFlow(BaseFlow):
         the message or controller supplies a unique directory-qualified suffix.
         """
         inventory: list[tuple[DatasetFile, str]] = []
-        for dataset in message.datasets or []:
+        for dataset in cls._analysis_catalog_sources(message):
             for dataset_file in dataset.files or []:
                 normalized_path = cls._safe_dataset_file_path(dataset_file)
                 if normalized_path:
@@ -1562,11 +1615,46 @@ class PlanActFlow(BaseFlow):
         *,
         classified_intent: str,
     ) -> bool:
-        normalized = " ".join((user_message or "").casefold().split())
-        has_preview_action = any(
-            marker in normalized for marker in cls._FILE_PREVIEW_ACTION_MARKERS
-        )
-        return cls._is_previewable_dataset_file(dataset_file) and has_preview_action
+        """Shortcut only a request whose entire scope is the original file.
+
+        Displaying plot labels or asking to preview *and* compute must still run
+        the analysis. A substring anywhere in the question (or even in a file
+        name such as overview.csv) cannot authorize skipping the executor.
+        Unrecognized phrasing takes the normal analysis path without losing the
+        original question; this shortcut is deliberately conservative.
+        """
+        if not cls._is_previewable_dataset_file(dataset_file):
+            return False
+        normalized = " ".join((user_message or "").replace("\\", "/").casefold().split())
+        path = cls._safe_dataset_file_path(dataset_file)
+        if not path:
+            return False
+        parts = PurePosixPath(path).parts
+        variants = ["/".join(parts[index:]) for index in range(len(parts))]
+        reference = next((item for item in variants if item in normalized), None)
+        if reference is None or normalized.count(reference) != 1:
+            return False
+        before, after = normalized.split(reference, 1)
+        remainder = before + " " + after
+        actions = "|".join(re.escape(item) for item in sorted(cls._FILE_PREVIEW_ACTION_MARKERS, key=len, reverse=True))
+        # Only neutral request words may surround the selected file and action.
+        # An extra instruction, field name, output name, or negation falls back.
+        neutral = ("please", "could", "can", "you", "me", "the", "this", "file", "image",
+                   "original", "contents", "content", "of", "请", "帮我", "给我", "一下", "下",
+                   "这个", "这份", "该", "指定", "文件", "图片", "图像", "原图", "内容", "的", "谢谢")
+        tokens = actions + "|" + "|".join(re.escape(item) for item in sorted(neutral, key=len, reverse=True))
+        punctuation = r"[\s`'\"“”‘’《》<>（）()，,。.!！?？:：;；]"
+        token_pattern = re.compile(rf"{tokens}|{punctuation}")
+        position, has_action = 0, False
+        # Consume each token once. A repeated-alternation fullmatch would allow
+        # exponential backtracking for overlapping phrases such as 显示原图.
+        while position < len(remainder):
+            match = token_pattern.match(remainder, position)
+            if match is None:
+                return False
+            has_action = has_action or match.group() in cls._FILE_PREVIEW_ACTION_MARKERS
+            position = match.end()
+        return has_action
 
     @staticmethod
     def _is_catalog_metadata_request(user_message: str) -> bool:
@@ -1645,7 +1733,8 @@ class PlanActFlow(BaseFlow):
 
     @staticmethod
     def _requests_downloadable_result(user_message: str) -> bool:
-        normalized = " ".join((user_message or "").casefold().split())
+        from app.domain.services.analysis_request_contract import affirmative_request_text
+        normalized = affirmative_request_text(user_message)
         markers = (
             "下载", "导出", "保存", "生成报告", "分析报告", "输出文件", "生成 csv",
             "生成csv", "生成 json", "生成json", "生成 markdown", "生成markdown",
@@ -1790,7 +1879,8 @@ class PlanActFlow(BaseFlow):
     @staticmethod
     def _dataset_requested_dimensions(user_message: str) -> list[str]:
         """Extract a stable analysis checklist without dataset-specific tuning."""
-        normalized = " ".join((user_message or "").casefold().split())
+        from app.domain.services.analysis_request_contract import affirmative_request_text
+        normalized = affirmative_request_text(user_message)
         dimensions: list[str] = []
         marker_groups = (
             (
@@ -2193,7 +2283,12 @@ class PlanActFlow(BaseFlow):
         events: list[BaseEvent] | ExecutionHistory,
         *,
         current_user_message: str | None = None,
+        dataset_ids: set[str] | None = None,
+        input_file_ids: set[str] | None = None,
     ) -> str:
+        scoped_results = (reviewed_history_steps(events, dataset_ids=dataset_ids,
+                                                input_file_ids=input_file_ids)
+                          if dataset_ids is not None and input_file_ids is not None else None)
         projection = events if isinstance(events, ExecutionHistory) else None
         if projection is not None:
             events = []
@@ -2263,6 +2358,12 @@ class PlanActFlow(BaseFlow):
             vision_results = projection.vision_results
             analysis_results = projection.analysis_results
             spill_references = projection.spill_references
+        if scoped_results is not None:
+            # The executor and final reviewer must see the same authorized
+            # historical results. A failed follow-up or other dataset's recent
+            # work must not hide the result being explained.
+            analysis_results = [(step.result, tuple(step.attachments[:8]))
+                                for step in reversed(scoped_results)]
         conversation = conversation[-self.MAX_SESSION_CONTEXT_MESSAGES:]
         rendered_messages_reversed: list[dict[str, str]] = []
         remaining_bytes = self.MAX_SESSION_CONTEXT_BYTES

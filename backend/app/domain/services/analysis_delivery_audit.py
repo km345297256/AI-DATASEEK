@@ -25,6 +25,7 @@ REPAIR_REASONS = frozenset({
     "execution_not_confirmed", "invalid_validation_evidence", "protected_artifact_changed",
     "validation_not_locally_repairable", "artifact_repair_no_progress",
     "delivery_failed",
+    "semantic_artifact_unresolved",
 })
 
 

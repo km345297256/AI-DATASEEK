@@ -16,7 +16,7 @@ from app.domain.services.tools.spill_projection import projected_tool_artifact, 
 
 JOB_CONTEXT_KEY = "analysis_job_record"
 JOB_ADMITTED_KEY = "analysis_job_admitted"
-JOB_CORE_TOOLS = frozenset({"shell_run", "dataset_unpack", "dataset_quicklook"})
+JOB_CORE_TOOLS = frozenset({"shell_run", "program_run", "dataset_unpack", "dataset_quicklook"})
 logger = logging.getLogger(__name__)
 
 
@@ -56,10 +56,15 @@ class AnalysisJobInterceptor(ToolExecutionInterceptor):
         contract = contract if isinstance(contract, dict) else {}
         timeout = contract.get("timeout_seconds", 120)
         if context.tool_name in JOB_CORE_TOOLS:
-            timeout = context.arguments.get("timeout_seconds", 30 if context.tool_name == "shell_run" else 120)
+            timeout = context.arguments.get("timeout_seconds", 30 if context.tool_name in {"shell_run", "program_run"} else 120)
         if isinstance(timeout, bool) or not isinstance(timeout, (float, int)):
             timeout = 120
         timeout = max(1, min(float(timeout), 120))
+        from app.domain.services.program_execution import is_trusted_program_tool
+        if not context.metadata.get("plugin") and is_trusted_program_tool(context.tool):
+            # program_run's argument controls one status observation window,
+            # not the lifetime of the cancellable, continuously leased job.
+            timeout = None
 
         async def publish(view: AnalysisJobView) -> None:
             if self._event_sink is not None:
@@ -135,6 +140,8 @@ class AnalysisJobInterceptor(ToolExecutionInterceptor):
         data = data if isinstance(data, dict) else {}
         if data.get("status") == "cancelled":
             status, code = AnalysisJobStatus.CANCELLED, "cancelled"
+        elif data.get("status") == "unknown":
+            status, code = AnalysisJobStatus.INTERRUPTED, "worker_interrupted"
         elif data.get("status") in {"timed_out", "timeout"}:
             status, code = AnalysisJobStatus.TIMED_OUT, "tool_timeout"
         else:

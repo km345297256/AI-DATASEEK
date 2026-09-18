@@ -35,7 +35,10 @@ async def validate_output_artifacts(request: ArtifactValidationRequest):
 async def analysis_fingerprints(request: AnalysisFingerprintsRequest):
     cancelled = threading.Event()
     try:
-        result = await asyncio.to_thread(fingerprint_analysis_files, request.paths, cancelled=cancelled)
+        result = await asyncio.to_thread(
+            fingerprint_analysis_files, request.paths,
+            approved_upload_paths=request.approved_upload_paths, cancelled=cancelled,
+        )
         return Response(success=True, data=result)
     finally:
         cancelled.set()

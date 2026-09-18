@@ -19,6 +19,17 @@ const tool = (overrides = {}) => ({
   ...overrides,
 });
 
+test('program execution uses a sanitized script identity instead of dumping arguments', () => {
+  const detail = getToolDisplayDetail(tool({ function: 'program_run', args: {
+    script_path: '/home/ubuntu/output/analysis.py', args: ['--token', 'do-not-show'],
+  } }));
+  assert.equal(detail.full, '~/output/analysis.py');
+  assert.equal(resolveToolName(tool({ name: 'program_run', function: '' })), 'shell');
+  assert.equal(getToolDisplayDetail(tool({ function: 'program_run', args: {
+    script_path: '/Users/private/analysis.py',
+  } })).full, '[受保护路径]');
+});
+
 test('shell_run exposes a useful command preview and expandable full command', () => {
   const command = `python3 - <<'PY'\n${'print("scientific analysis")\n'.repeat(12)}PY`;
   const detail = getToolDisplayDetail(tool({ args: { command } }));

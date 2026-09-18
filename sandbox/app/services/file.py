@@ -56,6 +56,15 @@ class FileService:
                 def read_file_async():
                     try:
                         with open(file, 'r', encoding='utf-8') as f:
+                            # A preview must not allocate/decode the full source
+                            # before truncation. One extra character determines
+                            # whether the visible prefix is actually truncated.
+                            # Full-file search/replace explicitly pass None.
+                            if (
+                                start_line is None and end_line is None
+                                and max_length is not None and max_length > 0
+                            ):
+                                return f.read(max_length + 1)
                             return f.read()
                     except Exception as e:
                         raise AppException(message=f"Failed to read file: {str(e)}")

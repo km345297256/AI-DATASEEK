@@ -100,13 +100,16 @@ test('page integrations use abortable five-turn history while shared views keep 
   assert.match(agent, /params: \{ turns: 5, before_seq: beforeSeq \}, signal/);
   for (const name of ['ChatPage', 'DatasetSeekPage']) {
     const source = await readFile(new URL(`../src/pages/${name}.vue`, import.meta.url), 'utf8');
-    assert.match(source, /getSessionHistory\(/);
-    assert.match(source, /historyRequest\?\.abort\(\)/);
-    assert.match(source, /request\.signal\.aborted/);
-    assert.match(source, /prependHistoricalMessages\(projectHistoryMessages\(page\.events/);
-    assert.match(source, /:key="messageKey\(message\)"/);
+    assert.match(source, /useAnalysisSession\(/);
+    assert.match(source, /analysisSession\.restore\(/);
+    assert.match(source, /:message-key="messageKey"/);
     assert.doesNotMatch(source, /watch\(messages,[\s\S]*?\{ deep: true \}/);
   }
+  const controller = await readFile(new URL('../src/composables/useAnalysisSession.ts', import.meta.url), 'utf8');
+  assert.match(controller, /getSessionHistory\(/);
+  assert.match(controller, /historyRequest\?\.abort\(\)/);
+  assert.match(controller, /request\.signal\.aborted/);
+  assert.match(controller, /prependHistoricalMessages\(projectHistoryMessages\(page\.events/);
   const shared = await readFile(new URL('../src/pages/SharePage.vue', import.meta.url), 'utf8');
   assert.match(shared, /getSharedSession\(/);
   assert.doesNotMatch(shared, /getSessionHistory\(/);

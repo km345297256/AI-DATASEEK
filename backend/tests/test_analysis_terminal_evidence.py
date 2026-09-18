@@ -106,7 +106,8 @@ async def test_saved_script_alone_does_not_prove_its_claimed_chart_or_numerical_
     assert UNVERIFIED not in public_payload(events)
     assert_unverified_notice(step.result)
     delivered = [item for event in terminal_messages(events) for item in event.attachments or []]
-    assert script[1].file_id in {item.file_id for item in delivered}
+    assert script[1].file_id not in {item.file_id for item in delivered}
+    assert step.outcome.status == "failed"
     assert all(not item.filename.endswith(".png") for item in delivered)
 
 

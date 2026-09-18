@@ -915,7 +915,7 @@ class MongoSessionRepository(SessionRepository):
                 # browser projections omit them. A slower fold cannot replace
                 # a newer valid watermark. An unknown version is replaceable.
                 await sessions.update_one({"session_id": session_id, "$or": [
-                    {"execution_history_projection.version": {"$ne": 1}},
+                    {"execution_history_projection.version": {"$ne": 2}},
                     {"execution_history_projection.seq": {"$lt": state.seq}},
                     {"execution_history_projection.seq": state.seq,
                      "execution_history_projection.event_count": {"$lte": state.event_count}},

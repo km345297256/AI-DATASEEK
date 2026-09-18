@@ -67,6 +67,7 @@ class ShellExecutionAttempt:
     observation_block_reason: str | None = None
     query_in_flight: bool = field(default=False, repr=False)
     last_query_at: float = field(default=0, repr=False)
+    program_execution: dict[str, Any] | None = field(default=None, repr=False)
 
     def belongs_to_call(self, tool_call_id: str) -> bool:
         return self.tool_call_id == tool_call_id or tool_call_id in self.observer_call_ids

@@ -38,6 +38,8 @@ from app.domain.services.tools.pipeline import opaque_log_identifier
 from app.domain.models.input_admission import AcceptedInput
 from app.domain.services.input_delivery import InputDeliveryService, InputLeaseLost
 from app.domain.services.analysis_checkpoint import configuration_digest
+from app.domain.models.analysis_input import AnalysisInputContext, upload_catalog_views
+from app.domain.services.analysis_input_selection import input_snapshot, snapshot_files, select_input_files
 
 # Setup logging
 logger = logging.getLogger(__name__)
@@ -726,6 +728,7 @@ class AgentDomainService:
         mcp_access_all: bool,
         client_message_id: Optional[str],
         resume_from: Optional[str] = None,
+        input_file_ids: Optional[List[str]] = None,
     ) -> Optional[Task]:
         """Serialize one session's bootstrap and refresh state inside the lock."""
         input_generation = None
@@ -758,6 +761,7 @@ class AgentDomainService:
                 client_message_id=client_message_id,
                 resume_from=resume_from,
                 input_generation=input_generation,
+                input_file_ids=input_file_ids,
             )
 
     async def _bootstrap_chat_task_locked(
@@ -774,10 +778,11 @@ class AgentDomainService:
         client_message_id: Optional[str],
         input_generation: int | None = None,
         resume_from: Optional[str] = None,
+        input_file_ids: Optional[List[str]] = None,
     ) -> Optional[Task]:
         if getattr(self, "_input_delivery", None) is not None:
             return await self._bootstrap_durable_input(session, user_id, message, timestamp, attachments,
-                skills, mcp_servers, dataset_ids, mcp_access_all, client_message_id, input_generation, resume_from)
+                skills, mcp_servers, dataset_ids, mcp_access_all, client_message_id, input_generation, resume_from, input_file_ids)
         if resume_from:
             raise ContinuationRejected("当前服务不支持安全续作，请检查原任务。")
         client_message_claimed = False
@@ -1094,7 +1099,7 @@ class AgentDomainService:
                 or session.user_id != user_id or not isinstance(expiry, datetime) or expiry <= datetime.now(UTC)
                 or checkpoint.get("configuration_digest") != configuration_digest(session)
                 or not session.sandbox_id or checkpoint.get("sandbox_id") != session.sandbox_id
-                or checkpoint.get("attachment_file_ids")
+                or (checkpoint.get("attachment_file_ids") and not checkpoint.get("analysis_input_manifest"))
                 or not isinstance(checkpoint.get("goal"), str) or not checkpoint["goal"].strip()):
             raise ContinuationRejected("续作进度已失效，或任务配置已变化；系统未重新执行。")
         if checkpoint.get("claimed_by") not in (None, client_message_id):
@@ -1107,7 +1112,7 @@ class AgentDomainService:
                     or any(not isinstance(value, str) or not value or len(value) > 4096 for value in values)
                     or len(set(values)) != len(values)):
                 raise ContinuationRejected("续作进度的数据范围记录不完整，系统未重新执行。")
-        if not checkpoint["dataset_ids"]:
+        if not checkpoint["dataset_ids"] and not checkpoint.get("analysis_input_manifest"):
             raise ContinuationRejected("该任务没有可验证的数据集来源，不能安全续作。")
         source_seq = checkpoint.get("source_seq")
         if type(source_seq) is not int or source_seq < 1:
@@ -1140,7 +1145,9 @@ class AgentDomainService:
 
     async def _bootstrap_durable_input(self, session, user_id, message, timestamp, attachments,
                                        skills, mcp_servers, dataset_ids, mcp_access_all, client_message_id,
-                                       input_generation=None, resume_from=None):
+                                       input_generation=None, resume_from=None, input_file_ids=None):
+        if resume_from and input_file_ids is not None:
+            raise ContinuationRejected("续作不能修改原任务的资料范围。")
         self._validate_continuation_payload(resume_from, message, attachments, skills, mcp_servers,
                                             dataset_ids, mcp_access_all, client_message_id)
         if client_message_id:
@@ -1160,6 +1167,8 @@ class AgentDomainService:
                 requested_metadata = {"skills": skills or [], "mcp_servers": mcp_servers or [],
                     "dataset_ids": list(dict.fromkeys(dataset_ids)) if dataset_ids is not None else previous_metadata.get("dataset_ids", []),
                     "mcp_access_all": mcp_access_all}
+                if "requested_input_file_ids" in previous_metadata:
+                    requested_metadata["requested_input_file_ids"] = input_file_ids
                 previous_files = [item.file_id for item in existing.event.attachments or []]
                 requested_files = [item["file_id"] for item in attachments or [] if isinstance(item, dict) and item.get("file_id")]
                 if (existing.admission.actor_user_id != user_id or existing.event.message != message
@@ -1196,15 +1205,22 @@ class AgentDomainService:
             message = CONTINUATION_MESSAGE
             dataset_ids, skills, mcp_servers = (list(checkpoint[field]) for field in ("dataset_ids", "skills", "mcp_servers"))
             mcp_access_all = bool(checkpoint.get("mcp_access_all", False))
+        selected_inputs, submitted_inputs = await self._prepare_input_selection(
+            session.id, user_id, attachments, input_file_ids,
+            checkpoint=checkpoint,
+        )
         effective_ids = list(dict.fromkeys(dataset_ids or session.dataset_ids or []))
         metadata = {"skills": skills or [], "mcp_servers": mcp_servers or [],
-                    "dataset_ids": effective_ids, "mcp_access_all": mcp_access_all}
+                    "dataset_ids": effective_ids, "mcp_access_all": mcp_access_all,
+                    "requested_input_file_ids": input_file_ids,
+                    "analysis_input_file_ids": [item.file_id for item in selected_inputs],
+                    "analysis_input_files": input_snapshot(selected_inputs)}
         if client_message_id:
             metadata["client_message_id"] = client_message_id
         if resume_from:
             metadata["resume_from"] = resume_from
         event = MessageEvent(message=message, role="user", metadata=metadata,
-            attachments=await self._resolve_message_attachments(attachments, user_id))
+            attachments=submitted_inputs or None)
         if timestamp is not None:
             event.timestamp = timestamp
         if client_message_id:
@@ -1292,11 +1308,12 @@ class AgentDomainService:
                     raise ContinuationRejected("原任务的数据来源不可用或访问权限已变化，不能续作。") from exc
                 raise
             resolution = await self._dataset_request_resolver.resolve(
-                question=checkpoint["goal"] if checkpoint is not None else event.message, datasets=datasets,
+                question=checkpoint["goal"] if checkpoint is not None else event.message,
+                datasets=datasets + upload_catalog_views(snapshot_files(metadata)),
                 events=history, llm_overrides=session.llm_overrides, user_id=record.admission.actor_user_id,
                 session_id=session.id, selected_skills=metadata.get("skills") or [],
                 selected_mcp_servers=metadata.get("mcp_servers") or [],
-                attachment_names=[item.filename for item in event.attachments or []])
+                attachment_names=[item.filename for item in snapshot_files(metadata)])
             await self._input_delivery._require_live(record.session_id, record.key, states={"claimed"})
             if checkpoint is not None:
                 current_session = await self._session_repository.find_by_id_and_user_id(session.id, record.admission.actor_user_id)
@@ -1351,12 +1368,15 @@ class AgentDomainService:
         llm_overrides: Optional[dict] = None,
         client_message_id: Optional[str] = None,
         resume_from: Optional[str] = None,
+        input_file_ids: Optional[List[str]] = None,
     ) -> AsyncGenerator[BaseEvent, None]:
         """
         Chat with an agent
         """
 
         try:
+            if resume_from and input_file_ids is not None:
+                raise ContinuationRejected("续作不能修改原任务的资料范围。")
             self._validate_continuation_payload(resume_from, message, attachments, skills, mcp_servers,
                                                 dataset_ids, mcp_access_all, client_message_id)
             if resume_from and llm_overrides is not None:
@@ -1391,6 +1411,7 @@ class AgentDomainService:
                             mcp_access_all=mcp_access_all,
                             client_message_id=client_message_id,
                             resume_from=resume_from,
+                            input_file_ids=input_file_ids,
                         )
                     ),
                     session_id,
@@ -1613,3 +1634,41 @@ class AgentDomainService:
                     )
                 )
         return resolved or None
+
+    async def _prepare_input_selection(self, session_id, user_id, attachments, input_file_ids, *, checkpoint=None):
+        """Freeze only explicitly authorized user inputs at message admission."""
+        history = await self._session_repository.get_events(session_id)
+        if checkpoint and checkpoint.get("analysis_input_manifest"):
+            context = AnalysisInputContext.model_validate(checkpoint["analysis_input_manifest"])
+            selected = []
+            for source in context.sources:
+                if source.kind != "upload":
+                    continue
+                for item in source.files:
+                    from pathlib import PurePosixPath
+                    path = PurePosixPath(item.runtime_path)
+                    selected.append(FileInfo(file_id=item.file_id, filename=path.name, size=item.size,
+                        content_type=item.content_type, metadata={"analysis_input_namespace": path.parent.name,
+                                                                  "analysis_input_filename": path.name}))
+            submitted = []
+        else:
+            incoming = []
+            for item in attachments or []:
+                if not isinstance(item, dict) or not isinstance(item.get("file_id"), str) or not item["file_id"]:
+                    raise ValueError("上传资料缺少有效文件标识。")
+                info = await self._file_storage.get_file_info(item["file_id"], user_id)
+                if info is None:
+                    raise ValueError("上传资料已不可用或无权访问，请重新选择文件。")
+                incoming.append(info)
+            selected, submitted = select_input_files(history, incoming, input_file_ids)
+        # Reauthorize even inherited inputs; stale event records are not permission.
+        for item in selected:
+            current = await self._file_storage.get_file_info(item.file_id, user_id)
+            if current is None:
+                raise ValueError("所选分析资料已不可用或无权访问，请调整资料范围。")
+            if current.size != item.size:
+                raise ValueError("分析资料内容已变化，请重新选择文件。")
+            item.user_id = current.user_id or user_id
+            item.upload_date = current.upload_date
+        by_id = {item.file_id: item for item in selected}
+        return selected, [by_id[item.file_id] for item in submitted]
