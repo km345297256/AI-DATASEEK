@@ -17,6 +17,7 @@ from app.core.exceptions import BadRequestException
 
 
 MAX_PROGRAM_SOURCE_BYTES = 8 * 1024 * 1024
+MAX_REVIEW_SOURCE_BYTES = 24_000
 MAX_PROGRAM_OUTPUT_CHARS = 32_000
 PROGRAM_OUTPUT_OMISSION = "\n\n[... middle of program output omitted; bounded head and tail only ...]\n\n"
 _OUTPUT_HEAD_CHARS = (MAX_PROGRAM_OUTPUT_CHARS - len(PROGRAM_OUTPUT_OMISSION)) // 2
@@ -227,6 +228,19 @@ def prepare_program(script_path: str, args: list[str]):
     snapshot.seek(0)
     metadata = {"version": 1, "script_path": script_path,
                 "source_digest": hashlib.sha256(source).hexdigest()}
+    # Bind review context to exactly the bytes in the anonymous execution
+    # snapshot, not a later path read or a reconstruction of file edits.
+    # The trusted backend adapter consumes and strips this private field.
+    if len(source) <= MAX_REVIEW_SOURCE_BYTES:
+        try:
+            content = source.decode("utf-8", errors="strict")
+        except UnicodeDecodeError:
+            pass
+        else:
+            metadata["source_snapshot"] = {
+                "version": 1, "encoding": "utf-8", "size_bytes": len(source),
+                "sha256": metadata["source_digest"], "content": content,
+            }
     return snapshot, diagnostics, metadata
 
 

@@ -115,7 +115,9 @@ async def test_repeated_wrong_shape_stops_after_one_protocol_recovery_without_pu
     result, ask = await run(shape_response("paragraph_fields"), shape_response("paragraph_scalar"), response(paragraph(GOOD)))
     assert result.status == "unavailable" and GOOD not in result.text
     assert result.metadata["review_schema_repair_status"] == "unavailable"
-    assert result.metadata["review_schema_error"] == "review_schema_root"
+    assert result.metadata["review_schema_error"] == "review_schema_root_fields"
+    assert result.metadata["review_schema_diagnostics"] == {
+        "missing_fields": ["answer_complete"], "extra_field_count": 0}
     assert result.missing_requirement_indices == () and ask.await_count == 2
     assert_frozen_shape_recovery(ask)
 
@@ -151,8 +153,25 @@ async def test_requirement_shape_recovery_can_confirm_only_existing_observed_pos
                       "bad_status": [{**check, "status": []}]}[shape_problem]
     result, ask = await run(response(paragraph(GOOD), checks=invalid_checks), covered_response(paragraph(GOOD), checks=[check]), requirements=[REQUIREMENT])
     assert result.status == "corrected" and result.text == GOOD and ask.await_count == 2
-    assert result.metadata["review_schema_error"] == "review_schema_requirement"
+    assert result.metadata["review_schema_error"] == {
+        "missing": "review_requirement_missing", "duplicate": "review_requirement_duplicate",
+        "bad_index": "review_requirement_index", "bad_status": "review_requirement_status",
+    }[shape_problem]
     assert result.missing_requirement_indices == ()
+
+
+@pytest.mark.parametrize("check, code", [
+    ("PRIVATE_REQUIREMENT", "review_requirement_object"),
+    ({"private_unknown_key": "PRIVATE_REQUIREMENT"}, "review_requirement_fields"),
+    ({"index": False, "status": "met", "evidence": []}, "review_requirement_index"),
+    ({"index": 0, "status": [], "evidence": []}, "review_requirement_status"),
+    ({"index": 0, "status": "unclear", "evidence": "PRIVATE_REQUIREMENT"}, "review_requirement_evidence_type"),
+])
+def test_requirement_shape_diagnostics_are_fixed_and_do_not_echo_invalid_values(check, code):
+    value = json.loads(response(paragraph(GOOD), checks=[check]).content)
+    with pytest.raises(review.ReviewSchemaError) as caught:
+        review._validate_review_shape(value, [{"index": 0, "objective": "Compute the mean"}])
+    assert caught.value.code == code and "PRIVATE_REQUIREMENT" not in str(caught.value)
 
 
 @pytest.mark.asyncio
@@ -198,7 +217,9 @@ async def test_valid_shape_with_semantic_failure_uses_only_existing_scoped_locke
 async def test_bad_scoped_repair_schema_cannot_restart_whole_answer_after_acceptance():
     semantic = response(paragraph(GOOD), paragraph("UNSUPPORTED", quote="bad citation"))
     result, ask = await run(semantic, shape_response("root_fields"), response(paragraph("UNAUTHORIZED_REWRITE")))
-    assert result.status == "unavailable" and GOOD in result.text and ask.await_count == 2
+    assert result.status == "unavailable" and GOOD in result.text and ask.await_count == 3
+    assert ask.await_args_list[1].args[0][1].content == ask.await_args_list[2].args[0][1].content
+    assert result.metadata["citation_schema_repair_status"] == "unavailable"
     assert "UNAUTHORIZED_REWRITE" not in result.text
     assert "review_schema_repair_attempted" not in result.metadata
 

@@ -19,6 +19,8 @@ from app.domain.models.spill import (
     SpillArtifactRecord,
     SpillArtifactRef,
     SpillArtifactSaveRequest,
+    SpillImageSaveRequest,
+    SpillImageContent,
 )
 from app.domain.repositories.spill_artifact_repository import SpillArtifactRepository
 
@@ -114,6 +116,16 @@ class FileStorageSpillArtifactStore(SpillArtifactStore):
 
     async def save_text(self, request: SpillArtifactSaveRequest) -> SpillArtifactRef:
         content = request.content.encode("utf-8")
+        if request.media_type.startswith("image/"):
+            raise ValueError("Image spill artifacts require the binary image boundary")
+        return await self._save_content(request, content)
+
+    async def save_image(self, request: SpillImageSaveRequest) -> SpillArtifactRef:
+        if not request.content.startswith(b"\x89PNG\r\n\x1a\n"):
+            raise ValueError("Image spill requires normalized PNG bytes")
+        return await self._save_content(request, request.content)
+
+    async def _save_content(self, request: SpillArtifactSaveRequest | SpillImageSaveRequest, content: bytes) -> SpillArtifactRef:
         digest = hashlib.sha256(content).hexdigest()
         artifact_id = self._artifact_id(request, digest)
         storage_user_id = self._storage_identity(request.owner, "user")
@@ -171,7 +183,7 @@ class FileStorageSpillArtifactStore(SpillArtifactStore):
         }
         uploaded = await self._file_storage.upload_file(
             io.BytesIO(content),
-            f"spill-{artifact_id}.txt",
+            f"spill-{artifact_id}.{'png' if request.media_type == 'image/png' else 'txt'}",
             storage_user_id,
             content_type=request.media_type,
             metadata=metadata,
@@ -381,12 +393,14 @@ class FileStorageSpillArtifactStore(SpillArtifactStore):
             sha256=record.sha256,
             media_type=record.media_type,
             retrieval_hint=(
+                "Call dataseek_mcp_image_read with this locator to inspect the image."
+                if record.media_type == "image/png" else
                 "Call spill_artifact_read with this locator and offset 0; "
                 "continue from next_byte until eof is true."
             ),
         )
 
-    def _artifact_id(self, request: SpillArtifactSaveRequest, digest: str) -> str:
+    def _artifact_id(self, request: SpillArtifactSaveRequest | SpillImageSaveRequest, digest: str) -> str:
         identity = json.dumps(
             {
                 "schema_version": 1,
@@ -439,6 +453,8 @@ class FileStorageSpillArtifactStore(SpillArtifactStore):
         record = await self._repository.find_by_artifact_id(artifact_id)
         if record is None:
             raise FileNotFoundError("Spill artifact was not found or has expired")
+        if record.media_type == "image/png":
+            raise ValueError("Use dataseek_mcp_image_read for image spill artifacts")
         if not (
             hmac.compare_digest(record.owner_user_id, owner.user_id)
             and hmac.compare_digest(record.owner_session_id, owner.session_id)
@@ -507,6 +523,38 @@ class FileStorageSpillArtifactStore(SpillArtifactStore):
             sha256=record.sha256,
             media_type=record.media_type,
         )
+
+    async def read_image(self, locator: str, owner: SpillArtifactOwner, *, max_bytes: int) -> SpillImageContent:
+        """Binary sibling of read_text with the same revocation boundary."""
+        if type(max_bytes) is not int or max_bytes < 1:
+            raise ValueError("Image read limit must be a positive integer")
+        artifact_id = _artifact_id_from_locator(locator)
+        record = await self._repository.find_by_artifact_id(artifact_id)
+
+        def authorized(value: SpillArtifactRecord | None) -> SpillArtifactRecord:
+            if (value is None or value.status != "active"
+                    or _as_utc(value.expires_at) <= datetime.now(UTC)):
+                raise FileNotFoundError("Image artifact was not found or has expired")
+            if not (hmac.compare_digest(value.owner_user_id, owner.user_id)
+                    and hmac.compare_digest(value.owner_session_id, owner.session_id)):
+                raise PermissionError("Image artifact belongs to a different session")
+            if value.media_type != "image/png" or not 0 < value.byte_count <= max_bytes:
+                raise ValueError("Image artifact is not a bounded normalized image")
+            return value
+
+        record = authorized(record)
+        raw, info = await self._file_storage.download_file_range(
+            record.storage_file_id, self._storage_user(record), offset=0, length=record.byte_count,
+        )
+        self._validate_storage_metadata(record, info)
+        if (not isinstance(raw, bytes) or len(raw) != record.byte_count
+                or not hmac.compare_digest(hashlib.sha256(raw).hexdigest(), record.sha256)):
+            raise RuntimeError("Image artifact integrity check failed")
+        latest = authorized(await self._repository.find_by_artifact_id(artifact_id))
+        if not (hmac.compare_digest(latest.storage_file_id, record.storage_file_id)
+                and hmac.compare_digest(latest.sha256, record.sha256)):
+            raise PermissionError("Image artifact ownership changed during read")
+        return SpillImageContent(content=raw, sha256=record.sha256)
 
     async def delete_owner(self, owner: SpillArtifactOwner) -> int:
         records = await self._repository.list_by_owner(

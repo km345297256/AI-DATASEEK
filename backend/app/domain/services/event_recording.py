@@ -365,12 +365,14 @@ def _recording_digest(
 
 def _event_payload(event: AgentEvent) -> dict[str, Any]:
     payload = event.model_dump(mode="json")
-    # Phase-4 metadata is additive. Canonical pre-job recordings must retain
-    # their original digest rather than gaining a new null field on load.
+    # Additive display metadata must not change canonical older recordings or
+    # their digest by introducing absent null fields during deserialization.
     if payload.get("analysis_job") is None:
         payload.pop("analysis_job", None)
     if payload.get("tool_approval") is None:
         payload.pop("tool_approval", None)
+    if payload.get("program_attempt") is None:
+        payload.pop("program_attempt", None)
     return payload
 
 

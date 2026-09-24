@@ -42,6 +42,17 @@ with socket.socket() as port_socket:
 BASE_URL = f"http://127.0.0.1:{TEST_PORT}"
 
 
+@pytest.fixture(autouse=True)
+def isolated_analysis_workspace(tmp_path_factory, monkeypatch):
+    """Real launches prepare a private output dir, never the developer's home."""
+    from app.services import analysis_workspace
+    # Keep framework startup files out of a case's own tmp_path: several
+    # readers assert that no disk spill or temporary snapshots remain there.
+    root = tmp_path_factory.mktemp("sandbox-runtime").resolve()
+    monkeypatch.setattr(analysis_workspace, "WORKSPACE_ROOT", root)
+    return root
+
+
 @pytest.fixture(scope="session", autouse=True)
 def sandbox_api_server():
     """Run the Sandbox API in-process so tests need no external service."""

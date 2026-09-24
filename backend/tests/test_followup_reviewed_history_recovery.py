@@ -9,9 +9,11 @@ from unittest.mock import AsyncMock
 import pytest
 
 from app.domain.models.analysis_outcome import AnalysisOutcome, DeliverableRequirement
+from app.domain.models.dataset import MountedDataset
 from app.domain.models.event import DoneEvent, PlanEvent, PlanStatus, ToolEvent
 from app.domain.models.plan import ExecutionStatus, Plan, Step
 from app.domain.services.analysis_answer_review import AnswerEvidence, review_answer
+from app.domain.services.analysis_scientific_review import SCIENTIFIC_DIMENSIONS
 from app.domain.services.execution_history import ExecutionHistory, reviewed_history_steps
 from app.domain.services.flows.plan_act import AgentStatus, PlanActFlow
 from test_analysis_answer_review_flow import (
@@ -19,6 +21,7 @@ from test_analysis_answer_review_flow import (
 )
 from test_analysis_repair_flow import collect, scenario, terminal_messages
 from test_execution_history_repository import repository
+from test_answer_scientific_scope_routing import with_answer_scope_checks
 
 
 FACT = "The historical sample has 12 observations and a median of 4.5 mm."
@@ -178,7 +181,7 @@ def followup_scenario(history):
 @pytest.mark.asyncio
 @pytest.mark.parametrize("compact", [False, True])
 @pytest.mark.parametrize("input_file_ids", [[], ["synthetic-upload-selection"]])
-@pytest.mark.parametrize("correction_mode", ["reclassify", "withdraw", "no_coverage", "unavailable"])
+@pytest.mark.parametrize("correction_mode", ["reclassify", "withdraw", "no_coverage", "malformed", "unavailable"])
 async def test_followup_recovers_older_history_and_repairs_one_paragraph_without_reexecution(
         compact, input_file_ids, correction_mode):
     original = reviewed_plan(text=FACT + "\n\n" + HISTORICAL_NOTE, input_file_ids=input_file_ids)
@@ -191,19 +194,47 @@ async def test_followup_recovers_older_history_and_repairs_one_paragraph_without
         payload = json.loads(messages[-1].content)
         payloads.append(payload)
         historical = next(source for source in payload["sources"] if source["kind"] == "prior_review")
+        if "frozen_paragraphs" in payload:
+            assert input_file_ids and correction_mode in {"reclassify", "withdraw"}
+            assert len(payloads) == 3
+            expected_paragraphs = [FACT]
+            if correction_mode == "reclassify":
+                expected_paragraphs.append("此前已核验的结果说明：" + HISTORICAL_NOTE)
+            assert payload["frozen_paragraphs"] == expected_paragraphs
+            assert payload["historical_source_ids"] == [historical["source_id"]]
+            assert not any(source["kind"] == "tool_result" for source in payload["sources"])
+            indices = list(range(len(expected_paragraphs)))
+            # The final protocol judges frozen published text; it cannot return
+            # replacement paragraphs, new work or the initial review root.
+            return json.dumps({"answer_scientific_checks": [{"dimension": dimension,
+                "status": "verified", "paragraph_indices": indices,
+                "evidence_scope": "historical_explanation",
+                "evidence": [{"source_id": historical["source_id"], "quote": FACT}]}
+                for dimension in SCIENTIFIC_DIMENSIONS],
+                "answer_scope_check": {"status": "complete", "paragraph_indices": indices,
+                                       "completion_blocker": "none"}})
         if len(payloads) == 1:
-            assert [source["kind"] for source in payload["sources"]] == ["catalog", "prior_review", "delivery_inventory"]
+            assert [source["kind"] for source in payload["sources"]] == ["catalog", "prior_review", "current_request", "delivery_inventory"]
+            request = next(source for source in payload["sources"] if source["kind"] == "current_request")
+            assert request["state"] == "requested" and request["text"] == message.message
             assert all(source["kind"] != "tool_result" for source in payload["sources"])
             inventory = next(source for source in payload["sources"] if source["kind"] == "delivery_inventory")
             assert json.loads(inventory["text"]) == []
-            return json.dumps({"unsupported_claims": False, "paragraphs": [
+            result = with_answer_scope_checks(payload, {"unsupported_claims": False, "paragraphs": [
                 {"text": FACT, "kind": "analysis", "evidence": [{"source_id": historical["source_id"], "quote": FACT}]},
                 {"text": HISTORICAL_NOTE, "kind": "limitation", "evidence": [{"source_id": historical["source_id"], "quote": HISTORICAL_NOTE}]},
-            ], "requirement_checks": []})
+            ], "requirement_checks": []}, status="verified",
+                evidence=[{"source_id": historical["source_id"], "quote": FACT}])
+            for check in result.get("answer_scientific_checks", []):
+                assert payload["historical_source_ids"] == [historical["source_id"]]
+                check["evidence_scope"] = "historical_explanation"
+            return json.dumps(result)
         assert [item["index"] for item in payload["failed_paragraphs"]] == [1]
         assert payload["accepted_paragraphs"][0]["paragraph"]["text"] == FACT
         if correction_mode == "unavailable":
             raise RuntimeError("Synthetic correction transport failure")
+        if correction_mode == "malformed":
+            return json.dumps({"not_the_correction_contract": True})
         paragraph = ({"text": HISTORICAL_NOTE, "kind": "analysis",
                       "evidence": [historical["excerpts"][0]["evidence_id"]]}
                      if correction_mode in {"reclassify", "no_coverage"} else None)
@@ -217,14 +248,18 @@ async def test_followup_recovers_older_history_and_repairs_one_paragraph_without
     real_reviewer(agent, ask)
     events = await collect(runner, message)
 
-    assert ask.await_count == 2
+    has_final_check = bool(input_file_ids) and correction_mode in {"reclassify", "withdraw"}
+    has_schema_retry = correction_mode == "malformed"
+    assert ask.await_count == (3 if has_final_check or has_schema_retry else 2)
+    if has_schema_retry:
+        assert payloads[1] == payloads[2]  # Retry the frozen correction, never analysis.
     assert len(state["prompts"]) == state["drained"] == 1
     assert not any(isinstance(event, ToolEvent) for event in events)
     assert not runner._generated_files and step.attachments == []
     assert not flow._artifact_repair_requests
     assert not step.outcome.can_resume
     assert step.outputs["answer_review"]["input_file_ids"] == input_file_ids
-    assert step.outputs["answer_review"]["source_count"] == 2  # Catalog + history, excludes the inventory.
+    assert step.outputs["answer_review"]["source_count"] == 2  # Observed catalog + history; not request/inventory.
     assert sum(isinstance(event, DoneEvent) for event in events) == 1
     assert FACT in step.result
     assert json.loads(flow.session_context)["prior_analysis_results"][0]["result"] == original.plan.steps[0].result
@@ -235,7 +270,16 @@ async def test_followup_recovers_older_history_and_repairs_one_paragraph_without
         assert step.outputs["answer_review"]["status"] == "corrected"
         assert "分析说明尚未完成证据核验" not in public
         assert any(FACT in event.message for event in terminal_messages(events))
+        if input_file_ids:
+            # Selected inputs activate science, but an authenticated, explicitly
+            # historical explanation does not require a new measurement.
+            review = step.outputs["answer_review"]
+            assert review["answer_scientific_review"]["status"] == "verified"
+            assert review["answer_scope_review"]["status"] == "verified"
+            assert review["answer_scientific_review"]["candidate_version_status"] == "original"
     else:
+        # Missing coverage, malformed correction and transport failure are
+        # incomplete review, not evidence that the historical finding is false.
         assert not step.success and step.outcome.reason_code == "answer_validation_unavailable"
     assert (HISTORICAL_NOTE in step.result) is (correction_mode in {"reclassify", "no_coverage"})
     if correction_mode in {"reclassify", "no_coverage"}:
@@ -271,3 +315,43 @@ async def test_recovered_history_cannot_attest_new_calculation_or_current_file_d
     assert result.status == "unavailable"
     assert not result.missing_requirement_indices  # Review failure does not authorize analytical replay.
     assert "A newly computed result was delivered." not in result.text
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("selection", ["dataset", "upload"])
+async def test_current_selected_input_preserves_historical_explanation_without_scientific_promotion(selection):
+    dataset_ids = ["same-dataset"] if selection == "dataset" else []
+    file_ids = ["same-upload"] if selection == "upload" else []
+    history = reviewed_plan(dataset_ids=dataset_ids, input_file_ids=file_ids)
+    runner, flow, step, message, state, agent = followup_scenario(history_view([history], True))
+    message.attachment_file_ids = file_ids
+    if dataset_ids:
+        message.datasets = [MountedDataset(dataset_id=dataset_ids[0], data_center_id="fixture",
+            data_center_name="Synthetic", name="Historical selection",
+            sandbox_path="/home/ubuntu/datasets/same")]
+    payloads = []
+
+    async def response(messages):
+        payload = json.loads(messages[-1].content)
+        payloads.append(payload)
+        source = next(item for item in payload["sources"] if item["kind"] == "prior_review")
+        citation = {"source_id": source["source_id"], "quote": FACT}
+        # Deliberately overconfident model judgment: host source validation
+        # must deny science green without deleting accurate historical prose.
+        return json.dumps(with_answer_scope_checks(payload, {"unsupported_claims": False,
+            "paragraphs": [{"text": FACT, "kind": "analysis", "evidence": [citation]}],
+            "requirement_checks": []}, status="verified", evidence=[citation]))
+
+    ask = AsyncMock(side_effect=response)
+    real_reviewer(agent, ask)
+    events = await collect(runner, message)
+    assert ask.await_count == 2  # Authoring cannot self-certify historical science.
+    assert FACT in step.result
+    assert not step.success and step.outcome.reason_code == "scientific_validation_unavailable"
+    science = step.outputs["answer_review"]["answer_scientific_review"]
+    assert science["status"] == "unavailable"
+    assert {item["reason"] for item in science["dimensions"]} == {"answer_scientific_source_not_independent"}
+    assert not any(item["kind"] == "tool_result" for item in payloads[0]["sources"])
+    assert not any(isinstance(event, ToolEvent) for event in events)
+    assert len(state["prompts"]) == 1 and not flow._artifact_repair_requests
+    assert not step.outcome.can_resume

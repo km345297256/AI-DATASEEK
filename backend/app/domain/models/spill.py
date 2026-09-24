@@ -34,6 +34,23 @@ class SpillArtifactSaveRequest(BaseModel):
     media_type: str = Field(default="text/plain; charset=utf-8", max_length=128)
 
 
+class SpillImageSaveRequest(BaseModel):
+    """Private normalized PNG bytes; never serialize this request to events."""
+
+    owner: SpillArtifactOwner
+    source: SpillArtifactSource
+    content: bytes = Field(min_length=1)
+    media_type: Literal["image/png"] = "image/png"
+
+
+class SpillImageContent(BaseModel):
+    """Authorized binary read, only used while building a model request."""
+
+    content: bytes
+    sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    media_type: Literal["image/png"] = "image/png"
+
+
 class SpillArtifactRef(BaseModel):
     """Model-safe reference to a private, durable spill artifact."""
 

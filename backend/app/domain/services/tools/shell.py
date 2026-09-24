@@ -103,6 +103,7 @@ class ShellToolkit(BaseToolkit):
             exec_dir=exec_dir,
             command=command,
             timeout_seconds=timeout_seconds,
+            recover_output=False,
         )
 
     @tool(parse_docstring=True)
@@ -830,6 +831,7 @@ class ShellToolkit(BaseToolkit):
         command: str,
         timeout_seconds: int,
         launch: Callable[[], Awaitable[ToolResult]] | None = None,
+        recover_output: bool = True,
     ) -> ToolResult:
         timeout_seconds = max(
             1,
@@ -840,7 +842,7 @@ class ShellToolkit(BaseToolkit):
         exec_data = self._result_data(exec_result)
         if exec_data.get("status") != "running":
             dispose_cancellation()
-            return exec_result
+            return await self._recover_contract_output(id, exec_result) if recover_output else exec_result
 
         # The production interceptor owns a 120 second outer deadline. Asking
         # the sandbox to wait for that exact duration lets the outer deadline
@@ -881,7 +883,22 @@ class ShellToolkit(BaseToolkit):
 
         result = await self._completed_command_result(id=id, command=command, returncode=wait_data.get("returncode"))
         dispose_cancellation()
-        return result
+        return await self._recover_contract_output(id, result) if recover_output else result
+
+    async def _recover_contract_output(self, id: str, result: ToolResult) -> ToolResult:
+        from app.domain.services.tools.shell_output import recover_shell_output, ShellOutputUnavailable
+        data = self._result_data(result)
+        if not data.get("output_metadata"):
+            return result
+        try:
+            output = await recover_shell_output(self.sandbox, id, data)
+        except asyncio.CancelledError:
+            raise
+        except Exception as error:
+            return ToolResult(success=False, message="Complete command output is unavailable; the command was not repeated",
+                data={"session_id": id, "status": data.get("status"), "returncode": data.get("returncode"),
+                      "error_code": error.code if isinstance(error, ShellOutputUnavailable) else "shell_output_unavailable"})
+        return result.model_copy(update={"data": {**data, "output": output}})
 
     async def _completed_command_result(
         self, *, id: str, command: str, returncode: int | None, retry_observation: bool = False,
@@ -920,6 +937,8 @@ class ShellToolkit(BaseToolkit):
                 "status": "completed",
                 "returncode": returncode,
                 "output": view_data.get("output", ""),
+                **({"output_metadata": view_data["output_metadata"]}
+                   if isinstance(view_data.get("output_metadata"), dict) else {}),
                 **({"program_execution": view_data["program_execution"]}
                    if isinstance(view_data.get("program_execution"), dict) else {}),
                 **({"error_code": "shell_output_unavailable", "output_available": False}
@@ -996,13 +1015,19 @@ class ShellToolkit(BaseToolkit):
         return result.data if isinstance(result.data, dict) else {}
     
     @tool(parse_docstring=True)
-    async def shell_view(self, id: str) -> ToolResult:
-        """View the content of a specified shell session. Use for checking command execution results or monitoring output.
+    async def shell_view(self, id: str, output_id: Optional[str] = None,
+                         cursor: Optional[int] = None, max_bytes: int = 8192) -> ToolResult:
+        """View bounded shell output or read a private log incrementally. First call with id only to get a preview and output_metadata.output_id; to recover complete text call with that output_id and cursor=0, then follow output_page.next_cursor. Each observer owns its cursor. A preview is not complete scientific evidence. Inspect log_status and output_page.lossy: missing output cannot be reconstructed by repeating the command. Logs retire when the command is replaced, the shell is released, or the sandbox restarts.
         
         Args:
             id: Unique identifier of the target shell session
+            output_id: Exact opaque output generation returned by a previous view or execution
+            cursor: Absolute UTF-8 byte offset, required together with output_id
+            max_bytes: Maximum page bytes from 4 to 16384, used only with cursor
         """
-        return await self.sandbox.view_shell(id)
+        if output_id is None and cursor is None:
+            return await self.sandbox.view_shell(id)
+        return await self.sandbox.view_shell(id, output_id=output_id, cursor=cursor, max_bytes=max_bytes)
     
     @tool(parse_docstring=True)
     async def shell_wait(

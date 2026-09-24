@@ -18,6 +18,7 @@ from app.domain.models.execution_environment import (
     SandboxExecutionIdentity,
     stable_sha256,
 )
+from app.domain.models.program_attempt import ProgramAttemptView
 from app.domain.services.event_recording import (
     EventRecordingError,
     create_event_recording,
@@ -132,6 +133,28 @@ def test_committed_recording_is_a_normalization_fixed_point():
         "event-tool",
         "event-done",
     ]
+    assert restored.events[1].program_attempt is None
+    assert "program_attempt" not in restored.to_jsonl()
+
+
+@pytest.mark.asyncio
+async def test_program_attempt_projection_survives_recording_replay_and_remains_digest_protected():
+    events = _events()
+    events[1] = ToolEvent(id="event-tool", seq=4, tool_call_id="program-call", tool_name="shell",
+        function_name="program_run", function_args={}, function_result={"success": True},
+        status=ToolStatus.CALLED, timestamp=CAPTURED_AT,
+        program_attempt=ProgramAttemptView(identity="a" * 64, state="succeeded", returncode=0))
+    encoded = create_event_recording(session_id="session-recording", events=events,
+        captured_at=CAPTURED_AT).to_jsonl()
+    restored = load_event_recording_jsonl(encoded)
+    assert restored.to_jsonl() == encoded
+    assert restored.events[1].program_attempt == events[1].program_attempt
+    projected = await EventMapper.events_to_sse_events(list(restored.events))
+    assert projected[1].data.program_attempt == events[1].program_attempt
+    assert projected[1].data.execution_status == "succeeded"
+    with pytest.raises(EventRecordingError, match="digest"):
+        load_event_recording_jsonl(encoded.replace('"identity":"' + "a" * 64,
+                                                  '"identity":"' + "b" * 64))
 
 
 @pytest.mark.asyncio

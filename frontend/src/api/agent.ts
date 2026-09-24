@@ -133,13 +133,14 @@ export const chatWithSession = async (
   clientMessageId?: string,
   resumeFrom?: string,
   inputFileIds?: string[],
+  timestamp?: number,
 ): Promise<() => void> => {
   const effectiveClientMessageId = message || resumeFrom
     ? clientMessageId || createClientMessageId()
     : undefined;
   const recovery = createAgentStreamRecovery({
     message,
-    timestamp: Math.floor(Date.now() / 1000),
+    timestamp: timestamp ?? Math.floor(Date.now() / 1000),
     event_id: eventId,
     event_seq: eventSeq,
     // A continuation is an explicit command, not a rewritten user request.
@@ -179,6 +180,21 @@ export function createClientMessageId(): string {
     return globalThis.crypto.randomUUID();
   }
   return `msg_${Date.now().toString(36)}_${Math.random().toString(36).slice(2)}`;
+}
+
+export interface InputReceiptResponse {
+  client_message_id: string;
+  accepted: boolean;
+  event_seq?: number | null;
+  state?: 'pending' | 'claimed' | 'running' | 'completed' | 'cancelled' | 'interrupted' | null;
+}
+
+/** Owner-only observation, never proof that an unobserved request cannot still commit. */
+export async function getInputReceipt(sessionId: string, clientMessageId: string, signal?: AbortSignal): Promise<InputReceiptResponse> {
+  const response = await apiClient.get<ApiResponse<InputReceiptResponse>>(
+    `/sessions/${encodeURIComponent(sessionId)}/inputs/${encodeURIComponent(clientMessageId)}`, { signal },
+  );
+  return response.data.data;
 }
 
 /**

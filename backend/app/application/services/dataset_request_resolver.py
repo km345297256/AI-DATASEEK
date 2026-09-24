@@ -132,7 +132,7 @@ class FrontControllerResolution:
 LightweightResolution = FrontControllerResolution
 
 
-FRONT_CONTROLLER_PROMPT_VERSION = "2026-09-17.1"
+FRONT_CONTROLLER_PROMPT_VERSION = "2026-09-20.1"
 MAX_TARGET_FILES = 48
 MAX_CONTROLLER_RESPONSE_CHARS = 16000
 
@@ -192,6 +192,16 @@ current user specifies an output filename, preserve it in output_paths as its
 exact canonical path under /home/ubuntu/output/; every listed path is required.
 Use [] only if the user did not specify output names. Do not omit these fields
 because an output is conditional or its input column might be unavailable.
+min_count counts physical output files, not sections or analytical checks.
+For one report covering verification, comparison and limitations, keep ONE
+report deliverable and combine all requested content obligations in its
+objective so each can be reviewed. Do not create another report slot for each
+section. Require separate report files only when the user explicitly requests
+multiple files, distinct filenames, or separate outputs. Preserve those
+explicit file counts and identities; do not merge them by kind or format.
+When the user has not specified a format, keep formats=[]; do not invent a
+Markdown requirement. A requested calculation or explanation alone does not
+imply an additional report download.
 For example, a user requesting value statistics in summary.csv and separate
 missing_measurement statistics in missing_summary.csv, while asking to keep the
 available part if a column is missing, still requires TWO table deliverables:
@@ -204,6 +214,9 @@ authorizes inventing data, substituting another column, or fabricating a file.
 Do not copy input dataset paths, host paths, or prior model attachment claims
 into this contract. A generic chart does not replace a requested analytical
 product just because both are images.
+Objectives must be one plain-text line. Scientific slash expressions such as
+SASA/Rg, B-factor/occupancy and mean/standard deviation are valid descriptions;
+filesystem paths belong only in the restricted output_paths field.
 Use [] for no requested files. Visualization requires kind=image; a script is
 not a chart. For an open-ended visualization request require one useful image;
 do not invent a four-chart obligation. Preserve explicit counts and output
@@ -333,6 +346,10 @@ catalog_queries is an array of objects; catalog_queries[].extensions is an array
 of strings (e.g. [".nc"] or [".nc", ".csv"], [] only when no extension filter is
 needed); catalog_queries[].metrics is an array of allowed metric names. Preserve
 every requested filter and suffix; do not drop predicates to make validation pass.
+For objective_non_plain_text, use one plain-text line without control or format
+characters. For objective_filesystem_path, describe the requested calculation
+without copying a filesystem path; preserve any required output identity in
+output_paths. Scientific slash expressions such as SASA/Rg are valid.
 """.strip()
 
 
@@ -609,6 +626,7 @@ class DatasetRequestResolver:
         )
         archive_records = self._archive_inventory_records(events)
         failure_stage = "transport"
+        routing_failures = []
         try:
             overrides = dict(llm_overrides or {})
             overrides["temperature"] = 0
@@ -657,6 +675,7 @@ class DatasetRequestResolver:
                     decision = RequestDecision.model_validate(repaired_payload)
                 except ValidationError as exc:
                     self._log_routing_validation_error(exc, stage="initial")
+                    routing_failures.append({"stage": "initial", "fields": self._routing_validation_fields(exc)})
                     failure_stage = "transport"
                     repaired_response = await self._invoke_with_transport_retry(
                         runnable,
@@ -719,6 +738,7 @@ class DatasetRequestResolver:
                                 repair_exc,
                                 stage="repair",
                             )
+                            routing_failures.append({"stage": "repair", "fields": self._routing_validation_fields(repair_exc)})
                             raise
             # Resolve model-selected sandbox targets before normalization clears
             # advisory catalog lookups. Coverage routing below may newly promote a
@@ -814,8 +834,13 @@ class DatasetRequestResolver:
                 "Front Controller failed closed error_type=%s failure_code=%s",
                 type(exc).__name__, failure_code,
             )
-            resolution = self._failed_closed("前置决策服务暂时不可用，任务未执行。", started_at=started_at)
+            reason = ("前置路由的结构校验未通过，分析尚未开始。"
+                      if failure_code == "invalid_routing" else "前置决策未完成，分析尚未开始。")
+            resolution = self._failed_closed(reason, started_at=started_at)
             resolution.controller_metadata["failure_code"] = failure_code
+            resolution.controller_metadata["failure_stage"] = failure_stage
+            if routing_failures:
+                resolution.controller_metadata["validation_failures"] = routing_failures
             return resolution
 
     @classmethod
@@ -892,9 +917,12 @@ class DatasetRequestResolver:
     @staticmethod
     def _routing_validation_fields(error: ValidationError) -> list[dict[str, str]]:
         """Expose only bounded schema locations/types, never model input values."""
+        known_fields = set().union(*(model.model_fields for model in (
+            RequestDecision, ExecutionDecision, CatalogQuery, DeliverableRequirement, SafetyReview)))
         return [
             {
-                "loc": ".".join(str(part) for part in item.get("loc", ())),
+                "loc": ".".join(str(part) if type(part) is int or part in known_fields else "unknown_field"
+                                  for part in item.get("loc", ())),
                 "type": str(item.get("type", "unknown")),
             }
             for item in error.errors(
@@ -1146,7 +1174,7 @@ class DatasetRequestResolver:
                 risk_level="high",
                 categories=["front_controller_unavailable"],
                 reason=reason,
-                suggestion="请稍后重新发送该任务；这不是对任务内容的违规判定。",
+                suggestion="请先检查前置决策的错误码和校验记录；本轮没有启动分析，也不是对任务内容的违规判定。系统不会自动重发。",
             ),
             execution=ExecutionDecision(mode="sandbox", required_evidence="user_message"),
             reason="front controller unavailable",

@@ -6,7 +6,8 @@ from dataclasses import asdict, dataclass
 from typing import Any, Optional
 
 from app.core.config import get_settings
-from app.domain.models.event import MessageEvent, PlanEvent, StepEvent, StepStatus, ToolEvent, ToolStatus
+from app.domain.models.event import ErrorEvent, MessageEvent, PlanEvent, PlanStatus, StepEvent, StepStatus, ToolEvent, ToolStatus
+from app.domain.models.plan import ExecutionStatus
 from langchain.messages import HumanMessage
 from app.infrastructure.external.llm import create_chat_model
 from app.domain.utils.robust_json_parser import parse_json_lenient
@@ -54,6 +55,52 @@ class CompletionAdviceService:
     def to_payload(self, advice: CompletionAdvice) -> dict[str, Any]:
         return asdict(advice)
 
+    @staticmethod
+    def _current_turn(events: list[Any]) -> list[Any]:
+        for index in range(len(events) - 1, -1, -1):
+            event = events[index]
+            if isinstance(event, MessageEvent) and event.role == "user":
+                return events[index:]
+        return events
+
+    def _incomplete_advice(self, events: list[Any]) -> Optional[CompletionAdvice]:
+        # Keep the last lifecycle event for each step: a historical failure
+        # must not override a subsequent successful completion of that step.
+        latest_steps: dict[str, bool] = {}
+        plan_failed = False
+        for event in events:
+            if isinstance(event, PlanEvent) and (
+                event.status == PlanStatus.COMPLETED
+                or event.plan.status in {ExecutionStatus.COMPLETED, ExecutionStatus.FAILED}
+            ):
+                # Some orchestration failures only finalize the plan; there
+                # may be no failed StepEvent for an unexecuted step.
+                plan_failed = event.plan.status == ExecutionStatus.FAILED
+                latest_steps = {
+                    step.id: (step.outcome.status != "succeeded" if step.outcome is not None
+                              else step.status != ExecutionStatus.COMPLETED)
+                    for step in event.plan.steps
+                }
+            elif isinstance(event, StepEvent):
+                latest_steps[event.step.id] = (
+                    event.step.outcome.status != "succeeded" if event.step.outcome is not None
+                    else event.status == StepStatus.FAILED
+                )
+        incomplete = plan_failed or any(latest_steps.values())
+        if not incomplete and not any(isinstance(event, ErrorEvent) for event in events):
+            return None
+        return CompletionAdvice(
+            recommendations=[
+                "列出本次已完成和未完成的内容",
+                "说明哪些结论还缺少证据",
+                "列出继续分析需要补充的资料",
+            ],
+            is_skill_candidate=False,
+            skill_reason="",
+            shapefile_preview_available=self._has_shapefile_artifact(events),
+            molecular_preview_available=self._has_molecular_artifact(events),
+        )
+
     def analyze_fast(self, events: list[Any]) -> CompletionAdvice:
         """Build completion advice without another model round trip.
 
@@ -62,8 +109,13 @@ class CompletionAdviceService:
         model-backed ``analyze`` method for explicit/offline callers, while the
         live task runner uses this deterministic heuristic.
         """
+        events = self._current_turn(events)
         if not events:
             return self._default_advice()
+
+        incomplete = self._incomplete_advice(events)
+        if incomplete is not None:
+            return incomplete
 
         user_messages = [
             event
@@ -164,8 +216,13 @@ class CompletionAdviceService:
         return json.dumps(messages, ensure_ascii=False, default=str)[:24000]
 
     async def analyze(self, events: list[Any]) -> CompletionAdvice:
+        events = self._current_turn(events)
         if not events:
             return self._default_advice()
+
+        incomplete = self._incomplete_advice(events)
+        if incomplete is not None:
+            return incomplete
 
         user_messages = [event for event in events if isinstance(event, MessageEvent) and event.role == "user"]
         assistant_messages = [event for event in events if isinstance(event, MessageEvent) and event.role == "assistant"]

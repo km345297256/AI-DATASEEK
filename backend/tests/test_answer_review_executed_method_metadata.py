@@ -89,14 +89,19 @@ def test_derived_metadata_is_a_fresh_private_projection_not_checkpoint_or_receip
     assert restored.render_sources() == again
 
 
-@pytest.mark.parametrize("limit", ["single_source", "all_sources"])
 @pytest.mark.parametrize("fits", [False, True])
-def test_metadata_obeys_exact_serialized_bounds_without_partial_code_or_lost_stdout(monkeypatch, limit, fits):
+def test_metadata_obeys_exact_total_serialized_bound_without_partial_code_or_lost_stdout(monkeypatch, fits):
     evidence, _ = observed(content="# Full source, including non-ASCII 数据\n" + "value=1\n" * 12)
     complete = evidence.render_sources()
     original_text = complete[-1]["text"]
-    size = len(review._json(complete[-1] if limit == "single_source" else complete))
-    monkeypatch.setattr(review, "MAX_SOURCE_CHARS" if limit == "single_source" else "MAX_EVIDENCE_CHARS", size - int(not fits))
+    # Under pressure the non-measuring write body may now be omitted. Exercise
+    # the exact boundary after that allowed saving, not the old duplicate-body
+    # size, while preserving the complete executed method and result bytes.
+    arguments = json.loads(complete[0]["text"])
+    complete[0].update(text=review._json({key: value for key, value in arguments.items() if key != "content"}),
+                       request_projection="write_content_omitted", omitted_request_fields=["content"])
+    size = len(review._json(complete))
+    monkeypatch.setattr(review, "MAX_EVIDENCE_CHARS", size - int(not fits))
     rendered = evidence.render_sources()
     assert ("executed_program_source" in rendered[-1]) is fits
     assert rendered[-1]["text"] == original_text
@@ -111,9 +116,12 @@ def test_global_allowance_is_shared_across_execution_metadata_in_stable_order(mo
     add_program(evidence, call_id="second")
     complete = evidence.render_sources()
     baseline = [{key: value for key, value in source.items() if key != "executed_program_source"} for source in complete]
+    for source in baseline:
+        if "executed_source_coverage" in source:
+            source.update(executed_source_coverage="unverified", executed_source_reason="evidence_budget_exceeded")
     first_index = next(index for index, source in enumerate(complete) if "executed_program_source" in source)
     first_only = copy.deepcopy(baseline)
-    first_only[first_index]["executed_program_source"] = complete[first_index]["executed_program_source"]
+    first_only[first_index] = copy.deepcopy(complete[first_index])
     monkeypatch.setattr(review, "MAX_EVIDENCE_CHARS", len(review._json(first_only)))
     rendered = evidence.render_sources()
     assert rendered == first_only
@@ -121,12 +129,15 @@ def test_global_allowance_is_shared_across_execution_metadata_in_stable_order(mo
     assert sum("executed_program_source" in source for source in rendered) == 1
 
 
-def test_actual_result_too_large_never_gets_truncated_to_fit_method_source():
+def test_result_text_keeps_ordinary_bound_while_method_uses_separate_private_allowance():
     content = "# full code\n" + "x=1\n" * 300
     evidence, _ = observed(content=content, output="RESULT_SENTINEL " + "o" * 4800)
     source = evidence.render_sources()[-1]
     assert source["executed_source_id"] == "tool_0001_request"
-    assert "executed_program_source" not in source
+    assert source["executed_program_source"]["content"] == content
+    assert source["executed_source_coverage"] == "full"
+    assert len(source["text"]) <= review.MAX_SOURCE_CHARS
+    assert len(review._json(evidence.render_sources())) <= review.MAX_EVIDENCE_CHARS
     assert "RESULT_SENTINEL" in source["text"] and source["truncated"] is False
     assert source["text"] == evidence._calls["run"]["sources"][1]["text"]
 

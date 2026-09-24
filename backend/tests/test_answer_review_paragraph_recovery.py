@@ -44,7 +44,7 @@ def repair(value, *, index=1, complete=True):
 async def call_review(bad, corrected, *, good=None, evidence=None, files=None, requirements=(), checks=()):
     evidence = evidence_set() if evidence is None else evidence
     before = copy.deepcopy(evidence.__dict__)
-    ask = AsyncMock(side_effect=[response(good or paragraph(GOOD), bad, checks=list(checks)), corrected])
+    ask = AsyncMock(side_effect=[response(good or paragraph(GOOD), bad, checks=list(checks)), corrected, corrected])
     result = await review.review_answer(ask=ask, question="Describe the observed result", draft="UNVERIFIED_DRAFT",
         files=[file()] if files is None else files, evidence=evidence, requirements=requirements)
     assert evidence.__dict__ == before
@@ -119,7 +119,8 @@ async def test_catalog_only_remainder_cannot_claim_complete_when_core_analysis_w
 async def test_withdrawal_coverage_must_be_an_explicit_boolean_not_truthy_data(complete):
     bad = paragraph("UNSUPPORTED", kind="analysis", source="verified_files", quote="observed.png")
     result, ask = await call_review(bad, repair(None, complete=complete))
-    assert result.status == "unavailable" and GOOD in result.text and ask.await_count == 2
+    assert result.status == "unavailable" and GOOD in result.text and ask.await_count == 3
+    assert result.metadata["validation_state"] == "unavailable"
     assert result.missing_requirement_indices == ()
 
 
@@ -220,7 +221,8 @@ async def test_failed_semantic_repair_retains_locked_text_without_false_completi
     elif failure == "wrong_index": second = repair(candidate("MUST_NOT_REWRITE", "analysis", "tool_0001_result"), index=0)
     elif failure == "malformed": second = AIMessage(content="not JSON " + PRIVATE)
     result, ask = await call_review(bad, second)
-    assert result.status == "unavailable" and GOOD in result.text and ask.await_count == 2
+    assert result.status == "unavailable" and GOOD in result.text
+    assert ask.await_count == (3 if failure == "wrong_index" else 2)
     assert result.missing_requirement_indices == ()
     public = result.text + json.dumps(result.metadata)
     assert all(value not in public for value in ("PRIVATE_PROVIDER_BODY", "/Users/", "MUST_NOT_PUBLISH", "MUST_NOT_REWRITE"))

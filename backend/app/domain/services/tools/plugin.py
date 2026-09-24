@@ -405,6 +405,7 @@ class PluginToolkit(BaseToolkit):
             )
         returncode = data.get("returncode")
         output = data.get("output", "")
+        output_data = data
         transport_success = result.success
         if status == "running":
             # The production timeout interceptor owns the exact deadline. Give
@@ -457,7 +458,24 @@ class PluginToolkit(BaseToolkit):
             view_data = self._result_data(viewed)
             returncode = wait_data.get("returncode")
             output = view_data.get("output", "")
+            output_data = view_data
             transport_success = waited.success and viewed.success
+
+        # The sandbox now returns bounded display previews. Protocol JSON must
+        # come from the same completed private output, not a head/tail excerpt.
+        # Recovery is read-only and bounded by the existing 2 MiB contract.
+        from app.domain.services.tools.shell_output import recover_shell_output, ShellOutputUnavailable
+        try:
+            output = await recover_shell_output(self.sandbox, execution_session_id, output_data)
+        except asyncio.CancelledError:
+            raise
+        except Exception as error:
+            return await self._released_result(execution_session_id, ToolResult(
+                success=False, message="Complete plugin output is unavailable; the tool was not repeated",
+                data={"status": "contract_rejected", "returncode": returncode,
+                      "contract_error": {"error": error.code if isinstance(error, ShellOutputUnavailable)
+                                         else "shell_output_unavailable", "path": []}},
+            ))
 
         if self._output_exceeds_budget(output):
             return await self._released_result(

@@ -37,6 +37,13 @@ class InputAdmission(BaseModel):
     attempts: int = Field(default=0, ge=0)
     terminal_kind: Literal["done", "wait", "error"] | None = None
     notified: bool = False
+    # Private, bounded failure facts; never store exception text or host paths.
+    preparation_failure_code: Literal[
+        "input_preparation_failed", "dataset_unreadable", "dataset_unsafe", "dataset_changed",
+        "dataset_limit", "dataset_preparation_failed", "model_audit_unavailable",
+    ] | None = None
+    # None preserves uncertainty for pre-upgrade interrupted records.
+    execution_started: bool | None = None
 
     @field_validator("lease_expires_at", "retry_after")
     @classmethod

@@ -2,6 +2,7 @@ import type { FileInfo } from '../api/file';
 import type { ToolPresentation } from './toolPresentation';
 import type { AnalysisJobView } from './analysisJob';
 import type { ToolApprovalView } from './toolApproval';
+import type { ProgramAttemptView } from './programAttempt';
 
 export interface SpillArtifactRef {
   schema_version: 1;
@@ -49,6 +50,7 @@ export interface ToolEventData extends BaseEventData {
   spill?: SpillArtifactNotice | null;
   analysis_job?: AnalysisJobView | null;
   tool_approval?: ToolApprovalView | null;
+  program_attempt?: ProgramAttemptView | null;
 }
 
 export interface StepEventData extends BaseEventData {
@@ -62,6 +64,7 @@ export interface MessageEventData extends BaseEventData {
     role: "user" | "assistant";
     attachments?: FileInfo[];
     metadata?: {
+      client_message_id?: string;
       step_id?: string;
       analysis_outcome?: import('./analysisOutcome').AnalysisOutcome;
       analysis_progress?: { stage?: string } | null;

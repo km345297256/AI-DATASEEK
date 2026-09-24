@@ -373,3 +373,365 @@ async def test_execution_stdout_fallback_preserves_observed_results_without_reop
     decoded = ExecutionResult.model_validate_json(answers[0])
     assert "12" in decoded.result and decoded.attachments == []
     assert "DSML" not in decoded.result and "synthetic unavailable" not in decoded.result
+
+# Request-local preparation recovery is deliberately distinct from scientific
+# evidence and from task/model budgets. All fixtures are offline.
+from app.domain.services.analysis_protocol_recovery import (
+    TerminalProtocolRecovery, confirmed_shell_success, native_operation_identity,
+)
+from app.domain.services.execution_evidence import (
+    ShellExecutionAttempt, ToolExecutionLedger, shell_command_digest,
+)
+from app.domain.services.tools.file import FileToolkit
+from app.domain.services.tools.shell import ShellToolkit
+
+
+def file_call(path="/home/ubuntu/output/analysis.py", *, content="print(1)", call_id="write-1", **extra):
+    return AIMessage(content="", tool_calls=[{"name": "file_write", "id": call_id,
+        "args": {"file": path, "content": content, **extra}}])
+
+
+def core_files(agent, *, success=True):
+    sandbox = SimpleNamespace(
+        file_write=AsyncMock(return_value=ToolResult(success=success, data={})),
+        file_read=AsyncMock(return_value=ToolResult(success=True, data={"content": "print(1)"})),
+    )
+    toolkit = FileToolkit(sandbox)
+    agent.toolkits.append(toolkit)
+    return sandbox, toolkit
+
+
+@pytest.mark.asyncio
+async def test_confirmed_source_preparation_allows_one_extra_correction_without_science_progress(monkeypatch):
+    agent, _, requests, _ = make_agent(monkeypatch, [
+        AIMessage(content=DSML), file_call(),
+        AIMessage(content="", tool_calls=[{"name": "file_read", "id": "read-back",
+            "args": {"file": "/home/ubuntu/output/analysis.py"}}]),
+        AIMessage(content=DSML), native_call(), AIMessage(content="Done"),
+    ])
+    sandbox, _ = core_files(agent)
+    events = [event async for event in agent.execute("Analyze")]
+    assert sandbox.file_write.await_count == 1 and sandbox.file_read.await_count == 1
+    assert len(requests) == 6 and events[-1].message == "Done"
+    assert "NOT evidence of analysis execution" in requests[4][-1].content
+
+
+@pytest.mark.asyncio
+async def test_renaming_or_changing_preparation_cannot_grant_a_third_correction(monkeypatch):
+    agent, _, requests, _ = make_agent(monkeypatch, [
+        AIMessage(content=DSML), file_call(), AIMessage(content=DSML),
+        file_call("/home/ubuntu/output/renamed.py", content="print(2)", call_id="write-2"),
+        AIMessage(content=DSML),
+    ])
+    sandbox, _ = core_files(agent)
+    events = [event async for event in agent.execute("Analyze")]
+    assert sandbox.file_write.await_count == 2 and len(requests) == 5
+    assert isinstance(events[-1], ErrorEvent)
+
+
+@pytest.mark.asyncio
+async def test_failed_preparation_does_not_authorize_extra_recovery(monkeypatch):
+    agent, _, requests, _ = make_agent(monkeypatch, [
+        AIMessage(content=DSML), file_call(), AIMessage(content=DSML),
+    ])
+    sandbox, _ = core_files(agent, success=False)
+    events = [event async for event in agent.execute("Analyze")]
+    assert sandbox.file_write.await_count == 1 and len(requests) == 3
+    assert isinstance(events[-1], ErrorEvent)
+
+
+@pytest.mark.asyncio
+async def test_correction_suppresses_equivalent_completed_native_file_write(monkeypatch):
+    agent, _, requests, _ = make_agent(monkeypatch, [
+        file_call(content="print(1)\n"), AIMessage(content=DSML),
+        file_call("/home/ubuntu/output/./analysis.py", call_id="new-id", append=None,
+                  sudo=False, trailing_newline=True), AIMessage(content="Done"),
+    ])
+    sandbox, _ = core_files(agent)
+    events = [event async for event in agent.execute("Analyze")]
+    assert sandbox.file_write.await_count == 1 and len(requests) == 4
+    assert any(isinstance(event, ToolEvent) and event.status == ToolStatus.CALLED
+        and isinstance(event.function_result, dict)
+        and event.function_result.get("blocked_by_policy") == "tool_replay_suppressed" for event in events)
+
+
+@pytest.mark.asyncio
+async def test_recovery_state_does_not_cross_execute_requests(monkeypatch):
+    sequence = [AIMessage(content=DSML), file_call(), AIMessage(content=DSML), AIMessage(content="Done")]
+    # Each provider response is a fresh value. Reusing the same AIMessage would
+    # feed the first request's compacted history receipt back as a new write.
+    agent, _, requests, _ = make_agent(monkeypatch, sequence + [item.model_copy(deep=True) for item in sequence])
+    sandbox, _ = core_files(agent)
+    for _ in range(2):
+        events = [event async for event in agent.execute("Analyze")]
+        assert events[-1].message == "Done"
+    assert sandbox.file_write.await_count == 2 and len(requests) == 8
+
+
+@pytest.mark.asyncio
+async def test_cancellation_during_preparation_correction_is_not_swallowed(monkeypatch):
+    agent, _, requests, _ = make_agent(monkeypatch, [
+        AIMessage(content=DSML), file_call(), AIMessage(content=DSML), asyncio.CancelledError(),
+    ])
+    sandbox, _ = core_files(agent)
+    with pytest.raises(asyncio.CancelledError):
+        _events = [event async for event in agent.execute("Analyze")]
+    assert sandbox.file_write.await_count == 1 and len(requests) == 4
+    assert agent.last_execution_outcome["code"] == "cancelled"
+
+
+def add_receipt(ledger, call, *, returncode=0, ordinal=1, sandbox_id="synthetic-sandbox"):
+    args = call["args"]
+    attempt = ShellExecutionAttempt(call["id"], f"{ordinal:032x}", sandbox_id,
+        args.get("id", "shell"), shell_command_digest(args.get("exec_dir", "/work"), args.get("command", "")), AsyncMock())
+    ledger.register(attempt)
+    assert attempt.observe({"version": 1, "operation_id": attempt.operation_id,
+        "command_digest": attempt.command_digest, "server_instance_id": "a" * 32,
+        "state": "exited", "returncode": returncode, "process_tree_quiescent": True})
+    return attempt
+
+
+@pytest.mark.asyncio
+async def test_new_failed_shell_receipts_never_reopen_protocol_correction(monkeypatch):
+    def failed_operations(agent):
+        # Regression for real 020: different commands and call/operation IDs,
+        # each terminal failure, used to increment the strong progress tuple.
+        for i in range(3):
+            call = {"name": "shell_run", "id": f"failed-{i}", "args": {
+                "id": f"shell-{i}", "exec_dir": "/work", "command": f"python -c 'bad_key_{i}'"}}
+            add_receipt(agent._tool_execution_ledger, call, returncode=1, ordinal=i + 1)
+        return AIMessage(content=DSML)
+    agent, toolkit, requests, _ = make_agent(monkeypatch, [AIMessage(content=DSML), failed_operations])
+    events = [event async for event in agent.execute("Analyze")]
+    assert len(requests) == 2 and toolkit._calls == []
+    assert agent._tool_execution_ledger.summary()["confirmed_failed_operation_count"] == 3
+    assert isinstance(events[-1], ErrorEvent)
+
+
+def test_confirmed_shell_progress_excludes_failure_unknown_and_duplicate_ids(monkeypatch):
+    make_agent(monkeypatch, [])
+    toolkit = ShellToolkit(SimpleNamespace(id="synthetic-sandbox"))
+    tool = toolkit.get_tool("shell_run")
+    call = {"name": "shell_run", "id": "one", "args": {
+        "id": "shell-a", "exec_dir": "/work", "command": "inspect --summary"}}
+    ledger, recovery = ToolExecutionLedger(), TerminalProtocolRecovery()
+    initial = recovery.progress("read-evidence")
+    assert recovery.correction_kind(initial) == "protocol"
+    add_receipt(ledger, call, returncode=1)
+    assert not confirmed_shell_success(tool, call, ledger)
+    assert recovery.correction_kind(initial) is None
+    call = {**call, "id": "two", "args": {**call["args"], "id": "shell-b", "timeout_seconds": 60}}
+    add_receipt(ledger, call, ordinal=2)
+    assert confirmed_shell_success(tool, call, ledger)
+    recovery.record_shell_success(native_operation_identity(tool, call))
+    assert recovery.correction_kind(recovery.progress("read-evidence")) == "protocol"
+    duplicate = {**call, "id": "three", "args": {**call["args"], "id": "shell-c", "exec_dir": "/work/./", "timeout_seconds": 30}}
+    add_receipt(ledger, duplicate, ordinal=3)
+    recovery.record_shell_success(native_operation_identity(tool, duplicate))
+    assert recovery.correction_kind(recovery.progress("read-evidence")) is None
+    # Latest unresolved attempt cannot fall back to an older matching success.
+    ledger.register(ShellExecutionAttempt("three", "f" * 32, "synthetic-sandbox", "shell-c", "d" * 64, AsyncMock()))
+    assert not confirmed_shell_success(tool, duplicate, ledger)
+
+
+def test_program_success_uses_source_identity_not_operation_or_filename(monkeypatch):
+    make_agent(monkeypatch, [])
+    recovery = TerminalProtocolRecovery()
+    call = {"name": "program_run", "id": "one", "args": {
+        "id": "shell-a", "exec_dir": "/work", "script_path": "/work/a.py", "argv": []}}
+    assert recovery.correction_kind(recovery.progress("reads")) == "protocol"
+    feedback = {"source_digest": "a" * 64, "returncode": 1, "operation_id": "1" * 32}
+    recovery.record_program_success(call, feedback)
+    assert recovery.correction_kind(recovery.progress("reads")) is None
+    feedback["returncode"] = 0
+    recovery.record_program_success(call, feedback)
+    assert recovery.correction_kind(recovery.progress("reads")) == "protocol"
+    call["args"]["script_path"] = "/work/renamed.py"
+    feedback["operation_id"] = "2" * 32
+    recovery.record_program_success(call, feedback)
+    assert recovery.correction_kind(recovery.progress("reads")) is None
+    feedback["source_digest"] = "b" * 64
+    recovery.record_program_success(call, feedback)
+    assert recovery.correction_kind(recovery.progress("reads")) == "protocol"
+
+
+@pytest.mark.parametrize("new_prerequisites,blocked", [
+    (None, True), ({"ready": False, "prerequisite_digest": "b" * 64}, True),
+    ({"ready": True, "prerequisite_digest": "a" * 64}, True),
+    ({"ready": True, "prerequisite_digest": "b" * 64}, False),
+])
+def test_program_replay_requires_proven_changed_source_not_missing_preflight(monkeypatch, new_prerequisites, blocked):
+    make_agent(monkeypatch, [])
+    toolkit = ShellToolkit(SimpleNamespace(id="synthetic-sandbox"))
+    tool = toolkit.get_tool("program_run")
+    call = {"name": "program_run", "id": "one", "args": {
+        "id": "shell-a", "exec_dir": "/work", "script_path": "/work/a.py"}}
+    old = {"ready": True, "prerequisite_digest": "a" * 64}
+    recovery = TerminalProtocolRecovery()
+    recovery.record_completed_write(native_operation_identity(tool, call, program_prerequisites=old), program_preparation=False)
+    recovery.record_program_completion(native_operation_identity(tool, call), old)
+    changed = {**call, "id": "two", "args": {**call["args"], "id": "new-shell", "argv": None, "timeout_seconds": 99}}
+    assert recovery.would_replay_completed_write(
+        native_operation_identity(tool, changed, program_prerequisites=new_prerequisites),
+        program_base=native_operation_identity(tool, changed), prerequisites=new_prerequisites) is blocked
+
+
+def test_unknown_tool_business_id_is_not_removed(monkeypatch):
+    make_agent(monkeypatch, [])
+    call = {"name": "program_run", "id": "one", "args": {"id": "business-a"}}
+    assert native_operation_identity(object(), call) != native_operation_identity(object(),
+        {**call, "args": {"id": "business-b"}})
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("fresh_source,expected_launches", [(None, 1), ("a", 1), ("b", 2)])
+async def test_agent_correction_replays_only_proven_new_program_source(monkeypatch, fresh_source, expected_launches):
+    from app.infrastructure.external.sandbox.docker_sandbox import DockerSandbox
+    from app.domain.services.program_execution import program_command
+    sandbox = object.__new__(DockerSandbox)
+    sandbox._container_name = "synthetic-sandbox"
+    state = {"source": "a"}
+
+    async def preflight(*_args):
+        source = state["source"]
+        if source is None:
+            return ToolResult(success=False)
+        return ToolResult(success=True, data={"version": 1, "status": "ready", "ready": True,
+            "prerequisite_digest": source * 64, "cwd": {"state": "ready"},
+            "source": {"state": "ready", "source_digest": source * 64}})
+    sandbox.program_preflight = preflight
+    toolkit = ShellToolkit(sandbox)
+    first = {"name": "program_run", "id": "program-one", "args": {
+        "id": "process-one", "exec_dir": "/work", "script_path": "/work/a.py"}}
+    second = {"name": "program_run", "id": "program-two", "args": {
+        **first["args"], "id": "process-two", "argv": None, "timeout_seconds": 120}}
+
+    def corrected(_agent):
+        state["source"] = fresh_source
+        return AIMessage(content="", tool_calls=[second])
+    agent, _, requests, _ = make_agent(monkeypatch, [
+        AIMessage(content="", tool_calls=[first]), AIMessage(content=DSML), corrected, AIMessage(content="Done")])
+    agent.toolkits = [toolkit]
+    launches = []
+
+    async def adapter_dispatch(_tool, call):
+        # Fake only the trusted adapter I/O boundary; production base, registry,
+        # preflight/feedback identity checks and recovery decisions are real.
+        launches.append(call["id"])
+        args = call["args"]
+        attempt = ShellExecutionAttempt(call["id"], f"{len(launches):032x}", sandbox.id, args["id"],
+            shell_command_digest(args["exec_dir"], program_command(args["script_path"], args.get("argv") or [])), AsyncMock())
+        agent._tool_execution_ledger.register(attempt)
+        attempt.observe({"version": 1, "operation_id": attempt.operation_id,
+            "command_digest": attempt.command_digest, "server_instance_id": "c" * 32,
+            "state": "exited", "returncode": 0, "process_tree_quiescent": True})
+        attempt.program_execution = {"version": 1, "script_path": args["script_path"],
+            "source_digest": state["source"] * 64, "returncode": 0,
+            "failure_fingerprint": None, "diagnostic": None, "output_truncated": False}
+        return ToolMessage(content="Completed", tool_call_id=call["id"], name=call["name"],
+            status="success", artifact=ToolResult(success=True, data={"returncode": 0}))
+    agent.invoke_tool = adapter_dispatch
+    events = [event async for event in agent.execute("Analyze")]
+    assert len(launches) == expected_launches and len(requests) == 4
+    assert events[-1].message == "Done"
+
+
+@pytest.mark.asyncio
+async def test_preparation_cannot_override_new_unknown_side_effect(monkeypatch):
+    def unknown_after_preparation(agent):
+        agent._tool_execution_ledger.record_unknown("unknown-write")
+        return AIMessage(content=DSML)
+    agent, _, requests, _ = make_agent(monkeypatch, [
+        AIMessage(content=DSML), file_call(), unknown_after_preparation])
+    sandbox, _ = core_files(agent)
+    events = [event async for event in agent.execute("Analyze")]
+    assert len(requests) == 3 and sandbox.file_write.await_count == 1
+    assert agent.last_execution_outcome["code"] == "tool_execution_unknown"
+    assert isinstance(events[-1], ErrorEvent)
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("completion_path", ["shell_wait", "reconcile"])
+async def test_later_confirmed_success_refreshes_original_launch_progress(monkeypatch, completion_path):
+    from app.infrastructure.external.sandbox.docker_sandbox import DockerSandbox
+    from app.domain.services.execution_evidence import register_shell_attempt, bind_shell_observation
+    sandbox = object.__new__(DockerSandbox)
+    sandbox._container_name = "synthetic-sandbox"
+    holder = {}
+
+    def receipt(attempt, completed=False):
+        return {"version": 1, "operation_id": attempt.operation_id,
+            "command_digest": attempt.command_digest, "server_instance_id": "a" * 32,
+            "state": "exited" if completed else "running", "returncode": 0 if completed else None,
+            "process_tree_quiescent": completed}
+
+    async def launch(identifier, cwd, command):
+        attempt = register_shell_attempt(sandbox, identifier, cwd, command)
+        assert attempt is not None
+        holder["attempt"] = attempt
+        attempt.observe(receipt(attempt))
+        return ToolResult(success=True, data={"status": "running", "returncode": None})
+
+    async def wait(identifier, seconds):
+        attempt = bind_shell_observation(sandbox, identifier)
+        assert attempt is holder["attempt"]
+        attempt.observe(receipt(attempt, True))
+        return ToolResult(success=True, data={"status": "completed", "returncode": 0})
+
+    async def status(identifier, operation):
+        attempt = holder["attempt"]
+        assert identifier == "shell-long" and operation == attempt.operation_id
+        return ToolResult(success=True, data=receipt(attempt, completion_path == "reconcile"))
+
+    sandbox.exec_command = AsyncMock(side_effect=launch)
+    sandbox.wait_for_process = AsyncMock(side_effect=wait)
+    sandbox.shell_operation_status = AsyncMock(side_effect=status)
+    responses = [AIMessage(content=DSML), AIMessage(content="", tool_calls=[{
+        "name": "shell_exec", "id": "launch-one", "args": {
+            "id": "shell-long", "exec_dir": "/work", "command": "installed-tool --analysis"}}])]
+    if completion_path == "shell_wait":
+        responses.append(AIMessage(content="", tool_calls=[{
+            "name": "shell_wait", "id": "wait-one", "args": {"id": "shell-long", "seconds": 1}}]))
+    responses.extend([AIMessage(content=DSML), AIMessage(content="Completed")])
+    agent, _, requests, _ = make_agent(monkeypatch, responses)
+    agent.toolkits.append(ShellToolkit(sandbox))
+    events = [event async for event in agent.execute("Analyze")]
+    assert events[-1].message == "Completed" and len(requests) == len(responses)
+    assert sandbox.exec_command.await_count == 1
+    assert holder["attempt"].confirmed and holder["attempt"].receipt.returncode == 0
+    assert sandbox.wait_for_process.await_count == (1 if completion_path == "shell_wait" else 0)
+
+@pytest.mark.asyncio
+async def test_same_correction_batch_rechecks_replay_after_pending_launch_finishes(monkeypatch):
+    from app.infrastructure.external.sandbox.docker_sandbox import DockerSandbox
+    from app.domain.services.execution_evidence import register_shell_attempt
+    sandbox = object.__new__(DockerSandbox)
+    sandbox._container_name = "synthetic-sandbox"
+    holder = {}
+
+    async def launch(identifier, cwd, command):
+        attempt = register_shell_attempt(sandbox, identifier, cwd, command)
+        holder["attempt"] = attempt
+        attempt.observe({"version": 1, "operation_id": attempt.operation_id,
+            "command_digest": attempt.command_digest, "server_instance_id": "a" * 32,
+            "state": "running", "returncode": None, "process_tree_quiescent": False})
+        attempt.observed_at = 0  # Make the normal bounded observation due.
+        return ToolResult(success=True, data={"status": "running", "returncode": None})
+
+    async def status(identifier, operation):
+        attempt = holder["attempt"]
+        assert operation == attempt.operation_id
+        return ToolResult(success=True, data={"version": 1, "operation_id": operation,
+            "command_digest": attempt.command_digest, "server_instance_id": "a" * 32,
+            "state": "exited", "returncode": 0, "process_tree_quiescent": True})
+
+    sandbox.exec_command = AsyncMock(side_effect=launch)
+    sandbox.shell_operation_status = AsyncMock(side_effect=status)
+    calls = [{"name": "shell_exec", "id": f"launch-{i}", "args": {
+        "id": f"shell-{i}", "exec_dir": "/work", "command": "installed-tool --write-output"}} for i in range(2)]
+    agent, _, requests, _ = make_agent(monkeypatch, [AIMessage(content=DSML),
+        AIMessage(content="", tool_calls=calls), AIMessage(content="Completed")])
+    agent.toolkits.append(ShellToolkit(sandbox))
+    events = [event async for event in agent.execute("Analyze")]
+    assert sandbox.exec_command.await_count == 1 and sandbox.shell_operation_status.await_count == 1
+    assert len(requests) == 3 and events[-1].message == "Completed"
+    assert any(isinstance(event, ToolEvent) and isinstance(event.function_result, dict)
+        and event.function_result.get("blocked_by_policy") == "tool_replay_suppressed" for event in events)

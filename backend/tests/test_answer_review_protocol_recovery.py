@@ -43,7 +43,7 @@ async def execute(first_check, second, *, evidence=None, requirements=None, firs
     before = copy.deepcopy(evidence.__dict__)
     first = response(first_paragraph or paragraph(GOOD_TEXT, source="tool_0002_result", quote="mean=7"),
                      checks=first_check if isinstance(first_check, list) else [first_check])
-    ask = AsyncMock(side_effect=[first, second])
+    ask = AsyncMock(side_effect=[first, second, second])
     result = await review.review_answer(ask=ask, question="Compute the observed mean", draft="UNTRUSTED_DRAFT",
         files=[file()], evidence=evidence, requirements=[OBJECTIVE] if requirements is None else requirements)
     assert evidence.__dict__ == before
@@ -177,7 +177,8 @@ async def test_recheck_cannot_modify_locked_items_or_smuggle_extra_checks(mutati
     else:
         payload["requirement_corrections"][0]["check"]["status"] = "unclear"
     result, ask = await execute(check("unclear"), AIMessage(content=json.dumps(payload)))
-    assert result.status == "unavailable" and result.missing_requirement_indices == () and ask.await_count == 2
+    assert result.status == "unavailable" and result.missing_requirement_indices == ()
+    assert ask.await_count == (2 if mutation == "unclear_with_evidence" else 3)
     assert GOOD_TEXT in result.text and "private" not in result.text and "fake" not in result.text
 
 

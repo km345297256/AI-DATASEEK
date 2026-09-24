@@ -54,6 +54,7 @@ const entry = `import {createApp,h,reactive,nextTick} from 'vue';
 import {createI18n} from 'vue-i18n';
 import ChatBox from ${JSON.stringify(resolve(frontend, 'src/components/ChatBox.vue'))};
 import AnalysisConversation from ${JSON.stringify(resolve(frontend, 'src/components/AnalysisConversation.vue'))};
+import {ConversationViewport} from ${JSON.stringify(resolve(frontend, 'src/utils/conversationViewport.ts'))};
 import en from ${JSON.stringify(resolve(frontend, 'src/locales/en.ts'))};
 const messages=${JSON.stringify(messages)};
 const state=reactive({modelValue:'',rows:1,isRunning:false,attachments:[],selectedSkills:[],selectedMcpServers:[],
@@ -73,6 +74,7 @@ const app=createApp({render:()=>h('main',[
 app.use(createI18n({legacy:false,locale:'en',messages:{en},missingWarn:false,fallbackWarn:false}));
 app.mount('#app');
 window.harness={state,events,messages,set:async patch=>{Object.assign(state,patch);await nextTick();},unmount:()=>app.unmount()};
+window.ConversationViewport=ConversationViewport;
 window.harnessReady=true;`;
 const bundle = await build({
   stdin: { contents: entry, sourcefile: 'chat-layout-entry.js', resolveDir: frontend },
@@ -265,6 +267,50 @@ try {
   assert.deepEqual(await visibleTypes(), ['attachments', 'user', 'task-summary', 'assistant']);
   assert.deepEqual(await page.evaluate(() => window.harness.messages), messages, 'Presentation and clicks must not mutate source history');
   report.checks.push({ conversation: { collapsedOrder: await visibleTypes(), expandedOrder: ['attachments', 'user', 'task-summary', 'step', 'assistant'], resumeSourceIndex: 4, sourceHistoryUnchanged: true } });
+  const nativeAnchor = await page.evaluate(async () => {
+    const frames = () => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+    const viewport = document.createElement('section');
+    viewport.style.cssText = 'height:240px;max-width:700px;overflow:auto;overflow-anchor:none;border:1px solid #999;margin:24px auto';
+    const content = document.createElement('div'); content.className = 'analysis-conversation';
+    for (let index = 0; index < 30; index++) {
+      const row = document.createElement('div'); row.dataset.messageKey = `fixture-${index}`;
+      row.style.cssText = 'height:80px;padding:18px;border-bottom:1px solid #ccc;box-sizing:border-box';
+      row.textContent = `Synthetic history row ${index}`; content.append(row);
+    }
+    viewport.append(content); document.body.append(viewport);
+    const controller = new window.ConversationViewport(() => false);
+    viewport.scrollTop = 430;
+    controller.capture(viewport);
+    const row = content.children[5];
+    const offset = () => row.getBoundingClientRect().top - viewport.getBoundingClientRect().top;
+    const before = offset();
+    const older = document.createElement('div'); older.style.height = '200px'; older.textContent = 'Older history';
+    content.prepend(older); controller.layout(); await frames();
+    const afterPrepend = offset();
+    const image = document.createElement('img'); image.style.cssText = 'display:block;width:100%;height:auto';
+    older.style.height = 'auto';
+    const loaded = new Promise(resolve => { image.onload = resolve; image.onerror = resolve; });
+    image.src = 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="600" height="300"><rect width="600" height="300" fill="#dff3e8"/><text x="30" y="150" font-size="24">Delayed synthetic image</text></svg>');
+    older.append(image); await loaded; await frames(); await frames();
+    const afterImage = offset();
+    const top = viewport.scrollTop;
+    // Native event dispatch releases the anchor; no artificial observer call.
+    viewport.dispatchEvent(new WheelEvent('wheel', { deltaY: -20, bubbles: true }));
+    const extra = document.createElement('div'); extra.style.height = '75px'; content.prepend(extra);
+    await frames(); await frames();
+    const afterIntent = viewport.scrollTop;
+    controller.dispose();
+    content.prepend(Object.assign(document.createElement('div'), { style: 'height:90px' }));
+    await frames();
+    const afterDispose = viewport.scrollTop;
+    return { before, afterPrepend, afterImage, top, afterIntent, afterDispose };
+  });
+  assert.ok(Math.abs(nativeAnchor.afterPrepend - nativeAnchor.before) <= 1, 'Native prepend must retain the same reading row');
+  assert.ok(Math.abs(nativeAnchor.afterImage - nativeAnchor.before) <= 1, 'A native ResizeObserver must retain the reading row after image decode');
+  assert.equal(nativeAnchor.afterIntent, nativeAnchor.top, 'Reader intent must release compensation');
+  assert.equal(nativeAnchor.afterDispose, nativeAnchor.afterIntent, 'Disposal must stop layout writes');
+  report.checks.push({ nativeAnchor });
+  await page.screenshot({ path: join(output, 'history-anchor.png'), fullPage: true });
   assert.deepEqual(report.errors, []); assert.deepEqual(report.consoleErrors, []);
   assert.deepEqual(report.externalAttempts, []); assert.deepEqual(report.unexpectedRequests, []);
   await page.evaluate(() => window.harness.unmount());

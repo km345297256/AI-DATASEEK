@@ -19,6 +19,7 @@ from app.domain.models.spill import SpillArtifactNotice
 from app.domain.models.tool_result import ToolResult
 from app.domain.models.analysis_job import AnalysisJobView
 from app.domain.models.tool_approval import ToolApprovalView
+from app.domain.models.program_attempt import ProgramAttemptView
 from app.domain.services.tools.spill_projection import (
     sanitize_spill_notice,
     spill_notice_from_result,
@@ -123,6 +124,7 @@ class ToolEventData(BaseEventData):
     spill: Optional[SpillArtifactNotice] = None
     analysis_job: Optional[AnalysisJobView] = None
     tool_approval: Optional[ToolApprovalView] = None
+    program_attempt: Optional[ProgramAttemptView] = None
 
 class ToolSSEEvent(BaseSSEEvent):
     event: Literal["tool"] = "tool"
@@ -176,6 +178,7 @@ class ToolSSEEvent(BaseSSEEvent):
                 spill=spill,
                 analysis_job=event.analysis_job,
                 tool_approval=event.tool_approval,
+                program_attempt=event.program_attempt if event.status == ToolStatus.CALLED else None,
             )
         )
 

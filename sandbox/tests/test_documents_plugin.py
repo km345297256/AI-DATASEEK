@@ -63,3 +63,49 @@ def test_presentation_plugin_is_discoverable():
     plugin=Path(__file__).resolve().parents[2]/"tools"/"presentations"/"manifest.json"
     manifest=__import__("json").loads(plugin.read_text())
     assert {item["name"] for item in manifest["tools"]} == {"presentation_inspect","pptx_extract_content","pptx_render_slides"}
+
+
+def test_native_pdf_inspection_advertises_content_extraction_without_claiming_readiness(tmp_path):
+    path = tmp_path / "unrelated-study.pdf"
+    _pdf(path)
+    inspected = OPS.inspect_document({"input_path": str(path)})
+    assert inspected["success"] and not inspected["answer_ready"]
+    assert inspected["summary"]["evidence_scope"] == "metadata_only"
+    assert inspected["summary"]["content_extracted"] is False
+    assert inspected["recommended_next_tools"] == ["pdf_extract_text"]
+    assert "Temperature observations" not in str(inspected)
+    extracted = OPS.pdf_text({"input_path": str(path)})
+    assert "Temperature observations" in extracted["summary"]["pages"][0]["text"]
+    assert extracted["summary"]["pages"][0]["page"] == 1
+    assert extracted["artifacts"] == []
+
+
+def test_pdf_without_text_routes_to_ocr_not_custom_script(tmp_path):
+    path = tmp_path / "scan.pdf"
+    _pdf(path, text="")
+    result = OPS.inspect_document({"input_path": str(path)})
+    assert result["summary"]["text_pages"] == 0
+    assert not result["answer_ready"]
+    assert result["recommended_next_tools"] == ["pdf_ocr_text", "pdf_render_pages"]
+
+
+def test_docx_metadata_and_content_are_distinct_capabilities(tmp_path):
+    path = tmp_path / "description.docx"
+    _docx(path)
+    inspected = OPS.inspect_document({"input_path": str(path)})
+    assert inspected["summary"]["content_extracted"] is False
+    assert not inspected["answer_ready"]
+    assert inspected["recommended_next_tools"] == ["docx_extract_structure"]
+    assert "Temperature observations" not in str(inspected)
+    extracted = OPS.docx_structure({"input_path": str(path)})
+    assert "Temperature observations" in str(extracted["summary"]["blocks"])
+    assert extracted["artifacts"] == []
+
+
+def test_text_inspection_recommends_reading_without_claiming_source_evidence(tmp_path):
+    path = tmp_path / "source.md"
+    path.write_text("A source assertion that metadata cannot support")
+    result = OPS.inspect_document({"input_path": str(path)})
+    assert not result["answer_ready"]
+    assert result["recommended_next_tools"] == ["file_read"]
+    assert "source assertion" not in str(result)

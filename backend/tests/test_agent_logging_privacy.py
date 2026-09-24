@@ -124,8 +124,12 @@ async def test_chat_bootstrap_log_hides_session_and_exception_values(caplog):
             RuntimeError(raw_error),
         )
 
-    assert len(captured_events) == 1
-    assert isinstance(captured_events[0], ErrorEvent)
+    assert len(captured_events) == 2
+    assert isinstance(captured_events[0], MessageEvent)
+    assert captured_events[0].metadata["analysis_outcome"]["reason_code"] == "input_preparation_failed"
+    assert captured_events[0].metadata["analysis_started"] is False
+    assert isinstance(captured_events[1], ErrorEvent)
+    assert all("bootstrap-secret" not in item.model_dump_json() for item in captured_events)
     logs = _module_logs(caplog, domain_service_module)
     assert "session=session:sha256:" in logs
     assert "error_type=RuntimeError" in logs

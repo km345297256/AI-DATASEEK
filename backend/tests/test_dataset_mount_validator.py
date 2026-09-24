@@ -13,6 +13,8 @@ class FakeContainers:
 
     def run(self, **kwargs):
         self.calls.append(kwargs)
+        if kwargs.get("user") == "ubuntu":
+            return b'{"ok":true,"file_count":2}'
         return self.output
 
 
@@ -87,7 +89,7 @@ def test_inspect_local_directory_returns_canonical_safe_manifest_and_uses_read_o
     ]
     assert inventory.total_size == 1066
 
-    assert len(client.containers.calls) == 1
+    assert len(client.containers.calls) == 2
     call = client.containers.calls[0]
     assert call["image"] == "helper-image"
     assert call["entrypoint"] == "python3"
@@ -109,6 +111,10 @@ def test_inspect_local_directory_returns_canonical_safe_manifest_and_uses_read_o
     assert "stat.S_ISREG" in helper_script
     assert "with os.scandir(directory_fd) as entries" in helper_script
     assert "sorted(iterator" not in helper_script
+    probe = client.containers.calls[1]
+    assert probe["user"] == "ubuntu" and probe["read_only"] and probe["network_disabled"]
+    assert probe["mounts"][0]["Source"] == "/srv/datasets/center-a"
+    assert probe["mounts"][0]["ReadOnly"] is True
 
 
 def test_inspect_maps_logical_path_into_configured_docker_host_root(monkeypatch):

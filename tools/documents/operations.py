@@ -25,8 +25,8 @@ def clean(value: Any) -> Any:
     return str(value)
 
 
-def response(operation: str, summary: dict[str,Any], *, evidence: list[dict[str,Any]]|None=None, artifacts: list[dict[str,Any]]|None=None, warnings: list[str]|None=None) -> dict[str,Any]:
-    return clean({"success":True,"answer_ready":True,"operation":operation,"summary":summary,"evidence":evidence or [],"artifacts":artifacts or [],"warnings":warnings or [],"provenance":{"tool":operation,"version":"1.0.0"},"recommended_next_tools":[]})
+def response(operation: str, summary: dict[str,Any], *, evidence: list[dict[str,Any]]|None=None, artifacts: list[dict[str,Any]]|None=None, warnings: list[str]|None=None, answer_ready: bool=True, recommended_next_tools: list[str]|None=None) -> dict[str,Any]:
+    return clean({"success":True,"answer_ready":answer_ready,"operation":operation,"summary":summary,"evidence":evidence or [],"artifacts":artifacts or [],"warnings":warnings or [],"provenance":{"tool":operation,"version":"1.0.0"},"recommended_next_tools":recommended_next_tools or []})
 
 
 def output_path(raw: str, directory: bool=False) -> Path:
@@ -85,7 +85,16 @@ def inspect_document(a: dict[str,Any]) -> dict[str,Any]:
     elif suffix in {".txt",".md"}:
         text=path.read_text(encoding="utf-8",errors="replace"); summary={"format":suffix[1:],"characters":len(text),"lines":text.count("\n")+1}
     else: raise ValueError("unsupported document format")
-    summary.update(name=path.name,size_bytes=path.stat().st_size); return response("document_inspect",summary,warnings=warnings)
+    # Parseability and metadata never stand in for source content. Keep the
+    # next action format-driven, not tied to a dataset name or a user question.
+    next_tools = {
+        ".pdf": ["pdf_extract_text"] if summary.get("text_pages") else ["pdf_ocr_text", "pdf_render_pages"],
+        ".docx": ["docx_extract_structure"],
+        ".txt": ["file_read"], ".md": ["file_read"],
+    }.get(suffix, [])
+    summary.update(name=path.name,size_bytes=path.stat().st_size,evidence_scope="metadata_only",content_extracted=False)
+    warnings.append("Metadata only: extract and inspect document content before summarizing it.")
+    return response("document_inspect",summary,warnings=warnings,answer_ready=False,recommended_next_tools=next_tools)
 
 
 def pdf_text(a: dict[str,Any]) -> dict[str,Any]:
@@ -243,7 +252,7 @@ FUNCTIONS={"document_inspect":inspect_document,"pdf_extract_text":pdf_text,"pdf_
 def main() -> int:
     parser=argparse.ArgumentParser(); parser.add_argument("tool"); parser.add_argument("payload"); args=parser.parse_args()
     try: output=FUNCTIONS[args.tool](json.loads(base64.urlsafe_b64decode(args.payload+"="*(-len(args.payload)%4))))
-    except Exception as exc: output={"success":False,"answer_ready":True,"operation":args.tool,"error":f"{type(exc).__name__}: {exc}","warnings":[]}
+    except Exception as exc: output={"success":False,"answer_ready":False,"operation":args.tool,"error":f"{type(exc).__name__}: {exc}","warnings":[]}
     print(json.dumps(clean(output),ensure_ascii=False,allow_nan=False)); return 0 if output["success"] else 1
 
 

@@ -4,6 +4,7 @@ import json
 import pytest
 
 from app.domain.services.analysis_progress import AnalysisProgressGuard, call_identity, program_identity
+from app.domain.services.execution_identity import private_identity_hmac
 
 
 def call(name="file_write", **args):
@@ -249,17 +250,300 @@ def test_unrelated_shell_ls_does_not_reset_failed_program_or_other_drafts():
     assert guard.blocked_without_progress == 1
 
 
-def test_legitimate_new_failure_feedback_and_successful_programs_can_continue():
+def test_different_failure_feedback_eventually_requires_diagnosis_not_a_task_stop():
     guard = AnalysisProgressGuard()
-    for index, error in enumerate(("missing header", "missing delimiter", "bad dtype", "bad unit")):
+    for index, error in enumerate(("missing header", "missing delimiter", "bad dtype")):
         item = call("file_str_replace", file=PROGRAM, old_str=str(index), new_str=str(index + 1))
         assert guard.before_call(item) is None
         guard.record(item, succeeded=True)
         record_program(guard, index, error=error)
-        assert guard.before_call(call("program_run", script_path=PROGRAM), program_path=PROGRAM) is None
+    notice = guard.before_call(call("program_run", script_path=PROGRAM), program_path=PROGRAM)
+    assert "several revisions" in notice and "minimal sample" in notice
+    assert not guard.should_stop
+    guard.record(call("file_read", file=SOURCE), succeeded=True, read_only=True,
+                 result_digest="confirmed source schema")
+    assert guard.before_call(call("program_run", script_path=PROGRAM), program_path=PROGRAM) is None
     record_program(guard, 100, returncode=0)
     assert not guard.programs[program_identity(PROGRAM)].failures
     assert not guard.stalled
+
+
+def source_snapshot(content):
+    source_digest = hashlib.sha256(content.encode()).hexdigest()
+    return source_digest, {"version": 1, "encoding": "utf-8", "size_bytes": len(content.encode()),
+                           "sha256": source_digest, "content": content}
+
+
+def bound_failure(guard, index, *, source_path=SOURCE, path=PROGRAM, argv=None, code=None):
+    digest, snapshot = source_snapshot(code or f"open({source_path!r}).read()\n")
+    guard.record_program_execution(path=path, operation_id=f"bound-{index}", source_digest=digest,
+        returncode=1, failure_fingerprint=f"different-error-{index}", source_snapshot=snapshot,
+        call=call("program_run", script_path=path, argv=argv))
+
+
+def test_unrelated_in_scope_input_read_cannot_clear_known_program_failure():
+    guard = AnalysisProgressGuard()
+    unrelated = "/home/ubuntu/datasets/unrelated.csv"
+    guard.read_scope_paths = frozenset({SOURCE, unrelated})
+    for index in range(3):
+        bound_failure(guard, index)
+    guard.record_blocked(call(file=PROGRAM, content="blind edit"), "diagnose")
+    guard.record(call("file_read", file=unrelated), succeeded=True, read_only=True,
+                 result_digest="new but unrelated observation")
+    assert guard.before_call(call("program_run", script_path=PROGRAM), program_path=PROGRAM)
+    assert guard.blocked_without_progress == 1 and guard.stalled
+    guard.record(call("file_read", file=SOURCE), succeeded=True, read_only=True,
+                 result_digest="relevant observation")
+    assert guard.before_call(call("program_run", script_path=PROGRAM), program_path=PROGRAM) is None
+    assert guard.blocked_without_progress == 0 and not guard.stalled
+    bound_failure(guard, 4)
+    assert guard.before_call(call("program_run", script_path=PROGRAM), program_path=PROGRAM)
+
+
+def test_global_evidence_digest_change_does_not_reset_unrelated_error_history():
+    guard = AnalysisProgressGuard()
+    unrelated = "/home/ubuntu/datasets/unrelated.csv"
+    guard.read_scope_paths = frozenset({SOURCE, unrelated})
+    for index in range(3):
+        guard.record(call("file_read", file=unrelated, start_line=index), succeeded=True, read_only=True,
+                     result_digest=f"new unrelated detail {index}")
+        bound_failure(guard, index)
+    assert guard.programs[program_identity(PROGRAM)].unsuccessful_executions == 3
+    assert guard.before_call(call("program_run", script_path=PROGRAM), program_path=PROGRAM)
+
+
+def test_input_diagnosis_opens_only_matching_program_not_other_failed_target():
+    guard = AnalysisProgressGuard()
+    other_source = "/home/ubuntu/datasets/other.csv"
+    other_program = "/home/ubuntu/output/other.py"
+    guard.read_scope_paths = frozenset({SOURCE, other_source})
+    for index in range(3):
+        bound_failure(guard, index)
+        bound_failure(guard, index, source_path=other_source, path=other_program)
+    guard.record_blocked(call(file=other_program, content="blind"), "other program needs diagnosis")
+    guard.record(call("file_read", file=SOURCE), succeeded=True, read_only=True, result_digest="new detail")
+    assert guard.before_call(call("program_run", script_path=PROGRAM), program_path=PROGRAM) is None
+    assert guard.before_call(call("program_run", script_path=other_program), program_path=other_program)
+    assert guard.blocked_without_progress == 1 and guard.stalled
+
+
+def test_content_identical_source_read_does_not_gain_novelty_from_line_range_or_wrapper():
+    guard = AnalysisProgressGuard()
+    guard.read_scope_paths = frozenset({SOURCE})
+    for index in range(3):
+        bound_failure(guard, index)
+    guard.record(call("file_read", file=SOURCE, start_line=0, end_line=10), succeeded=True, read_only=True,
+                 result_digest="wrapper-1", read_content_digest="actual returned content")
+    assert guard.before_call(call("program_run", script_path=PROGRAM), program_path=PROGRAM) is None
+    bound_failure(guard, 4)
+    guard.record(call("file_read", file=SOURCE, start_line=0, end_line=100), succeeded=True, read_only=True,
+                 result_digest="different-wrapper", read_content_digest="actual returned content")
+    assert guard.before_call(call("program_run", script_path=PROGRAM), program_path=PROGRAM)
+    assert len(guard.evidence) == 1
+
+
+def test_script_revisions_alone_do_not_reset_changed_error_checkpoint():
+    guard = AnalysisProgressGuard()
+    for index in range(3):
+        for name, args in [("file_str_replace", {"old_str": "old", "new_str": f"new{index}"}),
+                           ("file_write", {"content": str(index), "append": True})]:
+            guard.record(call(name, file=PROGRAM, **args), succeeded=True)
+        record_program(guard, index, error=f"changed-error-{index}")
+    assert guard.before_call(call("file_write", file=PROGRAM, content="fourth version"))
+    assert guard.programs[program_identity(PROGRAM)].revision == 6
+
+
+def test_successful_phases_and_evidence_backed_trials_have_no_total_execution_limit():
+    guard = AnalysisProgressGuard()
+    guard.read_scope_paths = frozenset({SOURCE})
+    for phase in range(40):
+        for index in range(3):
+            record_program(guard, phase * 5 + index, error=f"phase-{phase}-error-{index}")
+        assert guard.before_call(call("program_run", script_path=PROGRAM), program_path=PROGRAM)
+        guard.record(call("file_read", file=SOURCE, start_line=phase), succeeded=True, read_only=True,
+                     result_digest=f"confirmed phase {phase} input")
+        assert guard.before_call(call("program_run", script_path=PROGRAM), program_path=PROGRAM) is None
+        record_program(guard, phase * 5 + 4, returncode=0)
+        assert guard.programs[program_identity(PROGRAM)].unsuccessful_executions == 0
+        assert not guard.should_stop
+
+
+def test_an_unrelated_success_cannot_clear_another_program_diagnostic_block():
+    guard = AnalysisProgressGuard()
+    for index in range(3):
+        record_program(guard, index, error=f"different-error-{index}")
+    guard.record_blocked(call(file=PROGRAM, content="blind edit"), "diagnose")
+    record_program(guard, 10, path="/home/ubuntu/output/healthy.py", returncode=0)
+    assert guard.blocked_without_progress == 1 and guard.stalled
+    assert guard.before_call(call("program_run", script_path=PROGRAM), program_path=PROGRAM)
+
+
+def test_source_observation_never_authorizes_unknown_execution_replay():
+    guard = AnalysisProgressGuard()
+    guard.read_scope_paths = frozenset({SOURCE})
+    launch = call("program_run", script_path=PROGRAM)
+    guard.record(launch, succeeded=False, program_path=PROGRAM)
+    guard.record(call("file_read", file=SOURCE), succeeded=True, read_only=True, result_digest="new evidence")
+    assert guard.before_call(launch, program_path=PROGRAM)
+
+
+def test_input_binding_uses_validated_snapshot_or_argv_and_stores_only_identities():
+    guard = AnalysisProgressGuard()
+    unrelated = "/home/ubuntu/datasets/unrelated.csv"
+    guard.read_scope_paths = frozenset({SOURCE, unrelated})
+    bound_failure(guard, 0, source_path=unrelated, argv=[SOURCE])
+    state = guard.programs[program_identity(PROGRAM)]
+    assert state.input_targets == frozenset({program_identity(SOURCE), program_identity(unrelated)})
+    assert "open(" not in repr(state) and "/home/ubuntu" not in repr(state)
+    # Claimed snapshot bytes with the wrong digest cannot narrow recovery.
+    digest, snapshot = source_snapshot(f"open({SOURCE!r})")
+    snapshot["content"] = "different source"
+    new = AnalysisProgressGuard()
+    new.read_scope_paths = guard.read_scope_paths
+    new.record_program_execution(path=PROGRAM, operation_id="invalid-snapshot", source_digest=digest,
+                                 returncode=1, source_snapshot=snapshot)
+    assert new.programs[program_identity(PROGRAM)].input_targets is None
+
+
+def test_successful_phase_resets_input_binding_for_a_new_program_phase():
+    guard = AnalysisProgressGuard()
+    next_source = "/home/ubuntu/datasets/next-phase.csv"
+    guard.read_scope_paths = frozenset({SOURCE, next_source})
+    bound_failure(guard, 0)
+    record_program(guard, 1, returncode=0)
+    for index in range(2, 5):
+        bound_failure(guard, index, source_path=next_source)
+    assert guard.programs[program_identity(PROGRAM)].input_targets == frozenset({program_identity(next_source)})
+    guard.record(call("file_read", file=SOURCE), succeeded=True, read_only=True, result_digest="previous phase detail")
+    assert guard.before_call(call("program_run", script_path=PROGRAM), program_path=PROGRAM)
+    guard.record(call("file_read", file=next_source), succeeded=True, read_only=True, result_digest="new phase detail")
+    assert guard.before_call(call("program_run", script_path=PROGRAM), program_path=PROGRAM) is None
+
+
+def test_code_error_diagnosis_can_recover_from_changing_exception_fingerprints():
+    guard = AnalysisProgressGuard()
+    for index, exception in enumerate(("SyntaxError", "IndentationError", "NameError")):
+        guard.record_program_execution(path=PROGRAM, operation_id=f"code-{index}", source_digest=str(index),
+                                       returncode=1, failure_fingerprint=exception,
+                                       diagnostic={"exception_type": exception})
+    assert "code error" in guard.before_call(call("file_str_replace", file=PROGRAM))
+    guard.record_program_diagnostic(path=PROGRAM, content_digest="exact failed code lines")
+    assert guard.before_call(call("file_str_replace", file=PROGRAM)) is None
+    assert not guard.evidence
+
+
+def joint_failure(guard, index, *, error=None, revision=None):
+    content = f"data = open({SOURCE!r}).read()\nvalue = parse(data)\n# revision {revision or index}\n"
+    digest, snapshot = source_snapshot(content)
+    guard.record_program_execution(path=PROGRAM, operation_id=f"joint-failure-{index}", source_digest=digest,
+        returncode=1, failure_fingerprint=error or f"error-{index}", source_snapshot=snapshot,
+        diagnostic={"exception_type": "ValueError", "line": 2})
+    return content
+
+
+def observed_full_input(guard, *, path=SOURCE, content="complete input bytes"):
+    digest = private_identity_hmac({"purpose": "program-diagnostic-read/v1", "content": content})
+    guard.record(call("file_read", file=path), succeeded=True, read_only=True,
+                 result_digest="tool response wrapper", read_content_digest=digest)
+
+
+def observed_failed_code(guard, content):
+    digest = private_identity_hmac({"purpose": "program-diagnostic-read/v1", "content": content})
+    guard.record_program_diagnostic(path=PROGRAM, content_digest=digest)
+
+
+@pytest.mark.parametrize('input_first', [True, False])
+def test_already_fully_read_small_input_and_bound_failed_code_allow_one_joint_trial(input_first):
+    guard = AnalysisProgressGuard()
+    guard.read_scope_paths = frozenset({SOURCE})
+    observed_full_input(guard)  # All available data was already read before execution.
+    for index in range(3):
+        content = joint_failure(guard, index)
+    assert guard.before_call(call("file_str_replace", file=PROGRAM))
+    evidence_before = set(guard.evidence)
+    if input_first:
+        observed_full_input(guard)
+        assert guard.before_call(call("file_str_replace", file=PROGRAM))  # Data re-read alone is not progress.
+        observed_failed_code(guard, content)
+    else:
+        observed_failed_code(guard, content)
+        assert guard.before_call(call("file_str_replace", file=PROGRAM))  # Code inspection alone is not progress.
+        observed_full_input(guard)
+    assert guard.before_call(call("file_str_replace", file=PROGRAM)) is None
+    assert guard.evidence == evidence_before  # Diagnosis is not fabricated scientific evidence.
+    assert not guard.should_stop
+
+
+def test_same_error_input_bundle_cannot_be_reused_by_revision_churn_or_more_reads():
+    guard = AnalysisProgressGuard()
+    guard.read_scope_paths = frozenset({SOURCE})
+    observed_full_input(guard)
+    for index in range(3):
+        content = joint_failure(guard, index)
+    observed_full_input(guard)
+    observed_failed_code(guard, content)
+    assert guard.before_call(call("file_str_replace", file=PROGRAM)) is None
+    guard.record(call("file_str_replace", file=PROGRAM, old_str="2", new_str="changed"), succeeded=True)
+    changed = joint_failure(guard, 3, error="error-2", revision="cosmetic change")
+    observed_full_input(guard)
+    observed_failed_code(guard, changed)
+    assert guard.before_call(call("file_str_replace", file=PROGRAM))
+    assert len(guard.programs[program_identity(PROGRAM)].joint_diagnostic_trials) == 1
+    # A genuinely different confirmed error can be diagnosed, using the same
+    # small input. This is not a lifetime task-wide run limit.
+    different = joint_failure(guard, 4, error="new concrete exception")
+    observed_full_input(guard)
+    observed_failed_code(guard, different)
+    assert guard.before_call(call("file_str_replace", file=PROGRAM)) is None
+
+
+@pytest.mark.parametrize('fault', ['wrong-line', 'wrong-content', 'unrelated-input', 'pre-failure-code'])
+def test_joint_diagnosis_requires_post_failure_observations_bound_to_the_failed_location(fault):
+    guard = AnalysisProgressGuard()
+    unrelated = "/home/ubuntu/datasets/unrelated.csv"
+    guard.read_scope_paths = frozenset({SOURCE, unrelated})
+    observed_full_input(guard)
+    observed_full_input(guard, path=unrelated)
+    for index in range(3):
+        content = joint_failure(guard, index)
+    if fault == 'pre-failure-code':
+        observed_failed_code(guard, content)
+        joint_failure(guard, 3)
+        observed_full_input(guard)
+    else:
+        observed_full_input(guard, path=unrelated if fault == 'unrelated-input' else SOURCE)
+        expected = private_identity_hmac({'purpose': 'program-diagnostic-line/v1', 'content': 'value = parse(data)'})
+        guard.record_program_diagnostic(path=PROGRAM, content_digest='not-whole-code', line_observation={
+            'start_line': 0 if fault == 'wrong-line' else 1,
+            'line_digests': ['different-content'] if fault == 'wrong-content' else [expected],
+        })
+    assert guard.before_call(call("file_str_replace", file=PROGRAM))
+
+
+def test_confirmed_failed_line_excerpt_can_complete_joint_diagnosis():
+    guard = AnalysisProgressGuard()
+    guard.read_scope_paths = frozenset({SOURCE})
+    observed_full_input(guard)
+    for index in range(3):
+        joint_failure(guard, index)
+    observed_full_input(guard)
+    line_digest = private_identity_hmac({'purpose': 'program-diagnostic-line/v1', 'content': 'value = parse(data)'})
+    guard.record_program_diagnostic(path=PROGRAM, content_digest='an excerpt',
+                                   line_observation={'start_line': 1, 'line_digests': [line_digest]})
+    assert guard.before_call(call("file_str_replace", file=PROGRAM)) is None
+
+
+def test_joint_diagnosis_never_grants_replay_of_a_later_unknown_launch():
+    guard = AnalysisProgressGuard()
+    guard.read_scope_paths = frozenset({SOURCE})
+    observed_full_input(guard)
+    for index in range(3):
+        content = joint_failure(guard, index)
+    launch = call("program_run", script_path=PROGRAM)
+    guard.record(launch, succeeded=False, program_path=PROGRAM)
+    observed_full_input(guard)
+    observed_failed_code(guard, content)
+    assert guard.before_call(launch, program_path=PROGRAM)
 
 
 def test_repeated_error_cycle_is_detected_despite_intervening_other_error():

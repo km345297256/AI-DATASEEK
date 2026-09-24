@@ -1,5 +1,6 @@
 from typing import Optional, AsyncGenerator, List
 import asyncio
+import json
 import logging
 import re
 import shutil
@@ -40,6 +41,10 @@ from app.domain.services.input_delivery import InputDeliveryService, InputLeaseL
 from app.domain.services.analysis_checkpoint import configuration_digest
 from app.domain.models.analysis_input import AnalysisInputContext, upload_catalog_views
 from app.domain.services.analysis_input_selection import input_snapshot, snapshot_files, select_input_files
+from app.domain.services.model_runtime import ModelBudgetStopped, model_execution_scope
+from app.domain.services.analysis_terminal import preparation_failure_message, terminal_analysis_message
+from app.infrastructure.repositories.mongo_model_trace_repository import get_model_trace_repository
+from app.infrastructure.external.sandbox.dataset_readability import DatasetReadabilityError
 
 # Setup logging
 logger = logging.getLogger(__name__)
@@ -670,7 +675,8 @@ class AgentDomainService:
         task.add_done_callback(on_done)
         return task
 
-    async def _handle_chat_bootstrap_error(self, session_id: str, exc: BaseException) -> None:
+    async def _handle_chat_bootstrap_error(self, session_id: str, exc: BaseException,
+                                          *, analysis_started: bool | None = False) -> None:
         session_ref = opaque_log_identifier(session_id, namespace="session")
         logger.error(
             "Chat bootstrap failed session=%s error_type=%s",
@@ -678,9 +684,16 @@ class AgentDomainService:
             type(exc).__name__,
         )
         try:
+            code = (exc.code if isinstance(exc, DatasetReadabilityError)
+                    else "model_audit_unavailable" if isinstance(exc, ModelBudgetStopped)
+                    and exc.code == "trace_store_unavailable" else "input_preparation_failed")
+            outcome_event = (preparation_failure_message(code, 1) if analysis_started is False else
+                terminal_analysis_message("本轮请求的执行状态尚未确认（execution_failed）。请检查运行记录后再继续。",
+                    reason_code="execution_failed", stage="execution", analysis_started=analysis_started))
+            await self._session_repository.add_event(session_id, outcome_event)
             await self._session_repository.add_event(
                 session_id,
-                ErrorEvent(error=public_error_message(exc)),
+                ErrorEvent(error=outcome_event.message),
             )
             await self._session_repository.update_status(session_id, SessionStatus.COMPLETED)
         except Exception as persist_error:
@@ -867,17 +880,19 @@ class AgentDomainService:
                         for item in (attachments or [])
                         if isinstance(item, dict)
                     ]
-                    controller_resolution = await self._dataset_request_resolver.resolve(
-                        question=message,
-                        datasets=datasets,
-                        events=conversation_events,
-                        llm_overrides=session.llm_overrides,
-                        user_id=user_id,
-                        session_id=session.id,
-                        selected_skills=skills or [],
-                        selected_mcp_servers=mcp_servers or [],
-                        attachment_names=attachment_names,
-                    )
+                    with model_execution_scope(user_id=user_id, session_id=session.id,
+                            task_id=f"preparation-{uuid.uuid4().hex}", store=get_model_trace_repository()):
+                        controller_resolution = await self._dataset_request_resolver.resolve(
+                            question=message,
+                            datasets=datasets,
+                            events=conversation_events,
+                            llm_overrides=session.llm_overrides,
+                            user_id=user_id,
+                            session_id=session.id,
+                            selected_skills=skills or [],
+                            selected_mcp_servers=mcp_servers or [],
+                            attachment_names=attachment_names,
+                        )
                 except Exception as exc:
                     logger.error(
                         "Front Controller failed before task creation session=%s error_type=%s",
@@ -998,7 +1013,7 @@ class AgentDomainService:
                 len(message),
             )
             return task
-        except Exception as exc:
+        except (Exception, ModelBudgetStopped) as exc:
             release_claim = queued_event_id is None
             if queued_event_id is not None and task is not None:
                 try:
@@ -1027,7 +1042,8 @@ class AgentDomainService:
                         opaque_log_identifier(session.id, namespace="session"),
                         type(release_error).__name__,
                     )
-            await self._handle_chat_bootstrap_error(session.id, exc)
+            await self._handle_chat_bootstrap_error(session.id, exc,
+                analysis_started=None if queued_event_id is not None else False)
             raise
 
     def start_input_recovery(self) -> None:
@@ -1307,13 +1323,22 @@ class AgentDomainService:
                 if checkpoint is not None:
                     raise ContinuationRejected("原任务的数据来源不可用或访问权限已变化，不能续作。") from exc
                 raise
-            resolution = await self._dataset_request_resolver.resolve(
-                question=checkpoint["goal"] if checkpoint is not None else event.message,
-                datasets=datasets + upload_catalog_views(snapshot_files(metadata)),
-                events=history, llm_overrides=session.llm_overrides, user_id=record.admission.actor_user_id,
-                session_id=session.id, selected_skills=metadata.get("skills") or [],
-                selected_mcp_servers=metadata.get("mcp_servers") or [],
-                attachment_names=[item.filename for item in snapshot_files(metadata)])
+            # Routing runs before an analysis Task exists. Give every physical
+            # provider call an owner/session and exact preparation attempt now,
+            # including attempts that later fail sandbox admission. The normal
+            # governed driver deduplicates settlement by trace_id; no estimated
+            # usage is promoted to actual usage here.
+            preparation_id = f"preparation-{record.key}-{record.admission.attempts}"
+            with model_execution_scope(user_id=record.admission.actor_user_id, session_id=session.id,
+                    task_id=preparation_id, store=get_model_trace_repository()):
+                resolution = await self._dataset_request_resolver.resolve(
+                    question=checkpoint["goal"] if checkpoint is not None else event.message,
+                    datasets=datasets + upload_catalog_views(snapshot_files(metadata)),
+                    events=history, llm_overrides=session.llm_overrides, user_id=record.admission.actor_user_id,
+                    session_id=session.id, selected_skills=metadata.get("skills") or [],
+                    selected_mcp_servers=metadata.get("mcp_servers") or [],
+                    attachment_names=[item.filename for item in snapshot_files(metadata)])
+            resolution.controller_metadata["preparation_attempt_id"] = preparation_id
             await self._input_delivery._require_live(record.session_id, record.key, states={"claimed"})
             if checkpoint is not None:
                 current_session = await self._session_repository.find_by_id_and_user_id(session.id, record.admission.actor_user_id)
@@ -1346,10 +1371,20 @@ class AgentDomainService:
                 task.cancel()
             await self._reject_claimed_continuation(record, error)
             return None
-        except BaseException:
+        except BaseException as error:
             if task is not None:
                 task.cancel()
-            await self._input_delivery.retry_preparation(record)
+            failure_code = (error.code if isinstance(error, DatasetReadabilityError)
+                            else "model_audit_unavailable" if isinstance(error, ModelBudgetStopped)
+                            and error.code == "trace_store_unavailable" else "input_preparation_failed")
+            if isinstance(error, DatasetReadabilityError):
+                # DatasetReadabilityError owns the fixed diagnostic schema. It
+                # includes only anonymous object hashes and comparison fields.
+                logger.warning("Dataset preparation rejected session=%s attempt=%d code=%s diagnostic=%s",
+                    opaque_log_identifier(record.session_id, namespace="session"),
+                    record.admission.attempts, failure_code,
+                    json.dumps(getattr(error, "diagnostic", None), sort_keys=True))
+            await self._input_delivery.retry_preparation(record, failure_code=failure_code)
             raise
 
     async def chat(

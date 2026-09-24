@@ -8,7 +8,7 @@ import asyncio
 import io
 import re
 from urllib.parse import quote
-from pathlib import Path, PurePosixPath
+from pathlib import PurePosixPath
 from datetime import datetime, UTC
 from async_lru import alru_cache
 from app.core.config import get_settings
@@ -21,6 +21,11 @@ from app.domain.external.browser import Browser
 from app.infrastructure.external.sandbox.dataset_mount_validator import (
     canonical_host_source as _canonical_host_source,
     docker_host_source_and_candidates as _docker_host_source_and_candidates,
+)
+from app.infrastructure.external.sandbox.dataset_readability import (
+    DatasetReadabilityError,
+    prepare_managed_dataset_source,
+    verify_dataset_readability,
 )
 
 logger = logging.getLogger(__name__)
@@ -228,12 +233,12 @@ class DockerSandbox(Sandbox):
                         raise RuntimeError("Unapproved managed dataset volume")
                     if mount.target != dataset_root:
                         raise RuntimeError("Invalid managed dataset mount target")
-                    volume = docker_client.volumes.get(mount.source)
-                    volume_root = volume.attrs.get("Mountpoint")
-                    if not volume_root:
-                        raise RuntimeError(f"Docker volume {mount.source} has no host mountpoint")
                     target = dataset_root
-                    source = str(Path(volume_root) / mount.dataset_id)
+                    # New tasks receive a reusable immutable execution-readable
+                    # view. Existing cache files and old task mounts stay intact.
+                    source = prepare_managed_dataset_source(
+                        docker_client, image=image, volume=mount.source, dataset_id=mount.dataset_id,
+                    )
                     if target in seen_targets:
                         raise RuntimeError("Duplicate dataset mount target")
                     seen_targets.add(target)
@@ -264,6 +269,9 @@ class DockerSandbox(Sandbox):
                         source=docker_source,
                         candidate_roots=candidate_roots,
                     )
+                    # A root allowlist/type check does not establish permission
+                    # for the actual analysis user. Never chmod or copy host data.
+                    verify_dataset_readability(docker_client, image=image, source=source)
                     if source in seen_sources:
                         raise RuntimeError("Duplicate dataset mount source")
                     if target in seen_targets:
@@ -316,6 +324,8 @@ class DockerSandbox(Sandbox):
             
         except Exception as e:
             logger.exception("Failed to create Docker sandbox")
+            if isinstance(e, DatasetReadabilityError):
+                raise DatasetReadabilityError(e.code) from None
             if mounts:
                 raise RuntimeError("Failed to create Docker sandbox with the selected read-only dataset") from e
             raise Exception(f"Failed to create Docker sandbox: {str(e)}")
@@ -584,7 +594,9 @@ class DockerSandbox(Sandbox):
         )
         return consume_shell_receipt(self._tool_result_from_response(response, "plugin_exec"), attempt)
 
-    async def view_shell(self, session_id: str, console: bool = False) -> ToolResult:
+    async def view_shell(self, session_id: str, console: bool = False, *,
+                         output_id: str | None = None, cursor: int | None = None,
+                         max_bytes: int = 8192) -> ToolResult:
         from app.domain.services.execution_evidence import bind_shell_observation
         from app.domain.services.program_execution import consume_program_feedback
         attempt = bind_shell_observation(self, session_id)
@@ -594,6 +606,8 @@ class DockerSandbox(Sandbox):
                 "id": session_id,
                 "console": console,
                 **({"operation_id": attempt.operation_id} if attempt else {}),
+                **({"output_id": output_id, "cursor": cursor, "max_bytes": max_bytes}
+                   if output_id is not None or cursor is not None else {}),
             }
         )
         return consume_program_feedback(ToolResult(**response.json()), attempt)
@@ -763,7 +777,12 @@ class DockerSandbox(Sandbox):
                 "sudo": sudo
             }
         )
-        return self._tool_result_from_response(response, "file_replace")
+        result = self._tool_result_from_response(response, "file_replace")
+        status_code = getattr(response, "status_code", None)
+        if type(status_code) is int and 200 <= status_code < 300:
+            from app.domain.services.execution_evidence import confirm_file_replace_no_change
+            confirm_file_replace_no_change(self, file, result)
+        return result
 
     async def file_search(self, file: str, regex: str, sudo: bool = False) -> ToolResult:
         """Search in file content

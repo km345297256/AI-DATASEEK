@@ -144,7 +144,8 @@ def scenario(rounds, requirements, *, unknown=False, model_error=False, cancel_a
         info.model_copy(deep=True) for _, info in state["current"] if info.file_id])
     runner._sync_message_attachments_to_storage = AsyncMock()
     runner._sync_file_to_storage = AsyncMock(return_value=None)
-    runner._input_delivery = SimpleNamespace(_require_live=AsyncMock(side_effect=require_live))
+    runner._input_delivery = SimpleNamespace(_require_live=AsyncMock(side_effect=require_live),
+                                            mark_analysis_started=AsyncMock(side_effect=require_live))
     runner._accepted_input_key = "fixture-input"
     return runner, flow, step, message, state
 

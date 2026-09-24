@@ -1,8 +1,23 @@
-from typing import Literal, Optional, Dict, Any
+from typing import Annotated, Literal, Optional, Dict, Any
+from pydantic import AfterValidator, Field
 from app.domain.external.sandbox import Sandbox
 from app.domain.services.tools.base import BaseToolkit, tool_execution_contract
 from app.domain.models.tool_result import ToolResult
 from langchain.tools import tool
+
+
+def _require_nonblank_file_target(value: str) -> str:
+    if not value.strip():
+        raise ValueError("File target must not be blank")
+    # Whitespace may be part of a valid filename. Validate without choosing or
+    # normalizing the model's target; dispatch must preserve the original value.
+    return value
+
+
+_FileWriteTarget = Annotated[
+    str, Field(min_length=1), AfterValidator(_require_nonblank_file_target)
+]
+
 
 class FileToolkit(BaseToolkit):
     """File tool class, providing file operation functions"""
@@ -46,7 +61,7 @@ class FileToolkit(BaseToolkit):
     @tool(parse_docstring=True)
     async def file_write(
         self,
-        file: str,
+        file: _FileWriteTarget,
         content: str,
         append: Optional[bool] = False,
         leading_newline: Optional[bool] = False,
@@ -83,7 +98,7 @@ class FileToolkit(BaseToolkit):
     @tool(parse_docstring=True)
     async def file_str_replace(
         self,
-        file: str,
+        file: _FileWriteTarget,
         old_str: str,
         new_str: str,
         sudo: Optional[bool] = False

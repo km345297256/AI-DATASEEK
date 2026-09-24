@@ -1,13 +1,14 @@
 """Read-only routing recovers transient transport failure without bypassing safety."""
 import asyncio
 import json
+from contextlib import contextmanager
 from unittest.mock import AsyncMock
 
 import httpx
 from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import AIMessage
 from langchain_core.outputs import ChatGeneration, ChatResult
-from pydantic import PrivateAttr
+from pydantic import PrivateAttr, ValidationError
 from openai import APIStatusError
 import pytest
 
@@ -57,7 +58,10 @@ def decision(*, reject=False):
 @pytest.fixture
 def routing(monkeypatch):
     settings = Settings(_env_file=None, api_key="unit-test-routing", llm_retry_attempts=2,
-        llm_retry_base_seconds=0, llm_retry_max_seconds=0, dataset_request_resolver_timeout_seconds=0.01)
+        llm_retry_base_seconds=0, llm_retry_max_seconds=0)
+    # Keep actual cancellation/retry tests fast without allowing sub-second
+    # deployment settings; production configuration is validated separately.
+    settings.dataset_request_resolver_timeout_seconds = 0.01
     monkeypatch.setattr(resolver_module, "get_settings", lambda: settings)
     monkeypatch.setattr(runtime, "get_settings", lambda: settings)
     monkeypatch.setattr("app.domain.services.execution_identity.get_settings", lambda: settings)
@@ -72,6 +76,76 @@ def routing(monkeypatch):
 
 async def resolve(resolver):
     return await resolver.resolve(question="Compute the uploaded measurements", datasets=[], events=[])
+
+
+def test_front_controller_default_window_matches_answer_review(monkeypatch):
+    monkeypatch.delenv("DATASET_REQUEST_RESOLVER_TIMEOUT_SECONDS", raising=False)
+    monkeypatch.delenv("ANSWER_REVIEW_REQUEST_TIMEOUT_SECONDS", raising=False)
+    settings = Settings(_env_file=None)
+    assert settings.dataset_request_resolver_timeout_seconds == 60.0
+    assert settings.dataset_request_resolver_timeout_seconds == settings.answer_review_request_timeout_seconds
+
+
+@pytest.mark.parametrize("seconds", [1.0, 8.0, 60.0, 135.5, 300.0])
+def test_front_controller_window_remains_operator_configurable(monkeypatch, seconds):
+    monkeypatch.setenv("DATASET_REQUEST_RESOLVER_TIMEOUT_SECONDS", str(seconds))
+    settings = Settings(_env_file=None)
+    assert settings.dataset_request_resolver_timeout_seconds == seconds
+
+
+@pytest.mark.parametrize("seconds", [0, -1, 0.5, 300.1, float("inf"), float("-inf"), float("nan"), "invalid"])
+def test_front_controller_configuration_rejects_invalid_provider_windows(seconds):
+    with pytest.raises(ValidationError):
+        Settings(_env_file=None, dataset_request_resolver_timeout_seconds=seconds)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("configured,logical_latency", [(None, 9.0), (None, 39.0), (None, 59.0), (120.0, 80.0)])
+async def test_front_controller_uses_configured_window_for_slow_provider_response(
+    routing, monkeypatch, configured, logical_latency,
+):
+    """Capture the real driver's window without sleeping for wall-clock seconds.
+
+    The provider double models latency at its request boundary: the historical
+    eight-second window would time out before this response can be returned.
+    Real timer cancellation and exhausted retries remain covered below.
+    """
+    resolver, client, settings = routing
+    monkeypatch.delenv("DATASET_REQUEST_RESOLVER_TIMEOUT_SECONDS", raising=False)
+    configuration = {} if configured is None else {"dataset_request_resolver_timeout_seconds": configured}
+    settings.dataset_request_resolver_timeout_seconds = Settings(_env_file=None, **configuration).dataset_request_resolver_timeout_seconds
+    captured = []
+    original_timeout = runtime.model_request_timeout
+
+    @contextmanager
+    def observed_timeout(seconds):
+        captured.append(seconds)
+        with original_timeout(seconds):
+            yield
+
+    monkeypatch.setattr(runtime, "model_request_timeout", observed_timeout)
+    original_generate = RoutingClient._agenerate
+
+    async def logically_slow_generate(self, messages, stop=None, **kwargs):
+        # Assert the deadline is active at the physical provider boundary, not
+        # merely written into settings or passed as an unused model argument.
+        actual_window = runtime._REQUEST_TIMEOUT.get()
+        assert actual_window == settings.dataset_request_resolver_timeout_seconds
+        if logical_latency >= actual_window:
+            raise runtime.ModelProviderTimeout("provider_request_timeout")
+        return await original_generate(self, messages, stop=stop, **kwargs)
+
+    monkeypatch.setattr(RoutingClient, "_agenerate", logically_slow_generate)
+    client._responses = [decision()]
+    with runtime.model_execution_scope(user_id="u", session_id="s", task_id="slow-routing") as scope:
+        result = await resolve(resolver)
+        assert scope.ledger.call_limit is None and scope.ledger.token_limit is None
+        assert scope.ledger.calls == 1 and scope.ledger.stopped_code is None
+    assert result.mode == "sandbox"
+    assert captured == [60.0 if configured is None else configured]
+    assert len(client._requests) == 1 and client._cancelled == 0
+    assert "tools" not in client._requests[0]
+    assert runtime._REQUEST_TIMEOUT.get() is None
 
 
 @pytest.mark.asyncio

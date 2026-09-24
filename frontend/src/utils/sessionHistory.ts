@@ -1,8 +1,9 @@
 import type { AgentSSEEvent, MessageEventData, StepEventData, ToolEventData, ErrorEventData } from '../types/event';
 import type { Message, MessageContent, AttachmentsContent, StepContent, ToolContent } from '../types/message';
 import { acceptAgentEvent, createAgentEventCursor } from './agentEventCursor.ts';
-import { findAnalysisTool, mergeAnalysisToolEvent } from './analysisJob.ts';
-import { completeRunningSteps, failRunningSteps, findCurrentTurnRunningStep, findCurrentTurnStep, insertTaskExecutionSummary } from './chatTimeline.ts';
+import { mergeAnalysisToolEvent } from './analysisJob.ts';
+import { AnalysisTimelineIndex } from './analysisTimelineIndex.ts';
+import { completeRunningSteps, failRunningSteps, insertTaskExecutionSummary } from './chatTimeline.ts';
 import { isPlaceholderAssistantMessage } from './datasetResultPresentation.ts';
 import { isAnalysisProgressMessage } from './analysisProgress.ts';
 
@@ -14,6 +15,7 @@ export function isLegacyPlanProgressMessage(content: string): boolean {
 export function projectHistoryMessages(events: AgentSSEEvent[], datasetMode = false): Message[] {
   const messages: Message[] = [];
   const cursor = createAgentEventCursor();
+  const index = new AnalysisTimelineIndex();
   for (const event of events) {
     if (!acceptAgentEvent(cursor, event)) continue;
     if (event.event === 'message') {
@@ -26,16 +28,16 @@ export function projectHistoryMessages(events: AgentSSEEvent[], datasetMode = fa
       if (data.attachments?.length) messages.push({ type: 'attachments', content: { ...data } as AttachmentsContent });
     } else if (event.event === 'tool') {
       const tool = { ...event.data } as ToolEventData;
-      const current = findAnalysisTool(messages, tool.tool_call_id);
+      const current = index.tool(messages, tool.tool_call_id);
       if (current) Object.assign(current, mergeAnalysisToolEvent(current, tool));
       else {
-        const step = findCurrentTurnRunningStep(messages);
-        if (step) step.tools.push(tool);
+        const step = index.runningStep(messages);
+        if (step) { step.tools.push(tool); index.addTool(tool); }
         else messages.push({ type: 'tool', content: tool });
       }
     } else if (event.event === 'step') {
       const data = event.data as StepEventData;
-      const current = findCurrentTurnStep(messages, data.id);
+      const current = index.step(messages, data.id);
       if (current) {
         current.status = data.status;
         current.description = data.description;

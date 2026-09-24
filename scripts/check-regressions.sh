@@ -35,6 +35,7 @@ if [[ "$mode" == "--containers" ]]; then
     sandbox-image -c 'uv pip install --python /app/.venv/bin/python --index-url https://pypi.org/simple pytest pytest-asyncio pytest-mock httpx requests && python -m pytest -o addopts= -o log_cli=false -p no:cacheprovider -q -ra'
 else
   cd "$task_repo_root/backend"
+  uv run python scripts/check_persistence_contracts.py --check
   uv run pytest
   cd "$task_repo_root/sandbox"
   AI_DATASEEK_REQUIRE_GEOSCIENCE_STACK=1 uv run pytest

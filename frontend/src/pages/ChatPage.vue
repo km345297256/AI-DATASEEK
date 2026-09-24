@@ -136,7 +136,7 @@
 
           <!-- Loading indicator -->
           <LoadingIndicator v-if="isLoading || isRestoringHistory" role="status" aria-live="polite" :text="isRestoringHistory ? '正在加载最近对话…' : connectionNotice || analysisProgress || $t('Thinking')" />
-          <p v-else-if="connectionNotice" role="status" class="mt-3 text-sm text-[var(--text-tertiary)]">{{ connectionNotice }}</p>
+          <p v-else-if="connectionNotice" role="status" class="mt-3 text-sm text-[var(--text-tertiary)]"><span :role="analysisSession.canRetryInput.value ? 'button' : undefined" :tabindex="analysisSession.canRetryInput.value ? 0 : undefined" @click="analysisSession.retryPendingInput()" @keydown.enter.prevent="analysisSession.retryPendingInput()" @keydown.space.prevent="analysisSession.retryPendingInput()">{{ connectionNotice }}</span></p>
         </div>
 
         <div class="mobile-safe-bottom flex flex-col bg-[var(--background-gray-main)] sticky bottom-0">
@@ -221,6 +221,12 @@ const analysisSession = useAnalysisSession({
   onTerminal: () => eventBus.emit(EVENT_REFRESH_SESSION_LIST),
   onTitle: value => { if (!titleManuallySet.value) title.value = value; },
   onHistoryError: () => showErrorToast('历史记录加载失败，请重试。'),
+  onInputRejected: request => {
+    if (!inputMessage.value && !attachments.value.length) {
+      inputMessage.value = request.message;
+      attachments.value = request.files ?? [];
+    }
+  },
   onSessionRestored: session => {
     shareMode.value = session.is_shared ? 'public' : 'private';
     titleManuallySet.value = session.title_manually_set;
@@ -290,11 +296,14 @@ const chat = async (
   if (isLoading.value || isRestoringHistory.value) return;
   const question = uploadAnalysisPrompt(message, files);
   if (!question) return;
-  const pending = analysisSession.send({ message: question, files, skills, mcpServers, agentProfileId,
+  const originalDraft = inputMessage.value;
+  const originalAttachments = attachments.value;
+  const sent = await analysisSession.send({ message: question, files, skills, mcpServers, agentProfileId,
     inputFileIds: analysisInputs.selectedIds.value });
-  inputMessage.value = '';
-  attachments.value = [];
-  await pending;
+  if (sent && inputMessage.value === originalDraft && attachments.value === originalAttachments) {
+    inputMessage.value = '';
+    attachments.value = [];
+  }
 };
 
 const restoreSession = async () => {
@@ -383,6 +392,7 @@ const handleFollow = () => {
 }
 
 const handleScroll = (_: Event) => {
+  if (!analysisSession.isViewportReaderScroll()) return;
   follow.value = simpleBarRef.value?.isScrolledToBottom() ?? false;
 }
 

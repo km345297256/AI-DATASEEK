@@ -18,6 +18,7 @@ from app.domain.services.execution_environment import (
     create_lightweight_execution_snapshot,
 )
 from app.domain.utils.public_error import public_error_message
+from app.domain.services.analysis_terminal import terminal_analysis_message
 from pydantic import TypeAdapter
 
 logger = logging.getLogger(__name__)
@@ -162,6 +163,7 @@ class LightweightTaskRunner(TaskRunner):
             )
             review = self._resolution.decision.safety
             await self._record_safety_audit(review)
+            technical_failure = False
             if not review.allowed:
                 technical_failure = any(
                     category in {"front_controller_unavailable", "front_controller_decision_missing"}
@@ -176,6 +178,14 @@ class LightweightTaskRunner(TaskRunner):
                     "front_controller_error" if technical_failure else "safety_review": review.model_dump(),
                     "front_controller": self._resolution.controller_metadata,
                 }
+                if technical_failure:
+                    code = self._resolution.controller_metadata.get("failure_code")
+                    if code not in {"transport_timeout", "transport_error", "invalid_response",
+                                    "invalid_safety", "invalid_routing", "invalid_decision"}:
+                        code = "front_controller_unavailable"
+                    answer += f"\n\n失败阶段：前置路由；错误码：{code}。本轮没有执行分析工具或生成分析成果。"
+                    metadata.update(terminal_analysis_message(answer, reason_code=code,
+                        stage="routing", analysis_started=False).metadata)
             else:
                 answer = self._resolution.answer
                 metadata = {
@@ -192,8 +202,10 @@ class LightweightTaskRunner(TaskRunner):
             await self._publish(task, assistant_event)
             await self._session_repository.update_latest_message(self._session_id, answer, assistant_event.timestamp)
             await self._session_repository.increment_unread_message_count(self._session_id)
-            advice = self._completion_advice.default_advice()
-            await self._publish(task, DoneEvent(advice=self._completion_advice.to_payload(advice)))
+            # An unexecuted routing failure has no conclusion to expand or
+            # reusable analysis to turn into a skill.
+            advice = None if technical_failure else self._completion_advice.to_payload(self._completion_advice.default_advice())
+            await self._publish(task, DoneEvent(advice=advice))
             await self._session_repository.update_status(self._session_id, SessionStatus.COMPLETED)
         except Exception as exc:
             logger.error(

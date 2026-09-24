@@ -39,6 +39,7 @@ class ConsoleRecord(BaseModel):
     ps1: str = Field(..., description="Command prompt")
     command: str = Field(..., description="Executed command")
     output: str = Field(default="", description="Command output")
+    output_truncated: bool = False
 
 
 class ShellTask(BaseModel):
@@ -59,6 +60,7 @@ class ShellExecResult(BaseModel):
     output: Optional[str] = Field(None, description="Command execution output, only has value when status is completed")
     execution_receipt: Optional[ShellExecutionReceipt] = None
     program_execution: Optional[dict[str, Any]] = None
+    output_metadata: Optional[dict[str, Any]] = None
 
 
 class ShellViewResult(BaseModel):
@@ -67,6 +69,9 @@ class ShellViewResult(BaseModel):
     session_id: str = Field(..., description="Shell session ID")
     console: Optional[List[ConsoleRecord]] = Field(None, description="Console command records")
     program_execution: Optional[dict[str, Any]] = None
+    output_metadata: Optional[dict[str, Any]] = None
+    output_page: Optional[dict[str, Any]] = None
+    console_truncated: bool = False
 
 
 class ShellWaitResult(BaseModel):

@@ -5,6 +5,7 @@ from typing import Any
 
 from app.domain.models.spill import SpillArtifactChunk, SpillArtifactNotice
 from app.domain.models.tool_result import ToolResult
+from app.domain.utils.numeric_operator_redaction import redact_host_paths
 
 
 SPILL_PROJECTION_KEY = "__ai_dataseek_spill_projection_v1"
@@ -107,7 +108,7 @@ def sanitize_spill_public_text(value: str) -> str:
     # locator is also a typed capability and must survive unchanged.
     for scheme in ("https://", "http://", "wss://", "ws://", "spill://"):
         text = text.replace(scheme, f"{scheme[:-2]}{_SCHEME_MARKER}")
-    text = _HOST_PATH.sub("[protected path]", text)
+    text = redact_host_paths(text, pattern=_HOST_PATH)
     return text.replace(_SCHEME_MARKER, "//")
 
 

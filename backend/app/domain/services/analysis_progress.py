@@ -6,6 +6,7 @@ Only execution evidence or new verified read evidence clears a stalled loop.
 """
 from __future__ import annotations
 
+import ast
 from collections import OrderedDict
 from dataclasses import dataclass, field
 import posixpath
@@ -34,6 +35,15 @@ class ProgramProgress:
     confirmed_prerequisites: str | None = None
     prerequisites_ready: bool = False
     prerequisites_observed: bool = False
+    unsuccessful_executions: int = 0
+    input_targets: frozenset[str] | None = None
+    failure_identity: str | None = None
+    failed_line: int | None = None
+    failed_line_digest: str | None = None
+    failed_full_read_digest: str | None = None
+    failed_program_inspected: bool = False
+    post_failure_inputs: set[str] = field(default_factory=set)
+    joint_diagnostic_trials: set[str] = field(default_factory=set)
 
 
 @dataclass
@@ -73,6 +83,9 @@ def call_identity(call: dict) -> str:
 
 class AnalysisProgressGuard:
     MAX_RECORDS = 64
+    # A diagnostic checkpoint, not a task-wide retry budget. Failures with
+    # changing text/source versions still need an evidence-backed correction.
+    DIAGNOSE_AFTER_FAILURES = 3
 
     def __init__(self) -> None:
         self.failures: OrderedDict[str, int] = OrderedDict()
@@ -146,16 +159,20 @@ class AnalysisProgressGuard:
         state = self.programs.get(target) if target else None
         if state and state.diagnostic_required:
             reason = (
-                "The same code error has recurred. This revision or execution was NOT dispatched. "
+                "The program has repeated a code error or failed across several revisions. "
+                "This revision or execution was NOT dispatched. "
                 "Use file_read to inspect the relevant lines of this failed program and choose a concrete "
-                "correction. A new code-content observation allows one correction experiment; rereading "
+                "correction hypothesis and a minimal check before a full run. "
+                "A new code-content observation allows one correction experiment; rereading "
                 "the same content does not repeatedly reset this condition. Preserve verified outputs."
                 if state.diagnostic_exception in CODE_DIAGNOSTIC_ERRORS else
-                "The same program failure has recurred without new source evidence. "
+                "The program has repeated the same failure or failed across several revisions without new source evidence. "
                 "This additional revision or execution was NOT dispatched. Use file_read to inspect the original input "
-                "structure or relevant source sample and change the parsing/analysis strategy before "
-                "trying again. Reading the generated program or changing a few "
-                "characters is not new source evidence. Preserve already verified outputs."
+                "structure or relevant source sample, state a concrete correction hypothesis, and validate "
+                "a minimal sample before a full run. If this small input was already fully read, inspect it again "
+                "AND inspect the confirmed failing program line with file_read for one joint diagnosis trial. "
+                "Reading only an unrelated input or the generated program, or changing a few characters, "
+                "is not new source evidence. Preserve already verified outputs."
             )
         elif (target and not program_path and call.get("name") == "file_write"
               and str((call.get("args") or {}).get("file", "")).endswith(".py")
@@ -261,13 +278,15 @@ class AnalysisProgressGuard:
     def record_program_execution(self, *, path: str, operation_id: str,
                                  source_digest: str, returncode: int,
                                  failure_fingerprint: str | None = None,
-                                 call: dict | None = None, diagnostic: dict | None = None) -> None:
+                                 call: dict | None = None, diagnostic: dict | None = None,
+                                 source_snapshot: dict | None = None) -> None:
         """Consume host-validated direct-program evidence, never tool prose.
 
         Terminal shell state alone cannot attest which saved program ran. This
         method is called only after the trusted runner validates its receipt.
-        Failure novelty/source observations allow correction; source churn alone
-        does not turn a repeatedly identical failure into useful progress.
+        A new failure can justify a correction, but a series of changing errors
+        is not by itself progress. Only successful execution or relevant read
+        evidence can recover from a diagnosed failure cycle.
         """
         target = program_identity(path)
         state = self._program(target)
@@ -286,10 +305,18 @@ class AnalysisProgressGuard:
         state.last_operation = operation
         state.executed_revision = state.revision
         state.executed_source = private_identity_hmac({"purpose": "program-progress-source/v1", "digest": source_digest})
-        evidence = self.evidence_digest()
-        if state.execution_evidence != evidence:
-            state.failures.clear()
-        state.execution_evidence = evidence
+        state.execution_evidence = self.evidence_digest()
+        state.failed_program_inspected = False
+        state.post_failure_inputs.clear()
+        state.failed_line = state.failed_line_digest = state.failed_full_read_digest = None
+        inputs = self._program_inputs(source_snapshot, source_digest, call)
+        if state.unsuccessful_executions == 0 or returncode == 0:
+            state.input_targets = inputs or None
+        elif inputs:
+            # A later edit cannot make a known input unrelated or erase the
+            # diagnostic state. These identities are hints for targeted reads,
+            # never claims that a program read/analysed the referenced files.
+            state.input_targets = (state.input_targets or frozenset()) | inputs
         state.diagnostic_exception = diagnostic.get("exception_type") if isinstance(diagnostic, dict) else None
         self.writes.pop(target, None)
         self.reads.clear()  # The program may have changed derived outputs.
@@ -297,34 +324,133 @@ class AnalysisProgressGuard:
             state.failures.clear()
             state.diagnostic_required = False
             state.diagnostic_exception = None
+            state.unsuccessful_executions = 0
+            state.failure_identity = None
         else:
+            state.unsuccessful_executions += 1
             signature = private_identity_hmac({"purpose": "program-progress-failure/v1",
                 "fingerprint": failure_fingerprint or f"exit:{returncode}"})
+            state.failure_identity = signature
+            self._bind_failed_diagnostic(state, source_snapshot, source_digest, diagnostic)
             state.failures[signature] = state.failures.get(signature, 0) + 1
             while len(state.failures) > self.MAX_RECORDS:
                 state.failures.pop(next(iter(state.failures)))
-            state.diagnostic_required = state.failures[signature] >= 2
+            state.diagnostic_required = (state.failures[signature] >= 2
+                                         or state.unsuccessful_executions >= self.DIAGNOSE_AFTER_FAILURES)
         if state.diagnostic_required:
             self.stalled = True
             self.last_notice = (
-                "PROGRESS CHECK: repeated program failure without new source evidence. "
+                "PROGRESS CHECK: repeated program failures without new source evidence, even if error text changes. "
                 "Use file_read to inspect the original input structure or a representative failing record and change "
-                "the parsing/analysis strategy. Do not keep patching and rerunning blindly."
+                "the parsing/analysis strategy. State the correction hypothesis and validate a minimal sample "
+                "before the full run. For an already-read small input, inspect it and the confirmed failing "
+                "program line together for one joint diagnosis trial. Do not keep patching and rerunning blindly."
             )
         else:
-            self.stalled = False
+            self._blocked_targets.discard(target)
+            if not self._blocked_targets:
+                self.blocked_without_progress = 0
+            self.stalled = bool(self._blocked_targets) or any(item.diagnostic_required for item in self.programs.values())
+
+    def _program_inputs(self, snapshot: dict | None, source_digest: str,
+                        call: dict | None) -> frozenset[str]:
+        """Find scoped path references in immutable executed bytes/argv.
+
+        Literal references narrow the diagnostic target; they do not attest
+        reads or infer code semantics. Dynamic paths and unavailable snapshots
+        remain unknown, so they retain the request-scope fallback. No source
+        bytes, paths, or ASTs are stored in progress records.
+        """
+        if not self.read_scope_paths:
+            return frozenset()
+        from app.domain.services.program_execution import validated_source_snapshot
+        validated = validated_source_snapshot(snapshot, source_digest)
+        references = []
+        if validated:
+            try:
+                tree = ast.parse(validated["content"])
+                references.extend(node.value for node in ast.walk(tree)
+                                  if isinstance(node, ast.Constant) and isinstance(node.value, str))
+            except (SyntaxError, ValueError, RecursionError):
+                pass  # Syntax diagnostics can inspect the failed source itself.
+        arguments = (call or {}).get("args") or {}
+        argv = arguments.get("argv")
+        if isinstance(argv, list):
+            references.extend(item for item in argv if isinstance(item, str))
+        paths = {posixpath.normpath(value) for value in references if value.startswith("/")}
+        # Do not make a broad root literal a universal diagnostic escape hatch.
+        # A dataset/source directory is useful, but / and /home/ubuntu are not.
+        return frozenset(program_identity(path) for path in self.read_scope_paths
+                         if any(posixpath.normpath(path) == value or
+                                len(PurePosixPath(value).parts) >= 4 and
+                                posixpath.normpath(path).startswith(value.rstrip("/") + "/")
+                                for value in paths))
+
+    @staticmethod
+    def _bind_failed_diagnostic(state: ProgramProgress, snapshot: dict | None, source_digest: str,
+                               diagnostic: dict | None) -> None:
+        from app.domain.services.program_execution import validated_source_snapshot
+        validated = validated_source_snapshot(snapshot, source_digest)
+        if not validated:
+            return
+        # file_read uses text-mode universal newlines. Keep only opaque content
+        # identities, not a second copy of code or traceback text in the guard.
+        content = validated["content"].replace("\r\n", "\n").replace("\r", "\n")
+        state.failed_full_read_digest = private_identity_hmac({"purpose": "program-diagnostic-read/v1", "content": content})
+        line = diagnostic.get("line") if isinstance(diagnostic, dict) else None
+        lines = content.splitlines()
+        if type(line) is int and 1 <= line <= len(lines):
+            state.failed_line = line - 1
+            state.failed_line_digest = private_identity_hmac({"purpose": "program-diagnostic-line/v1",
+                                                              "content": lines[line - 1]})
+
+    def _try_joint_diagnostic(self, target: str, state: ProgramProgress) -> None:
+        """One paired inspection of a confirmed error and its bound input.
+
+        Full small inputs need not magically contain new bytes after failure.
+        Re-observation plus inspection of the failed program is a diagnosis,
+        not scientific progress. An error/input bundle is consumable once,
+        independent of revision, call IDs and line-range spelling.
+        """
+        if not (state.diagnostic_required and state.failure_identity and state.failed_program_inspected):
+            return
+        bundles = {private_identity_hmac({"purpose": "program-joint-diagnosis/v1",
+                    "error": state.failure_identity, "input": identity}) for identity in state.post_failure_inputs}
+        if not bundles - state.joint_diagnostic_trials:
+            return
+        state.joint_diagnostic_trials.update(bundles)
+        state.diagnostic_required = False
+        if self._blocked_targets <= {target}:
             self.blocked_without_progress = 0
             self._blocked_targets.clear()
+        if not self._blocked_targets and not any(item.diagnostic_required for item in self.programs.values()):
+            self.stalled = False
 
-    def record_program_diagnostic(self, *, path: str, content_digest: str) -> None:
+    def record_program_diagnostic(self, *, path: str, content_digest: str,
+                                  line_observation: dict | None = None) -> None:
         """A narrow code-error experiment, not dataset/output progress.
 
-        The digest must come from an identity-checked core file_read. It cannot
-        relieve data-parse errors or reset any other program's diagnostic gate.
+        The digest must come from an identity-checked core file_read. A code
+        read alone cannot relieve data-parse errors: those require the paired,
+        post-failure original-input diagnosis above. Neither path resets any
+        other program's diagnostic gate or confirms scientific progress.
         """
         target = program_identity(path)
         state = self.programs.get(target)
-        if not state or state.diagnostic_exception not in CODE_DIAGNOSTIC_ERRORS:
+        if not state:
+            return
+        if state.diagnostic_required and state.failure_identity:
+            full_read = state.failed_full_read_digest is not None and content_digest == state.failed_full_read_digest
+            located_read = False
+            if state.failed_line is not None and isinstance(line_observation, dict):
+                start, lines = line_observation.get("start_line"), line_observation.get("line_digests")
+                if (type(start) is int and start >= 0 and isinstance(lines, list)
+                        and 0 <= state.failed_line - start < len(lines)):
+                    located_read = lines[state.failed_line - start] == state.failed_line_digest
+            if full_read or located_read:
+                state.failed_program_inspected = True
+                self._try_joint_diagnostic(target, state)
+        if state.diagnostic_exception not in CODE_DIAGNOSTIC_ERRORS:
             return
         if content_digest in state.diagnostic_observations:
             return
@@ -343,7 +469,8 @@ class AnalysisProgressGuard:
 
     def record(self, call: dict, *, succeeded: bool, read_only: bool = False,
                result_digest: str | None = None, confirmed_execution: bool = False,
-               program_path: str | None = None) -> None:
+               program_path: str | None = None,
+               read_content_digest: str | None = None) -> None:
         key = call_identity(call)
         if succeeded and not read_only:
             # A successful content write (including core file_write without
@@ -381,14 +508,27 @@ class AnalysisProgressGuard:
             if call.get("name") == "file_write" and (call.get("args") or {}).get("append") is not True:
                 self._increment(self.writes, target)
         if read_only and result_digest:
+            args = call.get("args") or {}
+            path = args.get("file")
+            source_target = program_identity(path) if isinstance(path, str) else None
+            # Paired diagnosis admits a post-failure re-read of already known
+            # original bytes, but only from a checked core content receipt and
+            # only for the program whose executed snapshot references it.
+            if (read_content_digest and isinstance(path, str) and self.read_scope_paths is not None
+                    and path in self.read_scope_paths and source_target not in self.programs):
+                for target, state in self.programs.items():
+                    if (state.failure_identity and state.input_targets is not None
+                            and source_target in state.input_targets):
+                        state.post_failure_inputs.add(private_identity_hmac({"purpose": "program-diagnostic-input/v1",
+                            "target": source_target, "content": read_content_digest}))
+                        self._try_joint_diagnostic(target, state)
             evidence = private_identity_hmac({"purpose": "analysis-read-evidence/v1",
-                                             "call": key, "result": result_digest})
+                                             "call": source_target if read_content_digest and source_target else key,
+                                             "result": read_content_digest or result_digest})
             if evidence not in self.read_observations:
                 if len(self.read_observations) >= self.MAX_RECORDS:
                     self.read_observations.pop()
                 self.read_observations.add(evidence)
-                args = call.get("args") or {}
-                path = args.get("file")
                 generated_program = isinstance(path, str) and program_identity(path) in self.programs
                 source_read = not generated_program and (
                     self.read_scope_paths is None or path in self.read_scope_paths
@@ -397,22 +537,33 @@ class AnalysisProgressGuard:
                     if len(self.evidence) >= self.MAX_RECORDS:
                         self.evidence.pop()
                     self.evidence.add(evidence)
-                    self.stalled = False
-                    self.blocked_without_progress = 0
-                    self._blocked_targets.clear()
-                    for state in self.programs.values():
-                        state.diagnostic_required = False
+                    recovered = set()
+                    for target, state in self.programs.items():
+                        if state.input_targets is None or source_target in state.input_targets:
+                            # One evidence-backed experiment, not a reset of
+                            # the failed execution history. Another failure
+                            # after the checkpoint needs another diagnosis.
+                            state.diagnostic_required = False
+                            recovered.add(target)
+                    if self._blocked_targets <= recovered or not self.programs:
+                        self.blocked_without_progress = 0
+                        self._blocked_targets.clear()
+                    if not self._blocked_targets and not any(state.diagnostic_required for state in self.programs.values()):
+                        self.stalled = False
                 # A changed answer makes this a useful fresh read.
                 self.reads.pop(key, None)
             self._increment(self.reads, key)
 
     def instruction(self) -> str:
         if any(state.diagnostic_required for state in self.programs.values()):
-            return ("PROGRESS CHECK: the program has repeated the same failure without new source evidence. "
+            return ("PROGRESS CHECK: the program has repeated the same failure or failed across several revisions "
+                    "without new source evidence. "
                     "Use file_read to inspect original input structure/a representative failing record and change strategy "
-                    "before more revisions. For a confirmed syntax/name code error, inspect the exact failing program "
+                    "before more revisions. State a correction hypothesis, validate a minimal sample, then run the full analysis. "
+                    "For a confirmed syntax/name code error, inspect the exact failing program "
                     "lines with file_read for one correction experiment. Re-reading a generated script is not "
-                    "source evidence and cannot relieve data-parsing failures.")
+                    "source evidence. If the original small input was already fully read, pair a post-failure "
+                    "read of it with inspection of the confirmed failing program line for one joint diagnosis trial.")
         if any(count >= 2 and self.programs.get(target) and self.programs[target].direct_runner_supported
                for target, count in self.writes.items()):
             return ("PROGRESS CHECK: stop drafting the saved program. Execute the existing version "

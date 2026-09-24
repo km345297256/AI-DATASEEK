@@ -1,0 +1,8 @@
+{
+  "AgentEvent": {"type": "message", "id": "legacy-user", "timestamp": "2026-09-04T06:00:00Z", "role": "user", "message": "Analyze synthetic data", "metadata": {"client_message_id": "synthetic-input"}},
+  "Plan": {"id": "legacy-plan", "goal": "synthetic analysis", "steps": [{"id": "legacy-step", "status": "completed", "success": true, "result": "Synthetic observation"}]},
+  "Step": {"id": "legacy-step", "status": "pending", "description": "synthetic task"},
+  "Memory": {"messages": [{"type": "human", "content": "synthetic request"}, {"type": "ai", "content": "", "tool_calls": [{"name": "read", "id": "call-1", "args": {}}]}, {"type": "tool", "content": "synthetic output", "tool_call_id": "call-1", "name": "read"}]},
+  "InputAdmission": {"actor_user_id": "synthetic-user", "state": "interrupted", "retry_after": "2026-09-15T00:00:00Z"},
+  "ExecutionHistory": {"version": 2, "seq": 0, "event_count": 0}
+}

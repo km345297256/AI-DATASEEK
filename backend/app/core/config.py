@@ -83,9 +83,13 @@ class Settings(BaseSettings):
     # from provider/network retries and from the dataset quicklook synthesis
     # deadline, which has its own larger professional-analysis budget.
     agent_finalization_timeout_seconds: float = 45.0
-    # Lightweight dataset routing runs before any sandbox allocation. A slow or
-    # unavailable classifier must fall back to the normal Agent path promptly.
-    dataset_request_resolver_timeout_seconds: float = 8.0
+    # The unified routing/safety decision runs before any sandbox allocation.
+    # Give each provider request the same default window as answer review;
+    # unavailable or invalid safety decisions still fail closed after bounded
+    # transport retries. This is not a cumulative analysis/task time limit.
+    dataset_request_resolver_timeout_seconds: float = Field(
+        default=60.0, ge=1.0, le=300.0, allow_inf_nan=False,
+    )
     # Suggested questions are optional page bootstrap data. Keep their model
     # call below the browser API timeout so an unavailable provider can fall
     # back to local questions without turning the whole panel into an error.
@@ -114,6 +118,10 @@ class Settings(BaseSettings):
     vision_max_image_edge: int = Field(default=2048, ge=256, le=8192)
     # Base64 data-URL bytes across one physical model request, not raw bytes.
     vision_max_request_bytes: int = Field(default=20 * 1024 * 1024, ge=1024, le=128 * 1024 * 1024)
+    # Explicit opt-in: MCP media stays text-only unless the active route also
+    # declares vision=True and private spill storage is available.
+    mcp_image_results_enabled: bool = False
+    mcp_image_result_max_tokens: int = Field(default=12_500, ge=1024, le=65_536)
     
     # MongoDB configuration
     mongodb_uri: str = "mongodb://mongodb:27017"

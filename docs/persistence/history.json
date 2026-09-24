@@ -1,0 +1,24 @@
+{
+  "format_version": 1,
+  "snapshots": [
+    {
+      "file": "2026-09-24-baseline.json",
+      "reason": "Initial frozen inventory of the current working-tree persistence contracts; not a data migration."
+    },
+    {
+      "file": "2026-09-24-program-attempt.json",
+      "changes": {
+        "AgentEvent": {
+          "reason": "Add optional program_attempt display metadata for confirmed first-party executions; never reconstruct recovery from filenames or tool prose.",
+          "compatibility": "Additive nullable field with a null default. Existing version-1 events remain readable and never acquire execution/recovery authority. Canonical pre-upgrade recordings omit the absent null field so their original digests and bytes remain unchanged. New non-null projections are retained and digest-protected; writer version remains 1.",
+          "test": "backend/tests/test_event_recording_replay.py"
+        },
+        "ExecutionHistory": {
+          "reason": "The cache's embedded ToolEvent schema inherits the optional program_attempt field.",
+          "compatibility": "Existing version-2 cache records, including embedded pre-upgrade tool events, deserialize with program_attempt=None and retain their original result data. No cache migration or inferred success is needed; version-1 caches remain rejected, and the cache writer stays version 2.",
+          "test": "backend/tests/test_persistence_contracts.py"
+        }
+      }
+    }
+  ]
+}

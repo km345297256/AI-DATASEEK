@@ -12,7 +12,7 @@ from app.domain.models.analysis_outcome import (
 
 KINDS = {
     "image": {"png", "jpg", "jpeg", "webp", "gif", "bmp", "tif", "tiff", "svg", "avif"},
-    "table": {"csv", "tsv", "xlsx", "xls", "parquet"},
+    "table": {"csv", "tsv", "xlsx", "xls", "parquet", "md", "markdown"},
     "report": {"md", "markdown", "txt", "json", "html", "htm", "pdf", "docx"},
     "code": {"py", "r", "js", "ts", "sh", "sql", "ipynb"},
 }
@@ -20,7 +20,13 @@ LABELS = DELIVERABLE_LABELS
 REASONS = {
     "artifacts_missing": "部分要求的成果还未完成。",
     "artifact_validation_failed": "部分文件尚未通过内容检查，暂不能计为已完成成果。",
-    "answer_validation_unavailable": "本次结果说明尚未完成证据核验，暂不能作为已确认结论。",
+    "answer_validation_unavailable": "本次说明暂无法完成证据核验；核验未完成不等于结论被判错误。",
+    "answer_validation_rejected": "本次说明中的部分引用或证据未通过检查，相关结论暂未发布。",
+    "report_validation_rejected": "报告已保存，但部分正文未通过证据核验。",
+    "report_validation_unavailable": "报告已保存，但正文尚未完成证据核验。",
+    "scientific_validation_rejected": "本次结果的计算方法或数值一致性未通过核验。",
+    "scientific_validation_unavailable": "本次结果的计算方法与数值一致性尚未完整核验。",
+    "answer_objectives_missing": "本次回答未完整覆盖原请求的分析目标。",
     "analytical_requirements_missing": "部分要求的分析内容尚未完成。",
     "validation_unavailable": "暂时无法核验成果内容，完成情况尚未确认。",
     "delivery_failed": "部分成果文件尚未成功交付。",
@@ -42,6 +48,10 @@ REASONS = {
 
 def artifact_kind(path: str) -> str | None:
     extension = PurePosixPath(path).suffix.lower().lstrip(".")
+    # Markdown is a report by default. Only a byte-validation receipt can
+    # establish its additional table capability; an extension is insufficient.
+    if extension in {"md", "markdown"}:
+        return "report"
     return next((kind for kind, formats in KINDS.items() if extension in formats), None)
 
 
@@ -92,11 +102,35 @@ def _value(item: Any, key: str, default=None):
 
 
 def _matches(requirement: DeliverableRequirement, kind: str, path: Any) -> bool:
-    return bool((kind == requirement.kind or (requirement.kind == "any" and kind != "code"))
+    markdown_table = (requirement.kind == "table" and kind == "report" and isinstance(path, str)
+                      and PurePosixPath(path).suffix.lower() in {".md", ".markdown"})
+    # This is candidate/diagnostic compatibility only. _missing_requirements
+    # additionally checks trusted content metadata before filling a table slot.
+    return bool((kind == requirement.kind or markdown_table or (requirement.kind == "any" and kind != "code"))
                 and (not requirement.formats or (isinstance(path, str)
                     and PurePosixPath(path).suffix.lower().lstrip(".") in requirement.formats))
                 and (not requirement.output_paths or path in requirement.output_paths
                      or requirement.min_count > len(requirement.output_paths)))
+
+
+def _validated_markdown_table(record: dict) -> bool:
+    """Accept only bounded, internally consistent sandbox table observations.
+
+    The runner supplies these receipts after reading the actual uploaded
+    version. Neither a model's objective, filename nor a text 'table' heading
+    enters this predicate. Structural validity still does not prove content
+    coverage, column semantics, calculations, units or source attribution.
+    """
+    metadata = record.get("metadata")
+    if not isinstance(metadata, dict) or metadata.get("table_validation") != "rectangular":
+        return False
+    count, tables = metadata.get("table_count"), metadata.get("tables")
+    return bool(type(count) is int and 1 <= count <= 128 and isinstance(tables, list)
+                and len(tables) == count and all(isinstance(item, dict)
+                    and type(item.get("row_count")) is int and 2 <= item["row_count"] <= 100_000
+                    and type(item.get("column_count")) is int and 1 <= item["column_count"] <= 2_000
+                    for item in tables)
+                and sum(item["row_count"] * item["column_count"] for item in tables) <= 200_000)
 
 
 def _inspect_records(records, delivered, validation_available, *, _selected_deliveries=None):
@@ -131,6 +165,9 @@ def _inspect_records(records, delivered, validation_available, *, _selected_deli
         if (not _safe_output_path(path) or not isinstance(digest, str) or not re.fullmatch(r"[0-9a-f]{64}", digest)
                 or type(size) is not int or size <= 0 or not isinstance(kind, str) or kind not in KINDS
                 or (suffix not in KINDS[kind] and not (kind == "table" and suffix == "json"))):
+            failed(item, "validation_receipt_invalid")
+            continue
+        if kind == "table" and suffix in {"md", "markdown"} and not _validated_markdown_table(item):
             failed(item, "validation_receipt_invalid")
             continue
         valid[path] = item
@@ -183,6 +220,9 @@ def _missing_requirements(requirements, accepted):
         requirement = requirements[index]
         choices.append([position for position, item in enumerate(accepted)
                         if _matches(requirement, item["kind"], item["path"])
+                        and (requirement.kind != "table"
+                             or PurePosixPath(item["path"]).suffix.lower() not in {".md", ".markdown"}
+                             or _validated_markdown_table(item))
                         and (required_path is None or item["path"] == required_path)])
     assigned = {}
     def assign(slot, visited):
@@ -312,12 +352,29 @@ def verified_delivery_counts(delivered_files: list[Any]) -> dict[str, int]:
         seen_ids.add(file_id)
         seen_paths.add(path)
         kind = artifact_kind(path)
-        # JSON is the one supported extension whose verified content may be a
-        # data table or a report. An explicit receipt-derived kind disambiguates it.
-        if PurePosixPath(path).suffix.lower() == ".json" and (get("kind") or metadata.get("artifact_kind")) == "table":
+        # Ambiguous formats keep their receipt-derived kind when supplied by
+        # the caller; this presentation helper does not infer table content.
+        if PurePosixPath(path).suffix.lower() in {".json", ".md", ".markdown"} and (get("kind") or metadata.get("artifact_kind")) == "table":
             kind = "table"
         counts[kind or "any"] += 1
     return {kind: count for kind, count in counts.items() if count}
+
+
+def _missing_format_label(formats: Any) -> str:
+    """Display only known extensions; malformed private copies stay generic."""
+    if not isinstance(formats, list) or not 1 <= len(formats) <= 8:
+        return ""
+    allowed = set().union(*KINDS.values())
+    normalized = []
+    for value in formats:
+        if not isinstance(value, str):
+            return ""
+        suffix = value.removeprefix(".").lower()
+        if suffix not in allowed:
+            return ""
+        if suffix not in normalized:
+            normalized.append(suffix)
+    return "（" + " / ".join(suffix.upper() for suffix in normalized) + "）"
 
 
 def outcome_message(outcome: AnalysisOutcome, *, delivered_count: int = 0,
@@ -338,7 +395,9 @@ def outcome_message(outcome: AnalysisOutcome, *, delivered_count: int = 0,
         # explanation about code when the actual delivered content is unknown.
         lines.append(f"已交付并保留 {delivered_count} 个文件。")
     if outcome.missing:
-        lines.append("待完成：" + "、".join(f"{LABELS[item.kind]} × {item.min_count}" for item in outcome.missing) + "。")
+        lines.append("待完成：" + "、".join(
+            f"{LABELS[item.kind]}{_missing_format_label(item.formats)} × {item.min_count}"
+            for item in outcome.missing) + "。")
     missing_names = list(dict.fromkeys(issue.artifact_name for issue in outcome.issues
                                       if issue.blocking and issue.reason_code == "missing_artifact"))
     if missing_names:

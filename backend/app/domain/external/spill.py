@@ -7,6 +7,8 @@ from app.domain.models.spill import (
     SpillArtifactOwner,
     SpillArtifactRef,
     SpillArtifactSaveRequest,
+    SpillImageSaveRequest,
+    SpillImageContent,
 )
 
 
@@ -15,6 +17,14 @@ class SpillArtifactStore(Protocol):
 
     async def save_text(self, request: SpillArtifactSaveRequest) -> SpillArtifactRef:
         """Persist the complete text and return an opaque reference."""
+        ...
+
+    async def save_image(self, request: SpillImageSaveRequest) -> SpillArtifactRef:
+        """Store accepted normalized image bytes under the same private lifecycle."""
+        ...
+
+    async def read_image(self, locator: str, owner: SpillArtifactOwner, *, max_bytes: int) -> SpillImageContent:
+        """Read a complete bounded image after checking user, session and integrity."""
         ...
 
     async def read_text(

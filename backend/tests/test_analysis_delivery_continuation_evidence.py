@@ -1,8 +1,9 @@
 """Upload-only recovery retains measured facts without executing analysis again."""
 import json
+import hashlib
 from copy import deepcopy
 from types import SimpleNamespace
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, Mock
 
 import pytest
 
@@ -11,6 +12,9 @@ from app.domain.services.analysis_answer_review import AnswerEvidence, review_an
 from app.domain.services.analysis_checkpoint import _checkpoint_digest
 from test_analysis_checkpoint import Repository, Sandbox, SOURCE, checkpoint_fixture, input_message
 from test_analysis_repair_flow import collect, output, scenario, terminal_messages
+from test_analysis_answer_review import tool
+from test_answer_review_execution_evidence import bound_program
+from test_answer_scientific_scope_routing import with_answer_scope_checks
 
 FACT = "Observed 12 measurements; group mean = 4.5 mm. The requested chart was generated."
 UNVERIFIED_DRAFT = "UNVERIFIED_PRIVATE_DRAFT_SENTINEL: mean = 999 mm."
@@ -24,13 +28,35 @@ async def delivery_recovery_fixture():
     }])
     original = flow.executor._execute_with_tool_scope
     runner._handle_tool_event = AsyncMock()
+    runner._remember_private_tool_output = Mock()
+    # Authentic checkpoint fixtures retain both raw observations and the exact
+    # successful method receipt. Public program success alone is not such proof.
+    raw_values = "value\n" + "4\n5\n" * 6
+    script_path = "/home/ubuntu/group_means.py"
+    script = ("import csv\nfrom statistics import mean\n"
+              f"with open({SOURCE!r}) as handle:\n"
+              "    values = [float(row['value']) for row in csv.DictReader(handle)]\n"
+              "import matplotlib.pyplot as plt\nplt.bar(['group'], [mean(values)])\n"
+              f"plt.savefig({generated[0]['path']!r})\n"
+              "print(f'Observed {len(values)} measurements; group mean = {mean(values)} mm. "
+              "The requested chart was generated.')\n")
+    call = {"id": "original-analysis", "name": "program_run", "args": {
+        "script_path": script_path, "exec_dir": "/home/ubuntu", "id": "original-shell", "argv": []}}
+    receipt = {"version": 1, "script_path": script_path,
+               "source_digest": hashlib.sha256(script.encode()).hexdigest(), "returncode": 0}
+    core, ledger = bound_program(call, receipt)
+    flow.executor.get_tool = Mock(return_value=core)
 
     async def execute(prompt, **kwargs):
         async for event in original(prompt, **kwargs):
             if isinstance(event, MessageEvent):
-                yield ToolEvent(tool_call_id="original-analysis", tool_name="program", function_name="program_run",
-                    function_args={"script_path": "/home/ubuntu/group_means.py"}, status=ToolStatus.CALLED,
-                    function_result={"success": True, "data": {"status": "completed", "returncode": 0, "output": FACT}})
+                flow.executor._tool_execution_ledger = ledger
+                yield tool("file_read", call="original-read", args={"file": SOURCE}, data={"content": raw_values})
+                yield tool("file_write", call="original-method", args={"file": script_path, "content": script})
+                yield ToolEvent(tool_call_id=call["id"], tool_name=core.toolkit.name, function_name="program_run",
+                    function_args=call["args"], status=ToolStatus.CALLED,
+                    function_result={"success": True, "data": {"status": "completed", "returncode": 0,
+                        "output": FACT, "program_execution": receipt}})
                 payload = json.loads(event.message)
                 payload["result"] = UNVERIFIED_DRAFT
                 event = event.model_copy(update={"message": json.dumps(payload)})
@@ -79,13 +105,16 @@ async def delivery_recovery_fixture():
         fact = next((item for item in payload["sources"]
                      if item["kind"] == "tool_result" and FACT in item["text"]), None)
         inventory = next(item for item in payload["sources"] if item["source_id"] == "verified_files")
-        return json.dumps({"unsupported_claims": False, "paragraphs": [{
+        return json.dumps(with_answer_scope_checks(payload, {"unsupported_claims": False, "paragraphs": [{
             "text": FACT if fact else "The requested chart is available in the attachments.",
             "kind": "analysis" if fact else "delivery",
             "evidence": [{"source_id": fact["source_id"] if fact else "verified_files",
                           "quote": FACT if fact else inventory["text"]}],
         }], "requirement_checks": [{"index": 0, "status": "met" if fact else "unclear",
-            "evidence": [{"source_id": fact["source_id"], "quote": FACT}] if fact else []}]})
+            "evidence": [{"source_id": fact["source_id"], "quote": FACT}] if fact else []}]},
+            status="verified" if fact else "unclear",
+            evidence=[{"source_id": fact["source_id"], "quote": FACT}] if fact else [],
+            scope="complete" if fact else "unclear"))
 
     async def real_review(**arguments):
         return await review_answer(ask=review_provider, **arguments)
@@ -103,8 +132,11 @@ async def test_upload_only_continuation_uses_frozen_execution_evidence_without_r
     assert recovered.success and recovered.outcome.status == "succeeded"
     assert recovered.result == FACT
     assert requests[0]["current_step_id"] == recovered.id
-    original_fact = next(item for item in requests[0]["sources"] if item["kind"] == "tool_result")
+    original_fact = next(item for item in requests[0]["sources"] if item["kind"] == "tool_result" and FACT in item["text"])
     assert original_fact["step_id"] == recovered.id
+    assert original_fact["executed_source_coverage"] == "full"
+    assert original_fact["executed_source_id"] in {item["source_id"] for item in requests[0]["sources"]}
+    assert recovered.outputs["answer_review"]["answer_scientific_review"]["status"] == "verified"
     assert UNVERIFIED_DRAFT not in json.dumps(requests)
     assert uploaded.file_id in {info.file_id for event in terminal_messages(events) for info in event.attachments or []}
     assert "answer_evidence" not in json.dumps([event.model_dump(mode="json") for event in events])
@@ -161,7 +193,7 @@ async def test_repeated_upload_outage_retains_the_same_evidence_until_delivery_r
     assert flow.plan.steps[0].outcome.can_resume
     assert authority.checkpoint["answer_evidence"] == frozen
     assert authority.checkpoint["source_seq"] == 2
-    assert len(requests) == 1  # A read-only partial explanation, never execution.
+    assert len(requests) == 2  # Grounded answer + frozen review, never execution.
     resumed_again = resume.model_copy(deep=True)
     resumed_again.resume_from = authority.checkpoint["id"]
     resumed_again.client_message_id = "recovery-input-again"

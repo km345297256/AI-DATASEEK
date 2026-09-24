@@ -5,16 +5,29 @@ import type { AgentSSEEvent, CompletionAdviceData, DoneEventData, ErrorEventData
 import type { AttachmentsContent, Message, MessageContent, StepContent, ToolContent } from '../types/message';
 import type { AnalysisContinuationAttempt } from '../types/analysisOutcome';
 import type { CreateSessionResponse, GetSessionHistoryResponse } from '../types/response';
-import { findAnalysisTool, mergeAnalysisToolEvent } from '../utils/analysisJob.ts';
-import { completeRunningSteps, failRunningSteps, findCurrentTurnRunningStep, findCurrentTurnStep, insertTaskExecutionSummary } from '../utils/chatTimeline.ts';
+import { mergeAnalysisToolEvent } from '../utils/analysisJob.ts';
+import { AnalysisTimelineIndex } from '../utils/analysisTimelineIndex.ts';
+import { completeRunningSteps, failRunningSteps, insertTaskExecutionSummary } from '../utils/chatTimeline.ts';
 import { acceptAgentEvent, createAgentEventCursor, resetAgentEventCursor } from '../utils/agentEventCursor.ts';
 import { createMessageKey, isLegacyPlanProgressMessage, prependHistoricalMessages, projectHistoryMessages } from '../utils/sessionHistory.ts';
 import { isPlaceholderAssistantMessage } from '../utils/datasetResultPresentation.ts';
 import { continuationAttempt, resumableAnalysisOutcome } from '../utils/analysisOutcome.ts';
 import { isAnalysisProgressEvent, isAnalysisProgressMessage } from '../utils/analysisProgress.ts';
 import { useAnalysisProgress } from './useAnalysisProgress.ts';
+import { SSEConnectionError } from '../utils/sseConnection.ts';
+import { ConversationViewport } from '../utils/conversationViewport.ts';
 
-type SessionApi = Pick<typeof import('../api/agent'), 'chatWithSession' | 'createSession' | 'createClientMessageId' | 'getSessionHistory' | 'stopSession'>;
+type SessionApi = Pick<typeof import('../api/agent'), 'chatWithSession' | 'createSession' | 'createClientMessageId' | 'getSessionHistory' | 'stopSession'>
+  & Partial<Pick<typeof import('../api/agent'), 'getInputReceipt'>>;
+
+interface PendingInput {
+  readonly clientMessageId: string;
+  readonly request: AnalysisSessionRequest;
+  readonly echoes: Message[];
+  readonly timestamp: number;
+  state: 'sending' | 'unknown' | 'accepted' | 'rejected';
+  uncertain: boolean;
+}
 
 export interface AnalysisSessionRequest {
   message: string;
@@ -36,6 +49,8 @@ export interface AnalysisSessionOptions {
   onSessionRestored?: (session: GetSessionHistoryResponse) => void;
   onTitle?: (title: string) => void;
   onHistoryError?: () => void;
+  /** Restore rejected local input without overwriting a newer composer draft. */
+  onInputRejected?: (request: AnalysisSessionRequest) => void;
 }
 
 /** Both analysis entry points share transport, event projection and task lifecycle.
@@ -48,6 +63,7 @@ export function useAnalysisSession(options: AnalysisSessionOptions) {
   const messages = ref<Message[]>([]);
   const isLoading = ref(false);
   const connectionNotice = ref('');
+  const canRetryInput = ref(false);
   const loadingStatus = ref('');
   const hasMoreHistory = ref(false);
   const isLoadingHistory = ref(false);
@@ -69,10 +85,32 @@ export function useAnalysisSession(options: AnalysisSessionOptions) {
   const { analysisProgress, updateAnalysisProgress, beginAnalysisProgress, clearAnalysisProgress } = useAnalysisProgress();
   const messageKey = createMessageKey();
   const eventCursor = createAgentEventCursor();
+  const timelineIndex = new AnalysisTimelineIndex();
+  const viewportState = new ConversationViewport(() => follow.value);
   let generation = 0;
   let disposed = false;
   let stopping = false;
   let historyRequest: AbortController | undefined;
+  let receiptRequest: AbortController | undefined;
+  let pendingInput: PendingInput | undefined;
+  let viewportScheduled = false;
+
+  function syncViewport() {
+    if (disposed) return;
+    viewportState.bind(options.getViewport?.());
+    viewportState.layout();
+  }
+  const isViewportReaderScroll = () => viewportState.readerMoved(options.getViewport?.());
+
+  function scheduleViewport() {
+    if (viewportScheduled) return;
+    viewportScheduled = true;
+    const revision = generation;
+    void nextTick(() => {
+      viewportScheduled = false;
+      if (isCurrent(revision)) syncViewport();
+    });
+  }
 
   const isCurrent = (revision: number, id = sessionId.value) => !disposed && revision === generation && id === sessionId.value;
   const terminal = (status: StepEventData['status']) => status === 'completed' || status === 'failed';
@@ -88,9 +126,12 @@ export function useAnalysisSession(options: AnalysisSessionOptions) {
     stopping = false;
     historyRequest?.abort();
     historyRequest = undefined;
+    receiptRequest?.abort();
+    receiptRequest = undefined;
     isLoadingHistory.value = false;
     isRestoringHistory.value = false;
     cancelTransport();
+    viewportState.dispose();
     return generation;
   }
 
@@ -114,6 +155,27 @@ export function useAnalysisSession(options: AnalysisSessionOptions) {
 
   function handleMessage(data: MessageEventData) {
     if (isAnalysisProgressMessage(data)) return;
+    // A replay may expose the durable user event. Hand off by identity, never
+    // text, so intentional identical questions remain separate turns.
+    if (data.role === 'user' && pendingInput
+      && data.metadata?.client_message_id === pendingInput.clientMessageId) {
+      Object.assign(pendingInput.echoes[0].content, data);
+      if (Array.isArray(data.attachments)) {
+        const attachmentEcho = pendingInput.echoes.find(message => message.type === 'attachments');
+        if (attachmentEcho && data.attachments.length) {
+          Object.assign(attachmentEcho.content, { role: 'user', attachments: data.attachments, timestamp: data.timestamp });
+        } else if (attachmentEcho) {
+          messages.value = messages.value.filter(message => message !== attachmentEcho);
+          pendingInput.echoes.splice(pendingInput.echoes.indexOf(attachmentEcho), 1);
+        } else if (data.attachments.length) {
+          const position = messages.value.indexOf(pendingInput.echoes[0]) + 1;
+          messages.value.splice(position, 0, { type: 'attachments', content: { role: 'user', attachments: data.attachments, timestamp: data.timestamp } as AttachmentsContent });
+          pendingInput.echoes.push(messages.value[position]);
+        }
+      }
+      pendingInput.state = 'accepted';
+      return;
+    }
     if (data.role === 'user') startUserTurn();
     if (data.role === 'assistant' && (isPlaceholderAssistantMessage(data.content) || isLegacyPlanProgressMessage(data.content))) return;
     messages.value.push({ type: data.role, content: { ...data } as MessageContent });
@@ -122,13 +184,18 @@ export function useAnalysisSession(options: AnalysisSessionOptions) {
 
   function handleTool(data: ToolEventData) {
     let tool = { ...data } as ToolContent;
-    const existing = findAnalysisTool(messages.value, tool.tool_call_id);
+    const existing = timelineIndex.tool(messages.value, tool.tool_call_id);
     if (existing) {
       Object.assign(existing, mergeAnalysisToolEvent(existing, tool));
       tool = existing;
     } else {
-      const step = findCurrentTurnRunningStep(messages.value);
-      if (step) step.tools.push(tool);
+      const step = timelineIndex.runningStep(messages.value);
+      if (step) {
+        step.tools.push(tool);
+        // Keep Vue's observed instance, not the raw object supplied to push().
+        tool = step.tools[step.tools.length - 1];
+        timelineIndex.addTool(tool);
+      }
       else messages.value.push({ type: 'tool', content: tool });
       lastTool.value = tool;
     }
@@ -141,7 +208,7 @@ export function useAnalysisSession(options: AnalysisSessionOptions) {
       planned.status = data.status;
       planned.description = data.description;
     }
-    const existing = findCurrentTurnStep(messages.value, data.id);
+    const existing = timelineIndex.step(messages.value, data.id);
     if (existing) {
       if (terminal(existing.status) && !terminal(data.status)) return;
       Object.assign(existing, { status: data.status, description: data.description });
@@ -184,9 +251,20 @@ export function useAnalysisSession(options: AnalysisSessionOptions) {
     }
     if (event.data.event_id) lastEventId.value = event.data.event_id;
     lastEventSeq.value = eventCursor.lastSeq;
+    if (!isAnalysisProgressEvent(event)) scheduleViewport();
   }
 
-  function callbacks(revision: number, id: string): SSECallbacks<AgentSSEEvent['data']> {
+  function rejectInput(attempt: PendingInput) {
+    if (pendingInput !== attempt) return;
+    attempt.state = 'rejected';
+    const echoes = new Set(attempt.echoes);
+    messages.value = messages.value.filter(message => !echoes.has(message));
+    pendingInput = undefined;
+    canRetryInput.value = false;
+    options.onInputRejected?.(attempt.request);
+  }
+
+  function callbacks(revision: number, id: string, attempt?: PendingInput): SSECallbacks<AgentSSEEvent['data']> {
     const current = () => isCurrent(revision, id);
     const close = () => {
       isLoading.value = false;
@@ -197,24 +275,52 @@ export function useAnalysisSession(options: AnalysisSessionOptions) {
     };
     return {
       onOpen: () => { if (current()) { isLoading.value = true; connectionNotice.value = ''; } },
-      onRetry: ({ attempt, maxAttempts }) => {
-        if (current()) { isLoading.value = true; connectionNotice.value = `连接中断，正在恢复（${attempt}/${maxAttempts}）…`; }
+      onRetry: ({ attempt: count, maxAttempts }) => {
+        if (current()) {
+          if (attempt) attempt.uncertain = true;
+          isLoading.value = true; connectionNotice.value = `连接中断，正在恢复（${count}/${maxAttempts}）…`;
+        }
       },
-      onMessage: ({ event, data }) => { if (current()) handleEvent({ event: event as AgentSSEEvent['event'], data }); },
-      onClose: () => { if (current()) { close(); connectionNotice.value = ''; options.onTerminal?.(); } },
+      onMessage: ({ event, data }) => {
+        if (!current()) return;
+        if (attempt) attempt.uncertain = true;
+        handleEvent({ event: event as AgentSSEEvent['event'], data });
+        // Old adapters have no receipt endpoint. Production probes durable
+        // acceptance before a subsequent send; transport events alone do not
+        // identify which input was accepted.
+        if (attempt && !api.getInputReceipt && ['done', 'wait', 'error'].includes(event)) {
+          if (pendingInput === attempt) pendingInput = undefined;
+          canRetryInput.value = false;
+        }
+      },
+      onClose: () => {
+        if (current()) {
+          close();
+          if (attempt?.state !== 'unknown') { canRetryInput.value = false; connectionNotice.value = ''; }
+          options.onTerminal?.();
+        }
+      },
       onError: (error) => {
         if (!current()) return;
         // Transport uncertainty is not a confirmed execution failure.
         close(); connectionNotice.value = error.message; options.onTerminal?.();
+        if (attempt && pendingInput === attempt) {
+          if (!attempt.uncertain && error instanceof SSEConnectionError && error.kind === 'http'
+            && [400, 401, 403, 404, 422].includes(error.status ?? 0)) rejectInput(attempt);
+          else {
+            attempt.state = 'unknown'; attempt.uncertain = true; canRetryInput.value = true;
+            connectionNotice.value = `${error.message} 点击此处恢复原提交。`;
+          }
+        }
       },
     };
   }
 
-  async function connect(revision: number, request?: AnalysisSessionRequest, continuation?: AnalysisContinuationAttempt) {
+  async function connect(revision: number, request?: AnalysisSessionRequest, continuation?: AnalysisContinuationAttempt, attempt?: PendingInput) {
     const id = sessionId.value;
     if (!id || !isCurrent(revision, id)) return;
     let ended = false;
-    const handlers = callbacks(revision, id);
+    const handlers = callbacks(revision, id, attempt);
     const finish = (callback: (() => void) | undefined) => { ended = true; callback?.(); };
     try {
       const cancel = await api.chatWithSession(
@@ -222,7 +328,7 @@ export function useAnalysisSession(options: AnalysisSessionOptions) {
         (request?.files ?? []).filter(file => file.file_id && !file.file_id.startsWith('temp-')).map(file => ({ file_id: file.file_id, filename: file.filename })),
         request?.skills ?? [], request?.mcpServers ?? [], request?.agentProfileId ?? null,
         { ...handlers, onClose: () => finish(handlers.onClose), onError: error => { ended = true; handlers.onError?.(error); } },
-        request?.datasetIds, continuation?.clientMessageId, continuation?.resumeFrom, request?.inputFileIds,
+        request?.datasetIds, attempt?.clientMessageId ?? continuation?.clientMessageId, continuation?.resumeFrom, request?.inputFileIds, attempt?.timestamp,
       );
       if (!isCurrent(revision, id) || ended) cancel();
       else cancelCurrentChat.value = cancel;
@@ -234,6 +340,46 @@ export function useAnalysisSession(options: AnalysisSessionOptions) {
       loadingStatus.value = '';
       cancelCurrentChat.value = null;
       connectionNotice.value = '连接未能建立，请刷新页面确认任务状态。';
+      if (attempt && pendingInput === attempt) {
+        attempt.state = 'unknown'; attempt.uncertain = true; canRetryInput.value = true;
+        connectionNotice.value = '连接未能建立，点击此处恢复原提交。';
+      }
+    }
+  }
+
+  async function receipt(attempt: PendingInput, revision: number, id: string) {
+    if (!api.getInputReceipt) return undefined;
+    const request = new AbortController();
+    receiptRequest?.abort(); receiptRequest = request;
+    const result = await api.getInputReceipt(id, attempt.clientMessageId, request.signal);
+    if (request.signal.aborted || !isCurrent(revision, id) || pendingInput !== attempt) return undefined;
+    if (result.client_message_id !== attempt.clientMessageId || typeof result.accepted !== 'boolean') throw new Error('Invalid input receipt');
+    if (result.accepted) attempt.state = 'accepted';
+    return result;
+  }
+
+  /** Explicit recovery of the existing submission, never text-based deduplication. */
+  async function retryPendingInput() {
+    const attempt = pendingInput;
+    const id = sessionId.value;
+    if (!attempt || !id || disposed || isLoading.value || isRestoringHistory.value) return false;
+    const revision = invalidate();
+    isLoading.value = true; canRetryInput.value = false;
+    connectionNotice.value = ''; loadingStatus.value = '正在确认并恢复原提交…';
+    try {
+      const observed = await receipt(attempt, revision, id);
+      if (!isCurrent(revision, id) || pendingInput !== attempt) return false;
+      attempt.state = observed?.accepted ? 'accepted' : 'sending';
+      // An unobserved record can still commit. Retry with the original ID AND
+      // all original inputs; an accepted record needs only event replay.
+      await connect(revision, observed?.accepted ? undefined : attempt.request, undefined, attempt);
+      return isCurrent(revision, id);
+    } catch {
+      if (isCurrent(revision, id)) {
+        isLoading.value = false; loadingStatus.value = ''; canRetryInput.value = true;
+        connectionNotice.value = '暂时无法确认原提交，点击此处重试；不会另发一条分析请求。';
+      }
+      return false;
     }
   }
 
@@ -246,11 +392,51 @@ export function useAnalysisSession(options: AnalysisSessionOptions) {
       datasetIds: request.datasetIds && [...request.datasetIds],
       inputFileIds: request.inputFileIds && [...request.inputFileIds],
     };
+    // A new user action always gets a new identity, but first reconcile an
+    // unresolved prior submission instead of silently replacing its ownership.
+    if (pendingInput && sessionId.value) {
+      const previous = pendingInput, id = sessionId.value, revision = generation;
+      const needsReplay = previous.state === 'unknown';
+      isRestoringHistory.value = true;
+      try {
+        const observed = await receipt(previous, revision, id);
+        if (!isCurrent(revision, id)) return false;
+        if (!observed?.accepted || !['completed', 'cancelled', 'interrupted'].includes(observed.state ?? '')) {
+          canRetryInput.value = true;
+          connectionNotice.value = '上一条提交尚未确认结束，点击此处恢复；当前草稿已保留。';
+          return false;
+        }
+        if (needsReplay) {
+          // The receipt proves acceptance/termination, not delivery of the
+          // intervening output. Reattach first so the next turn cannot hide it.
+          isLoading.value = true;
+          connectionNotice.value = '上一条任务已结束，正在恢复其结果；当前草稿已保留。';
+          await connect(revision, undefined, undefined, previous);
+          return false;
+        }
+        pendingInput = undefined; canRetryInput.value = false;
+      } catch {
+        if (isCurrent(revision, id)) {
+          canRetryInput.value = true;
+          connectionNotice.value = '暂时无法确认上一条提交，点击此处恢复；当前草稿已保留。';
+        }
+        return false;
+      } finally { if (isCurrent(revision, id)) isRestoringHistory.value = false; }
+    }
     const revision = invalidate();
     analysisContinuation.value = null;
     startUserTurn();
-    messages.value.push({ type: 'user', content: { content: request.message, timestamp: Math.floor(Date.now() / 1000) } as MessageContent });
-    if (request.files?.length) messages.value.push({ type: 'attachments', content: { role: 'user', attachments: request.files } as AttachmentsContent });
+    const clientMessageId = api.createClientMessageId();
+    const timestamp = Math.floor(Date.now() / 1000);
+    messages.value.push({ type: 'user', content: { content: request.message, timestamp, metadata: { client_message_id: clientMessageId } } as MessageContent });
+    const echoes = [messages.value[messages.value.length - 1]];
+    if (request.files?.length) {
+      messages.value.push({ type: 'attachments', content: { role: 'user', attachments: request.files } as AttachmentsContent });
+      echoes.push(messages.value[messages.value.length - 1]);
+    }
+    const attempt: PendingInput = { clientMessageId, request, echoes, timestamp, state: 'sending', uncertain: false };
+    pendingInput = attempt; canRetryInput.value = false;
+    scheduleViewport();
     isLoading.value = true;
     taskStartedAtMs.value = performance.now();
     connectionNotice.value = '';
@@ -269,16 +455,19 @@ export function useAnalysisSession(options: AnalysisSessionOptions) {
           taskStartedAtMs.value = undefined;
           loadingStatus.value = '';
           connectionNotice.value = '无法创建分析会话，请稍后重试。';
+          rejectInput(attempt);
         }
         return false;
       }
     }
-    await connect(revision, request);
-    return isCurrent(revision);
+    await connect(revision, request, undefined, attempt);
+    return isCurrent(revision) && attempt.state !== 'rejected';
   }
 
   function canResumeAnalysis(index: number) {
-    return Boolean(!disposed && sessionId.value && !isLoading.value && !isRestoringHistory.value && !cancelCurrentChat.value && resumableAnalysisOutcome(messages.value, index));
+    return Boolean(!disposed && sessionId.value && !isLoading.value && !isRestoringHistory.value && !cancelCurrentChat.value
+      && messages.value[index]?.type === 'assistant' && timelineIndex.isLastDialogue(messages.value, index)
+      && resumableAnalysisOutcome(messages.value, index));
   }
 
   async function resumeAnalysis(index: number) {
@@ -301,9 +490,12 @@ export function useAnalysisSession(options: AnalysisSessionOptions) {
 
   function reset() {
     invalidate();
+    pendingInput = undefined;
+    canRetryInput.value = false;
     options.onReset?.();
     beginAnalysisProgress();
     resetAgentEventCursor(eventCursor);
+    timelineIndex.clear();
     sessionId.value = undefined;
     sessionCreatedAt.value = null;
     messages.value = [];
@@ -379,11 +571,15 @@ export function useAnalysisSession(options: AnalysisSessionOptions) {
       const viewport = options.getViewport?.();
       const oldHeight = viewport?.scrollHeight ?? 0;
       const oldTop = viewport?.scrollTop ?? 0;
+      const anchored = viewportState.capture(viewport);
       messages.value = prependHistoricalMessages(projectHistoryMessages(page.events, true), messages.value);
       hasMoreHistory.value = page.has_more && page.next_before_seq != null && page.next_before_seq < before;
       historyBeforeSeq.value = hasMoreHistory.value ? page.next_before_seq! : undefined;
       await nextTick();
-      if (viewport && isCurrent(revision, id)) viewport.scrollTop = oldTop + viewport.scrollHeight - oldHeight;
+      if (viewport && isCurrent(revision, id)) {
+        if (anchored) viewportState.layout();
+        else viewport.scrollTop = oldTop + viewport.scrollHeight - oldHeight;
+      }
     } catch {
       if (!request.signal.aborted && isCurrent(revision, id)) options.onHistoryError?.();
     } finally {
@@ -405,7 +601,13 @@ export function useAnalysisSession(options: AnalysisSessionOptions) {
     if (!id) return;
     try { await api.stopSession(id); }
     catch {
-      if (isCurrent(revision, id)) connectionNotice.value = '停止请求未能确认，请刷新页面检查任务状态。';
+      if (isCurrent(revision, id)) {
+        connectionNotice.value = '停止请求未能确认，请刷新页面检查任务状态。';
+        if (pendingInput) {
+          pendingInput.state = 'unknown'; pendingInput.uncertain = true; canRetryInput.value = true;
+          connectionNotice.value = '停止请求未能确认，点击此处恢复原提交并检查任务状态。';
+        }
+      }
       return;
     } finally {
       if (isCurrent(revision, id)) {
@@ -416,6 +618,8 @@ export function useAnalysisSession(options: AnalysisSessionOptions) {
       }
     }
     if (!isCurrent(revision, id)) return;
+    pendingInput = undefined;
+    canRetryInput.value = false;
     failActiveSteps();
     taskStartedAtMs.value = undefined;
     options.onTerminal?.();
@@ -424,10 +628,13 @@ export function useAnalysisSession(options: AnalysisSessionOptions) {
   function dispose() {
     disposed = true;
     invalidate();
+    pendingInput = undefined;
+    canRetryInput.value = false;
+    timelineIndex.clear();
     clearAnalysisProgress();
   }
 
-  return { sessionId, sessionCreatedAt, messages, isLoading, connectionNotice, loadingStatus, hasMoreHistory,
+  return { sessionId, sessionCreatedAt, messages, isLoading, connectionNotice, canRetryInput, retryPendingInput, syncViewport, isViewportReaderScroll, loadingStatus, hasMoreHistory,
     isLoadingHistory, isRestoringHistory, historyBeforeSeq, timelineRevision, follow, plan, lastTool, lastNoMessageTool,
     completionAdvice, selectedSkills, selectedMcpServers, lastEventId, lastEventSeq, taskStartedAtMs, analysisProgress,
     messageKey, send, restore, loadEarlierHistory, stop, reset, dispose, canResumeAnalysis, resumeAnalysis, handleEvent };

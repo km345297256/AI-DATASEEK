@@ -24,11 +24,13 @@ export interface SSEOptions {
 
 export class SSEConnectionError extends Error {
   readonly kind: 'transport' | 'http' | 'protocol';
+  readonly status?: number;
 
-  constructor(kind: 'transport' | 'http' | 'protocol', message: string) {
+  constructor(kind: 'transport' | 'http' | 'protocol', message: string, status?: number) {
     super(message);
     this.name = 'SSEConnectionError';
     this.kind = kind;
+    this.status = status;
   }
 }
 
@@ -88,7 +90,7 @@ export function startSSEConnection<T>(
             if (controller.signal.aborted) return;
             if (!response.ok) {
               // HTTP/application failures need an explicit decision, not a POST replay.
-              throw new SSEConnectionError('http', `连接请求失败（HTTP ${response.status}）`);
+              throw new SSEConnectionError('http', `连接请求失败（HTTP ${response.status}）`, response.status);
             }
             if (!response.headers.get('content-type')?.toLowerCase().startsWith('text/event-stream')) {
               throw new SSEConnectionError('protocol', '服务器返回了非事件流响应，请刷新页面后重试。');

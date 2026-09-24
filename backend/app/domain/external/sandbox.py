@@ -47,12 +47,17 @@ class Sandbox(Protocol):
         """
         ...
     
-    async def view_shell(self, session_id: str, console: bool = False) -> ToolResult:
+    async def view_shell(self, session_id: str, console: bool = False, *,
+                         output_id: str | None = None, cursor: int | None = None,
+                         max_bytes: int = 8192) -> ToolResult:
         """View shell status
         
         Args:
             session_id: Session ID
             console: Whether to return console records
+            output_id: Exact output generation from the preview, required with cursor
+            cursor: Optional absolute UTF-8 byte cursor; reads never consume another observer's position
+            max_bytes: Bounded page size when cursor is supplied
 
         Returns:
             Shell status information

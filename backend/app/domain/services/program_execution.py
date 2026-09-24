@@ -1,5 +1,6 @@
 """Private adapter-bound program feedback; never inferred from model output."""
 import json
+import hashlib
 import inspect
 import re
 import asyncio
@@ -25,11 +26,57 @@ def program_command(script_path: str, args: list[str]) -> str:
                        "args": args}, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
 
 
-def consume_program_feedback(result, attempt):
-    """Called only by the trusted sandbox adapter, not tool-result processing."""
-    data = result.data if isinstance(result.data, dict) else {}
+MAX_REVIEW_SOURCE_BYTES = 24_000
+
+
+def validated_source_snapshot(value, source_digest: str) -> dict | None:
+    """Validate complete immutable bytes; this checks shape, not authenticity."""
+    if (type(value) is not dict or set(value) != {
+            "version", "encoding", "size_bytes", "sha256", "content"}
+            or type(value.get("version")) is not int or value["version"] != 1
+            or value.get("encoding") != "utf-8"
+            or type(value.get("size_bytes")) is not int
+            or not 0 <= value["size_bytes"] <= MAX_REVIEW_SOURCE_BYTES
+            or not isinstance(value.get("content"), str)
+            or len(value["content"]) > MAX_REVIEW_SOURCE_BYTES
+            or not isinstance(source_digest, str)
+            or not re.fullmatch(r"[0-9a-f]{64}", source_digest)
+            or value.get("sha256") != source_digest):
+        return None
     try:
-        feedback = ProgramExecutionFeedback.model_validate(data.get("program_execution"))
+        encoded = value["content"].encode("utf-8", errors="strict")
+    except UnicodeEncodeError:
+        return None
+    if (len(encoded) != value["size_bytes"]
+            or hashlib.sha256(encoded).hexdigest() != source_digest):
+        return None
+    return dict(value)
+
+
+def consume_program_feedback(result, attempt):
+    """Trusted adapter only. Strip private code before every public return.
+
+    Even absent/invalid attempts or malformed feedback cannot leak the private
+    source through console views, model observations or persisted ToolResults.
+    Input dictionaries are not mutated; private ledger and returned data do not
+    share the snapshot object.
+    """
+    data = result.data if isinstance(result.data, dict) else {}
+    raw = data.get("program_execution")
+    snapshot = None
+    if isinstance(raw, dict):
+        public = {key: value for key, value in raw.items() if key != "source_snapshot"}
+        result = result.model_copy(update={"data": {**data, "program_execution": public}})
+        snapshot = validated_source_snapshot(raw.get("source_snapshot"), raw.get("source_digest"))
+    else:
+        public = raw
+        if raw is not None:
+            # A malformed non-object feedback has no legitimate public schema.
+            # Do not let nested opaque private fields bypass dictionary removal.
+            result = result.model_copy(update={"data": {key: value for key, value in data.items()
+                                                        if key != "program_execution"}})
+    try:
+        feedback = ProgramExecutionFeedback.model_validate(public)
     except (ValueError, TypeError):
         return result
     if (not feedback.script_path.startswith("/")
@@ -40,7 +87,12 @@ def consume_program_feedback(result, attempt):
         prior = attempt.program_execution
         if prior is None or (prior["script_path"] == feedback.script_path
                              and prior["source_digest"] == feedback.source_digest):
-            attempt.program_execution = feedback.model_dump()
+            private = feedback.model_dump()
+            if snapshot is None and prior is not None:
+                snapshot = validated_source_snapshot(prior.get("source_snapshot"), feedback.source_digest)
+            if snapshot is not None:
+                private["source_snapshot"] = snapshot
+            attempt.program_execution = private
     return result
 
 

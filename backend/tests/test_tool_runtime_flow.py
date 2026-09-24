@@ -21,6 +21,7 @@ from app.domain.models.tool_result import ToolResult
 from app.domain.services import model_runtime
 from app.domain.services.agents.execution import ExecutionAgent
 from app.domain.services.context_budget import estimate_context_tokens
+from app.domain.services.domain_presets import get_domain_preset
 from app.domain.services.execution_environment import create_agent_execution_snapshot
 from app.domain.services.flows.plan_act import PlanActFlow
 from app.domain.services.tools.mcp import MCPToolkit
@@ -134,7 +135,7 @@ async def test_default_flow_is_small_but_legacy_profile_retains_full_catalog(flo
     legacy = flow_factory({"name": "Pre-Phase-7 profile"})
     assert small.plugin_toolkit.catalog_snapshot.engine == "cordis"
     assert len(small.plugin_toolkit.get_tools()) == 280
-    assert len(small._plugin_view.get_tools()) == 3
+    assert len(small._plugin_view.get_tools()) == len(get_domain_preset("general").initial_tools)
     assert len(legacy._plugin_view.get_tools()) == 280
     assert legacy.tool_runtime.selection_mode == "all"
     assert not legacy.tool_runtime.code_mode_enabled and not legacy.tool_runtime.domain_subagents_enabled
@@ -278,7 +279,7 @@ async def test_snapshot_preserves_complete_catalog_models_and_task_initial_selec
     assert first.catalog.tool_count == 280 and first.catalog.plugin_count == 15
     assert first.toolset.tool_count > 280
     assert {agent.name for agent in flow._domain_agents.values()} <= {model.role for model in first.models}
-    assert first.toolset.selection.initial_tool_count == 3
+    assert first.toolset.selection.initial_tool_count == len(get_domain_preset("general").initial_tools)
     assert first.toolset.selection.domain_agent_count == 2
     assert first.toolset.selection.domain_subagents_enabled
     assert flow._plugin_view.load(["space_ground_track"]).success

@@ -102,7 +102,28 @@ const REASON_LABELS: Record<string, string> = {
   completed: '本次分析已完成。',
   artifacts_missing: '部分要求的成果还未完成。',
   artifact_validation_failed: '部分文件尚未通过内容检查，暂不能计为已完成成果。',
-  answer_validation_unavailable: '本次结果说明尚未完成证据核验，暂不能作为已确认结论。',
+  answer_validation_unavailable: '本次说明暂无法完成证据核验；核验未完成不等于结论被判错误。',
+  answer_validation_rejected: '本次说明中的部分引用或证据未通过检查，相关结论暂未发布。',
+  report_validation_rejected: '报告已保存，但部分正文未通过证据核验。',
+  report_validation_unavailable: '报告已保存，但正文尚未完成证据核验。',
+  scientific_validation_rejected: '本次结果的计算方法或数值一致性未通过核验。',
+  scientific_validation_unavailable: '本次结果的计算方法与数值一致性尚未完整核验。',
+  answer_objectives_missing: '结果说明遗漏了您明确要求的部分内容，本次分析尚未完成。',
+  input_preparation_failed: '输入准备失败，本次分析尚未开始。',
+  dataset_unreadable: '当前数据无法读取，本次分析尚未开始。请检查数据来源的可用性和读取权限。',
+  dataset_unsafe: '当前数据未通过安全读取检查，本次分析尚未开始。',
+  dataset_changed: '数据读取前后的状态校验不一致，本次分析尚未开始。',
+  dataset_limit: '当前数据超出准备阶段的处理范围，本次分析尚未开始。',
+  dataset_preparation_failed: '数据准备失败，本次分析尚未开始。',
+  model_audit_unavailable: '暂时无法记录准备过程，本次分析尚未开始。',
+  transport_timeout: '请求准备超时，本次分析尚未开始。',
+  transport_error: '请求准备时连接失败，本次分析尚未开始。',
+  invalid_response: '请求准备未得到有效结果，本次分析尚未开始。',
+  invalid_safety: '请求安全检查未完成，本次分析尚未开始。',
+  invalid_routing: '未能确定本次请求的处理方式，分析尚未开始。',
+  invalid_decision: '请求准备未得到有效处理决定，本次分析尚未开始。',
+  front_controller_unavailable: '请求准备服务暂时不可用，本次分析尚未开始。',
+  runtime_admission_unavailable: '暂时无法确认执行条件，本次请求未进入分析队列。',
   analytical_requirements_missing: '部分要求的分析内容尚未完成。',
   validation_unavailable: '暂时无法核验成果内容，完成情况尚未确认。',
   delivery_failed: '部分成果文件尚未成功交付。',
@@ -116,12 +137,17 @@ const REASON_LABELS: Record<string, string> = {
   finalization_timeout: '结果整理超时。',
   finalization_failed: '结果整理失败。',
   invalid_final_result: '结果格式未通过验证。',
+  invalid_execution_result: '模型未返回可验证的执行结果，本次分析尚未完成。',
+  tool_protocol_error: '模型未能发起有效的工具调用，相关操作未执行。',
   execution_failed: '分析尚未完成。',
   requirements_satisfied: '本次分析已完成。',
   missing_artifacts: '部分要求的成果尚未生成。',
   missing_deliverables: '部分要求的成果尚未生成。',
   incomplete_analysis: '本次分析还有未完成的部分。',
   execution_interrupted: '本次分析执行已中断。',
+  request_cancelled: '本次请求已取消。',
+  tool_authorization_stopped: '工具操作未获授权，本次执行已停止。',
+  model_runtime_stopped: '模型运行已停止，本次分析尚未完成。',
   model_unavailable: '模型服务暂时不可用。',
   model_budget_exceeded: '本次分析已达到处理预算。',
   model_protocol_error: '模型返回的结果未通过完整性校验。',
@@ -134,8 +160,9 @@ export function analysisOutcomeReason(outcome: AnalysisOutcome, hasDeliveredFile
   if (['completed', 'requirements_satisfied'].includes(outcome.reason_code)) return '本次分析仍有待完成项。';
   const reason = (Object.prototype.hasOwnProperty.call(REASON_LABELS, outcome.reason_code) ? REASON_LABELS[outcome.reason_code] : undefined)
     ?? '本次分析尚未完成，具体原因暂未确认。';
-  return hasDeliveredFiles && ['answer_validation_unavailable', 'execution_interrupted'].includes(outcome.reason_code)
-    ? `${reason}本次已交付的文件仍可使用。` : reason;
+  return hasDeliveredFiles && ['answer_validation_unavailable', 'execution_interrupted',
+    'scientific_validation_rejected', 'scientific_validation_unavailable'].includes(outcome.reason_code)
+    ? `${reason}本次已交付的文件仍可查看，内容需结合核验结论使用。` : reason;
 }
 
 /** Final assistant message attachments are published deliveries for this response.
@@ -153,9 +180,33 @@ export function analysisOutcomeTitle(outcome: AnalysisOutcome): string {
     : outcome.status === 'failed' ? '未完成' : '部分完成';
 }
 
+// Keep unknown metadata out of display labels, including history predating formats.
+const MISSING_FORMAT_LABELS = new Set([
+  'png', 'jpg', 'jpeg', 'webp', 'gif', 'bmp', 'tif', 'tiff', 'svg', 'avif',
+  'csv', 'tsv', 'xlsx', 'xls', 'parquet', 'md', 'markdown',
+  'txt', 'json', 'html', 'htm', 'pdf', 'docx',
+  'py', 'r', 'js', 'ts', 'sh', 'sql', 'ipynb',
+]);
+
+function missingFormatLabel(formats: unknown): string {
+  if (!Array.isArray(formats) || formats.length < 1 || formats.length > 8) return '';
+  const normalized = new Set<string>();
+  for (const value of formats) {
+    if (typeof value !== 'string') return '';
+    const suffix = (value.startsWith('.') ? value.slice(1) : value).toLowerCase();
+    if (!MISSING_FORMAT_LABELS.has(suffix)) return '';
+    normalized.add(suffix);
+  }
+  return `（${[...normalized].map(suffix => suffix.toUpperCase()).join(' / ')}）`;
+}
+
 export function analysisOutcomeMissing(outcome: AnalysisOutcome): string[] {
   const labels: Record<string, string> = { image: '图表', table: '数据表', report: '报告', code: '代码', any: '结果文件' };
-  return outcome.missing.map((item) => `${Object.prototype.hasOwnProperty.call(labels, item.kind) ? labels[item.kind] : '成果'} × ${item.min_count}`);
+  return outcome.missing.map((item) => {
+    const label = Object.prototype.hasOwnProperty.call(labels, item.kind) ? labels[item.kind] : '成果';
+    const formats = 'formats' in item ? missingFormatLabel(item.formats) : '';
+    return `${label}${formats} × ${item.min_count}`;
+  });
 }
 
 export function resumableAnalysisOutcome(messages: Message[], index: number): AnalysisOutcome | undefined {

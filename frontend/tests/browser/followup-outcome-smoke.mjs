@@ -148,7 +148,7 @@ try {
     assert.equal(await notice.count(), 1, `${item.id}: real ChatMessage must render its current structured outcome`);
     const text = (await notice.innerText()).replace(/\s+/g, ' ').trim();
     assert.ok(text.startsWith(item.noticeTitle), `${item.id}: outcome title mismatch: ${text}`);
-    assert.equal(text.includes('本次已交付的文件仍可使用。'), item.usableFiles, `${item.id}: file usability must reflect only this response's delivered attachments`);
+    assert.equal(text.includes('本次已交付的文件仍可查看，内容需结合核验结论使用。'), item.usableFiles, `${item.id}: file availability must reflect only this response's delivered attachments without promising scientific validity`);
     if (!item.usableFiles && !item.optionalIssue) assert.ok(!/文件.*(?:可用|使用|仍保留)/.test(text), `${item.id}: no unsupported file-availability claims`);
     if (item.missing) assert.ok(text.includes(item.missing), `${item.id}: genuinely missing deliverables remain visible`);
     const plan = fixture.locator('[data-plan-status]');
@@ -181,6 +181,7 @@ try {
     assert.ok(geometry.pageWidth <= width + 1, `${width}px: conversation must not overflow the viewport`);
     assert.equal(geometry.overflowingNotices, 0, `${width}px: outcome wording and missing-file labels must wrap`);
     report.checks.push({ width, geometry });
+    await page.screenshot({ path: join(output, `outcomes-${width}.png`), fullPage: true });
   }
   assert.deepEqual(await page.evaluate(() => window.harness.cases), cases, 'Rendering must not mutate source history or final metadata');
   assert.deepEqual(report.errors, []);

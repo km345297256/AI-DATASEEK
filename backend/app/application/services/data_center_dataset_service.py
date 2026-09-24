@@ -31,6 +31,10 @@ from app.infrastructure.external.sandbox.dataset_mount_validator import (
     DatasetDirectoryInspectionError,
     inspect_local_dataset_directory,
 )
+from app.infrastructure.external.sandbox.dataset_readability import (
+    DatasetReadabilityError,
+    prepare_registered_managed_dataset,
+)
 from app.infrastructure.models.documents import (
     DataCenterDatasetDocument,
     TemporaryDatasetDocument,
@@ -200,7 +204,11 @@ class DataCenterDatasetService:
                         # Replacing a completed same-directory copy avoids
                         # following a target hard link and never exposes a
                         # partially copied catalog file to a sandbox mount.
-                        shutil.copy2(source, temporary)
+                        # Dataset bytes are data, not a transport for host modes,
+                        # ACLs or executable bits. Only this independent copy is
+                        # changed; the repository/host source stays untouched.
+                        shutil.copyfile(source, temporary)
+                        temporary.chmod(0o644)
                         temporary.replace(target)
                     except OSError:
                         raise BadRequestError("Curated dataset file could not be copied") from None
@@ -296,6 +304,7 @@ class DataCenterDatasetService:
                 raise BadRequestError("Curated dataset ID conflicts with an owner registration")
             return existing.to_domain()
 
+        await self._prepare_managed_execution_view(seed.dataset_id)
         values = seed.model_dump(exclude={"files"})
         document = DataCenterDatasetDocument(
             **values,
@@ -306,7 +315,7 @@ class DataCenterDatasetService:
                 storage_type=DatasetStorageType.MANAGED_UPLOAD,
                 source_path=seed.dataset_id,
                 verified=True,
-                verification_message="Verified from the bundled dataset catalog",
+                verification_message="Verified bundled bytes and execution-user readable read-only view",
             )],
             enabled=True,
             is_submission=False,
@@ -320,6 +329,18 @@ class DataCenterDatasetService:
                 raise BadRequestError("Curated dataset catalog identity already exists") from None
             return existing.to_domain()
         return document.to_domain()
+
+    async def _prepare_managed_execution_view(self, dataset_id: str) -> None:
+        try:
+            await asyncio.to_thread(
+                prepare_registered_managed_dataset,
+                image=self._settings.sandbox_image,
+                volume=self._settings.dataset_managed_volume,
+                dataset_id=dataset_id,
+                timeout=self._settings.sandbox_docker_create_timeout_seconds,
+            )
+        except DatasetReadabilityError as error:
+            raise BadRequestError(error.message) from None
 
     async def register_curated_host_directory(
         self,

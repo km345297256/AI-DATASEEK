@@ -96,6 +96,8 @@ async def view_shell(request: ShellViewRequest):
         raise BadRequestException("Session ID not provided")
         
     tracked = {"operation_id": request.operation_id} if request.operation_id is not None else {}
+    if request.cursor is not None:
+        tracked.update(output_id=request.output_id, cursor=request.cursor, max_bytes=request.max_bytes)
     result = await shell_service.view_shell(session_id=request.id, console=request.console, **tracked)
     
     # Construct response

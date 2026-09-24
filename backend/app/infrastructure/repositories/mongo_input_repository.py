@@ -96,6 +96,15 @@ class MongoInputRepository:
             {"producer_event_key": 1})
         return identities[document["producer_event_key"]] if document else None
 
+    async def committed_outcome(self, record: AcceptedInput) -> MessageEvent | None:
+        identity = hashlib.sha256(terminal_event_id(record.key, "analysis_outcome").encode()).hexdigest()
+        document = await SessionEventDocument.get_pymongo_collection().find_one(
+            {"session_id": record.session_id, "producer_event_key": identity}, {"event": 1})
+        if document is None:
+            return None
+        event = MessageEvent.model_validate(document["event"])
+        return event if event.role == "assistant" and (event.metadata or {}).get("analysis_outcome") else None
+
     async def matches_terminal(self, session_id: str, key: str, seq: int, kind: str) -> bool:
         identity = hashlib.sha256(terminal_event_id(key, kind).encode()).hexdigest()
         return await SessionEventDocument.get_pymongo_collection().find_one(

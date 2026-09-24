@@ -168,7 +168,7 @@ async def test_no_tool_followup_cannot_claim_a_new_execution_limitation(source):
         source=source, quote=sources[source]["text"])), events=[], files=[], evidence=evidence)
     assert result.status == "unavailable"
     assert result.metadata["reason"] == "unsupported_limitation"
-    assert ask.await_count == 2
+    assert ask.await_count == 3
     assert "A new file read failed" not in result.text
     assert result.metadata["citation_diagnostics"]["initial"] == {"unsupported_limitation": 1}
 
@@ -265,7 +265,7 @@ async def test_file_existence_saved_script_attempt_or_failure_is_not_computation
     # A read-only paragraph correction may withdraw an unsupported claim, but
     # repeating the same invalid response cannot manufacture execution proof.
     assert result.metadata["reason"] == "unsupported_analysis"
-    assert "Observed mean" not in result.text and ask.await_count == 2
+    assert "Observed mean" not in result.text and ask.await_count == 3
     assert result.metadata["citation_diagnostics"]["initial"] == {"unsupported_analysis": 1}
 
 
@@ -491,7 +491,7 @@ async def test_kind_correction_cannot_promote_input_observation_to_delivered_out
         lambda messages: citation_correction(messages, text="Delivered `source.csv`.", kind="analysis"),
         evidence=evidence, files=[])
     assert result.status == "unavailable" and "Delivered" not in result.text
-    assert result.metadata["citation_diagnostics"]["correction"] == {"invalid_review": 1}
+    assert result.metadata["citation_diagnostics"]["correction"] == {"correction_kind_change": 1}
     assert len(calls) == 2
     if quote == "missing quote":
         assert result.metadata["reason"] == "invalid_citations"
@@ -572,7 +572,7 @@ async def test_correction_cannot_modify_already_accepted_paragraphs():
     assert "Observed mean is 3 mg." in result.text
     assert "UNAUTHORIZED_REWRITE" not in result.text and "Second measurement" not in result.text
     assert result.metadata["withheld_paragraph_count"] == 1
-    assert len(calls) == 2
+    assert len(calls) == 3
     assert [item["index"] for item in json.loads(calls[1][-1].content)["failed_paragraphs"]] == [1]
 
 
@@ -606,7 +606,8 @@ async def test_failed_correction_is_bounded_and_preserves_supported_paragraphs(f
     assert result.status == "unavailable" and "Observed mean is 3 mg." in result.text
     assert "UNSUPPORTED" not in result.text and "PRIVATE" not in result.text and "/Users/" not in result.text
     assert result.missing_requirement_indices == ()
-    assert len(calls) == 2 and result.metadata["unresolved_citation_count"] == 1
+    assert len(calls) == (3 if failure == "duplicate_index" else 2)
+    assert result.metadata["unresolved_citation_count"] == 1
 
 
 @pytest.mark.asyncio
@@ -713,7 +714,9 @@ async def test_long_execution_review_repairs_reference_from_same_bounded_frozen_
     def repair(messages):
         payload = json.loads(messages[-1].content)
         assert payload["truncated"] is True
-        assert [source["source_id"] for source in payload["sources"][:-1]] == expected_ids
+        assert [source["source_id"] for source in payload["sources"]
+                if source["kind"] not in {"current_request", "delivery_inventory"}] == expected_ids
+        assert [source["source_id"] for source in payload["sources"][-2:]] == ["current_request", "verified_files"]
         assert "tool_0001_result" not in expected_ids
         return citation_correction(messages, source="tool_0041_result")
 
@@ -984,7 +987,7 @@ def test_checkpoint_enforces_total_observation_budget():
     ("PRIVATE_PATH /Users/private/private.csv", "unrecognized_absolute_path"),
     ("PRIVATE_PATH /private", "unrecognized_root_path"),
     ("PRIVATE_PATH results/private.csv", "unrecognized_relative_path"),
-    ("PRIVATE_IDENTIFIER `x/y`", "unrecognized_inline_path"),
+    ("PRIVATE_IDENTIFIER `./x/y`", "unrecognized_relative_path"),
     ("PRIVATE_IDENTIFIER `private.customtype`", "unrecognized_identifier"),
 ])
 async def test_file_reference_rejection_has_fixed_diagnostic_without_rejected_text(text, code):
@@ -992,11 +995,11 @@ async def test_file_reference_rejection_has_fixed_diagnostic_without_rejected_te
     assert result.status == "unavailable"
     assert result.metadata["reason"] == "unverified_file_reference"
     assert result.metadata["citation_diagnostics"]["initial"] == {"file_reference_" + code: 1}
-    assert result.metadata["citation_diagnostics"]["correction"] == {"invalid_review": 1}
+    assert result.metadata["citation_diagnostics"]["correction"] == {"correction_schema_root": 1}
     assert "PRIVATE_" not in json.dumps(result.metadata) + result.text
     assert "private.csv" not in json.dumps(result.metadata) + result.text
     assert "/Users" not in json.dumps(result.metadata) + result.text
-    assert ask.await_count == 2
+    assert ask.await_count == 3
 
 
 @pytest.mark.asyncio
@@ -1005,7 +1008,7 @@ async def test_ambiguous_file_diagnostic_does_not_relax_exact_identity_boundary(
     result, _ = await run(response(paragraph("Delivered `observed.png`.", kind="delivery", source="verified_files", quote="observed.png")), files=files)
     assert result.metadata["reason"] == "unverified_file_reference"
     assert result.metadata["citation_diagnostics"]["initial"] == {"file_reference_ambiguous_basename": 1}
-    assert result.metadata["citation_diagnostics"]["correction"] == {"invalid_review": 1}
+    assert result.metadata["citation_diagnostics"]["correction"] == {"correction_schema_root": 1}
     accepted, _ = await run(response(paragraph("Delivered `/home/ubuntu/output/first/observed.png`.",
         kind="delivery", source="verified_files", quote="observed.png")), files=files)
     assert accepted.status == "verified" and "/home/" not in accepted.text

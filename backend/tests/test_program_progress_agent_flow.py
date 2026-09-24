@@ -1,4 +1,6 @@
 """Execution-loop regressions with scripted model responses, no model/network."""
+import asyncio
+import hashlib
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
@@ -183,3 +185,121 @@ async def test_trusted_code_read_opens_only_one_same_error_correction_trial(monk
     assert agent.last_execution_outcome["code"] == "completed"
     assert any(isinstance(event, ToolEvent) and event.tool_call_id == "blind-patch"
                and event.status == ToolStatus.CALLED and event.function_result["success"] is False for event in events)
+
+
+@pytest.mark.asyncio
+async def test_changing_errors_require_targeted_evidence_before_next_correction(monkeypatch):
+    unrelated = "/home/ubuntu/datasets/unrelated.csv"
+    calls = [
+        invocation("program_run", "run-1", script_path=PROGRAM),
+        invocation("file_str_replace", "patch-1", file=PROGRAM, old_str="first", new_str="second"),
+        invocation("program_run", "run-2", script_path=PROGRAM),
+        invocation("file_str_replace", "patch-2", file=PROGRAM, old_str="second", new_str="third"),
+        invocation("program_run", "run-3", script_path=PROGRAM),
+        invocation("file_read", "unrelated", file=unrelated),
+        invocation("file_str_replace", "blind-patch", file=PROGRAM, old_str="third", new_str="blind"),
+        invocation("file_read", "diagnose", file=SOURCE, start_line=0, end_line=10),
+        invocation("file_str_replace", "informed-patch", file=PROGRAM, old_str="third", new_str="fixed"),
+        invocation("program_run", "run-4", script_path=PROGRAM),
+    ]
+    agent = scripted_agent(calls)
+    dispatched = []
+
+    async def invoke(_tool, call):
+        dispatched.append(call["id"])
+        return ToolMessage(tool_call_id=call["id"], name=call["name"], content=f"observation-{call['id']}",
+                           artifact=ToolResult(success=call["id"] not in {"run-1", "run-2", "run-3"}))
+
+    def feedback(_tool, call, _result, _ledger):
+        content = f"source = {SOURCE!r}\n# revision {call['id']}\n"
+        digest = hashlib.sha256(content.encode()).hexdigest()
+        return {"script_path": PROGRAM, "operation_id": call["id"], "source_digest": digest,
+                "returncode": 0 if call["id"] == "run-4" else 1,
+                "failure_fingerprint": f"different-error-{call['id']}",
+                "source_snapshot": {"version": 1, "encoding": "utf-8", "size_bytes": len(content.encode()),
+                                    "sha256": digest, "content": content}}
+
+    monkeypatch.setattr("app.domain.services.agents.base.resolved_program_path",
+                        lambda tool, call: PROGRAM if tool.name == "program_run" else None)
+    monkeypatch.setattr("app.domain.services.agents.base.trusted_program_execution_feedback", feedback)
+    monkeypatch.setattr("app.domain.services.agents.base.resolved_tool_is_read_only", lambda tool: tool.name == "file_read")
+    monkeypatch.setattr("app.domain.services.agents.base.program_diagnostic_read_digest",
+                        lambda tool, call, result: call["id"] if call["name"] == "file_read" else None)
+    agent.invoke_tool = invoke
+    recovery = AnalysisRecoveryContext(review=AsyncMock())
+    recovery.progress.read_scope_paths = frozenset({SOURCE, unrelated})
+    with analysis_recovery_scope(recovery):
+        events = [event async for event in agent.execute("analyze original dataset")]
+    assert dispatched == [call["id"] for call in calls if call["id"] != "blind-patch"]
+    blocked = next(event for event in events if isinstance(event, ToolEvent) and event.status == ToolStatus.CALLED
+                   and event.tool_call_id == "blind-patch")
+    assert "several revisions" in blocked.function_result["message"]
+    assert agent.last_execution_outcome["code"] == "completed"
+    assert not recovery.progress.should_stop
+
+
+@pytest.mark.asyncio
+async def test_cancelled_program_is_not_retried_or_recorded_as_repair_progress(monkeypatch):
+    agent = scripted_agent([invocation("program_run", "cancelled", script_path=PROGRAM)])
+    agent.invoke_tool = AsyncMock(side_effect=asyncio.CancelledError)
+    monkeypatch.setattr("app.domain.services.agents.base.resolved_program_path", lambda *args: PROGRAM)
+    with pytest.raises(asyncio.CancelledError):
+        _ = [event async for event in agent.execute("analyze")]
+    agent.invoke_tool.assert_awaited_once()
+    assert not agent._analysis_progress.evidence
+    assert not any(state.executed_source for state in agent._analysis_progress.programs.values())
+
+
+@pytest.mark.asyncio
+async def test_small_input_joint_diagnosis_recovers_through_real_core_read_adapter(monkeypatch):
+    from app.domain.services.tools.file import FileToolkit
+
+    calls = [
+        invocation("file_read", "initial-data", file=SOURCE),
+        invocation("program_run", "run-1", script_path=PROGRAM),
+        invocation("file_str_replace", "patch-1", file=PROGRAM, old_str="first", new_str="second"),
+        invocation("program_run", "run-2", script_path=PROGRAM),
+        invocation("file_str_replace", "patch-2", file=PROGRAM, old_str="second", new_str="third"),
+        invocation("program_run", "run-3", script_path=PROGRAM),
+        invocation("file_read", "diagnostic-data", file=SOURCE),
+        invocation("file_str_replace", "blind-patch", file=PROGRAM, old_str="third", new_str="blind"),
+        invocation("file_read", "diagnostic-code", file=PROGRAM, start_line=1, end_line=2),
+        invocation("file_str_replace", "informed-patch", file=PROGRAM, old_str="third", new_str="fixed"),
+        invocation("program_run", "run-4", script_path=PROGRAM),
+    ]
+    agent = scripted_agent(calls)
+    original_get_tool = agent.get_tool
+    file_toolkit = FileToolkit(SimpleNamespace())
+    agent.get_tool = lambda name: file_toolkit.get_tool(name) if name == "file_read" else original_get_tool(name)
+    dispatched = []
+
+    async def invoke(_tool, call):
+        dispatched.append(call["id"])
+        observed = "value = parse(data)" if call["id"] == "diagnostic-code" else "name,value\na,1\n"
+        data = {"file": call["args"]["file"], "content": observed} if call["name"] == "file_read" else None
+        return ToolMessage(tool_call_id=call["id"], name=call["name"], content=str(data),
+                           artifact=ToolResult(success=call["id"] not in {"run-1", "run-2", "run-3"}, data=data))
+
+    def feedback(_tool, call, _result, _ledger):
+        content = f"data = open({SOURCE!r}).read()\nvalue = parse(data)\n# revision {call['id']}\n"
+        digest = hashlib.sha256(content.encode()).hexdigest()
+        return {"script_path": PROGRAM, "operation_id": call["id"], "source_digest": digest,
+                "returncode": 0 if call["id"] == "run-4" else 1,
+                "failure_fingerprint": f"different-error-{call['id']}",
+                "diagnostic": {"exception_type": "ValueError", "line": 2},
+                "source_snapshot": {"version": 1, "encoding": "utf-8", "size_bytes": len(content.encode()),
+                                    "sha256": digest, "content": content}}
+
+    monkeypatch.setattr("app.domain.services.agents.base.resolved_program_path",
+                        lambda tool, call: PROGRAM if tool.name == "program_run" else None)
+    monkeypatch.setattr("app.domain.services.agents.base.trusted_program_execution_feedback", feedback)
+    monkeypatch.setattr("app.domain.services.agents.base.resolved_tool_is_read_only", lambda tool: tool.name == "file_read")
+    agent.invoke_tool = invoke
+    recovery = AnalysisRecoveryContext(review=AsyncMock())
+    recovery.progress.read_scope_paths = frozenset({SOURCE})
+    with analysis_recovery_scope(recovery):
+        _ = [event async for event in agent.execute("analyze this complete small dataset")]
+    assert dispatched == [call["id"] for call in calls if call["id"] != "blind-patch"]
+    assert agent.last_execution_outcome["code"] == "completed"
+    assert len(recovery.progress.evidence) == 1
+    assert not recovery.progress.should_stop

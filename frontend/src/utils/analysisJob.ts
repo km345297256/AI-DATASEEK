@@ -28,6 +28,7 @@ export const mergeAnalysisToolEvent = (current: ToolContent, incoming: ToolConte
   content: incoming.content ?? current.content,
   presentation: incoming.presentation ?? current.presentation,
   spill: incoming.spill ?? current.spill,
+  program_attempt: incoming.program_attempt ?? current.program_attempt,
 });
 
 export const analysisJobElapsedSeconds = (job: AnalysisJobView, now = Date.now()): number => {

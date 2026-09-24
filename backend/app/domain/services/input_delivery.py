@@ -11,6 +11,9 @@ from uuid import uuid4
 from app.domain.models.event import DoneEvent, ErrorEvent, MessageEvent, ToolEvent, ToolStatus, WaitEvent
 from app.domain.models.input_admission import AcceptedInput, input_key, terminal_event_id
 from app.domain.models.session import SessionStatus
+from app.domain.services.analysis_terminal import (
+    PREPARATION_FAILURE_CODES, preparation_failure_message, terminal_analysis_message,
+)
 
 logger = logging.getLogger(__name__)
 TERMINALS = (DoneEvent, ErrorEvent, WaitEvent)
@@ -71,11 +74,26 @@ class InputDeliveryService:
         record = await self._require_live(session_id, key, states={"claimed"})
         if record.admission.task_id != task.id or not await self.repository.authorized(record):
             raise InputLeaseLost()
-        updated = await self.repository.transition(record, {"state": "running"}, require_live=True)
+        # A worker starting does not establish that input synchronization and
+        # analysis-runtime admission completed. A crashed worker is unknown
+        # until the runner has durably marked the actual analysis boundary.
+        updated = await self.repository.transition(record, {"state": "running", "execution_started": None,
+            "preparation_failure_code": None}, require_live=True)
         if updated is None:
             raise InputLeaseLost()
         self._local[(session_id, key)] = _LocalInput(updated, asyncio.current_task(), task)
         return True
+
+    async def mark_analysis_started(self, session_id: str, key: str) -> None:
+        for _ in range(3):
+            record = await self._require_live(session_id, key, states={"running"})
+            if record.admission.execution_started is True:
+                return
+            updated = await self.repository.transition(record, {"execution_started": True}, require_live=True)
+            if updated is not None:
+                self._local[(session_id, key)].record = updated
+                return
+        raise InputLeaseLost()
 
     async def _require_live(self, session_id: str, key: str, *, states=None) -> AcceptedInput:
         record = await self.repository.get(session_id, key)
@@ -130,6 +148,12 @@ class InputDeliveryService:
             # Recovery can identify a committed terminal even when the process
             # exited before the following state update. Nothing new enters SSE.
             event.id = terminal_event_id(key, event.type)
+        elif (isinstance(event, MessageEvent) and event.role == "assistant"
+                and (event.metadata or {}).get("analysis_outcome")
+                and not (event.metadata or {}).get("step_id")):
+            # A final scientific verdict can commit before Done. Give recovery
+            # an exact identity so a process exit cannot overwrite that verdict.
+            event.id = terminal_event_id(key, "analysis_outcome")
 
     async def complete(self, session_id: str, key: str, event) -> None:
         if not isinstance(event, TERMINALS):
@@ -143,13 +167,15 @@ class InputDeliveryService:
                 return
         raise InputLeaseLost()
 
-    async def retry_preparation(self, record: AcceptedInput) -> None:
+    async def retry_preparation(self, record: AcceptedInput, *, failure_code: str = "input_preparation_failed") -> None:
+        failure_code = failure_code if failure_code in PREPARATION_FAILURE_CODES else "input_preparation_failed"
         current = await self.repository.get(record.session_id, record.key)
         if current and current.admission.state == "claimed" and current.admission.runtime_id == self.runtime_id:
+            failure = {"preparation_failure_code": failure_code, "execution_started": False}
             if current.admission.attempts >= 3:
-                await self.repository.transition(current, {"state": "interrupted", "notified": False})
+                await self.repository.transition(current, {**failure, "state": "interrupted", "notified": False})
             else:
-                await self.repository.transition(current, {"state": "pending", "runtime_id": None, "task_id": None,
+                await self.repository.transition(current, {**failure, "state": "pending", "runtime_id": None, "task_id": None,
                     "lease_expires_at": None, "retry_after": datetime.now(UTC) + timedelta(seconds=5)})
         self._local.pop((record.session_id, record.key), None)
 
@@ -198,8 +224,23 @@ class InputDeliveryService:
             return
         kind = await self.repository.terminal_kind(record)
         if kind is None:
+            read_outcome = getattr(self.repository, "committed_outcome", None)
+            committed = await read_outcome(record) if callable(read_outcome) else None
             message = ("本轮执行已中断，系统没有自动重跑。已有结果已保留，请检查后再继续。"
                        if record.admission.state == "interrupted" else "本轮请求已取消，未完成的执行不会自动重跑。")
+            if (record.admission.state == "interrupted" and record.admission.preparation_failure_code
+                    and record.admission.execution_started is False):
+                outcome = preparation_failure_message(record.admission.preparation_failure_code, record.admission.attempts)
+                message = outcome.message
+            else:
+                outcome = terminal_analysis_message(message,
+                    reason_code="execution_interrupted" if record.admission.state == "interrupted" else "request_cancelled",
+                    stage="execution", analysis_started=record.admission.execution_started)
+            # Stable producer identity makes recovery between these two writes
+            # idempotent. The outcome is durable before the terminal is visible.
+            if committed is None:
+                outcome.id = terminal_event_id(record.key, "analysis_outcome")
+                await self._sessions.add_event(record.session_id, outcome)
             event = ErrorEvent(id=terminal_event_id(record.key, "error"), error=message)
             await self._sessions.add_event(record.session_id, event)
             kind = "error"

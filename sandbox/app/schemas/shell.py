@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field, SecretStr, field_validator
+from pydantic import BaseModel, Field, SecretStr, field_validator, model_validator
 import re
 from typing import Optional
 
@@ -46,6 +46,15 @@ class ShellViewRequest(BaseModel):
     id: str = Field(..., description="Unique identifier of the target shell session")
     console: Optional[bool] = Field(False, description="Whether to return console records")
     operation_id: Optional[str] = Field(None, pattern=r"^[0-9a-f]{32}$", strict=True)
+    output_id: Optional[str] = Field(None, pattern=r"^[0-9a-f]{32}$", strict=True)
+    cursor: Optional[int] = Field(None, ge=0, strict=True)
+    max_bytes: int = Field(8192, ge=4, le=16384, strict=True)
+
+    @model_validator(mode="after")
+    def cursor_identity(self):
+        if (self.output_id is None) != (self.cursor is None):
+            raise ValueError("Output pagination requires output_id and cursor together")
+        return self
 
 
 class ShellWaitRequest(BaseModel):

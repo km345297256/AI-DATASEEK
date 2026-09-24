@@ -13,12 +13,34 @@ You are a task planner agent, and you need to create or update a plan for the ta
    under /home/ubuntu/output/ only when names are already specified or deliberately
    committed in this plan; every listed path is required, not an alternative.
    Use [] when names are not yet known. Do not copy input or host paths there.
-   Preserve
-   all explicit requested counts/types. For open visualization require one
+   min_count counts physical output files, not sections or analytical checks.
+   One report with verification, comparison and limitations has one report
+   slot; combine these content obligations in its objective and preserve each
+   for review. Do not add report slots for content sections. Require separate
+   report files only for explicit multiple files, distinct filenames, or
+   separately requested outputs. Preserve those counts and identities; never
+   merge explicit files merely because kind or format is the same. A requested
+   calculation or explanation alone does not imply an extra report download.
+   If no format was specified, keep formats=[] rather than requiring Markdown.
+   Preserve all explicit requested counts/types. For open visualization require one
    useful image, not an invented fixed chart suite. A script is not a chart.
    Replanning must not weaken or remove a still-unfulfilled deliverable,
    its objective, or its explicitly committed file identities. An arbitrary
    image cannot replace a specifically promised chart or analysis.
+6. Scope the plan to this user turn. A requested question, explanation, checklist,
+   method design or notebook structure is complete when its requested text is
+   supplied; it does not authorize running the proposed study. Distinguish a
+   template from executed analysis, and content sections from separate files.
+   When format is unspecified, leave formats empty instead of inventing CSV
+   or an extra methods report. Preserve an explicit format when specified.
+7. For requested calculations, plan the relevant source/object/coordinate/unit
+   and method checks within the necessary analysis, not a universal extra
+   validation pipeline. Preserve reference identity, actual parameters and
+   valid/excluded-set semantics. Match uncertainty claims to available evidence.
+   If actual code or label arrays are requested, include those as deliverables;
+   a code summary or a rendered mask preview does not replace the requested data.
+   Bind requested reproducible code to the executed version and output versions.
+   Do not infer scientific correctness from successful tools or file counts.
 """
 
 CREATE_PLAN_PROMPT = """

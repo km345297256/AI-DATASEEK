@@ -11,6 +11,7 @@ from langchain.messages import AIMessage, AnyMessage
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from app.domain.services.execution_identity import private_identity_hmac
+from app.domain.models.model_request import ToolImageObservationMessage
 
 
 TOKEN_ESTIMATOR_VERSION = "utf8_bytes_div3_v1"
@@ -329,6 +330,14 @@ def _complete_exchanges(messages: Sequence[AnyMessage]) -> tuple[_Exchange, ...]
             reply_ids.append(reply_id)
             cursor += 1
         if len(reply_ids) == len(expected_ids) and set(reply_ids) == set(expected_ids):
+            # DeepSeek's request-only tool-image carrier uses user-role wire
+            # content but is evidence from this exact completed tool batch.
+            # Omit it only together with that batch, never as an actual user
+            # request or a detached image whose provenance has been discarded.
+            if (cursor < len(messages)
+                    and isinstance(messages[cursor], ToolImageObservationMessage)
+                    and messages[cursor].tool_call_ids == tuple(expected_ids)):
+                cursor += 1
             exchanges.append(_Exchange(
                 start=index,
                 end=cursor,

@@ -79,6 +79,10 @@ class MemoryInputs:
                 return event.type
         return None
 
+    async def committed_outcome(self, record):
+        return next((event for event in self.events if isinstance(event, MessageEvent)
+            and event.bind_producer_event_id() == terminal_event_id(record.key, "analysis_outcome")), None)
+
     async def authorized(self, record):
         return self.allow and record.admission.session_generation == self.input_generation
 
@@ -259,7 +263,8 @@ async def test_cancelled_pending_input_is_not_recovered_as_new_work():
     await service.cancel_session("session")
     await service.maintain(lambda _: pytest.fail("cancelled input must not dispatch"))
     assert (await repository.get("session", record.key)).admission.state == "cancelled"
-    assert len(repository.events) == 2
+    assert [event.type for event in repository.events] == ["message", "message", "error"]
+    assert repository.events[1].metadata["analysis_outcome"]["reason_code"] == "request_cancelled"
 
 
 def test_private_admission_and_request_snapshot_do_not_enter_event_or_message_schema():

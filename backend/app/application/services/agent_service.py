@@ -56,6 +56,7 @@ class AgentService:
         self._spill_artifact_store = spill_artifact_store
         self._analysis_job_service = analysis_job_service
         self._tool_approval_service = tool_approval_service
+        self._input_repository = input_repository
         self._agent_domain_service = AgentDomainService(
             self._agent_repository,
             self._session_repository,
@@ -176,6 +177,38 @@ class AgentService:
             if not session:
                 raise RuntimeError("Session not found")
         return await self._session_repository.get_events(session_id)
+
+    async def get_input_receipt(self, session_id: str, user_id: str, client_message_id: str) -> dict:
+        """Observe durable admission only; never enqueue, claim, or restart work.
+
+        A negative observation is not a rejection: the original POST may still
+        commit. The caller must keep the same ID when retrying that submission.
+        """
+        from app.application.errors.exceptions import BadRequestError, NotFoundError
+        from app.domain.models.event import MessageEvent
+        from app.domain.models.input_admission import input_key
+
+        if not isinstance(client_message_id, str) or not client_message_id.strip() or len(client_message_id) > 128:
+            raise BadRequestError("Invalid client message identity")
+        if await self.get_session(session_id, user_id) is None:
+            raise NotFoundError("Session not found")
+        receipt = {"client_message_id": client_message_id, "accepted": False}
+        event_id = AgentDomainService._client_message_event_id(session_id, client_message_id)
+        repository = getattr(self, "_input_repository", None)
+        if repository is not None:
+            record = await repository.get(session_id, input_key(MessageEvent(id=event_id, role="user", message="")))
+            if record is not None:
+                if record.session_id != session_id or record.admission.actor_user_id != user_id:
+                    raise NotFoundError("Input not found")
+                return {**receipt, "accepted": True, "event_seq": record.event.seq,
+                        "state": record.admission.state}
+        # Historical user events predate the admission table. A client claim
+        # alone is NOT evidence of durable receipt; only the event is.
+        resolve = getattr(self._session_repository, "resolve_event_sequence", None)
+        seq = await resolve(session_id, event_id) if callable(resolve) else None
+        if type(seq) is int and seq > 0:
+            return {**receipt, "accepted": True, "event_seq": seq}
+        return receipt
     
     async def get_session_history(self, session_id: str, user_id: str, *, turns: int = 5,
                                   before_seq: int | None = None) -> SessionHistoryPage:

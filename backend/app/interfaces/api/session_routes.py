@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, Request, WebSocket, WebSocketDisconnect, Query
+from fastapi import APIRouter, Depends, Request, WebSocket, WebSocketDisconnect, Query, Path
 from fastapi.responses import StreamingResponse
 from sse_starlette.sse import EventSourceResponse
 from typing import AsyncGenerator, List, Optional
@@ -24,6 +24,7 @@ from app.interfaces.schemas.session import (
     ShareSessionResponse, SharedSessionResponse, CreateSessionRequest,
     UpdateSessionTitleRequest, TaskFeedbackRequest, TaskFeedbackResponse,
     OpenJupyterRequest, OpenJupyterResponse,
+    InputReceiptResponse,
 )
 from app.application.services.jupyter_service import JupyterService
 from app.interfaces.schemas.file import FileInfoResponse, FileViewRequest, FileViewResponse
@@ -201,6 +202,17 @@ async def get_session_history(
         events=await EventMapper.events_to_sse_events(page.events), is_shared=session.is_shared,
         is_owner=True, collaborators=[], has_more=page.has_more, next_before_seq=page.next_before_seq,
     ))
+
+
+@router.get("/{session_id}/inputs/{client_message_id}", response_model=APIResponse[InputReceiptResponse])
+async def get_input_receipt(
+    session_id: str,
+    client_message_id: str = Path(min_length=1, max_length=128),
+    current_user: User = Depends(get_current_user),
+    agent_service: AgentService = Depends(get_agent_service),
+) -> APIResponse[InputReceiptResponse]:
+    receipt = await agent_service.get_input_receipt(session_id, current_user.id, client_message_id)
+    return APIResponse.success(InputReceiptResponse.model_validate(receipt))
 
 
 @router.delete("/{session_id}", response_model=APIResponse[None])

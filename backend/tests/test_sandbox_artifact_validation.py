@@ -8,11 +8,12 @@ from app.infrastructure.external.sandbox.docker_sandbox import DockerSandbox
 
 
 @pytest.mark.asyncio
-async def test_artifact_validation_adapter_uses_batch_read_only_api():
-    items = [{"path": "/home/ubuntu/output/chart.png", "kind": "image"}]
+@pytest.mark.parametrize("suffix,image_format", [("png", "PNG"), ("svg", "SVG")])
+async def test_artifact_validation_adapter_uses_batch_read_only_api(suffix, image_format):
+    items = [{"path": f"/home/ubuntu/output/chart.{suffix}", "kind": "image"}]
     receipt = {"path": items[0]["path"], "expected_kind": "image", "kind": "image", "valid": True,
                "reason": "validated", "sha256": "a" * 64, "size": 100,
-               "metadata": {"format": "PNG", "width": 10, "height": 10, "frames": 1}}
+               "metadata": {"format": image_format, "width": 10, "height": 10, "frames": 1}}
     requests = []
     def respond(request):
         requests.append(request)

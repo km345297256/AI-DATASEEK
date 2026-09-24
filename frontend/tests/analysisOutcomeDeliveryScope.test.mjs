@@ -20,8 +20,8 @@ test('a pure explanation failure refers only to this explanation, not imagined f
   const value = outcome();
   assert.equal(outcomes.analysisOutcomeTitle(value), '未完成');
   const text = outcomes.analysisOutcomeReason(value);
-  assert.match(text, /本次结果说明尚未完成证据核验/);
-  assert.match(text, /暂不能作为已确认结论/);
+  assert.match(text, /本次说明暂无法完成证据核验/);
+  assert.match(text, /核验未完成不等于结论被判错误/);
   assert.doesNotMatch(text, /文件|已交付|历史|之前|已完成/);
 });
 
@@ -30,8 +30,8 @@ test('a response with published attachments can mention only this response deliv
   assert.equal(outcomes.analysisOutcomeTitle(value), '部分完成');
   assert.equal(outcomes.analysisOutcomeIsComplete(value), false);
   const text = outcomes.analysisOutcomeReason(value, outcomes.hasDeliveredAnalysisFiles(assistant([file])));
-  assert.match(text, /本次结果说明尚未完成证据核验/);
-  assert.match(text, /本次已交付的文件仍可使用/);
+  assert.match(text, /本次说明暂无法完成证据核验/);
+  assert.match(text, /本次已交付的文件仍可查看，内容需结合核验结论使用/);
   assert.doesNotMatch(text, /本次分析已完成/);
 });
 
@@ -72,7 +72,17 @@ test('live and history projections do not lend previous-turn files to a new expl
 test('interrupted execution also avoids claiming preserved files without a published attachment', () => {
   const value = outcome({ reason_code: 'execution_interrupted' });
   assert.equal(outcomes.analysisOutcomeReason(value), '本次分析执行已中断。');
-  assert.match(outcomes.analysisOutcomeReason(value, true), /本次已交付的文件仍可使用/);
+  assert.match(outcomes.analysisOutcomeReason(value, true), /本次已交付的文件仍可查看，内容需结合核验结论使用/);
+});
+
+test('scientific failure of a text-only answer never invents a saved artifact', () => {
+  for (const reason_code of ['scientific_validation_rejected', 'scientific_validation_unavailable']) {
+    const value = outcome({ reason_code });
+    assert.match(outcomes.analysisOutcomeReason(value), /计算方法/);
+    assert.doesNotMatch(outcomes.analysisOutcomeReason(value), /文件|已保存|已交付/);
+    assert.match(outcomes.analysisOutcomeReason(value, true), /本次已交付的文件仍可查看/);
+    assert.equal(outcomes.analysisOutcomeIsComplete(value), false);
+  }
 });
 
 const source = readFileSync(new URL('../src/components/AnalysisOutcomeNotice.vue', import.meta.url), 'utf8');
@@ -91,12 +101,13 @@ const renderNotice = (value, hasDeliveredFiles) => renderToString(vue.createSSRA
 test('actual notice renders no file reassurance for pure explanations, and remains failed or partial', async () => {
   for (const status of ['failed', 'partial']) {
     const html = await renderNotice(outcome({ status }));
-    assert.match(html, /本次结果说明尚未完成证据核验/);
+    assert.match(html, /本次说明暂无法完成证据核验/);
+    assert.match(html, /核验未完成不等于结论被判错误/);
     assert.match(html, status === 'failed' ? /未完成/ : /部分完成/);
     assert.doesNotMatch(html, /文件|已交付|本次分析已完成|text-\[#247357\]/);
   }
   const delivered = await renderNotice(outcome({ status: 'partial' }), true);
-  assert.match(delivered, /本次已交付的文件仍可使用/);
+  assert.match(delivered, /本次已交付的文件仍可查看，内容需结合核验结论使用/);
   assert.match(delivered, /部分完成/);
 });
 

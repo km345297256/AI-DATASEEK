@@ -21,6 +21,7 @@ from app.domain.services.agents.execution import ExecutionAgent
 from app.domain.services.execution_history import ExecutionHistory
 from app.domain.services.flows.plan_act import AgentStatus
 from test_analysis_repair_flow import collect, output, scenario, terminal_messages
+from test_answer_scientific_scope_routing import with_answer_scope_checks
 
 
 FALSE_DRAFT = (
@@ -336,9 +337,9 @@ async def test_followup_may_explain_only_versioned_reviewed_history_without_runn
         # Invalid historical provenance must not be salvageable by echoing
         # historical raw text into an invented evidence id.
         source_id = reviewed[0]["source_id"] if reviewed else "prior_review_0001"
-        return json.dumps({"unsupported_claims": False, "paragraphs": [{
+        return json.dumps(with_answer_scope_checks(payload, {"unsupported_claims": False, "paragraphs": [{
             "text": fact, "kind": "analysis", "evidence": [{"source_id": source_id, "quote": fact}]}],
-            "requirement_checks": []})
+            "requirement_checks": []}))
 
     real_reviewer(agent, AsyncMock(side_effect=response))
     events = await collect(runner, message)
@@ -355,7 +356,10 @@ async def test_followup_may_explain_only_versioned_reviewed_history_without_runn
         assert step.result == fact
     else:
         assert fact not in terminal_payload(events)
+        # This fixture repeats a full-answer response during scoped correction;
+        # that is a protocol failure, not a substantive scientific verdict.
         assert step.outcome.reason_code == "answer_validation_unavailable"
+        assert step.outputs["answer_review"]["validation_state"] == "unavailable"
 
 
 @pytest.mark.asyncio
@@ -398,7 +402,7 @@ async def test_review_transport_retry_is_model_only_honors_provider_wait_and_nev
     from app.domain.services import model_runtime
 
     if failure_kind == "invalid_json":
-        # Syntax errors retry the same read-only request; make its existing
+        # Syntax errors retain the read-only scope plus fixed feedback; make its existing
         # bounded jitter deterministic without changing provider Retry-After.
         monkeypatch.setattr("app.domain.services.model_retry.random.random", lambda: 0.5)
     request = httpx.Request("POST", "https://provider.invalid/independent-review")
@@ -414,7 +418,7 @@ async def test_review_transport_retry_is_model_only_honors_provider_wait_and_nev
             if failure_kind == "invalid_json":
                 return "Not a review JSON response."
             raise error
-        return inventory_review_response(messages)
+        return inventory_review_response(messages[:2] if failure_kind == "invalid_json" else messages)
 
     agent = object.__new__(ExecutionAgent)
     transport = SimpleNamespace(ainvoke=AsyncMock(side_effect=invoke))
@@ -438,11 +442,16 @@ async def test_review_transport_retry_is_model_only_honors_provider_wait_and_nev
             "exponential_jitter" if failure_kind == "invalid_json" else "retry_after_seconds")
         if failure_kind == "invalid_json":
             assert isinstance(recorded.await_args.args[0], json.JSONDecodeError)
-        assert calls[1] is calls[0], "Transport retry must not introduce an executor repair prompt"
+            assert len(calls[1]) == 3 and calls[1][:2] == calls[0]
+            assert all(calls[1][index] is calls[0][index] for index in range(2))
+            assert "complete, compact JSON object" in calls[1][-1].content
+            assert "Do not truncate" in calls[1][-1].content and "Do not use tools" in calls[1][-1].content
+        else:
+            assert calls[1] is calls[0], "Transport retry must not introduce an executor repair prompt"
     else:
         sleep.assert_not_awaited()
         recorded.assert_not_awaited()
-    assert all(len(messages) == 2 for messages in calls)
+    assert [len(messages) for messages in calls] == ([2, 3] if failure_kind == "invalid_json" else [2] * expected_calls)
     assert all(message.type != "tool" for messages in calls for message in messages)
     assert all(call.kwargs == {"response_format": {"type": "json_object"}}
                for call in agent._model.bind.call_args_list)

@@ -17,8 +17,8 @@ _PRESETS = (
     DomainPreset(
         id="general", name="通用数据分析",
         description="先识别数据格式，再按需查找并加载适合的领域工具。",
-        plugin_ids=(), initial_tools=(_INSPECT, "scientific_inspect", "document_inspect"),
-        instructions="Inspect the supplied dataset first. Discover and load only the tools required by the current step. Use evidence from actual files; never infer unavailable data.",
+        plugin_ids=(), initial_tools=(_INSPECT, "scientific_inspect", "document_inspect", "pdf_extract_text", "docx_extract_structure"),
+        instructions="Inspect the supplied dataset first. Document inspection provides metadata, not the document's contents: use pdf_extract_text or docx_extract_structure for bounded native evidence before considering a custom extraction script. Discover and load OCR or other tools when the observed format or content requires them. Use evidence from actual files; never infer unavailable data.",
     ),
     DomainPreset(
         id="tabular", name="表格与工作簿",

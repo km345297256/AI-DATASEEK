@@ -163,7 +163,7 @@ async def test_runtime_scope_is_private_restored_and_bound_to_original_input():
     runner._session_repository = SimpleNamespace(find_by_id_and_user_id=AsyncMock(return_value=SimpleNamespace(llm_overrides={})))
     runner._analysis_source_fingerprints = None
     runner._analysis_budget_service = AnalysisBudgetService(repository, policy=BudgetPolicy())
-    runner._input_delivery = SimpleNamespace(_require_live=AsyncMock())
+    runner._input_delivery = SimpleNamespace(_require_live=AsyncMock(), mark_analysis_started=AsyncMock())
     runner._accepted_input_key = "original-input"
     message = Message(message="original analysis")
     with ExitStack() as stack:

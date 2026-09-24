@@ -1,5 +1,6 @@
 import type { ToolContent } from '../types/message';
 import { mergeAnalysisToolEvent } from './analysisJob.ts';
+import { recoveredProgramAttempts } from './programRecovery.ts';
 
 export interface DisplayToolItem {
   key: string;
@@ -8,6 +9,7 @@ export interface DisplayToolItem {
   count: number;
   summary?: string;
   revisions: ToolContent[];
+  recoveredByCallId?: string;
 }
 
 const isMutation = (tool: ToolContent): boolean => tool.name === 'file'
@@ -35,6 +37,7 @@ export function buildToolTimeline(events: ToolContent[]): DisplayToolItem[] {
     calls.set(event.tool_call_id, previous ? mergeAnalysisToolEvent(previous, event) : { ...event });
   }
   const items: DisplayToolItem[] = [];
+  const recovered = recoveredProgramAttempts([...calls.values()]);
   const groups = new Map<string, DisplayToolItem>();
   for (const tool of calls.values()) {
     // Approval and declarative output cards must remain visible individually.
@@ -50,7 +53,7 @@ export function buildToolTimeline(events: ToolContent[]): DisplayToolItem[] {
       group.summary = `${group.count} 次修改${failures ? ` · ${failures} 次失败` : ''}`;
     } else {
       const item = { key: tool.tool_call_id, tool, panelTool: tool, count: 1,
-        revisions: groupable ? [tool] : [] };
+        revisions: groupable ? [tool] : [], recoveredByCallId: recovered.get(tool.tool_call_id) };
       items.push(item);
       if (target) groups.set(target, item);
     }

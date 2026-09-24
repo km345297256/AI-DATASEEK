@@ -76,7 +76,7 @@ async def run_recovery(bad, corrected, *, evidence=None, good=None, files=None):
     ("delivery", "verified_files", "Delivered `observed.png`.", ["verified_files"]),
     ("limitation", "tool_0003_result", "An optional inspection failed.",
      [f"tool_{index:04d}_result" for index in range(1, 8)]),
-    ("context", "catalog_0001", "The registered catalog is Observatory.", ["catalog_0001"]),
+    ("context", "catalog_0001", "The registered catalog is Observatory.", ["catalog_0001", "current_request"]),
 ])
 async def test_scoped_payload_lists_only_original_kind_gate_anchors(kind, source, text, expected):
     bad = paragraph("UNSUPPORTED_CLAIM", kind=kind, source="invented_source", quote=PRIVATE)

@@ -822,7 +822,7 @@ async def test_explicit_attachment_outside_output_is_preserved_and_deduplicated(
 async def test_file_read_tool_event_does_not_upload_the_file_directly():
     class FakeSandbox:
         async def file_read(self, file_path):
-            return ToolResult(success=True, data={"content": "print('ready')"})
+            pytest.fail("Completed file_read events must not read the file again")
 
     runner = AgentTaskRunner.__new__(AgentTaskRunner)
     runner._agent_id = "agent-1"
@@ -840,6 +840,7 @@ async def test_file_read_tool_event_does_not_upload_the_file_directly():
         function_name="file_read",
         function_args={"file": "/home/ubuntu/output/plot.py"},
         status=ToolStatus.CALLED,
+        function_result=ToolResult(success=True, data={"content": "print('ready')"}),
     )
 
     await runner._handle_tool_event(event)
@@ -1238,7 +1239,12 @@ async def test_chat_bootstrap_failure_after_sse_cancellation_is_persisted(monkey
 
     assert repository.session.status == SessionStatus.COMPLETED
     assert repository.events
-    assert repository.events[-1].error == "sandbox failed"
+    assert repository.events[-2].metadata["analysis_outcome"]["status"] == "failed"
+    assert repository.events[-2].metadata["analysis_outcome"]["reason_code"] == "input_preparation_failed"
+    assert repository.events[-2].metadata["execution_stage"] == "input_preparation"
+    assert repository.events[-2].metadata["analysis_started"] is False
+    assert repository.events[-1].error == repository.events[-2].message
+    assert "分析尚未开始" in repository.events[-1].error
 
 
 @pytest.mark.asyncio

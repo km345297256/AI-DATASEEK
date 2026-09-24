@@ -31,6 +31,12 @@ test('execution budget stops retain the concrete reason without promising a reru
     ['analysis_budget_deadline_exceeded', '最长执行时间'],
     ['analysis_budget_store_unavailable', '无法可靠记录执行额度'],
     ['budget_no_progress_loop', '未产生新的有效进展'],
+    ['invalid_execution_result', '未返回可验证的执行结果'],
+    ['tool_protocol_error', '未能发起有效的工具调用'],
+    ['report_validation_rejected', '部分正文未通过证据核验'],
+    ['report_validation_unavailable', '正文尚未完成证据核验'],
+    ['scientific_validation_rejected', '计算方法或数值一致性未通过核验'],
+    ['scientific_validation_unavailable', '计算方法与数值一致性尚未完整核验'],
   ]) {
     const parsed = readAnalysisOutcome(outcome({ reason_code, can_resume: false }));
     const text = analysisOutcomeReason(parsed);
@@ -45,6 +51,26 @@ test('invalid or nonopaque checkpoint identifiers never enable resume', () => {
     const parsed = readAnalysisOutcome(outcome({ resume_from }));
     assert.equal(parsed.can_resume, false);
     assert.equal(parsed.resume_from, undefined);
+  }
+});
+
+test('preparation failures explain that analysis has not started without implying source corruption or retry', () => {
+  for (const code of ['dataset_unreadable', 'dataset_unsafe', 'dataset_changed', 'dataset_limit', 'dataset_preparation_failed',
+    'input_preparation_failed', 'model_audit_unavailable', 'transport_timeout', 'transport_error', 'invalid_response',
+    'invalid_safety', 'invalid_routing', 'invalid_decision', 'front_controller_unavailable']) {
+    const parsed = readAnalysisOutcome(outcome({ status: 'failed', reason_code: code, can_resume: false, missing: [] }));
+    assert.match(analysisOutcomeReason(parsed), /尚未开始/);
+    assert.doesNotMatch(analysisOutcomeReason(parsed), /自动重|已完成|数据已损坏|源文件已改变/);
+    assert.equal(resumableAnalysisOutcome([assistant(parsed)], 0), undefined);
+  }
+});
+
+test('rejected evidence and missing requested sections remain failures, not an unavailable generic explanation', () => {
+  for (const [code, fragment] of [['answer_validation_rejected', /引用或证据未通过检查/], ['answer_objectives_missing', /遗漏了您明确要求/]]) {
+    const parsed = readAnalysisOutcome(outcome({ status: 'failed', reason_code: code, can_resume: false, missing: [] }));
+    assert.match(analysisOutcomeReason(parsed), fragment);
+    assert.equal(analysisOutcomeTitle(parsed), '未完成');
+    assert.doesNotMatch(analysisOutcomeReason(parsed, true), /仍可使用|本次分析已完成/);
   }
 });
 
@@ -65,6 +91,28 @@ test('outcome notices use controlled labels and never display arbitrary diagnost
     const inherited = readAnalysisOutcome(outcome({ reason_code: key, missing: [{ kind: key, min_count: 1, label: key }] }));
     assert.equal(typeof analysisOutcomeReason(inherited), 'string');
     assert.deepEqual(analysisOutcomeMissing(inherited), ['成果 × 1']);
+  }
+});
+
+test('missing deliverable labels show format constraints without changing the typed outcome', () => {
+  const raw = outcome({ missing: [
+    { kind: 'report', min_count: 1, label: '报告', formats: ['md'] },
+    { kind: 'table', min_count: 2, label: '数据表', formats: ['.CSV', 'csv', 'TSV'] },
+    { kind: 'code', min_count: 1, label: '代码' },
+  ] });
+  const before = structuredClone(raw);
+  const parsed = readAnalysisOutcome(raw);
+  assert.deepEqual(analysisOutcomeMissing(parsed), ['报告（MD） × 1', '数据表（CSV / TSV） × 2', '代码 × 1']);
+  assert.equal(analysisOutcomeTitle(parsed), '部分完成');
+  assert.deepEqual(raw, before);
+  assert.deepEqual(parsed.missing, raw.missing);
+});
+
+test('missing format labels reject arbitrary metadata and preserve the generic label', () => {
+  for (const formats of [undefined, null, [], 'md', {}, [null], [1], ['unknownformat'],
+    ['md', '/private/secret'], ['<script>'], ['md\nsecret'], [' md '], ['..md'], Array(9).fill('md')]) {
+    const parsed = readAnalysisOutcome(outcome({ missing: [{ kind: 'report', min_count: 1, label: '报告', formats }] }));
+    assert.deepEqual(analysisOutcomeMissing(parsed), ['报告 × 1']);
   }
 });
 

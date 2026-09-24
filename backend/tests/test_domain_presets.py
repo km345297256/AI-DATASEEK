@@ -86,7 +86,7 @@ def test_legacy_all_preserves_complete_catalog_and_on_demand_does_not(toolkit):
     legacy = PluginToolView(toolkit, selection_mode="all")
     small = PluginToolView(toolkit)
     assert len(legacy.get_tools()) == len(toolkit.get_tools())
-    assert len(small.get_tools()) == 3
+    assert len(small.get_tools()) == len(get_domain_preset("general").initial_tools)
     assert legacy.get_tool("space_ground_track") is not None
     assert small.get_tool("space_ground_track") is None
     assert len(toolkit.get_tools()) >= 280
@@ -116,7 +116,8 @@ def test_search_load_is_bounded_and_atomic_and_does_not_execute(toolkit):
     assert view.load(["table_profile"] * 9).success is False
     assert view.load([]).success is False
     assert view.load(["/Users/private"]).success is False
-    assert view.load(["table_profile", "table_extract", "table_filter_aggregate", "table_join_compare", "table_pivot"]).success
+    remaining = 8 - len(view.loaded_tool_names)
+    assert view.load(["table_profile", "table_extract", "table_filter_aggregate", "table_join_compare", "table_pivot"][:remaining]).success
     full = view.selection_snapshot()
     assert full["loaded_tool_count"] == 8
     assert view.load(["table_schema_infer"]).success is False
@@ -209,7 +210,7 @@ def test_returned_schemas_and_selection_snapshots_cannot_mutate_catalog(toolkit)
     schemas[0]["function"]["name"] = "modified"
     state = view.selection_snapshot()
     state["loaded_tool_names"].clear()
-    assert len(view.loaded_tool_names) == 3
+    assert len(view.loaded_tool_names) == len(get_domain_preset("general").initial_tools)
     assert "modified" not in view.loaded_tool_names
 
 
@@ -218,7 +219,28 @@ def test_view_disable_is_local_and_plugin_disable_remains_authoritative(toolkit)
     one.set_enabled(False)
     assert one.get_tools() == [] and one.get_tool("data_format_inspect") is None
     assert one.load(["table_profile"]).success is False
-    assert len(two.get_tools()) == 3 and toolkit.enabled
+    assert len(two.get_tools()) == len(get_domain_preset("general").initial_tools) and toolkit.enabled
     toolkit.set_enabled(False)
     assert two.get_tools() == [] and two.get_tool("data_format_inspect") is None
     assert two.search().success is False
+
+
+def test_general_document_content_tools_are_available_without_custom_scripts(toolkit):
+    view = PluginToolView(toolkit)
+    for name in ("document_inspect", "pdf_extract_text", "docx_extract_structure"):
+        assert view.get_tool(name) is not None
+    assert "metadata, not the document's contents" in get_domain_preset("general").instructions
+    assert view.get_tool("pdf_ocr_text") is None
+    assert view.load(["pdf_ocr_text"]).success
+    assert view.get_tool("pdf_ocr_text") is not None
+
+
+def test_general_does_not_invent_disabled_document_capabilities(catalog):
+    filtered = catalog.model_copy(update={
+        "tools": tuple(tool for tool in catalog.tools if tool.plugin != "documents"),
+        "plugins": tuple(plugin for plugin in catalog.plugins if plugin.plugin != "documents"),
+    })
+    toolkit = PluginToolkit(SimpleNamespace(), session_id="no-documents", plugin_runtime=SimpleNamespace(current_snapshot=filtered))
+    view = PluginToolView(toolkit)
+    assert view.get_tool("pdf_extract_text") is None
+    assert not view.load(["pdf_extract_text"]).success

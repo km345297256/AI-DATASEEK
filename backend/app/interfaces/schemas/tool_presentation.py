@@ -16,6 +16,7 @@ from typing import Any, Literal
 from urllib.parse import parse_qs, urlsplit
 
 from pydantic import BaseModel, ConfigDict, Field
+from app.domain.utils.numeric_operator_redaction import redact_host_paths
 
 
 ToolPresentationKind = Literal[
@@ -157,7 +158,7 @@ def _safe_text(value: Any, *, limit: int) -> str | None:
     text = text.replace(_WEB_SCHEME_MARKER, "?")
     for scheme in ("https://", "http://", "wss://", "ws://"):
         text = text.replace(scheme, f"{scheme[:-2]}{_WEB_SCHEME_MARKER}")
-    text = _HOST_PATH.sub("[protected path]", text)
+    text = redact_host_paths(text, pattern=_HOST_PATH)
     text = text.replace(_WEB_SCHEME_MARKER, "//")
     return text[:limit]
 

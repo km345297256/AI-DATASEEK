@@ -9,6 +9,10 @@ from typing import Any, Sequence
 import docker
 
 from app.core.config import get_settings
+from app.infrastructure.external.sandbox.dataset_readability import (
+    DatasetReadabilityError,
+    verify_dataset_readability,
+)
 
 
 DEFAULT_MAX_DIRECTORY_FILES = 10_000
@@ -727,6 +731,16 @@ def inspect_local_dataset_directory(
             remove=True,
             user="0:0",
         )
+        inventory = _parse_directory_inventory(
+            output, max_files=max_files, max_output_bytes=max_output_bytes,
+        )
+        # Registration's root inspector only establishes path containment and
+        # inventory. Prove actual execution-user access before declaring usable.
+        verify_dataset_readability(
+            docker_client, image=image, source=inventory.canonical_source_directory,
+        )
+    except DatasetReadabilityError as error:
+        raise DatasetDirectoryInspectionError(error.code, error.message) from None
     except DatasetDirectoryInspectionError:
         raise
     except Exception as error:
@@ -741,11 +755,7 @@ def inspect_local_dataset_directory(
             except Exception:
                 pass
 
-    return _parse_directory_inventory(
-        output,
-        max_files=max_files,
-        max_output_bytes=max_output_bytes,
-    )
+    return inventory
 
 
 # Private aliases retain compatibility for the original docker_sandbox helper

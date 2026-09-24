@@ -6,10 +6,10 @@
           :message="message"
           :session-id="sessionId || undefined"
           :hide-header="isConsecutiveAssistant(messages, index)"
-          :show-assistant-actions="!isLoading && isLatestAssistantMessage(messages, index)"
+          :show-assistant-actions="!isLoading && presentation.latestAssistant === message"
           :allow-analysis-resume="canResumeAnalysis(index)"
           :task-summary-expanded="expanded.has(messageKey(message))"
-          :show-product-button="allowProducts && !isLoading && isLatestAssistantMessage(messages, index)"
+          :show-product-button="allowProducts && !isLoading && presentation.latestAssistant === message"
           @resume-analysis="$emit('resumeAnalysis', index)"
           @tool-click="$emit('toolClick', $event)"
           @jupyter-opened="$emit('jupyterOpened', $event)"
@@ -64,8 +64,7 @@ import type { FileInfo } from '../api/file';
 import { prepareShapefilePreview } from '../api/file';
 import type { CompletionAdviceData } from '../types/event';
 import { isConsecutiveAssistant, type Message, type ToolContent } from '../types/message';
-import { isLatestAssistantMessage } from '../utils/chatTimeline';
-import { conversationEntries, currentTurnDeliveries, deliveredFiles, deliveredImages, precedingTaskSummary } from '../utils/analysisPresentation';
+import { ConversationPresentationIndex, currentTurnDeliveries, deliveredFiles, deliveredImages } from '../utils/analysisPresentation';
 import { useFilePanel } from '../composables/useFilePanel';
 import { showErrorToast } from '../utils/toast';
 
@@ -88,7 +87,8 @@ defineEmits<{
 const { showFilePanel, beginFilePreview } = useFilePanel();
 const previewLoading = ref(false);
 const expanded = ref(new Set<number>());
-const displayEntries = computed(() => conversationEntries(props.messages));
+const presentation = new ConversationPresentationIndex();
+const displayEntries = computed(() => presentation.update(props.messages));
 watch(() => props.sessionId, () => { expanded.value = new Set(); });
 function toggleSummary(message: Message) {
   const key = props.messageKey(message);
@@ -96,9 +96,9 @@ function toggleSummary(message: Message) {
   if (next.has(key)) next.delete(key); else next.add(key);
   expanded.value = next;
 }
-function showMessage(message: Message, index: number) {
+function showMessage(message: Message, _index: number) {
   if (message.type !== 'step') return true;
-  const summary = precedingTaskSummary(props.messages, index);
+  const summary = presentation.summaryFor(message);
   return !summary || expanded.value.has(props.messageKey(summary));
 }
 function previewUrl(file: FileInfo) {

@@ -26,6 +26,8 @@ from app.core.exceptions import AppException, ResourceNotFoundException, BadRequ
 from app.services.program import (
     BOOTSTRAP, append_program_output, prepare_program, program_command, program_feedback,
 )
+from app.services.shell_output import ShellOutputBuffer, utf8_prefix
+from app.services.analysis_workspace import prepare_analysis_workspace
 
 # Set up logger
 logger = logging.getLogger(__name__)
@@ -78,6 +80,8 @@ class _ShellExecutionAttempt:
 
 
 class ShellService:
+    MAX_CONSOLE_RECORDS = 64
+    MAX_CONSOLE_BYTES = 128 * 1024
     EXEC_COMPLETION_GRACE_SECONDS = 5
     OUTPUT_READER_DRAIN_GRACE_SECONDS = 1
     REPLACED_PROCESS_TERMINATION_GRACE_SECONDS = 1
@@ -395,6 +399,7 @@ class ShellService:
             # terminated without touching the sandbox server's group.
             process_kwargs["start_new_session"] = True
 
+        prepare_analysis_workspace()
         process = await asyncio.create_subprocess_shell(
             command,
             executable="/bin/bash",
@@ -412,6 +417,7 @@ class ShellService:
 
     async def _create_program_process(self, exec_dir: str, script_path: str,
                                       args: list[str], *, receipt_record=None) -> asyncio.subprocess.Process:
+        prepare_analysis_workspace()
         snapshot, diagnostics, metadata = prepare_program(script_path, args)
         try:
             if receipt_record is not None:
@@ -821,6 +827,18 @@ class ShellService:
         if not shell:
             return
 
+        buffer = getattr(process, "_dataseek_output_buffer", None)
+        if buffer is None:
+            # Also supports old in-process adapters without changing their
+            # launch/receipt protocol. Production allocates before publish.
+            buffer = ShellOutputBuffer()
+            setattr(process, "_dataseek_output_buffer", buffer)
+            if shell.get("process") is process:
+                shell["output_buffer"] = buffer
+        if buffer.status == "closed":
+            return
+        buffer.append(output)
+
         program_output = None
         if getattr(process, "_dataseek_program_execution", None):
             previous, truncated = getattr(process, "_dataseek_program_output", ("", False))
@@ -829,7 +847,7 @@ class ShellService:
 
         if shell.get("process") is process:
             if program_output is None:
-                shell["output"] += output
+                shell["output"] = buffer.preview()
             else:
                 shell["output"] = program_output
                 shell["output_truncated"] = truncated
@@ -838,9 +856,30 @@ class ShellService:
             record is console_record for record in shell.get("console", [])
         ):
             if program_output is None:
-                console_record.output += output
+                console_record.output = buffer.preview()
             else:
                 console_record.output = program_output
+            console_record.output_truncated = (buffer.total_bytes > buffer.preview_bytes
+                                                if program_output is None else truncated)
+        self._bound_console(shell)
+
+    def _bound_console(self, shell: Dict[str, Any]) -> None:
+        """Bound legacy console history as well as the current output view."""
+        records = shell.get("console", [])
+        def size(record):
+            return sum(len(value.encode("utf-8")) for value in (record.ps1, record.command, record.output))
+        total = sum(size(record) for record in records)
+        while len(records) > 1 and (len(records) > self.MAX_CONSOLE_RECORDS or total > self.MAX_CONSOLE_BYTES):
+            total -= size(records.pop(0))
+            shell["console_truncated"] = True
+        if records and total > self.MAX_CONSOLE_BYTES:
+            record = records[-1]
+            # An unusually long command must not defeat the console cap. This
+            # changes only its display copy, never the execution identity.
+            for field in ("ps1", "command", "output"):
+                setattr(record, field, utf8_prefix(getattr(record, field).encode("utf-8"), self.MAX_CONSOLE_BYTES // 3).decode("utf-8"))
+            record.output_truncated = True
+            shell["console_truncated"] = True
 
     async def _start_output_reader(
         self,
@@ -857,12 +896,14 @@ class ShellService:
             console_record = console[-1] if console else None
 
         decoder = codecs.getincrementaldecoder("utf-8")(errors="replace")
+        reached_eof = False
         try:
             while process.stdout:
                 try:
-                    buffer = await process.stdout.read(128)
+                    buffer = await process.stdout.read(64 * 1024)
                     if not buffer:
                         # Process output ended
+                        reached_eof = True
                         break
 
                     output = decoder.decode(buffer, final=False)
@@ -886,6 +927,9 @@ class ShellService:
                 console_record,
                 remaining_output,
             )
+            captured = getattr(process, "_dataseek_output_buffer", None)
+            if captured is not None:
+                captured.stream_complete = reached_eof
 
         logger.debug("Output reader finished session=%s", session_ref)
 
@@ -949,6 +993,15 @@ class ShellService:
         exec_dir = os.path.abspath(os.path.normpath(exec_dir))
         receipt_record = (self._register_execution_operation(session_id, operation_id, command, exec_dir)
                           if operation_id is not None else None)
+        # A first program may legitimately use the platform's output directory
+        # as cwd. Prepare that fixed directory before checking caller cwd;
+        # arbitrary missing working/input directories must still fail below.
+        try:
+            prepare_analysis_workspace()
+        except BadRequestException:
+            if receipt_record is not None:
+                receipt_record.state = "not_started"
+            raise
         # Ensure directory exists
         if not os.path.exists(exec_dir):
             if receipt_record is not None:
@@ -1012,6 +1065,8 @@ class ShellService:
                 else []
             )
             console_history.append(console_record)
+            output_buffer = ShellOutputBuffer()
+            setattr(process, "_dataseek_output_buffer", output_buffer)
             shell = {
                 "process": process,
                 "process_group": getattr(
@@ -1021,11 +1076,14 @@ class ShellService:
                 ),
                 "exec_dir": exec_dir,
                 "output": "",
+                "output_buffer": output_buffer,
                 "console": console_history,
+                "console_truncated": bool(previous_shell and previous_shell.get("console_truncated")),
                 "operation_id": operation_id,
                 "program_execution": getattr(process, "_dataseek_program_execution", None),
                 "program_diagnostics": getattr(process, "_dataseek_program_diagnostics", None),
             }
+            self._bound_console(shell)
 
             if not self._publish_exec_shell(
                 session_id,
@@ -1042,7 +1100,13 @@ class ShellService:
                     process_group=shell.get("process_group"),
                 )
                 program_feedback(shell)
+                output_buffer.close()
                 raise RuntimeError("Shell session was cancelled during process creation")
+
+            if previous_shell is not None:
+                # Replacement has its own output identity. Retire the previous
+                # private files; a stale cursor can never read the new launch.
+                self._retire_output(previous_shell)
 
             shell["reader_task"] = asyncio.create_task(
                 self._start_output_reader(session_id, process, console_record)
@@ -1076,6 +1140,7 @@ class ShellService:
                         output=view_result.output,
                         execution_receipt=self._execution_receipt(receipt_record) if receipt_record else None,
                         program_execution=program_feedback(shell),
+                        output_metadata=output_buffer.metadata(),
                     )
             except Exception as e:
                 # Other exceptions, ignore and continue
@@ -1097,6 +1162,7 @@ class ShellService:
                 status="running",
                 execution_receipt=self._execution_receipt(receipt_record) if receipt_record else None,
                 program_execution=program_feedback(shell),
+                output_metadata=output_buffer.metadata(),
             )
         except Exception as e:
             logger.error("Command execution failed error_type=%s", type(e).__name__)
@@ -1110,7 +1176,9 @@ class ShellService:
             if operation is not None:
                 self._finish_exec(session_id, operation)
 
-    async def view_shell(self, session_id: str, console: bool = False, *, operation_id: Optional[str] = None) -> ShellViewResult:
+    async def view_shell(self, session_id: str, console: bool = False, *, operation_id: Optional[str] = None,
+                         output_id: Optional[str] = None, cursor: Optional[int] = None,
+                         max_bytes: int = 8192) -> ShellViewResult:
         """
         Asynchronously view the content of the specified shell session
         """
@@ -1127,6 +1195,15 @@ class ShellService:
         # Get raw output and filter ANSI escape codes
         raw_output = shell["output"]
         clean_output = self._remove_ansi_escape_codes(raw_output)
+        buffer = shell.get("output_buffer")
+        page = None
+        if output_id is not None or cursor is not None:
+            if buffer is None or output_id != buffer.output_id or cursor is None:
+                raise BadRequestException("Output identity is unavailable or has been replaced")
+            try:
+                clean_output, page = buffer.read(cursor, max_bytes)
+            except ValueError as error:
+                raise BadRequestException(str(error)) from error
         
         # Get command console records with filtered output
         if console:
@@ -1139,6 +1216,9 @@ class ShellService:
             session_id=session_id,
             console=console,
             program_execution=program_feedback(shell),
+            output_metadata=buffer.metadata() if buffer is not None else None,
+            output_page=page,
+            console_truncated=bool(shell.get("console_truncated")),
         )
 
     def get_console_records(self, session_id: str) -> List[ConsoleRecord]:
@@ -1158,7 +1238,8 @@ class ShellService:
             clean_record = ConsoleRecord(
                 ps1=record.ps1,
                 command=record.command,
-                output=self._remove_ansi_escape_codes(record.output)
+                output=self._remove_ansi_escape_codes(record.output),
+                output_truncated=record.output_truncated,
             )
             clean_console.append(clean_record)
         
@@ -1254,9 +1335,8 @@ class ShellService:
             
             # Add input to output and console records
             input_str = input_data.decode('utf-8')
-            shell["output"] += input_str
-            if shell["console"]:
-                shell["console"][-1].output += input_str
+            self._append_process_output(session_id, process,
+                                        shell["console"][-1] if shell["console"] else None, input_str)
             
             # Asynchronously write input
             process.stdin.write(input_data)
@@ -1343,6 +1423,7 @@ class ShellService:
             raise AppException(message="Failed to release shell session") from error
 
         program_feedback(shell)
+        self._retire_output(shell)
 
         # The id is private to one plugin invocation. Identity-check before
         # deletion in case a future caller accidentally attempts reuse.
@@ -1353,6 +1434,17 @@ class ShellService:
             status="released",
             returncode=process.returncode if process.returncode is not None else 0,
         )
+
+    @staticmethod
+    def _retire_output(shell: Dict[str, Any]) -> None:
+        output_buffer = shell.get("output_buffer")
+        if output_buffer is not None:
+            output_buffer.close()
+        reader = shell.get("reader_task")
+        if reader is not None and not reader.done():
+            # Process teardown already received its bounded final drain. Do
+            # not leave a reader pinned by an inherited pipe after release.
+            reader.cancel()
 
     def create_session_id(self) -> str:
         """

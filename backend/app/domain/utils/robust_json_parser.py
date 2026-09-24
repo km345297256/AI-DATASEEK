@@ -1,35 +1,17 @@
-"""RobustJsonParser
+"""Decode complete native tool arguments without inventing executable input.
 
-A layered JSON repair pipeline for tool call arguments, implemented as a
-LangChain Runnable[AIMessage, AIMessage] so it can be composed with a model
-using the | operator:
-
-    chain = model_with_tools | RobustJsonParser.from_llm(llm)
-
-Repair stages applied in order when invalid_tool_calls are detected:
-
-  Stage 1 — parse_partial_json   : repair truncated / incomplete JSON locally.
-  Stage 2 — parse_json_markdown  : repair JSON wrapped in markdown code fences.
-  Stage 3 — OutputFixingParser   : ask the LLM to rewrite only the broken JSON
-                                   string (wraps JsonOutputParser, cheap call).
-
-When stages 1-3 are all insufficient, a ToolCallParseError is raised.  The
-caller can catch it and implement model-level retries (stages 4-5):
-
-  Stage 4 — silent model retry   : re-invoke the chain without extra context
-                                   (mirrors RetryOutputParser).
-  Stage 5 — error model retry    : re-invoke with the failed AIMessage and
-                                   error details appended (mirrors
-                                   RetryWithErrorOutputParser).
-
-Stages 4-5 are intentionally left to the caller so that the Runnable stays
-composable and stateless.  ToolCallParseError exposes a make_retry_context()
-helper to build the stage-5 context without duplicating the template.
+Only a complete JSON object, optionally enclosed in a complete JSON fence, can
+be promoted from invalid_tool_calls. Partial parsing and model rewriting may
+drop a key or finish a truncated string, so neither may authorize execution.
+ToolCallParseError preserves the caller's existing bounded resend protocol.
+The separate parse_json_lenient helper is for non-executable response parsing.
 """
 import asyncio
 import logging
 import json
+import math
 import re
+import uuid
 from typing import Any, Optional
 
 from langchain_core.exceptions import OutputParserException
@@ -48,12 +30,79 @@ _EXPLICIT_JSON_FENCE = re.compile(
     r"```[ \t]*json[ \t]*(?:\r?\n|\s)(.*?)```",
     re.IGNORECASE | re.DOTALL,
 )
+_COMPLETE_JSON_FENCE = re.compile(
+    r"\s*```(?:json)?[ \t]*\r?\n(.*?)\r?\n?```\s*", re.IGNORECASE | re.DOTALL,
+)
+
+
+def _complete_tool_argument_object(raw: str) -> Optional[dict]:
+    """Decode the entire object, rejecting ambiguous keys and non-JSON numbers."""
+    def unique_object(pairs):
+        result = {}
+        for key, value in pairs:
+            if key in result:
+                raise ValueError("duplicate_argument_key")
+            result[key] = value
+        return result
+
+    def invalid_constant(_value):
+        raise ValueError("nonfinite_argument_number")
+
+    def finite_float(value):
+        number = float(value)
+        if not math.isfinite(number):
+            raise ValueError("nonfinite_argument_number")
+        return number
+
+    try:
+        value = json.loads(raw, object_pairs_hook=unique_object,
+                           parse_constant=invalid_constant, parse_float=finite_float)
+        return value if isinstance(value, dict) else None
+    except (ValueError, TypeError, RecursionError, OverflowError):
+        return None
 
 _RETRY_WITH_ERROR_TEMPLATE = (
-    "Your previous response contained invalid JSON in the tool call arguments.\n"
+    "Your previous response contained invalid tool call arguments or identities.\n"
     "Error details:\n{error}\n\n"
-    "Please resend the tool call with correctly formatted JSON arguments."
+    "Return one shorter, complete native tool call in the next response. "
+    "Never guess or fill in missing or truncated content. "
+    "If the intended content is too long for one response, use smaller write/append calls, each with "
+    "a complete JSON object and complete intended content for that part, one call per response. "
+    "Do not replay operations that already succeeded."
+    " Every tool call in a response must have a distinct non-empty call ID."
 )
+
+
+def validate_tool_call_identity(message: AIMessage) -> AIMessage:
+    """Validate the whole batch before dispatch; fill absent IDs on a copy only.
+
+    Reject collisions rather than executing a valid prefix. Arguments and raw
+    provider diagnostics never appear in correction feedback. This also runs
+    after lossless promotion of invalid_tool_calls, so mixed batches cannot
+    bypass the identity check.
+    """
+    seen: set[str] = set()
+    missing = False
+    for call in message.tool_calls:
+        identity = call.get("id")
+        if identity is None or identity == "":
+            missing = True
+            continue
+        if not isinstance(identity, str) or not identity.strip() or identity in seen:
+            detail = "Tool call identity is invalid or duplicated; this batch was not executed."
+            raise ToolCallParseError(detail, message, [detail])
+        seen.add(identity)
+    if not missing:
+        return message
+    normalized = message.model_copy(deep=True)
+    for call in normalized.tool_calls:
+        if not call.get("id"):
+            identity = str(uuid.uuid4())
+            while identity in seen:
+                identity = str(uuid.uuid4())
+            call["id"] = identity
+            seen.add(identity)
+    return normalized
 
 
 def _escape_unescaped_quotes_in_strings(raw: str) -> str:
@@ -164,11 +213,10 @@ def parse_json_lenient(raw: str) -> Any:
 
 
 class ToolCallParseError(OutputParserException):
-    """Raised when stages 1-3 cannot repair all invalid_tool_calls.
+    """Raised when native arguments cannot be decoded without changing values.
 
-    Carries the partially-repaired AIMessage and per-call error details so
-    callers can implement stages 4-5 (model-level retries) without
-    re-discovering the errors.
+    Carries the rejected AIMessage and safe per-call error details for the
+    caller's bounded resends. The rejected batch must not enter tool history.
     """
 
     def __init__(
@@ -182,24 +230,22 @@ class ToolCallParseError(OutputParserException):
         self.error_details = error_details
 
     def make_retry_context(self, context: list[Any]) -> list[Any]:
-        """Build a stage-5 context by appending error feedback to *context*.
+        """Append safe feedback without opening an unexecuted tool-call turn.
 
         Args:
             context: Current conversation messages.
 
         Returns:
-            A new list with the failed AIMessage and a corrective HumanMessage
-            appended, ready to be passed back to the model.
+            Original context plus a corrective HumanMessage. A failed mixed
+            batch can contain valid tool_calls that were never dispatched;
+            appending it would require fake tool responses or break protocol.
         """
         error_str = "\n\n".join(self.error_details)
-        return context + [
-            self.invalid_message,
-            HumanMessage(content=_RETRY_WITH_ERROR_TEMPLATE.format(error=error_str)),
-        ]
+        return context + [HumanMessage(content=_RETRY_WITH_ERROR_TEMPLATE.format(error=error_str))]
 
 
 class RobustJsonParser(Runnable[AIMessage, AIMessage]):
-    """Layered JSON repair for tool call arguments (stages 1-3).
+    """Lossless decoding for native tool arguments.
 
     Implements Runnable[AIMessage, AIMessage] so it composes cleanly with a
     bound model via the | operator::
@@ -212,18 +258,14 @@ class RobustJsonParser(Runnable[AIMessage, AIMessage]):
         )
         message = await chain.ainvoke(messages)
 
-    Combines parse_partial_json, parse_json_markdown, JsonOutputParser, and
-    OutputFixingParser into an escalating repair pipeline.  Raises
-    ToolCallParseError (a subclass of OutputParserException) when all three
-    stages are exhausted, so callers can add model-level retries (stages 4-5)
-    on top — e.g. via chain.with_retry() or a manual loop.
+    Incomplete or ambiguous input raises ToolCallParseError before any member
+    of the response batch can execute. The caller owns bounded model resends.
     """
 
     def __init__(self, llm: BaseChatModel) -> None:
         self._llm = llm
-        # Stage 3: OutputFixingParser wraps JsonOutputParser.
-        # JsonOutputParser validates the fixed string is well-formed JSON;
-        # OutputFixingParser drives one LLM repair call on failure.
+        # Retain the explicit legacy helper for compatibility. Automatic tool
+        # promotion never uses a model-generated rewrite of these arguments.
         self._fixing_parser: OutputFixingParser = OutputFixingParser.from_llm(
             llm=llm,
             parser=JsonOutputParser(),
@@ -235,7 +277,7 @@ class RobustJsonParser(Runnable[AIMessage, AIMessage]):
         """Create a RobustJsonParser from a chat model.
 
         Args:
-            llm: Chat model used for Stage 3 (OutputFixingParser) repair.
+            llm: Chat model retained for the explicit legacy repair helper.
 
         Returns:
             A RobustJsonParser instance ready for use in a chain.
@@ -243,39 +285,28 @@ class RobustJsonParser(Runnable[AIMessage, AIMessage]):
         return cls(llm=llm)
 
     # ------------------------------------------------------------------
-    # Stage 1: parse_partial_json
+    # The historical method name is retained for caller compatibility.
     # ------------------------------------------------------------------
 
     def _stage1_partial_json(self, raw: str) -> Optional[dict]:
-        """Stage 1: tolerates truncated / incomplete JSON."""
-        try:
-            result = parse_partial_json(raw)
-            if isinstance(result, dict):
-                return result
-        except Exception:
-            pass
-        return None
+        """Accept only a complete JSON object; never close or discard tokens."""
+        return _complete_tool_argument_object(raw)
 
     # ------------------------------------------------------------------
-    # Stage 2: parse_json_markdown
+    # Complete JSON fence decoding
     # ------------------------------------------------------------------
 
     def _stage2_json_markdown(self, raw: str) -> Optional[dict]:
-        """Stage 2: strips markdown code fences before parsing."""
-        try:
-            result = parse_json_markdown(raw)
-            if isinstance(result, dict):
-                return result
-        except Exception:
-            pass
-        return None
+        """Unwrap one complete fence without dropping any surrounding prose."""
+        match = _COMPLETE_JSON_FENCE.fullmatch(raw)
+        return _complete_tool_argument_object(match[1]) if match else None
 
     # ------------------------------------------------------------------
     # Stage 3: OutputFixingParser(JsonOutputParser)
     # ------------------------------------------------------------------
 
     async def _stage3_output_fixing(self, raw: str) -> Optional[dict]:
-        """Stage 3: asks LLM to rewrite the broken JSON string."""
+        """Legacy explicit helper; never used to promote native tool arguments."""
         try:
             with model_call_role("tool_json_repair"):
                 result = await self._fixing_parser.aparse(raw)
@@ -286,11 +317,11 @@ class RobustJsonParser(Runnable[AIMessage, AIMessage]):
         return None
 
     # ------------------------------------------------------------------
-    # Per-message repair (Stages 1-3)
+    # Per-message lossless decoding
     # ------------------------------------------------------------------
 
     async def _repair_invalid_tool_calls(self, message: AIMessage) -> AIMessage:
-        """Attempt to repair each invalid_tool_call through stages 1-3.
+        """Decode complete invalid_tool_call envelopes without semantic repair.
 
         Repaired calls are promoted from invalid_tool_calls to tool_calls.
         Calls that cannot be repaired remain in invalid_tool_calls.
@@ -305,16 +336,13 @@ class RobustJsonParser(Runnable[AIMessage, AIMessage]):
             name: str = itc.get("name") or ""
             raw_args: str = itc.get("args") or ""
 
-            fixed: Optional[dict] = (
-                self._stage1_partial_json(raw_args)
-                or self._stage2_json_markdown(raw_args)
-                or await self._stage3_output_fixing(raw_args)
-            )
+            fixed = self._stage1_partial_json(raw_args)
+            if fixed is None:
+                fixed = self._stage2_json_markdown(raw_args)
 
             if fixed is not None:
                 logger.info(
-                    "Repaired invalid tool call '%s' (raw args length: %d)",
-                    name,
+                    "Decoded complete tool argument envelope (raw args length: %d)",
                     len(raw_args),
                 )
                 repaired_calls.append(
@@ -332,10 +360,9 @@ class RobustJsonParser(Runnable[AIMessage, AIMessage]):
 
     def _collect_errors(self, message: AIMessage) -> list[str]:
         return [
-            f"Tool '{itc.get('name', 'unknown')}': "
-            f"{itc.get('error', 'JSON parse error')}\n"
-            f"Raw arguments: {itc.get('args', '')}"
-            for itc in (message.invalid_tool_calls or [])
+            f"Tool call {index}: arguments must be one complete, unambiguous JSON object; "
+            "no arguments were completed or discarded and this batch was not executed."
+            for index, _ in enumerate(message.invalid_tool_calls or [])
         ]
 
     # ------------------------------------------------------------------
@@ -358,7 +385,7 @@ class RobustJsonParser(Runnable[AIMessage, AIMessage]):
         config: Optional[RunnableConfig] = None,
         **kwargs: Any,
     ) -> AIMessage:
-        """Repair invalid_tool_calls in *input* through stages 1-3.
+        """Decode complete invalid_tool_calls or request a bounded resend.
 
         Args:
             input: The AIMessage produced by the model.
@@ -369,10 +396,9 @@ class RobustJsonParser(Runnable[AIMessage, AIMessage]):
             AIMessage with all tool call arguments successfully parsed.
 
         Raises:
-            ToolCallParseError: If one or more tool calls cannot be repaired by
-                stages 1-3.  The exception carries the partial-repaired
-                AIMessage and per-call error details for the caller to use in
-                stage-4/5 model retries.
+            ToolCallParseError: If one or more tool calls cannot be decoded
+                losslessly. The exception carries the partially decoded
+                AIMessage and safe per-call error details for bounded resends.
         """
         message = await self._repair_invalid_tool_calls(input)
 
@@ -387,4 +413,4 @@ class RobustJsonParser(Runnable[AIMessage, AIMessage]):
                 error_details=errors,
             )
 
-        return message
+        return validate_tool_call_identity(message)

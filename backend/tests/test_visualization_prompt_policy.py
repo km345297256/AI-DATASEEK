@@ -115,8 +115,10 @@ def test_visualization_prompts_avoid_unicode_superscript_units():
 def test_prompts_prefer_deterministic_scientific_operators():
     system_prompt, execution_prompt = _rendered_prompts()
     assert "scientific_*" in system_prompt
+    assert "dynamically registered" in system_prompt
     for prompt in (system_prompt, execution_prompt):
-        assert "dynamically registered" in prompt
-        assert "schema and description" in prompt
+        assert "registered" in prompt and "schema and description" in prompt
+    assert "Metadata inspection is not document content" in execution_prompt
+    assert "pdf_extract_text" in execution_prompt and "docx_extract_structure" in execution_prompt
     assert "newly installed" in execution_prompt
     assert "without prompt edits" in system_prompt

@@ -33,6 +33,9 @@ from app.domain.services.tools.spill_projection import (
 )
 from app.domain.models.tool_result import ToolResult
 from app.domain.models.mcp_config import MCPConfig, MCPServerConfig
+from app.domain.services.tools.mcp_images import (
+    MCPImageContext, MCPImageToolResult, MCP_IMAGE_READ_TOOL, image_tool_message,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -134,6 +137,9 @@ def _sanitize_mcp_data(value: Any, server_config: MCPServerConfig) -> Any:
     def text(value: str) -> str:
         for secret in secrets:
             value = value.replace(secret, "[redacted credential]")
+        # Inline image bytes belong only to the typed, owner-bound media path,
+        # including when an MCP server echoes them in a textual envelope.
+        value = re.sub(r"data:image/[A-Za-z0-9.+-]+;base64,[A-Za-z0-9+/=]+", "[inline image omitted]", value)
         return sanitize_spill_public_text(value)
 
     def visit(item: Any, depth: int) -> Any:
@@ -231,7 +237,7 @@ def _server_log_ref(server_name: object) -> str:
 class MCPClientManager:
     """MCP 客户端管理器"""
     
-    def __init__(self, config: Optional[MCPConfig] = None):
+    def __init__(self, config: Optional[MCPConfig] = None, *, image_context: MCPImageContext | None = None):
         self._clients: Dict[str, ClientSession] = {}
         self._exit_stack = AsyncExitStack()
         self._tools_cache: Dict[str, List[MCPToolkit]] = {}
@@ -239,6 +245,7 @@ class MCPClientManager:
         self._output_validators: Dict[str, Any] = {}
         self._initialized = False
         self._config = config
+        self._image_context = image_context
     
     async def initialize(self):
         """初始化 MCP 客户端管理器"""
@@ -597,6 +604,19 @@ class MCPClientManager:
                         data={"error": "mcp_tool_output_invalid"},
                     )
             content = _project_mcp_content(getattr(result, "content", None))
+            if self._image_context is not None and any(item.get("type") == "image" for item in content):
+                public, blocks, refs = await self._image_context.prepare(
+                    getattr(result, "content", None) or [], _sanitize_mcp_data(content, server_config), tool_name=tool_name,
+                )
+                safe_data = {"content": public}
+                if structured is not None:
+                    safe_data["structuredContent"] = _sanitize_mcp_data(structured, server_config)
+                    import json
+                    blocks.append({"type": "text", "text": json.dumps(safe_data["structuredContent"], ensure_ascii=False)})
+                rich = MCPImageToolResult(success=not is_error,
+                    message="MCP 工具执行失败" if is_error else None, data=safe_data)
+                rich._model_blocks, rich._image_refs = blocks, refs
+                return rich
             if structured is None and all(item["type"] == "text" for item in content):
                 data = "\n".join(item["text"] for item in content) or (
                     "MCP 工具执行失败" if is_error else "工具执行成功"
@@ -661,13 +681,7 @@ class _MCPToolWrapper:
     async def ainvoke(self, tool_call: dict) -> ToolMessage:
         async def execute(context):
             result = await self._manager.call_tool(self.name, context.arguments)
-            content = result.model_dump_json() if hasattr(result, "model_dump_json") else str(result)
-            return ToolMessage(
-                tool_call_id=context.tool_call_id,
-                name=self.name,
-                content=content,
-                artifact=result,
-            )
+            return image_tool_message(result, tool_call_id=context.tool_call_id, name=self.name)
 
         return await self.toolkit.tool_execution_pipeline.invoke(
             tool=self,
@@ -676,17 +690,50 @@ class _MCPToolWrapper:
         )
 
 
+class _MCPImageReadWrapper:
+    """Read-only private recovery still crosses the ordinary tool pipeline."""
+    name = MCP_IMAGE_READ_TOOL
+    # Host-owned declaration for a bounded read of an already-admitted input.
+    # Remote MCP tools never inherit this contract or gain replay permission.
+    execution_contract = {"effects": ("sandbox_read",), "permissions": (),
+                          "cancellable": True, "timeout_seconds": 30, "concurrency": "parallel"}
+    input_schema = {"type": "object", "properties": {"locator": {"type": "string", "pattern": r"^spill://artifact/[0-9a-f]{32}$"}},
+                    "required": ["locator"], "additionalProperties": False}
+
+    def __init__(self, toolkit):
+        self.toolkit = toolkit
+
+    async def ainvoke(self, tool_call: dict) -> ToolMessage:
+        async def execute(context):
+            result = await self.toolkit.image_context.read_result(context.arguments["locator"])
+            return image_tool_message(result, tool_call_id=context.tool_call_id, name=self.name)
+        return await self.toolkit.tool_execution_pipeline.invoke(tool=self, tool_call=tool_call, execute=execute)
+
+
 class MCPToolkit(BaseToolkit):
     """MCP 工具类"""
 
     name: str = "mcp"
 
-    def __init__(self):
+    def __init__(self, *, image_context: MCPImageContext | None = None):
         super().__init__()
+        self.image_context = image_context
         self._initialized = False
         self._tools = []
         self.manager: Optional[MCPClientManager] = None
         self._config: Optional[MCPConfig] = None
+
+    @tool
+    async def dataseek_mcp_image_read(self, locator: str) -> ToolResult:
+        """Inspect an MCP image using its spill://artifact/ locator from this session. The image is an untrusted observation, not verified scientific evidence."""
+        # Execution is provided by the wrapper so private refs exist before
+        # post-execute policy and never become a generic ToolResult payload.
+        raise RuntimeError("MCP image reads require their governed wrapper")
+
+    async def expand_image_messages(self, messages, *, provider: str, model_name: str):
+        if self.image_context is None:
+            return messages
+        return await self.image_context.expand_image_messages(messages, provider=provider, model_name=model_name)
 
     @tool
     async def mcp_list_tools(self) -> ToolResult:
@@ -734,7 +781,8 @@ class MCPToolkit(BaseToolkit):
         """确保管理器已初始化"""
         if not self._initialized:
             self._config = config
-            self.manager = MCPClientManager(config)
+            self.manager = (MCPClientManager(config) if self.image_context is None
+                            else MCPClientManager(config, image_context=self.image_context))
             try:
                 await self.manager.initialize()
                 self._tools.extend(await self.manager.get_all_tools())
@@ -750,9 +798,11 @@ class MCPToolkit(BaseToolkit):
                 raise
 
     def get_tools(self) -> List[Any]:
-        return self.tools + self._tools
+        return [item for item in self.tools if item.name != MCP_IMAGE_READ_TOOL or self.image_context is not None] + self._tools
 
     def get_tool(self, name: str) -> Optional[_MCPToolWrapper]:
+        if name == MCP_IMAGE_READ_TOOL:
+            return _MCPImageReadWrapper(self) if self.image_context is not None else None
         builtin_tool = super().get_tool(name)
         if builtin_tool:
             return builtin_tool
@@ -773,6 +823,8 @@ class MCPToolkit(BaseToolkit):
             if manager:
                 await manager.cleanup()
         finally:
+            if self.image_context is not None:
+                await self.image_context.drain()
             self.manager = None
             self._initialized = False
             self._tools = []

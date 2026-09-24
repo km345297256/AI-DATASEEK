@@ -5,7 +5,7 @@ from app.domain.models.tool_result import ToolResult
 from app.domain.services.execution_identity import private_identity_hmac
 
 
-def program_diagnostic_read_digest(tool, call: dict, result) -> str | None:
+def _trusted_read_content(tool, call: dict, result) -> str | None:
     if call.get("name") != "file_read":
         return None
     from app.domain.services.tools.base import Tool
@@ -27,6 +27,32 @@ def program_diagnostic_read_digest(tool, call: dict, result) -> str | None:
     if (not isinstance(content, str) or not content.strip() or not isinstance(observed_path, str)
             or posixpath.normpath(observed_path) != posixpath.normpath(path)):
         return None
+    return content
+
+
+def program_diagnostic_read_digest(tool, call: dict, result) -> str | None:
+    content = _trusted_read_content(tool, call, result)
+    if content is None:
+        return None
     # Neither call IDs nor requested line ranges create novelty when the
     # returned contents are identical. No source content enters guard state.
     return private_identity_hmac({"purpose": "program-diagnostic-read/v1", "content": content})
+
+
+def program_diagnostic_read_lines(tool, call: dict, result) -> dict | None:
+    """Private content-only line identities from a checked core file_read.
+
+    These enable a diagnosis of the exact failed line, never a claim that code
+    executed or that an input/result is correct. Negative slicing and truncated
+    reads cannot be placed reliably and provide no line-level proof.
+    """
+    content = _trusted_read_content(tool, call, result)
+    if content is None or content.endswith("(truncated)"):
+        return None
+    args = call.get("args") or {}
+    start, end = args.get("start_line"), args.get("end_line")
+    if any(value is not None and (type(value) is not int or value < 0) for value in (start, end)):
+        return None
+    return {"start_line": start or 0, "line_digests": [
+        private_identity_hmac({"purpose": "program-diagnostic-line/v1", "content": line})
+        for line in content.splitlines()]}

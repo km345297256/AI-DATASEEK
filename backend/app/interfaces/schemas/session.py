@@ -3,6 +3,7 @@ from typing import Optional, List
 from app.interfaces.schemas.event import AgentSSEEvent
 from app.domain.models.session import SessionStatus
 from app.domain.models.event import MAX_EVENT_SEQUENCE
+from app.domain.models.input_admission import InputState
 
 
 class CreateSessionRequest(BaseModel):
@@ -79,6 +80,14 @@ class GetSessionResponse(BaseModel):
 class GetSessionHistoryResponse(GetSessionResponse):
     has_more: bool = False
     next_before_seq: Optional[int] = Field(default=None, ge=1, le=MAX_EVENT_SEQUENCE)
+
+
+class InputReceiptResponse(BaseModel):
+    """Owner-only admission observation, never the private input payload."""
+    client_message_id: str = Field(min_length=1, max_length=128)
+    accepted: bool
+    event_seq: Optional[int] = Field(default=None, ge=1, le=MAX_EVENT_SEQUENCE)
+    state: Optional[InputState] = None
 
 
 class ListSessionItem(BaseModel):

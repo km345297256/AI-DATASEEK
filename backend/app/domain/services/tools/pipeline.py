@@ -245,7 +245,7 @@ class ToolExecutionPipeline:
         execute: ToolExecutionHandler,
         metadata: Mapping[str, Any] | None = None,
     ) -> Any:
-        from app.domain.services.tools.tool_contract import normalize_failed_tool_result, validate_tool_arguments
+        from app.domain.services.tools.tool_contract import normalize_failed_tool_result, result_failed, validate_tool_arguments
         tool_call = validate_tool_arguments(tool, tool_call)
         context = ToolExecutionContext(
             tool=tool,
@@ -255,6 +255,7 @@ class ToolExecutionPipeline:
         # One invocation sees one stable interceptor tree. Registration changes
         # take effect on the next invocation, never halfway through a tool call.
         interceptors = self.interceptors
+        dispatch_started = False
 
         try:
             for interceptor in interceptors:
@@ -263,7 +264,9 @@ class ToolExecutionPipeline:
                 await interceptor.guard(context)
 
             async def execute_at(index: int) -> Any:
+                nonlocal dispatch_started
                 if index >= len(interceptors):
+                    dispatch_started = True
                     return await execute(context)
                 interceptor = interceptors[index]
                 return await interceptor.execute(
@@ -279,6 +282,11 @@ class ToolExecutionPipeline:
             value = normalize_failed_tool_result(value)
             for interceptor in reversed(interceptors):
                 await interceptor.complete(context, value)
+            if not dispatch_started and result_failed(value):
+                # A host middleware can reject by returning a failed result
+                # instead of raising. The same private phase proof applies.
+                from app.domain.services.execution_evidence import record_tool_not_dispatched
+                record_tool_not_dispatched(context.tool_call_id)
             return value
         except BaseException as error:
             # Error observers are best-effort cleanup/telemetry hooks. The
@@ -299,4 +307,10 @@ class ToolExecutionPipeline:
                         type(observer_error).__name__,
                         type(error).__name__,
                     )
+            if not dispatch_started:
+                # The host control flow proves the executable was never
+                # entered. Do not infer this from PermissionError, tool names,
+                # caller metadata or a self-reported side_effect_state.
+                from app.domain.services.execution_evidence import record_tool_not_dispatched
+                record_tool_not_dispatched(context.tool_call_id)
             raise

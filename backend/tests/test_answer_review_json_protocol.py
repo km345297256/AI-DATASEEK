@@ -96,12 +96,16 @@ def conversation(kind):
     return evidence, initial, repair, repaired_text
 
 
-def assert_protocol(requests, bindings):
+def assert_protocol(requests, bindings, *, syntax_retry_indices=()):
     assert bindings == [{"response_format": {"type": "json_object"}}] * len(requests)
-    for request in requests:
+    for index, request in enumerate(requests):
         messages = request["messages"]
-        assert len(messages) == 2 and [message.type for message in messages] == ["system", "human"]
-        system, human = messages
+        expected_types = ["system", "human"] + (["human"] if index in syntax_retry_indices else [])
+        assert [message.type for message in messages] == expected_types
+        system, human = messages[:2]
+        if index in syntax_retry_indices:
+            assert "complete, compact JSON object" in messages[-1].content
+            assert "Do not truncate" in messages[-1].content and "Do not use tools" in messages[-1].content
         assert "json" in system.content.lower()
         assert "json" not in human.content.lower(), "Protocol must not accidentally depend on user/evidence text"
         assert all(not getattr(message, "tool_calls", None) for message in messages)
@@ -143,7 +147,7 @@ def assert_private_result(result, store):
 @pytest.mark.asyncio
 @pytest.mark.parametrize("failure_phase", ["initial", "repair"])
 @pytest.mark.parametrize("bad_content", ["", " \n\t ", '{"private":"' + PRIVATE_BODY])
-async def test_empty_or_truncated_json_retries_the_same_frozen_request_then_succeeds(setup, failure_phase, bad_content):
+async def test_empty_or_truncated_json_retries_frozen_scope_with_syntax_feedback_then_succeeds(setup, failure_phase, bad_content):
     agent, driver, provider = setup
     evidence, initial, repair, repaired_text = conversation("analysis")
     bad = AIMessage(content=bad_content)
@@ -155,8 +159,8 @@ async def test_empty_or_truncated_json_retries_the_same_frozen_request_then_succ
     assert result.status == "corrected" and GOOD in result.text and repaired_text in result.text
     assert len(provider._requests) == 3 and not provider._responses
     retry_start = 0 if failure_phase == "initial" else 1
-    assert transcript(provider._requests[retry_start]) == transcript(provider._requests[retry_start + 1])
-    assert_protocol(provider._requests, driver._bindings)
+    assert transcript(provider._requests[retry_start]) == transcript(provider._requests[retry_start + 1])[:2]
+    assert_protocol(provider._requests, driver._bindings, syntax_retry_indices=(retry_start + 1,))
     assert_private_result(result, store)
     assert all(record.role == "answer_review" for record in store.records.values())
     assert all(PRIVATE_BODY not in message.content for request in provider._requests for message in request["messages"])
@@ -180,14 +184,14 @@ async def test_repeated_malformed_json_exhausts_only_the_bounded_review_retry_wi
     assert result.status == "unavailable" and result.missing_requirement_indices == ()
     assert len(provider._requests) == (2 if failure_phase == "initial" else 3)
     assert len(provider._responses) == 1
-    assert transcript(provider._requests[-2]) == transcript(provider._requests[-1])
+    assert transcript(provider._requests[-2]) == transcript(provider._requests[-1])[:2]
     diagnostics = result.metadata["citation_diagnostics"]
     if failure_phase == "initial":
         assert diagnostics["review"] == "invalid_json"
     else:
         assert diagnostics["correction"] == {"invalid_json": 1}
         assert GOOD in result.text
-    assert_protocol(provider._requests, driver._bindings)
+    assert_protocol(provider._requests, driver._bindings, syntax_retry_indices=(len(provider._requests) - 1,))
     assert_private_result(result, store)
     agent.execute.assert_not_called()
     agent._parse_json.assert_not_called()
@@ -210,7 +214,8 @@ async def test_cancellation_during_review_or_syntax_retry_propagates_without_ano
     assert len(provider._requests) == expected_calls and len(provider._responses) == 1
     assert list(store.records.values())[-1].status == "cancelled"
     assert list(store.records.values())[-1].scheduled_retry is None
-    assert_protocol(provider._requests, driver._bindings)
+    assert_protocol(provider._requests, driver._bindings,
+                    syntax_retry_indices=(expected_calls - 1,) if malformed_before_cancel else ())
     agent.execute.assert_not_called()
     agent._parse_json.assert_not_called()
 
@@ -245,7 +250,7 @@ async def test_valid_but_wrong_schema_and_forbidden_tools_never_trigger_syntax_r
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("failure_phase", ["initial", "repair"])
-async def test_structural_object_recovery_is_initial_only_and_never_reopens_accepted_paragraphs(setup, failure_phase):
+async def test_structural_object_recovery_respects_initial_or_scoped_boundary_and_never_reopens_accepted_paragraphs(setup, failure_phase):
     agent, driver, provider = setup
     evidence, initial, repair, _ = conversation("analysis")
     invalid = AIMessage(content=json.dumps({"unexpected": PRIVATE_BODY}))
@@ -264,9 +269,11 @@ async def test_structural_object_recovery_is_initial_only_and_never_reopens_acce
         assert transcript(provider._requests[0])[1] == transcript(provider._requests[1])[1]
         assert not provider._responses
     else:
-        assert result.status == "unavailable" and len(provider._requests) == 2
+        assert result.status == "corrected" and len(provider._requests) == 3
         assert "review_schema_repair_attempted" not in result.metadata
-        assert len(provider._responses) == 1
+        assert result.metadata["citation_schema_repair_status"] == "corrected"
+        assert transcript(provider._requests[1])[1] == transcript(provider._requests[2])[1]
+        assert not provider._responses
     assert_protocol(provider._requests, driver._bindings)
     assert_private_result(result, store)
     agent.execute.assert_not_called()

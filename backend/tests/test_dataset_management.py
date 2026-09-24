@@ -87,6 +87,9 @@ def _service(*, storage_root=None, seed_root=None):
     )
     service._storage_root = storage_root
     service._seed_root = seed_root
+    # Filesystem/catalog unit fixtures do not allocate real Docker helpers.
+    # Dedicated readability tests exercise this boundary and its real identity.
+    service._prepare_managed_execution_view = AsyncMock()
     return service
 
 

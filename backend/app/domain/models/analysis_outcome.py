@@ -6,6 +6,7 @@ import re
 import unicodedata
 
 from pydantic import BaseModel, ConfigDict, Field, field_serializer, field_validator, model_validator
+from pydantic_core import PydanticCustomError
 from typing_extensions import TypedDict
 
 DELIVERABLE_LABELS = {"image": "图表", "table": "数据表", "report": "报告", "code": "代码", "any": "结果文件"}
@@ -94,14 +95,26 @@ class DeliverableRequirement(BaseModel):
     @classmethod
     def safe_objective(cls, value: str) -> str:
         if any(unicodedata.category(char).startswith("C") for char in value):
-            raise ValueError("Deliverable objectives must be plain text")
+            raise PydanticCustomError("objective_non_plain_text", "Deliverable objectives must be plain text")
         # Objectives are semantic descriptions also visible in plan events.
         # Put exact file identities in the root-restricted output_paths field,
         # never in a free-text field that could disclose a real host path.
         semantic = re.sub(r"\bhttps?://[^\s]+", "", value)
-        if (re.search(r"(?<!\s)/|/(?!\s)", semantic)
+        # A single slash between semantic terms is not a filesystem path:
+        # SASA/Rg, B-factor/occupancy, 均值/标准差 and mg/L are valid objectives.
+        # Keep absolute roots, traversal, directory chains and file components
+        # out of this public field; output_paths remains the only path contract.
+        if (re.search(r"(?:^|[\s\"'`=:：;；,，(（\[【])~?/(?!\s)", semantic)
+                or re.search(r"(?:^|[\s\"'`=:：;；,，(（\[【])\.\.?[/\\]", semantic)
+                or re.search(r"/[^\s/]+/", semantic)
+                # CJK prose can touch an absolute ASCII basename without a
+                # separating space (分析/secret). Retain that privacy boundary;
+                # same-script ratios and Latin scientific terms remain valid.
+                or re.search(r"[\u3400-\u9fff]/[A-Za-z0-9_.-]", semantic)
+                or re.search(r"/(?:Users|home|root|private|tmp|var|etc|mnt|srv|opt|data|app)(?:/|\b)", semantic)
+                or re.search(r"/[^\s/]+\.[A-Za-z][A-Za-z0-9]{0,15}(?:\b|$)", semantic)
                 or re.search(r"[A-Za-z]:[\\/]|\\\\", semantic)):
-            raise ValueError("Deliverable objectives must not contain filesystem paths")
+            raise PydanticCustomError("objective_filesystem_path", "Deliverable objectives must not contain filesystem paths")
         return value.strip()
 
     @field_validator("formats")

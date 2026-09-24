@@ -147,6 +147,7 @@
           <ToolUse
             :tool="item.tool"
             :summary="item.summary"
+            :recovered-by-call-id="item.recoveredByCallId"
             :label="item.count > 1 ? '文件修订' : undefined"
             @click="handleToolClick(item.panelTool)"
           />
@@ -182,6 +183,7 @@ import { Message, MessageContent, AttachmentsContent, TaskSummaryContent } from 
 import ToolUse from './ToolUse.vue';
 import DeclarativeToolCard from './DeclarativeToolCard.vue';
 import { marked } from 'marked';
+import { createAnalysisMarkdown } from '@/utils/analysisMarkdown';
 import DOMPurify from 'dompurify';
 import { CheckIcon, Copy as CopyIcon, PackageOpen, Share2 as Share2Icon, ShieldAlert, ThumbsDown, ThumbsUp, X } from 'lucide-vue-next';
 import { computed, onMounted, onUnmounted, ref, watch, type Component } from 'vue';
@@ -415,6 +417,7 @@ const displayTools = computed(() => buildToolTimeline(stepContent.value.tools ||
 const { relativeTime } = useRelativeTime();
 
 const renderer = new marked.Renderer();
+const analysisMarkdown = createAnalysisMarkdown();
 renderer.link = ({ href, title, text }: { href: string; title?: string | null; text: string }) => {
   const titleAttr = title ? ` title="${title}"` : '';
   return `<a href="${href}" target="_blank" rel="noopener noreferrer"${titleAttr}>${text}</a>`;
@@ -494,7 +497,7 @@ async function handleMarkdownClick(event: MouseEvent) {
 
 const renderMarkdown = (text: string) => {
   if (typeof text !== 'string') return '';
-  const html = marked(text, { renderer }) as string;
+  const html = analysisMarkdown.parse(text, { renderer }) as string;
   return DOMPurify.sanitize(html, { ADD_ATTR: ['target'] });
 };
 </script>

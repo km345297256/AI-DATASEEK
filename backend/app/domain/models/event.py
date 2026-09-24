@@ -10,6 +10,7 @@ import json
 from app.domain.models.search import SearchResultItem
 from app.domain.models.analysis_job import AnalysisJobView
 from app.domain.models.tool_approval import ToolApprovalView
+from app.domain.models.program_attempt import ProgramAttemptView
 
 MAX_EVENT_SEQUENCE = 9_007_199_254_740_991
 
@@ -132,6 +133,8 @@ class ToolEvent(BaseEvent):
     presentation: Optional[Dict[str, Any]] = None
     analysis_job: Optional[AnalysisJobView] = None
     tool_approval: Optional[ToolApprovalView] = None
+    # First-party execution ledger projection, not derived from tool text.
+    program_attempt: Optional[ProgramAttemptView] = None
 
 class TitleEvent(BaseEvent):
     """Title event"""

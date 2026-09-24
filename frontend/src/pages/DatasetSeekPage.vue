@@ -381,7 +381,7 @@
               <span>建议您使用NCView进行可视化分析</span>
               <ChevronRight class="size-4 shrink-0 text-[var(--icon-tertiary)]" />
             </button>
-            <p v-if="connectionNotice" role="status" class="mt-3 text-sm text-[var(--text-tertiary)]">{{ connectionNotice }}</p>
+            <p v-if="connectionNotice" role="status" class="mt-3 text-sm text-[var(--text-tertiary)]"><span :role="analysisSession.canRetryInput.value ? 'button' : undefined" :tabindex="analysisSession.canRetryInput.value ? 0 : undefined" @click="analysisSession.retryPendingInput()" @keydown.enter.prevent="analysisSession.retryPendingInput()" @keydown.space.prevent="analysisSession.retryPendingInput()">{{ connectionNotice }}</span></p>
             <div v-else-if="isLoading && (analysisProgress || !hasRunningStep)" role="status" aria-live="polite" class="mt-3 flex items-center gap-2 text-sm text-[var(--text-tertiary)]">
               <LoaderCircle class="size-4 animate-spin" />
               <span>{{ analysisProgress || loadingStatus }}</span>
@@ -543,6 +543,7 @@ const analysisSession = useAnalysisSession({
   onReset: () => { hideFilePanel(); closeToolPanel(); },
   onTerminal: () => { void refreshHistory(); eventBus.emit(EVENT_REFRESH_SESSION_LIST); },
   onHistoryError: () => showErrorToast('历史记录加载失败，请重试。'),
+  onInputRejected: request => { if (!inputMessage.value) inputMessage.value = request.message; },
   onSessionCreated: session => localStorage.setItem(datasetStorageKey(), session.session_id),
   onSessionRestored: session => {
     localStorage.setItem(datasetStorageKey(), session.session_id);
@@ -1017,10 +1018,11 @@ async function submit() {
   const selected = dataset.value;
   if (!question || !selected || catalogLoading.value || isLoading.value || isRestoringHistory.value) return;
   const capabilities = buildDatasetChatCapabilities(selected.dataset_id, selectedSkills.value);
-  inputMessage.value = '';
-  await analysisSession.send({ message: question, files: capabilities.attachments,
+  const originalDraft = inputMessage.value;
+  const sent = await analysisSession.send({ message: question, files: capabilities.attachments,
     skills: capabilities.skills, mcpServers: capabilities.mcpServers,
     agentProfileId: selectedProfileId.value, datasetIds: capabilities.datasetIds });
+  if (sent && inputMessage.value === originalDraft) inputMessage.value = '';
 }
 
 function askSuggestion(question: string) {

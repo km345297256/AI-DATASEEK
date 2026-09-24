@@ -138,6 +138,19 @@ class SpillArtifactInterceptor(ToolExecutionInterceptor):
     async def result(self, context: ToolExecutionContext, result: Any) -> Any:
         if context.tool_name in self._excluded_tools or not isinstance(result, ToolMessage):
             return result
+        from app.core.config import get_settings
+        from app.domain.services.tools.mcp_images import MCP_IMAGE_REFS_KEY, bound_mcp_image_result
+        if MCP_IMAGE_REFS_KEY in result.additional_kwargs and isinstance(result.content, list):
+            async def save_image_manifest(text):
+                task = asyncio.create_task(self._store.save_text(SpillArtifactSaveRequest(
+                    owner=self._owner, source=SpillArtifactSource(tool_name=context.tool_name,
+                        tool_call_id=str(context.tool_call_id or ""), label="mcp-image-manifest-v1"), content=text,
+                )))
+                self._track_save(task)
+                return await asyncio.wait_for(asyncio.shield(task), self._store_timeout_seconds)
+            return await bound_mcp_image_result(result,
+                max_tokens=get_settings().mcp_image_result_max_tokens, max_text_bytes=self._max_inline_bytes,
+                max_artifact_bytes=self._max_artifact_bytes, save_text=save_image_manifest)
         content = result.content
         if not isinstance(content, str):
             return result

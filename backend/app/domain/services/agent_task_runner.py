@@ -32,6 +32,7 @@ from app.domain.models.event import (
     SkillToolContent,
 )
 from app.domain.utils.public_error import public_error_message
+from app.domain.utils.robust_json_parser import ToolCallParseError
 from app.domain.services.flows.plan_act import AgentStatus, PlanActFlow
 from app.domain.external.sandbox import Sandbox
 from app.domain.external.browser import Browser
@@ -49,6 +50,7 @@ from app.domain.models.analysis_input import (
     assign_upload_namespace, build_analysis_inputs, upload_runtime_path, UPLOAD_INPUT_ROOT,
 )
 from app.domain.services.analysis_input_selection import snapshot_files
+from app.domain.services.analysis_terminal import terminal_analysis_message
 from app.domain.models.execution_environment import ExecutionEnvironmentSnapshot
 from app.domain.services.execution_environment import create_agent_execution_snapshot
 from app.domain.services.model_runtime import ModelBudgetStopped, model_execution_scope, model_stop_reason, analysis_budget_scope
@@ -221,7 +223,18 @@ class AgentTaskRunner(TaskRunner):
         self._tool_approval_views: dict[str, Any] = {}
         self._llm_overrides = dict(llm_overrides or {})
         self._execution_snapshot: ExecutionEnvironmentSnapshot | None = None
-        self._mcp_tool = MCPToolkit()
+        from app.domain.services.tools.mcp_images import MCPImageContext
+        from app.domain.models.spill import SpillArtifactOwner
+        from app.core.config import get_settings
+        image_settings = get_settings()
+        mcp_images = None
+        if image_settings.mcp_image_results_enabled and image_settings.spill_enabled and spill_artifact_store is not None:
+            mcp_images = MCPImageContext(store=spill_artifact_store,
+                owner=SpillArtifactOwner(user_id=user_id, session_id=session_id),
+                provider=str(self._llm_overrides.get("model_provider") or image_settings.model_provider).lower().strip(),
+                model_name=self._llm_overrides.get("model_name") or image_settings.model_name,
+                settings=image_settings)
+        self._mcp_tool = MCPToolkit(image_context=mcp_images)
         self._front_controller_resolution = front_controller_resolution
         self._safety_policy_store = get_safety_policy_store()
         self._audit_service = AuditService()
@@ -374,6 +387,14 @@ class AgentTaskRunner(TaskRunner):
             await reserve_sequence(self._session_id, event)
         await self._session_repository.add_event(self._session_id, event)
         if isinstance(event, MessageEvent) and event.role == "assistant":
+            metadata = event.metadata or {}
+            if metadata.get("analysis_outcome"):
+                # Per-step delivery is not the final verdict of a multi-step
+                # turn. A later interrupted step must remain visibly unfinished.
+                if not metadata.get("step_id"):
+                    self._analysis_outcome_published = True
+                if metadata["analysis_outcome"].get("status") in {"succeeded", "partial"}:
+                    self._analysis_has_verified_result = True
             preserved = getattr(self, "_prior_artifact_file_ids", None)
             if preserved is None:
                 preserved = self._prior_artifact_file_ids = set()
@@ -1507,6 +1528,22 @@ class AgentTaskRunner(TaskRunner):
                         event.tool_content = FileToolContent(content=event.function_result.model_dump_json() if hasattr(event.function_result, "model_dump_json") else str(event.function_result))
                     elif event.function_name == "file_find_in_content":
                         event.tool_content = FileToolContent(content=event.function_result.model_dump_json() if hasattr(event.function_result, "model_dump_json") else str(event.function_result))
+                    elif event.function_name == "file_read":
+                        # Render the completed observation. A fresh read can
+                        # change its version, discard a requested line range,
+                        # or replace a failed read with unrelated later data.
+                        result = event.function_result
+                        result = result.model_dump(mode="python") if isinstance(result, ToolResult) else result
+                        result = result if isinstance(result, dict) else {}
+                        data = result.get("data")
+                        content = data.get("content") if isinstance(data, dict) else None
+                        if result.get("success") is True and isinstance(content, str):
+                            file_content = content
+                        elif result.get("success") is False:
+                            file_content = "(File read failed)"
+                        else:
+                            file_content = "(No Content)"
+                        event.tool_content = FileToolContent(content=file_content)
                     elif "file" in event.function_args:
                         file_path = event.function_args["file"]
                         file_read_result = await self._sandbox.file_read(file_path)
@@ -1623,6 +1660,9 @@ class AgentTaskRunner(TaskRunner):
             }
             self._flow._analysis_job_event_sink = lambda view, context: self._publish_analysis_job(task, view, context)
             self._flow._tool_approval_event_sink = lambda view, context: self._publish_tool_approval(task, view, context)
+        self._analysis_outcome_published = False
+        self._analysis_has_verified_result = False
+        self._analysis_turn_started = False
         try:
             logger.info(
                 "Message processing task started agent=%s",
@@ -1649,6 +1689,9 @@ class AgentTaskRunner(TaskRunner):
                 analysis_uploads = []
                 metadata = {}
                 if isinstance(event, MessageEvent):
+                    self._analysis_outcome_published = False
+                    self._analysis_has_verified_result = False
+                    self._analysis_turn_started = False
                     self._accepted_input_key = None
                     self._accepted_input_finished = False
                     delivery = getattr(self, "_input_delivery", None)
@@ -1777,24 +1820,39 @@ class AgentTaskRunner(TaskRunner):
                 opaque_log_identifier(self._agent_id, namespace="agent"),
             )
             if isinstance(error, ModelBudgetStopped) or model_stop_reason():
-                await self._put_and_add_event(task, MessageEvent(
-                    message=("本次分析已达到执行时间上限，已有结果保持不变。"
+                await self._put_and_add_event(task, self._terminal_failure_event(
+                    ("本次分析已达到执行时间上限，已有结果保持不变。"
                              if getattr(error, "code", None) == "analysis_budget_deadline_exceeded" or model_stop_reason() == "analysis_budget_deadline_exceeded"
                              else "本轮执行已达到模型运行边界，或运行记录暂时无法保存。已有分析结果会保留，请检查模型运行记录后继续。"),
+                    reason_code="model_runtime_stopped",
                 ))
             elif isinstance(error, ToolAuthorizationStopped):
-                await self._put_and_add_event(task, MessageEvent(
-                    message="本次工具调用未获得有效授权（可能已拒绝、过期、凭据未配置或权限检查未通过），本轮执行已停止。请检查调用权限和凭据配置后重新发起。",
+                await self._put_and_add_event(task, self._terminal_failure_event(
+                    "本次工具调用未获得有效授权（可能已拒绝、过期、凭据未配置或权限检查未通过），本轮执行已停止。请检查调用权限和凭据配置后重新发起。",
+                    reason_code="tool_authorization_stopped",
                 ))
             elif isinstance(error, AnalysisJobCancelled):
-                await self._put_and_add_event(task, MessageEvent(
-                    message="当前分析作业已取消，本轮执行已停止。你可以调整要求后继续分析。",
+                await self._put_and_add_event(task, self._terminal_failure_event(
+                    "当前分析作业已取消，本轮执行已停止。你可以调整要求后继续分析。",
+                    reason_code="request_cancelled",
                 ))
-            elif isinstance(error, AnalysisJobInterrupted):
-                await self._put_and_add_event(task, MessageEvent(
-                    message="当前分析作业的执行已中断，本轮执行已停止。系统没有自动重跑，请检查已有结果后再继续。",
+            else:
+                await self._put_and_add_event(task, self._terminal_failure_event(
+                    "当前执行已中断，本轮执行已停止。系统没有自动重跑，请检查运行记录和已有结果后再继续。",
+                    reason_code="execution_interrupted",
                 ))
             await self._put_and_add_event(task, DoneEvent())
+            await self._session_repository.update_status(self._session_id, SessionStatus.COMPLETED)
+        except ToolCallParseError:
+            # The entire malformed batch was rejected before tool dispatch.
+            # Preserve any earlier committed verdict and never publish raw
+            # provider arguments or parser excerpts as a user-facing error.
+            message = "模型未能生成完整、有效的工具参数，本次分析已停止。已有结果保持不变。"
+            logger.warning("Analysis stopped after bounded native tool argument retries")
+            await self._put_and_add_event(task, self._terminal_failure_event(
+                message, reason_code="tool_protocol_error",
+            ))
+            await self._put_and_add_event(task, ErrorEvent(error=message))
             await self._session_repository.update_status(self._session_id, SessionStatus.COMPLETED)
         except Exception as e:
             logger.error(
@@ -1812,11 +1870,27 @@ class AgentTaskRunner(TaskRunner):
                 )
                 debugpy.breakpoint()  # This will pause execution if a debugger is attached
             
+            await self._put_and_add_event(task, self._terminal_failure_event(
+                "本轮执行因运行错误停止（execution_failed）。系统没有自动重跑，请检查运行记录后再继续。",
+                reason_code="execution_failed",
+            ))
             await self._put_and_add_event(
                 task,
                 ErrorEvent(error=public_error_message(f"Task error: {e}")),
             )
             await self._session_repository.update_status(self._session_id, SessionStatus.COMPLETED)
+
+    def _terminal_failure_event(self, message: str, *, reason_code: str) -> MessageEvent:
+        # A transport/cleanup failure after a committed scientific verdict must
+        # not replace that verdict. Never infer a lease cause or artifact health.
+        if getattr(self, "_analysis_outcome_published", False):
+            return MessageEvent(message=message)
+        started = getattr(self, "_analysis_turn_started", False)
+        event = terminal_analysis_message(message, reason_code=reason_code,
+            stage="execution" if started else "input_preparation", analysis_started=started)
+        if getattr(self, "_analysis_has_verified_result", False):
+            event.metadata["analysis_outcome"]["status"] = "partial"
+        return event
 
     async def _initialize_mcp_tool(self, selected_servers: List[str], *, is_admin: bool = False) -> None:
         await self._mcp_tool.cleanup()
@@ -2008,6 +2082,7 @@ class AgentTaskRunner(TaskRunner):
         This lookup observes host memory only; it never invokes a tool.
         """
         evidence = self._analysis_answer_evidence
+        self._observe_scope_repair_tool(event, evidence.current_step_id)
         proof = None
         if event.status == ToolStatus.CALLED and event.function_name == "program_run":
             from app.domain.services.execution_evidence import ToolExecutionLedger
@@ -2034,6 +2109,184 @@ class AgentTaskRunner(TaskRunner):
                         logger.warning("Analysis program source proof unavailable")
         evidence.observe(event, trusted_program_execution=proof)
 
+    def _observe_scope_repair_tool(self, event, step_id):
+        """Record only resolved native reads and affirmative pre-dispatch failures."""
+        states = getattr(self, "_analysis_scope_observations", None)
+        if states is None or not step_id or event.status != ToolStatus.CALLED:
+            return
+        state = states.setdefault(step_id, {"reads": set(), "blocked": False})
+        from app.domain.services.execution_evidence import ToolExecutionLedger
+        from app.domain.services.tools.file import FileToolkit
+        from app.domain.models.tool_result import ToolResult
+        steps = getattr(getattr(self._flow, "plan", None), "steps", [])
+        step = next((item for item in steps if item.id == step_id), None)
+        executor = (getattr(self._flow, "_domain_agents", {}).get(step.agent, getattr(self._flow, "executor", None))
+                    if step is not None else None)
+        ledger = getattr(executor, "_tool_execution_ledger", None)
+        result = event.function_result
+        if type(ledger) is not ToolExecutionLedger or not isinstance(result, ToolResult):
+            state["blocked"] = True
+            return
+        if result.success is False and ledger.failure_state(event.tool_call_id) == "not_started":
+            return
+        try:
+            tool = executor.get_tool(event.function_name)
+            args = event.function_args
+            native = (type(getattr(tool, "toolkit", None)) is FileToolkit
+                      and getattr(getattr(tool, "_tool", None), "coroutine", None) is FileToolkit.file_read.coroutine
+                      and event.function_name == "file_read" and event.tool_name == "file")
+            full = (isinstance(args, dict) and args.get("start_line") is None
+                    and args.get("end_line") is None and args.get("sudo", False) is False)
+            content = result.data.get("content") if isinstance(result.data, dict) else None
+            if native and full and result.success is True and isinstance(content, str) and content.strip():
+                path = args.get("file")
+                if isinstance(path, str) and path in {item.get("path") for item in self._analysis_source_fingerprints or []}:
+                    state["reads"].add(path)
+                    return
+        except (AttributeError, TypeError, ValueError):
+            pass
+        state["blocked"] = True
+
+    async def _review_scope_completion(self, step, message, files, requirements, outcome, execution,
+                                       reviewed, *, source_seq):
+        """Narrow same-input completion after reads; no scientific-error reexecutor."""
+        from datetime import UTC, datetime
+        from app.domain.services.analysis_scope_repair import ScopeRepairGuards, ScopeRepairTracker, ScopeReviewBinding
+        from app.domain.services.analysis_checkpoint import fingerprints, approved_upload_paths
+        from app.domain.services.model_runtime import current_analysis_budget
+        from app.domain.services.analysis_scope_repair_audit import ScopeRepairAuditStore
+        from copy import deepcopy
+        # Freeze the complete review verdict before any runtime/storage await.
+        # Mutable diagnostic mappings must not switch the eligible candidate.
+        metadata = deepcopy(getattr(reviewed, "metadata", {}))
+        scope = metadata.get("answer_scope_review", {})
+        final_review = metadata.get("final_candidate_review", {})
+        candidate = getattr(reviewed, "scope_completion_candidate", None)
+        original = getattr(reviewed, "scope_completion_request", None)
+        # An unavailable scientific check alone is never a reason to execute.
+        if (files or requirements or message._resume_checkpoint or step.attachments
+                or type(source_seq) is not int or source_seq < 1
+                or (step.inputs or {}).get("dataset_intent") != "analysis"
+                or scope.get("status") != "incomplete" or scope.get("completion_blocker") != "none"
+                or candidate is None or original != message.message
+                or metadata.get("evidence_truncated") is not False
+                or metadata.get("review_schema_repair_attempted") or metadata.get("citation_repair_attempted")
+                or not isinstance(final_review, dict)
+                or type(final_review.get("protocol_attempts")) is not int
+                or final_review.get("protocol_attempts") != 1
+                or final_review.get("schema_recovered") or final_review.get("error")
+                or any(issue.blocking for issue in outcome.issues)):
+            return False
+        def rejected(value):
+            if isinstance(value, dict):
+                return value.get("status") == "rejected" or any(rejected(v) for v in value.values())
+            return isinstance(value, list) and any(rejected(v) for v in value)
+        if any(rejected(metadata.get(key)) for key in ("answer_scientific_review", "scientific_review", "report_review")):
+            return False
+        resolution = getattr(self, "_front_controller_resolution", None)
+        state = getattr(self, "_analysis_scope_observations", {}).get(step.id, {})
+        trackers = getattr(self, "_analysis_scope_trackers", None)
+        budget = current_analysis_budget()
+        delivery, identity = getattr(self, "_input_delivery", None), getattr(self, "_accepted_input_key", None)
+        if (trackers is None or budget is None or delivery is None or identity is None
+                or not self._answer_scientific_scope(step, message)
+                or getattr(resolution, "mode", None) != "sandbox"
+                or resolution.decision.safety.allowed is not True
+                or not state.get("reads") or state.get("blocked") is not False
+                or model_stop_reason()):
+            return False
+        key = source_seq
+        tracker = trackers.setdefault(key, ScopeRepairTracker(input_seq=source_seq, step_id=step.id, request=message.message))
+        if tracker.snapshot()["consumed"]:
+            return False
+        try:
+            await delivery._require_live(self._session_id, identity)
+            snapshot = await budget.snapshot()
+            if (snapshot.lineage_id != message._budget_lineage_id
+                    or snapshot.model_call_limit is not None and snapshot.model_calls >= snapshot.model_call_limit
+                    or snapshot.model_token_limit is not None and snapshot.charged_tokens >= snapshot.model_token_limit
+                    or snapshot.hard_limit is not None and snapshot.tool_batches_used >= snapshot.hard_limit):
+                return False
+            expected = [dict(item) for item in self._analysis_source_fingerprints if item.get("path") in state["reads"]]
+            current = await fingerprints(self._sandbox, sorted(state["reads"]), approved_upload_paths=approved_upload_paths(message))
+            if not current or sorted(current, key=lambda item:item["path"]) != sorted(expected, key=lambda item:item["path"]):
+                return False
+            await delivery._require_live(self._session_id, identity)
+            decision = tracker.review(binding=ScopeReviewBinding(input_seq=source_seq, step_id=step.id,
+                    request=original, paragraphs=candidate, metadata=scope), execution=execution,
+                guards=ScopeRepairGuards(analysis_authorized=True, current_input=True, original_request_complete=True,
+                    candidate_complete=True, read_only_observations=True, prerequisites_met=scope.get("completion_blocker")=="none",
+                    no_user_input_required=scope.get("completion_blocker")=="none", no_policy_refusal=True, runtime_live=True,
+                    no_artifacts_or_requirements=True, no_review_repair=True),
+                now=datetime.now(UTC), deadline_at=snapshot.deadline_at)
+            if not decision.allowed:
+                return False
+            audit = getattr(self, "_scope_repair_audit_store", None) or ScopeRepairAuditStore()
+            async with asyncio.timeout(3):
+                recorded = await audit.claim(user_id=self._user_id, session_id=self._session_id, snapshot=tracker.snapshot())
+            if not recorded:
+                return False
+            await delivery._require_live(self._session_id, identity)
+            if (getattr(self, "_accepted_input_key", None) != identity or message.message != original or model_stop_reason()
+                    or snapshot.deadline_at is not None and datetime.now(UTC) >= snapshot.deadline_at):
+                return False
+            feedback = dict(decision.feedback)
+            feedback["previous_analysis"] = "\n\n".join(candidate)
+            self._flow._artifact_repair_requests[step.id] = feedback
+            logger.info("analysis_scope_completion allowed=True reason=scope_completion_allowed")
+            return True
+        except Exception as error:
+            # Runtime admission failures are not permission to retry. Original
+            # CancelledError and ModelBudgetStopped (BaseException) propagate.
+            logger.info("analysis_scope_completion allowed=False reason=host_evidence_unavailable error_type=%s", type(error).__name__)
+            return False
+
+    def _answer_scientific_scope(self, step, message) -> bool:
+        """Select factual analysis review from this admission and step only.
+
+        Input identities do not by themselves turn a greeting or a file-copy
+        operation into analysis. Conversely, dataset structure/unit explanation
+        is analysis even when it produces no artifact or fitted model.
+        """
+        resolution = getattr(self, "_front_controller_resolution", None)
+        admission_mode = getattr(resolution, "mode", None)
+        inputs = step.inputs or {}
+        mode = inputs.get("execution_mode")
+        intent = inputs.get("dataset_intent")
+        mode = mode.strip().casefold() if isinstance(mode, str) else None
+        intent = intent.strip().casefold() if isinstance(intent, str) else None
+        if admission_mode in {"direct", "catalog", "reject"}:
+            return False
+        if intent in {
+            "file_preview", "preview_file", "preview", "file_inventory", "inventory", "files",
+            "catalog_description", "catalog_semantics", "dataset_purpose", "purpose", "use_cases",
+            "catalog_metadata", "metadata", "size", "file_count", "file_formats", "formats",
+        }:
+            # Copy/navigation and pure catalog metadata do not claim measured
+            # scientific findings. Mixed field/unit explanations use analysis
+            # or file_structure, not a test of the model's final draft.
+            return False
+        context = message.analysis_inputs
+        has_current_inputs = bool(
+            message.datasets or (context is not None and context.sources)
+            or any(isinstance(value, str) and value.strip() for value in message.attachment_file_ids)
+        )
+        if not has_current_inputs:
+            return False
+        if mode == "dataset_fast_path":
+            return True
+        if intent in {
+            "analysis", "custom_question", "question", "visualization", "visualisation",
+            "visualize", "visualise", "plot", "file_structure", "archive_structure",
+        }:
+            return True
+        # Skill/domain/multistep analysis can bypass the one-step dataset fast
+        # path. Its host admission still binds the request to file contents;
+        # do not let a missing planner intent disable factual verification.
+        decision = getattr(resolution, "decision", None)
+        execution = getattr(decision, "execution", None)
+        return admission_mode == "sandbox" and getattr(execution, "required_evidence", None) == "file_content"
+
     async def _review_analysis_answer(self, step, message, files, requirements, outcome, *, evidence=None):
         """Ground prose independently of the minimum artifact-count verdict."""
         from app.domain.services.analysis_answer_review import AnswerEvidence, review_answer
@@ -2048,21 +2301,64 @@ class AgentTaskRunner(TaskRunner):
         }}, ensure_ascii=False)
         arguments = dict(question=question, draft=step.result or "", files=files,
                          evidence=evidence, requirements=requirements,
-                         language=getattr(getattr(self._flow, "plan", None), "language", None) or "zh")
+                         language=getattr(getattr(self._flow, "plan", None), "language", None) or "zh",
+                         answer_scientific_scope=self._answer_scientific_scope(step, message))
+        from app.domain.services.analysis_report_review import load_report_targets
+        targets = await load_report_targets(files=files, storage=getattr(self, "_file_storage", None),
+            user_id=getattr(self, "_user_id", ""), session_id=getattr(self, "_session_id", ""),
+            requirements=requirements)
+        if targets:
+            arguments["report_targets"] = targets
         if callable(reviewer):
             reviewed = await reviewer(**arguments)
         else:
             async def unavailable(_messages):
                 raise RuntimeError("answer_reviewer_unavailable")
             reviewed = await review_answer(ask=unavailable, **arguments)
+        from app.domain.services.analysis_report_review import changed_report_indices
+        changed_reports = changed_report_indices(targets, files)
+        if changed_reports:
+            from dataclasses import replace
+            from copy import deepcopy
+            from app.domain.services.analysis_report_review import report_review_metadata
+            report = deepcopy(reviewed.metadata.get("report_review")) or report_review_metadata(
+                targets, None, citations=lambda *_: [], lookup={})
+            for record in report["reports"]:
+                if record["report_index"] in changed_reports:
+                    record.update(status="unavailable", reason="delivery_version_changed",
+                        unverified_ranges=[[0, record["size"]]] if record["size"] is not None else [])
+            report["status"] = "rejected" if any(item["status"] == "rejected" for item in report["reports"]) else "unavailable"
+            metadata = {**reviewed.metadata, "status": "unavailable", "report_review": report}
+            if any(targets[index].target_kind == "structured" for index in changed_reports):
+                from app.domain.services.analysis_scientific_review import scientific_review_metadata
+                scientific = scientific_review_metadata(targets, None, citations=lambda *_: [], lookup={},
+                                                         evidence_complete=False)
+                scientific.update(status="unavailable", reason="delivery_version_changed")
+                metadata["scientific_review"] = scientific
+            if reviewed.status != "unavailable":
+                metadata.update(reason="scientific_validation_unavailable" if any(
+                    target.target_kind == "structured" for target in targets) else "report_validation_unavailable",
+                                validation_state="unavailable",
+                                chat_review_status=reviewed.status)
+            notice = ("成果版本已变化，先前内容核验不适用于当前附件。"
+                      if arguments["language"].lower().startswith("zh") else
+                      "The artifact version changed; its earlier review does not verify the current attachment.")
+            reviewed = replace(reviewed, text=reviewed.text + "\n\n" + notice, status="unavailable", metadata=metadata)
         step.result = reviewed.text
         step.outputs["answer_review"] = {"version": 1, "status": reviewed.status, **reviewed.metadata,
             "dataset_ids": sorted({item.dataset_id for item in message.datasets}),
             "input_file_ids": sorted(set(message.attachment_file_ids))}
-        if reviewed.status == "unavailable":
+        if reviewed.status == "unavailable" and outcome.status == "succeeded":
             outcome.status = "partial" if files else "failed"
-            outcome.reason_code = "answer_validation_unavailable"
-        elif reviewed.missing_requirement_indices:
+            outcome.reason_code = (
+                reviewed.metadata["reason"] if reviewed.metadata.get("reason") in {
+                    "report_validation_rejected", "report_validation_unavailable",
+                    "scientific_validation_rejected", "scientific_validation_unavailable"}
+                else "answer_objectives_missing" if reviewed.metadata.get("reason") == "answer_coverage_incomplete"
+                else "answer_validation_rejected" if reviewed.metadata.get("validation_state") == "rejected"
+                else "answer_validation_unavailable"
+            )
+        elif reviewed.missing_requirement_indices and outcome.status == "succeeded":
             # Indices bind only to the pre-execution contract, never to a
             # filename or extra analytical method invented by the final draft.
             outcome.missing = [requirements[index].model_copy(deep=True)
@@ -2177,6 +2473,9 @@ class AgentTaskRunner(TaskRunner):
             validation_available=available, source_seq=source_seq,
             semantic_missing=([requirements[index] for index in answer_review.missing_requirement_indices]
                               if answer_review is not None and answer_review.status != "unavailable" else ()))
+        if not repair_pending and not protected_changed and answer_review is not None:
+            repair_pending = await self._review_scope_completion(step, message, checked_files, requirements,
+                outcome, execution, answer_review, source_seq=source_seq)
         if answer_review is not None and answer_review.status == "corrected" and not repair_pending:
             from app.domain.services.analysis_answer_review import rejected_missing_claim_paths
             from app.domain.services.analysis_completion import issues_from_records
@@ -2659,12 +2958,23 @@ class AgentTaskRunner(TaskRunner):
             if not isinstance(error, BudgetUnavailableError):
                 raise
             logger.warning("Analysis runtime admission unavailable error_type=%s", type(error).__name__)
-            yield MessageEvent(message="本次执行暂未启动：无法确认任务运行记录。已有结果保持不变，请检查任务运行记录后再继续。")
+            yield terminal_analysis_message(
+                "本次分析尚未开始：无法确认任务运行记录（runtime_admission_unavailable）。请检查运行记录后再继续。",
+                reason_code="runtime_admission_unavailable", stage="input_preparation", analysis_started=False)
             yield DoneEvent()
             return
+        delivery = getattr(self, "_input_delivery", None)
+        identity = getattr(self, "_accepted_input_key", None)
+        if delivery is not None and identity is not None:
+            await delivery.mark_analysis_started(self._session_id, identity)
+        self._analysis_turn_started = True
         if checkpoint:
             self._generated_files = [FileInfo.model_validate(item) for item in checkpoint.get("delivered", [])]
         self._analysis_delivery_trackers = {}
+        # These survive executor context resets/compaction and are keyed by
+        # the original accepted input. Durable audit also prevents restart use.
+        self._analysis_scope_trackers = {}
+        self._analysis_scope_observations = {}
         self._analysis_verified_files = {}
         self._analysis_preserved_answer_evidence = {}
         self._analysis_verified_receipts = {}
