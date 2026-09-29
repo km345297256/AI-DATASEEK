@@ -75,6 +75,7 @@ from app.domain.services.model_runtime import (
 )
 from app.domain.models.model_trace import ScheduledModelRetry
 from app.domain.services.model_retry import model_retry_decision
+from app.domain.services.tool_settlement import ToolCallSettlement, register_tool_settlement
 
 
 logger = logging.getLogger(__name__)
@@ -557,6 +558,7 @@ class BaseAgent(ABC):
                 with tool_execution_scope(ledger, call_id):
                     budget = current_analysis_budget()
                     if budget is None:
+                        self._mark_tool_invocation(call_id)
                         result = normalize_failed_tool_result(await tool.ainvoke(invocation))
                     else:
                         from datetime import UTC, datetime
@@ -570,6 +572,7 @@ class BaseAgent(ABC):
                         if deadline is None:
                             # Single-operation deadlines remain in the normal
                             # tool pipeline; no cumulative task deadline wraps it.
+                            self._mark_tool_invocation(call_id)
                             result = normalize_failed_tool_result(await tool.ainvoke(invocation))
                         else:
                             # Explicit isolated bounded policies remain usable
@@ -581,6 +584,7 @@ class BaseAgent(ABC):
                             deadline_guard = asyncio.timeout(remaining)
                             try:
                                 async with deadline_guard:
+                                    self._mark_tool_invocation(call_id)
                                     result = normalize_failed_tool_result(await tool.ainvoke(invocation))
                             except TimeoutError:
                                 if deadline_guard.expired():
@@ -707,15 +711,146 @@ class BaseAgent(ABC):
         recovery = current_analysis_recovery()
         self._tool_execution_ledger = recovery.executions if recovery else ToolExecutionLedger()
         self._analysis_progress = recovery.progress if recovery else AnalysisProgressGuard()
+        self._active_tool_batch: dict[str, ToolCallSettlement] = {}
+        generation = self._tool_settlement_generation = object()
+        budget = current_analysis_budget()
+        self._tool_settlement_require_live = getattr(budget, "require_live", None)
+        execution = self._execute_bounded(request, format, max_iterations)
+
+        async def close_and_settle() -> list[ToolEvent]:
+            await execution.aclose()
+            if self._tool_settlement_generation is not generation:
+                return []
+            return await self._settle_tool_batch()
+
+        dispose = register_tool_settlement(close_and_settle)
+        primary_error = None
         try:
-            async for event in self._execute_bounded(request, format, max_iterations):
+            async for event in execution:
                 yield event
-        except asyncio.CancelledError as error:
-            self._set_execution_outcome(getattr(error, "code", "cancelled"))
+        except BaseException as error:
+            primary_error = error
+            if self._tool_settlement_generation is not generation:
+                raise
+            self._set_execution_outcome(
+                getattr(error, "code", "cancelled") if isinstance(error, (asyncio.CancelledError, GeneratorExit))
+                else "execution_failed"
+            )
+            terminal_events = await self._settle_tool_batch(suppress_errors=True)
+            if not isinstance(error, GeneratorExit):
+                for event in terminal_events:
+                    yield event
+                    self._active_tool_batch[event.tool_call_id].event_delivered = True
             raise
-        except Exception:
-            self._set_execution_outcome("execution_failed")
-            raise
+        finally:
+            try:
+                await execution.aclose()
+                if self._tool_settlement_generation is generation:
+                    await self._settle_tool_batch(suppress_errors=primary_error is not None)
+            finally:
+                # aclose cannot yield; retain its registered cleanup until the
+                # consumer scope can publish undelivered terminal events.
+                if (self._tool_settlement_generation is not generation
+                        or all(state.event_delivered for state in self._active_tool_batch.values())):
+                    dispose()
+
+    def _mark_tool_invocation(self, tool_call_id: str) -> None:
+        state = getattr(self, "_active_tool_batch", {}).get(tool_call_id)
+        if state is not None:
+            state.invocation_entered = True
+
+    async def _remember_tool_response(self, result: ToolMessage) -> None:
+        """Append once before exposing CALLED or dispatching another call.
+
+        A save can fail after committing. Keep the safe in-memory observation
+        and stop dispatch; cleanup may save the same snapshot, never append a
+        duplicate result or rerun a side effect to recreate its output.
+        """
+        state = self._active_tool_batch[result.tool_call_id]
+        if state.result is None:
+            state.result = result
+        if state.persistence_attempted:
+            return
+        state.memory_response = result
+        require_live = getattr(self, "_tool_settlement_require_live", None)
+        if require_live is not None:
+            await require_live()
+        state.persistence_attempted = True
+        await self._add_to_memory([result])
+        state.persisted = True
+
+    def _terminal_tool_event(self, state: ToolCallSettlement) -> ToolEvent:
+        if state.event is None:
+            try:
+                artifact = projected_tool_artifact(state.result)
+            except Exception:
+                artifact = ToolResult(success=False, message="The observed result could not be safely displayed. "
+                    "Do not repeat the operation to recreate its output.",
+                    data={"error_code": "tool_result_unavailable", "side_effect_state": "unknown"})
+            state.event = ToolEvent(
+                status=ToolStatus.CALLED,
+                tool_call_id=state.call["id"],
+                tool_name=getattr(getattr(state.tool, "toolkit", None), "name", "tool"),
+                function_name=state.call["name"],
+                # Cleanup for an unentered call does not expose its arguments.
+                function_args=state.display_args or {},
+                function_result=artifact,
+                presentation=state.presentation,
+            )
+        return state.event
+
+    async def _settle_tool_batch(self, *, suppress_errors: bool = False) -> list[ToolEvent]:
+        """Record host-observed outcomes without querying or replaying tools."""
+        batch = getattr(self, "_active_tool_batch", {})
+        if not batch:
+            return []
+        additions = []
+        for call_id, state in batch.items():
+            if state.result is None:
+                side_effect_state = self._tool_execution_ledger.failure_state(
+                    call_id, "unknown" if state.invocation_entered else "not_started",
+                )
+                code = ("tool_not_executed" if side_effect_state == "not_started"
+                        else "tool_outcome_unknown")
+                detail = ("This call was NOT executed before the batch stopped."
+                          if side_effect_state == "not_started" else
+                          "The call stopped without a usable result. Do not repeat the operation; "
+                          "observe its original execution identity before deciding further work.")
+                failure = ToolResult(success=False, message=detail, data={
+                    "error_code": code, "side_effect_state": side_effect_state,
+                })
+                state.result = ToolMessage(tool_call_id=call_id, name=state.call["name"],
+                    status="error", content=failure.model_dump_json(), artifact=failure)
+                self._record_tool_failure(failure.data, call_id=call_id)
+            if not state.persistence_attempted:
+                try:
+                    response = self._tool_result_for_memory(state.result, call_id, state.call["name"])
+                except Exception:
+                    # Projection failures must not put raw MCP bytes/artifacts
+                    # into memory, nor pretend a completed write never ran.
+                    response = ToolMessage(tool_call_id=call_id, name=state.call["name"], status="error",
+                        content="TOOL_RESULT_UNAVAILABLE: the observed result could not be safely stored. "
+                                "Do not repeat this operation to recreate its output.")
+                state.memory_response = response
+                additions.append(response)
+        try:
+            async with asyncio.timeout(5):
+                require_live = getattr(self, "_tool_settlement_require_live", None)
+                if require_live is not None:
+                    await require_live()
+                if additions:
+                    for response in additions:
+                        batch[response.tool_call_id].persistence_attempted = True
+                    await self._add_to_memory(additions)
+                elif any(not state.persisted for state in batch.values()):
+                    await self._persist_memory()
+                for state in batch.values():
+                    state.persisted = True
+        except BaseException as error:
+            if not suppress_errors:
+                raise
+            logger.warning("tool_settlement_memory_failed agent=%s error_type=%s", self.name, type(error).__name__)
+        return [self._terminal_tool_event(state) for state in batch.values() if not state.event_delivered]
 
     async def _execute_bounded(
         self, request: str, format: Optional[str] = None,
@@ -797,6 +932,9 @@ class BaseAgent(ABC):
             # Defense in depth for custom in-process model/agent adapters that
             # bypass ask_with_messages: no valid prefix may run on collision.
             message = validate_tool_call_identity(message)
+            self._active_tool_batch = {
+                call["id"]: ToolCallSettlement(call=call) for call in message.tool_calls
+            }
             corrected_tool_batch = correction_response
             correction_response = False
             tool_responses = []
@@ -833,6 +971,9 @@ class BaseAgent(ABC):
                 tool_responses = [ToolMessage(tool_call_id=call["id"], name=call["name"], status="error",
                     content="This call was NOT executed. Safe execution or its admission audit could not be established. Return verified results and remaining gaps without requesting tools.")
                     for call in message.tool_calls]
+                for response in tool_responses:
+                    await self._remember_tool_response(response)
+                    self._active_tool_batch[response.tool_call_id].event_delivered = True
             if not admission_denied:
                 iterations += 1
                 if adaptive_budget is None:
@@ -857,6 +998,7 @@ class BaseAgent(ABC):
                 # The entire batch was validated before persistence/dispatch.
                 # Never assign identity part way through side-effect execution.
                 tool_call_id = tool_call["id"]
+                settlement = self._active_tool_batch[tool_call_id]
                 function_args = tool_call["args"]
 
                 if function_name == "message_ask_user":
@@ -888,6 +1030,8 @@ class BaseAgent(ABC):
                                 ),
                             }),
                         ))
+                        await self._remember_tool_response(tool_responses[-1])
+                        settlement.event_delivered = True
                         continue
                 
                 tool = self.get_tool(function_name)
@@ -908,6 +1052,8 @@ class BaseAgent(ABC):
                             content=f"Tool is unavailable: {function_name}",
                         )
                     )
+                    await self._remember_tool_response(tool_responses[-1])
+                    settlement.event_delivered = True
                     continue
 
                 tool_presentation = self._tool_presentation(tool)
@@ -922,6 +1068,9 @@ class BaseAgent(ABC):
                         "source_bytes": len(source.encode("utf-8", errors="replace")),
                         "source_hmac": private_identity_hmac({"purpose": "code-mode-source/v1", "source": source}),
                     }
+                settlement.tool = tool
+                settlement.display_args = display_args
+                settlement.presentation = tool_presentation
 
                 # Generate event before tool call
                 yield ToolEvent(
@@ -1006,7 +1155,7 @@ class BaseAgent(ABC):
                         "message": blocked_reason,
                         "blocked_by_policy": "runtime_dependency_installation" if blocked_code == "tool_permission_denied" else blocked_code,
                     }
-                    yield ToolEvent(
+                    settlement.event = ToolEvent(
                         status=ToolStatus.CALLED,
                         tool_call_id=tool_call_id,
                         tool_name=tool.toolkit.name,
@@ -1024,10 +1173,20 @@ class BaseAgent(ABC):
                             status="error",
                         )
                     )
+                    await self._remember_tool_response(tool_responses[-1])
+                    yield settlement.event
+                    settlement.event_delivered = True
                     continue
 
                 tool_started = time.perf_counter()
                 tool_result = await self.invoke_tool(tool, tool_call)
+                settlement.result = tool_result
+                if tool_result.tool_call_id != tool_call_id:
+                    logger.warning("Tool result identity corrected agent=%s", self.name)
+                    tool_result.tool_call_id = tool_call_id
+                response = self._tool_result_for_memory(tool_result, tool_call_id, function_name)
+                await self._remember_tool_response(response)
+                tool_responses.append(response)
                 call_evidence = self._tool_execution_ledger.call_summary(tool_call_id)
                 if call_evidence["tracked_operation_count"]:
                     protocol_recovery.observe_launch(tool, tool_call, prerequisites=prerequisites)
@@ -1071,17 +1230,8 @@ class BaseAgent(ABC):
                     (time.perf_counter() - tool_started) * 1000,
                     getattr(tool_result, "status", "unknown"),
                 )
-                if tool_result.tool_call_id != tool_call_id:
-                    logger.warning(
-                        "Tool %s returned mismatched tool_call_id %r; using active call %r",
-                        function_name,
-                        tool_result.tool_call_id,
-                        tool_call_id,
-                    )
-                    tool_result.tool_call_id = tool_call_id
-
                 # Generate event after tool call
-                yield ToolEvent(
+                settlement.event = ToolEvent(
                     status=ToolStatus.CALLED,
                     tool_call_id=tool_call_id,
                     tool_name=tool.toolkit.name,
@@ -1092,6 +1242,8 @@ class BaseAgent(ABC):
                     program_attempt=trusted_program_attempt_view(
                         tool, tool_call, tool_result, self._tool_execution_ledger),
                 )
+                yield settlement.event
+                settlement.event_delivered = True
 
                 self._compact_tool_call_arguments(tool_call, tool_result)
                 completed_tool_results.append(tool_result)
@@ -1107,10 +1259,6 @@ class BaseAgent(ABC):
                         },
                         tool_result,
                     ))
-
-                tool_responses.append(
-                    self._tool_result_for_memory(tool_result, tool_call_id, function_name)
-                )
 
             deterministic_completion = self._completion_from_tool_batch(
                 completed_tool_results
@@ -1321,6 +1469,10 @@ class BaseAgent(ABC):
             durable.bound(self.MAX_MEMORY_BYTES, self.MAX_TOOL_MESSAGE_CONTENT_BYTES)
             note_memory_change(checkpoint, durable.messages, "storage_bound")
         await flush_memory_changes()
+        budget = current_analysis_budget()
+        require_live = getattr(budget, "require_live", None)
+        if require_live is not None:
+            await require_live()
         await self._repository.save_memory(self._agent_id, self.name, durable)
     
     async def _add_to_memory(self, messages: List[Dict[str, Any]]) -> None:
@@ -1397,7 +1549,20 @@ class BaseAgent(ABC):
         allow_tools: bool = True,
         max_tokens: Optional[int] = None,
     ) -> AIMessage:
-        await self._add_to_memory(messages)
+        # Completed calls are already durable before CALLED. Specialized
+        # synthesis may supply a sanitized replacement: apply that only to the
+        # request copy, never append a second result or rewrite evidence.
+        batch = getattr(self, "_active_tool_batch", {})
+        tool_overrides = {
+            item.tool_call_id: item for item in messages
+            if isinstance(item, ToolMessage)
+            and (state := batch.get(item.tool_call_id)) is not None
+            and state.persisted
+        }
+        await self._add_to_memory([
+            item for item in messages
+            if not isinstance(item, ToolMessage) or item.tool_call_id not in tool_overrides
+        ])
 
         response_format = None
         if format:
@@ -1423,6 +1588,13 @@ class BaseAgent(ABC):
         chain = runnable | RobustJsonParser.from_llm(self._model) if allow_tools else runnable
 
         stored_messages = self.memory.get_messages()
+        if tool_overrides:
+            stored_messages = list(stored_messages)
+            remaining = dict(tool_overrides)
+            for index in range(len(stored_messages) - 1, -1, -1):
+                item = stored_messages[index]
+                if isinstance(item, ToolMessage) and item.tool_call_id in remaining:
+                    stored_messages[index] = remaining.pop(item.tool_call_id)
         context, repaired_history = self._repair_tool_call_history(stored_messages)
         if repaired_history:
             # Compatibility is a provider request projection, not a rewrite of
@@ -1679,6 +1851,30 @@ class BaseAgent(ABC):
         last_message = self.memory.get_last_message()
         if not last_message:
             return False
+        if isinstance(last_message, ToolMessage):
+            # New batches checkpoint each result before emitting CALLED. A
+            # successful ask-user call is therefore followed by its completed
+            # tool receipt (and possibly not-started sibling receipts), rather
+            # than ending at the old unresolved assistant message. Preserve
+            # that evidence; the answer is new user input, not a second result
+            # for the same tool call. Only inspect the current contiguous batch.
+            index = len(self.memory.messages) - 1
+            completed = {}
+            while index >= 0 and isinstance(self.memory.messages[index], ToolMessage):
+                item = self.memory.messages[index]
+                completed.setdefault(item.tool_call_id, item)
+                index -= 1
+            assistant = self.memory.messages[index] if index >= 0 else None
+            if isinstance(assistant, AIMessage):
+                waiting_call = next((call for call in assistant.tool_calls
+                    if call.get("name") == "message_ask_user"
+                    and not is_non_substantive_message_text((call.get("args") or {}).get("text"))
+                    and (result := completed.get(call.get("id"))) is not None
+                    and result.name == "message_ask_user" and result.status == "success"), None)
+                if waiting_call is not None:
+                    await self._add_to_memory([HumanMessage(content=message.message)])
+                    self._preserve_context_for_next_request = True
+                    return True
         if last_message.type != "ai":
             return False
         if not last_message.tool_calls:

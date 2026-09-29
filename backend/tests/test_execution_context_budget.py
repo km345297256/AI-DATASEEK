@@ -938,6 +938,7 @@ def test_execution_iteration_override_is_ignored_and_not_forwarded_to_model():
 @pytest.mark.asyncio
 async def test_repeated_missing_tool_stops_without_emitting_an_empty_final_message():
     agent = object.__new__(BaseAgent)
+    agent._add_to_memory = AsyncMock()
     agent.max_iterations = 2
     looping_message = AIMessage(content="", tool_calls=[{
         "name": "missing_tool",
@@ -965,6 +966,7 @@ async def test_repeated_missing_tool_stops_without_emitting_an_empty_final_messa
 @pytest.mark.asyncio
 async def test_iteration_override_does_not_force_tool_free_synthesis():
     agent = object.__new__(BaseAgent)
+    agent._add_to_memory = AsyncMock()
     agent.max_iterations = 1
     tool_message = AIMessage(content="", tool_calls=[{
         "name": "missing_tool",
@@ -986,6 +988,7 @@ async def test_iteration_override_does_not_force_tool_free_synthesis():
 @pytest.mark.asyncio
 async def test_no_progress_finalization_has_a_single_call_timeout():
     agent = object.__new__(BaseAgent)
+    agent._add_to_memory = AsyncMock()
     agent.max_iterations = 1
     agent.FINALIZATION_TIMEOUT_SECONDS = 0.01
     tool_message = AIMessage(content="", tool_calls=[{
@@ -1026,6 +1029,7 @@ async def test_budget_finalization_failure_preserves_successful_tool_evidence(
     expected_fragment,
 ):
     agent = object.__new__(ExecutionAgent)
+    agent._add_to_memory = AsyncMock()
     agent.max_iterations = 1
     agent.FINALIZATION_TIMEOUT_SECONDS = 0.01
     agent._dataset_fast_path_mode = False
@@ -1078,6 +1082,7 @@ async def test_budget_finalization_failure_preserves_successful_tool_evidence(
 @pytest.mark.asyncio
 async def test_budget_timeout_does_not_promote_arbitrary_shell_output_to_final_result():
     agent = object.__new__(ExecutionAgent)
+    agent._add_to_memory = AsyncMock()
     agent.max_iterations = 1
     agent.FINALIZATION_TIMEOUT_SECONDS = 0.01
     agent._dataset_fast_path_mode = False
@@ -1561,6 +1566,7 @@ def test_quicklook_table_evidence_prefers_measured_value_over_time_axis():
 @pytest.mark.asyncio
 async def test_runtime_package_install_is_blocked_without_invoking_the_shell():
     agent = object.__new__(BaseAgent)
+    agent._add_to_memory = AsyncMock()
     agent.name = "execution"
     agent.max_iterations = 2
     install_call = AIMessage(content="", tool_calls=[{

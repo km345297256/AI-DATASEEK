@@ -3,21 +3,13 @@ import assert from 'node:assert/strict';
 import { build } from 'esbuild';
 import { compileScript, compileStyle, compileTemplate, parse } from '@vue/compiler-sfc';
 import { createHash } from 'node:crypto';
-import { existsSync } from 'node:fs';
 import { mkdtemp, readFile, readdir, writeFile } from 'node:fs/promises';
-import { createRequire } from 'node:module';
-import { homedir, tmpdir } from 'node:os';
+import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
-import { fileURLToPath, pathToFileURL } from 'node:url';
+import { fileURLToPath } from 'node:url';
+import { browserEngine, launchBrowser } from './runtime.mjs';
 
 const frontend = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
-const require = createRequire(resolve(frontend, 'package.json'));
-let playwrightEntry = process.env.VISUALIZATION_PLAYWRIGHT_MODULE;
-if (!playwrightEntry) {
-  try { playwrightEntry = require.resolve('playwright'); }
-  catch { playwrightEntry = join(homedir(), '.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright/index.mjs'); }
-}
-const { chromium } = await import(pathToFileURL(resolve(playwrightEntry)).href);
 const fixtureFile = { file_id: 'synthetic-chat-input', filename: 'synthetic-table.csv', size: 42, upload_date: '' };
 const fixtureSkill = { id: 'synthetic-chat-skill', name: 'Synthetic table skill', description: 'Synthetic layout fixture', triggers: [], scope: 'user', installed: true, source: 'personal' };
 const messages = [
@@ -111,12 +103,8 @@ const projectCssName = (await readdir(resolve(frontend, 'dist/assets'))).find(na
 assert.ok(projectCssName, 'Run npm run build before this check so the real utility CSS is current');
 const projectCss = await readFile(resolve(frontend, 'dist/assets', projectCssName));
 const output = await mkdtemp(join(tmpdir(), 'dataseek-chat-layout-'));
-const report = { name: 'chat-layout', passed: false, errors: [], consoleErrors: [], externalAttempts: [], unexpectedRequests: [], mockedRequests: [], checks: [] };
-const systemChrome = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
-const browser = await chromium.launch({
-  executablePath: process.env.VISUALIZATION_BROWSER_EXECUTABLE || (existsSync(systemChrome) ? systemChrome : undefined),
-  headless: true, args: ['--disable-background-networking', '--disable-component-update'],
-});
+const report = { name: 'chat-layout', browserEngine, passed: false, errors: [], consoleErrors: [], externalAttempts: [], unexpectedRequests: [], mockedRequests: [], checks: [] };
+const browser = await launchBrowser();
 const context = await browser.newContext({ viewport: { width: 1200, height: 900 }, serviceWorkers: 'block' });
 const page = await context.newPage();
 page.setDefaultTimeout(10000);
@@ -235,6 +223,20 @@ try {
   assert.equal((await readEvents()).submissions.length, beforeKeyboard + 1, 'Blank Enter must not submit');
   report.checks.push({ keyboard: { shiftEnterAddsNewline: true, enterSubmits: true, blankEnterIgnored: true } });
 
+  // Browser automation cannot operate an OS IME. Dispatch its two actual
+  // KeyboardEvent representations into the real ChatBox handler, then use a
+  // trusted ordinary Enter to prove only the confirmed draft is submitted.
+  const beforeIme = (await readEvents()).submissions.length;
+  await textarea.fill('中文输入候选');
+  for (const event of [{ key: 'Enter', isComposing: true }, { key: 'Enter', isComposing: false, keyCode: 229 }]) {
+    await textarea.dispatchEvent('keydown', event);
+    assert.equal((await readEvents()).submissions.length, beforeIme, 'IME candidate confirmation must not submit');
+    assert.equal(await textarea.inputValue(), '中文输入候选', 'IME candidate confirmation must retain the draft');
+  }
+  await textarea.press('Enter');
+  assert.deepEqual((await readEvents()).submissions.slice(beforeIme), ['中文输入候选']);
+  report.checks.push({ ime: { composingIgnored: true, safari229Ignored: true, confirmedEnterSubmitsOnce: true } });
+
   for (const width of [320, 1200]) {
     await page.setViewportSize({ width, height: 900 });
     await setState({ compactComposer: false, submitOnEnter: false, rows: 3, modelValue: '' });
@@ -296,6 +298,11 @@ try {
     const top = viewport.scrollTop;
     // Native event dispatch releases the anchor; no artificial observer call.
     viewport.dispatchEvent(new WheelEvent('wheel', { deltaY: -20, bubbles: true }));
+    // WebKit also performs this event's native scroll. Measure after that
+    // settles: release means later growth must not compensate, not that the
+    // reader's requested movement should be suppressed.
+    await frames(); await frames();
+    const intentTop = viewport.scrollTop;
     const extra = document.createElement('div'); extra.style.height = '75px'; content.prepend(extra);
     await frames(); await frames();
     const afterIntent = viewport.scrollTop;
@@ -303,11 +310,11 @@ try {
     content.prepend(Object.assign(document.createElement('div'), { style: 'height:90px' }));
     await frames();
     const afterDispose = viewport.scrollTop;
-    return { before, afterPrepend, afterImage, top, afterIntent, afterDispose };
+    return { before, afterPrepend, afterImage, top, intentTop, afterIntent, afterDispose };
   });
   assert.ok(Math.abs(nativeAnchor.afterPrepend - nativeAnchor.before) <= 1, 'Native prepend must retain the same reading row');
   assert.ok(Math.abs(nativeAnchor.afterImage - nativeAnchor.before) <= 1, 'A native ResizeObserver must retain the reading row after image decode');
-  assert.equal(nativeAnchor.afterIntent, nativeAnchor.top, 'Reader intent must release compensation');
+  assert.equal(nativeAnchor.afterIntent, nativeAnchor.intentTop, 'After native reader movement settles, later growth must not compensate');
   assert.equal(nativeAnchor.afterDispose, nativeAnchor.afterIntent, 'Disposal must stop layout writes');
   report.checks.push({ nativeAnchor });
   await page.screenshot({ path: join(output, 'history-anchor.png'), fullPage: true });

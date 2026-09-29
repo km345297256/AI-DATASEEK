@@ -23,6 +23,7 @@ def invocation(name, identifier, **args):
 
 def scripted_agent(calls):
     agent = object.__new__(BaseAgent)
+    agent._add_to_memory = AsyncMock()  # Scripted model; no memory repository.
     agent.max_retries = 0
     agent.get_tool = lambda name: SimpleNamespace(name=name, toolkit=SimpleNamespace(name="test"))
     agent._compact_tool_call_arguments = lambda *args: None

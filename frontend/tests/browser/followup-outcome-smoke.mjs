@@ -6,21 +6,13 @@ import assert from 'node:assert/strict';
 import { build } from 'esbuild';
 import { compileScript, compileStyle, compileTemplate, parse } from '@vue/compiler-sfc';
 import { createHash } from 'node:crypto';
-import { existsSync } from 'node:fs';
 import { mkdtemp, readFile, readdir, writeFile } from 'node:fs/promises';
-import { createRequire } from 'node:module';
-import { homedir, tmpdir } from 'node:os';
+import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
-import { fileURLToPath, pathToFileURL } from 'node:url';
+import { fileURLToPath } from 'node:url';
+import { browserEngine, launchBrowser } from './runtime.mjs';
 
 const frontend = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
-const require = createRequire(resolve(frontend, 'package.json'));
-let playwrightEntry = process.env.VISUALIZATION_PLAYWRIGHT_MODULE;
-if (!playwrightEntry) {
-  try { playwrightEntry = require.resolve('playwright'); }
-  catch { playwrightEntry = join(homedir(), '.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright/index.mjs'); }
-}
-const { chromium } = await import(pathToFileURL(resolve(playwrightEntry)).href);
 const result = (status, reason_code, extra = {}) => ({ status, reason_code, missing: [], can_resume: false, ...extra });
 const file = { file_id: 'synthetic-published-file', filename: 'synthetic-chart.png', size: 42, upload_date: '' };
 const user = timestamp => ({ type: 'user', content: { content: '请详细解释刚才的结果。', timestamp } });
@@ -119,11 +111,8 @@ const output = await mkdtemp(join(tmpdir(), 'dataseek-followup-outcome-'));
 const report = { name: 'followup-outcome', passed: false, cssName,
   cssSha256: createHash('sha256').update(projectCss).digest('hex'),
   errors: [], consoleErrors: [], externalAttempts: [], unexpectedRequests: [], checks: [] };
-const systemChrome = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
-const browser = await chromium.launch({
-  executablePath: process.env.VISUALIZATION_BROWSER_EXECUTABLE || (existsSync(systemChrome) ? systemChrome : undefined),
-  headless: true, args: ['--disable-background-networking', '--disable-component-update'],
-});
+report.browserEngine = browserEngine;
+const browser = await launchBrowser();
 const context = await browser.newContext({ viewport: { width: 1200, height: 900 }, serviceWorkers: 'block' });
 const page = await context.newPage();
 page.setDefaultTimeout(10000);

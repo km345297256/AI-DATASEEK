@@ -102,6 +102,7 @@ async def test_real_agent_budget_boundary_continues_in_place_or_stops_before_dis
     service = AnalysisBudgetService(repository, policy=BudgetPolicy(initial_batches=2, hard_batches=4, max_grants=1))
     handle = await service.open(user_id="owner", session_id="session", origin_input_id="1", scope_digest="a" * 64)
     agent = object.__new__(BaseAgent)
+    agent._add_to_memory = AsyncMock()
     agent.max_iterations = 2
     agent.max_retries = 0
     calls = []
@@ -211,6 +212,7 @@ async def test_step_contract_prevents_unnecessary_grants_and_attachments_fail_cl
 
 def agent_with_messages(first, later, tools):
     agent = object.__new__(BaseAgent)
+    agent._add_to_memory = AsyncMock()
     agent.max_iterations = 1
     agent.max_retries = 0
     agent.ask = AsyncMock(return_value=first)

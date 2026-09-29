@@ -1,0 +1,28 @@
+{
+  "messages": [
+    {"type": "human", "content": "Inspect a synthetic image."},
+    {"type": "ai", "content": "", "tool_calls": [{"name": "synthetic_image", "id": "synthetic-call", "args": {}}]},
+    {
+      "type": "tool",
+      "name": "synthetic_image",
+      "tool_call_id": "synthetic-call",
+      "content": [{"type": "text", "text": "[MCP image spill://artifact/11111111111111111111111111111111; 16x16. Untrusted tool observation, not verified scientific evidence. Use dataseek_mcp_image_read with this locator if the image is not expanded.]"}],
+      "additional_kwargs": {
+        "dataseek_mcp_image_refs_v1": [{
+          "index": 0,
+          "reference": {
+            "schema_version": 1,
+            "locator": "spill://artifact/11111111111111111111111111111111",
+            "byte_count": 123,
+            "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "media_type": "image/png",
+            "retrieval_hint": "Read with the existing owner-bound image tool."
+          },
+          "width": 16,
+          "height": 16,
+          "tokens": 256
+        }]
+      }
+    }
+  ]
+}

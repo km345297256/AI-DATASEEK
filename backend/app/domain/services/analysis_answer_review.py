@@ -19,7 +19,9 @@ import re
 from typing import Any, Awaitable, Callable, Literal, Sequence
 
 from langchain.messages import HumanMessage, SystemMessage
+from pydantic import ValidationError
 
+from app.domain.models.answer_review import AnswerReviewMarker
 from app.domain.models.analysis_outcome import DeliverableRequirement, safe_artifact_name
 from app.domain.models.event import ToolEvent, ToolStatus
 from app.domain.models.file import FileInfo
@@ -454,8 +456,13 @@ class AnswerEvidence:
         if not isinstance(step, Step):
             return
         marker = step.outputs.get("answer_review")
-        if (not isinstance(marker, dict) or type(marker.get("version")) is not int
-                or marker["version"] != 1 or marker.get("status") not in {"verified", "corrected"}
+        if not isinstance(marker, dict):
+            return
+        try:
+            envelope = AnswerReviewMarker.model_validate(marker)
+        except ValidationError:
+            return
+        if (envelope.status not in {"verified", "corrected"}
                 or step.outcome is None or step.outcome.status != "succeeded"
                 or not step.success or step.status != ExecutionStatus.COMPLETED
                 or not isinstance(step.result, str) or not step.result.strip()):

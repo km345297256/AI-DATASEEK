@@ -54,6 +54,7 @@ from app.domain.services.analysis_terminal import terminal_analysis_message
 from app.domain.models.execution_environment import ExecutionEnvironmentSnapshot
 from app.domain.services.execution_environment import create_agent_execution_snapshot
 from app.domain.services.model_runtime import ModelBudgetStopped, model_execution_scope, model_stop_reason, analysis_budget_scope
+from app.domain.services.tool_settlement import tool_settlement_scope
 from app.infrastructure.repositories.mongo_model_trace_repository import get_model_trace_repository
 from app.domain.services.tools.mcp import MCPToolkit
 from app.domain.services.tools.interceptors import (
@@ -1796,8 +1797,14 @@ class AgentTaskRunner(TaskRunner):
                     if execution_task_id is not None
                     else self._run_flow(message_obj)
                 )
-                async with aclosing(flow_events):
+                async with aclosing(flow_events), tool_settlement_scope(
+                    lambda terminal: self._put_and_add_event(task, terminal),
+                ) as settle_tools:
                     async for event in flow_events:
+                        if isinstance(event, (DoneEvent, ErrorEvent, WaitEvent)):
+                            # Input completion relinquishes the live-owner
+                            # lease. Settle interrupted/WAIT siblings first.
+                            await settle_tools()
                         await self._put_and_add_event(task, event)
                         if isinstance(event, TitleEvent):
                             await self._session_repository.update_title(self._session_id, event.title)
@@ -2345,9 +2352,10 @@ class AgentTaskRunner(TaskRunner):
                       "The artifact version changed; its earlier review does not verify the current attachment.")
             reviewed = replace(reviewed, text=reviewed.text + "\n\n" + notice, status="unavailable", metadata=metadata)
         step.result = reviewed.text
-        step.outputs["answer_review"] = {"version": 1, "status": reviewed.status, **reviewed.metadata,
+        from app.domain.models.answer_review import AnswerReviewMarker
+        step.outputs["answer_review"] = AnswerReviewMarker.model_validate({"version": 1, "status": reviewed.status, **reviewed.metadata,
             "dataset_ids": sorted({item.dataset_id for item in message.datasets}),
-            "input_file_ids": sorted(set(message.attachment_file_ids))}
+            "input_file_ids": sorted(set(message.attachment_file_ids))}).model_dump(exclude_unset=True)
         if reviewed.status == "unavailable" and outcome.status == "succeeded":
             outcome.status = "partial" if files else "failed"
             outcome.reason_code = (

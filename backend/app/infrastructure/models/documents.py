@@ -278,6 +278,8 @@ class TokenUsageDocument(BaseDocument[TokenUsageRecord], id_field="usage_id", do
     prompt_tokens: int = 0
     completion_tokens: int = 0
     total_tokens: int = 0
+    cache_read_tokens: int | None = Field(default=None, ge=0, strict=True)
+    cache_write_tokens: int | None = Field(default=None, ge=0, strict=True)
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
     class Settings:

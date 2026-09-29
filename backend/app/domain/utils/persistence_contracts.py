@@ -15,9 +15,14 @@ from pydantic import TypeAdapter
 
 from app.domain.models.event import AgentEvent, PlanEvent, StepEvent
 from app.domain.models.input_admission import InputAdmission
+from app.domain.models.answer_review import AnswerReviewMarker
 from app.domain.models.memory import Memory
+from app.domain.models.model_trace import ModelTraceRecord
 from app.domain.models.plan import Plan, Step
+from app.domain.models.spill import SpillArtifactNotice, SpillArtifactRecord, SpillArtifactRef
+from app.domain.models.usage import TokenUsageRecord
 from app.domain.services.execution_history import ExecutionHistory
+from app.domain.services.tools.mcp_images import MCPImageRef, MCP_IMAGE_REFS_KEY, MCP_IMAGE_REFS_VERSION
 
 
 def canonical(value) -> str:
@@ -39,9 +44,9 @@ def normalize(value, key=""):
     return value
 
 
-def writer_version(model) -> int:
+def writer_version(model, field: str = "version") -> int:
     schema = model.model_json_schema()
-    value = schema.get("properties", {}).get("version", {}).get("const", 0)
+    value = schema.get("properties", {}).get(field, {}).get("const", 0)
     return value if type(value) is int else 0
 
 
@@ -56,12 +61,33 @@ def current_catalog() -> dict:
         "Memory": (TypeAdapter(Memory), writer_version(Memory), "durable"),
         "InputAdmission": (TypeAdapter(InputAdmission), writer_version(InputAdmission), "durable"),
         "ExecutionHistory": (TypeAdapter(ExecutionHistory), writer_version(ExecutionHistory), "rebuildable"),
+        # Generic dictionary fields do not expose these subprotocols in their
+        # owner's JSON Schema. Inventory their actual production model types
+        # independently, including the real envelope version where present.
+        "MCPImageRef": (TypeAdapter(MCPImageRef), MCP_IMAGE_REFS_VERSION, "durable"),
+        "SpillArtifactRef": (TypeAdapter(SpillArtifactRef), writer_version(SpillArtifactRef, "schema_version"), "durable"),
+        "SpillArtifactNotice": (TypeAdapter(SpillArtifactNotice), writer_version(SpillArtifactNotice, "schema_version"), "durable"),
+        "SpillArtifactRecord": (TypeAdapter(SpillArtifactRecord), writer_version(SpillArtifactRecord), "durable"),
+        "AnswerReviewMarker": (TypeAdapter(AnswerReviewMarker), writer_version(AnswerReviewMarker), "event-owned"),
+        "ModelTraceRecord": (TypeAdapter(ModelTraceRecord), writer_version(ModelTraceRecord, "schema_version"), "durable"),
+        "TokenUsageRecord": (TypeAdapter(TokenUsageRecord), writer_version(TokenUsageRecord), "durable"),
+    }
+    owners = {
+        "MCPImageRef": [f"Memory.ToolMessage.additional_kwargs.{MCP_IMAGE_REFS_KEY}"],
+        "SpillArtifactRef": ["MCPImageRef.reference", "SpillArtifactNotice.reference"],
+        "SpillArtifactNotice": ["ToolResult.data.spill"],
+        "SpillArtifactRecord": ["SpillArtifactDocument"],
+        "AnswerReviewMarker": ["Step.outputs.answer_review"],
+        "ModelTraceRecord": ["ModelTraceDocument"],
+        "TokenUsageRecord": ["TokenUsageDocument"],
     }
     roots = {}
     for name, (adapter, version, storage) in definitions.items():
         contract = {"writer_version": version, "storage": storage,
                     "read_schema": normalize(adapter.json_schema(mode="validation")),
                     "write_schema": normalize(adapter.json_schema(mode="serialization"))}
+        if name in owners:
+            contract["owners"] = sorted(owners[name])
         roots[name] = {**contract, "sha256": hashlib.sha256(canonical(contract).encode()).hexdigest()}
     return {"format_version": 1, "roots": roots}
 
@@ -135,6 +161,8 @@ def compare_catalogs(before: dict, after: dict) -> list[dict]:
             details.extend(schema_changes(old[name][field], new[name][field], f"/{field}"))
         if old[name]["storage"] != new[name]["storage"]:
             details.append({"path": "/storage", "classification": "breaking"})
+        if old[name].get("owners") != new[name].get("owners"):
+            details.append({"path": "/owners", "classification": "breaking"})
         if details or old[name]["writer_version"] != new[name]["writer_version"]:
             changes.append({"root": name,
                 "classification": "breaking" if any(item["classification"] == "breaking" for item in details) else "compatible",

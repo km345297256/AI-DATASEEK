@@ -19,6 +19,46 @@
           "test": "backend/tests/test_persistence_contracts.py"
         }
       }
+    },
+    {
+      "file": "2026-09-29-independent-subprotocols.json",
+      "changes": {
+        "MCPImageRef": {
+          "reason": "Inventory private typed image references hidden inside generic ToolMessage additional_kwargs.",
+          "compatibility": "Registration of the existing version-1 envelope, with the unchanged dataseek_mcp_image_refs_v1 key derived from its real version constant. No image bytes, access grants or data migration are added. Frozen legacy references pass the actual memory reader.",
+          "test": "backend/tests/test_persistence_subprotocols.py"
+        },
+        "SpillArtifactRef": {
+          "reason": "Track spill references independently and record both typed owners.",
+          "compatibility": "Existing schema_version=1 is unchanged. Old opaque locators, checksums and retrieval metadata roundtrip unchanged; ownership and expiry validation remain outside this structural gate.",
+          "test": "backend/tests/test_persistence_subprotocols.py"
+        },
+        "SpillArtifactNotice": {
+          "reason": "Track the persisted spill notice hidden inside generic ToolResult.data.spill.",
+          "compatibility": "Registration only, no wire changes. Existing schema_version=1 and unavailable notices remain readable without fabricating a stored reference.",
+          "test": "backend/tests/test_persistence_subprotocols.py"
+        },
+        "SpillArtifactRecord": {
+          "reason": "Inventory private durable artifact ownership/storage records, independently of public references.",
+          "compatibility": "The existing record is unversioned and is explicitly recorded as writer_version=0, not assigned a fictitious migration version. Missing legacy storage principals remain absent and use the existing compatibility path.",
+          "test": "backend/tests/test_persistence_subprotocols.py"
+        },
+        "AnswerReviewMarker": {
+          "reason": "Bind the durable Step.outputs.answer_review envelope to a production writer/reader model and an independent schema root.",
+          "compatibility": "Version remains 1. Existing version/status/scope bindings and unknown diagnostic dictionaries roundtrip without added defaults. Strict version validation preserves the previous rejection of bool/string versions. Missing legacy optional scope remains missing; semantic history/evidence authorization remains independently fail-closed.",
+          "test": "backend/tests/test_persistence_subprotocols.py"
+        },
+        "ModelTraceRecord": {
+          "reason": "Inventory the private model trace separately from public views, including optional cache observations and tool-schema identity.",
+          "compatibility": "Existing schema_version=1 retained. New fields default to None, never imply a cache hit, and are excluded from the public trace view. Pre-upgrade traces retain their original usage and identity; no raw schemas or provider metadata are persisted.",
+          "test": "backend/tests/test_model_cache_observability.py"
+        },
+        "TokenUsageRecord": {
+          "reason": "Inventory durable token-usage records and optional explicit cache counters.",
+          "compatibility": "The existing record remains unversioned (writer_version=0). Nullable strict nonnegative cache observations are additive and old missing values stay unknown. Existing prompt/completion/total values and accounting are unchanged; cache observations are not added to totals.",
+          "test": "backend/tests/test_model_cache_observability.py"
+        }
+      }
     }
   ]
 }

@@ -106,6 +106,7 @@ async def test_missing_prerequisite_then_real_source_creation_recovers_through_a
              {"name": "file_write", "id": "create-source", "args": {
                  "file": path, "content": "print('validated')\n"}},
              run_call("after-source", path=path, directory=directory)]
+    agent._add_to_memory = AsyncMock()  # Model/memory I/O is outside this recovery fixture.
     agent.ask = AsyncMock(return_value=AIMessage(content="", tool_calls=[calls[0]]))
     agent.ask_with_messages = AsyncMock(side_effect=[
         *(AIMessage(content="", tool_calls=[call]) for call in calls[1:]), AIMessage(content="done"),

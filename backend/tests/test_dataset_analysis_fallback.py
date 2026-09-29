@@ -105,6 +105,7 @@ async def test_real_inventory_fallback_loop_blocks_masked_script_before_invocati
     monkeypatch.setattr("app.domain.services.execution_identity.get_settings",
         lambda: SimpleNamespace(execution_snapshot_identity_key="synthetic-test-key" * 3))
     agent = object.__new__(ExecutionAgent)
+    agent._add_to_memory = AsyncMock()  # This fixture replaces model/memory I/O.
     agent.reset_context = AsyncMock()
     agent.toolkits = []
     agent.get_tool = lambda name: SimpleNamespace(name=name, toolkit=SimpleNamespace(name="shell"))

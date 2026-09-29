@@ -28,7 +28,8 @@ from app.domain.services.model_input_policy import (
     deepseek_image_tokens, image_url, project_image, resolve_model_capability,
 )
 
-MCP_IMAGE_REFS_KEY = "dataseek_mcp_image_refs_v1"
+MCP_IMAGE_REFS_VERSION = 1
+MCP_IMAGE_REFS_KEY = f"dataseek_mcp_image_refs_v{MCP_IMAGE_REFS_VERSION}"
 MCP_IMAGE_READ_TOOL = "dataseek_mcp_image_read"
 _MIMES = {"image/png", "image/jpeg", "image/webp", "image/gif", "image/tiff"}
 

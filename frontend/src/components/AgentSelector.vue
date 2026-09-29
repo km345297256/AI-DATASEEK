@@ -110,7 +110,7 @@ async function toggleOpen() {
 watch(isOpen, (open) => {
   if (open) {
     updateMenuPosition()
-    refreshProfiles()
+    void refreshProfiles().catch(() => undefined)
   }
 })
 
@@ -126,6 +126,6 @@ function manageProfiles() {
 
 onMounted(async () => {
   clientConfig.value = await getCachedClientConfig()
-  await refreshProfiles()
+  await refreshProfiles().catch(() => undefined)
 })
 </script>

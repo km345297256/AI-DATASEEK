@@ -6,6 +6,7 @@ JSON repair and tool-owned browser calls. It never queries a user's quota.
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import json
 import logging
 import math
@@ -306,6 +307,23 @@ def _usage(message) -> dict[str, int] | None:
     return usage
 
 
+def _tool_schema_identity(tool_schemas) -> tuple[str | None, int | None]:
+    """Observe the exact ordered wire schemas without logging their contents.
+
+    Key order is JSON-insignificant; array order is request-prefix significant.
+    Unsupported synthetic adapters leave identity unknown rather than changing
+    request behavior. This is observability, never a dispatch/authorization key.
+    """
+    if not isinstance(tool_schemas, (list, tuple)) or not all(isinstance(item, dict) for item in tool_schemas):
+        return None, None
+    try:
+        encoded = json.dumps(tool_schemas, ensure_ascii=False, sort_keys=True,
+                             separators=(",", ":"), allow_nan=False).encode("utf-8")
+    except (TypeError, ValueError, UnicodeError, RecursionError):
+        return None, None
+    return hashlib.sha256(b"dataseek-tool-schema/v1\0" + encoded).hexdigest(), len(tool_schemas)
+
+
 async def invoke_model_request(*, messages, tool_schemas=(), response_format=None, max_output_tokens: int,
                                provider: str, model_name: str, driver_version: str = "langchain-driver/v1",
                                invoke: Callable[[list, int], Awaitable[Any]]):
@@ -326,6 +344,7 @@ async def invoke_model_request(*, messages, tool_schemas=(), response_format=Non
         driver_version=safe_public_identifier(driver_version)[:64], reserved_output_tokens=max_output_tokens,
         task_token_limit=scope.ledger.token_limit if scope else None, task_call_limit=scope.ledger.call_limit if scope else None)
     trace.timings.memory_flush_ms = memory_flush_ms
+    trace.tool_schema_sha256, trace.tool_schema_count = _tool_schema_identity(tool_schemas)
     try:
         phase_started = time.perf_counter()
         try:
@@ -416,6 +435,9 @@ async def invoke_model_request(*, messages, tool_schemas=(), response_format=Non
     trace.timings.provider_call_ms = (time.perf_counter() - phase_started) * 1000
     phase_started = time.perf_counter()
     usage = _usage(message)
+    cache_usage = TokenUsageService().extract_cache_usage(message)
+    trace.cache_read_tokens = cache_usage["cache_read_tokens"]
+    trace.cache_write_tokens = cache_usage["cache_write_tokens"]
     if scope is not None:
         scope.ledger.settle(reserved, usage["total_tokens"] if usage else None)
         trace.task_tokens_charged = scope.ledger.charged_tokens

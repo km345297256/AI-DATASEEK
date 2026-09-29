@@ -16,4 +16,8 @@ class TokenUsageRecord(BaseModel):
     prompt_tokens: int = 0
     completion_tokens: int = 0
     total_tokens: int = 0
+    # Provider observations only; these are subsets/details, never additions
+    # to prompt_tokens or total_tokens. None means unreported or unverifiable.
+    cache_read_tokens: int | None = Field(default=None, ge=0, strict=True)
+    cache_write_tokens: int | None = Field(default=None, ge=0, strict=True)
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))

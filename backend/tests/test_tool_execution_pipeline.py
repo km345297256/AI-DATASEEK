@@ -81,6 +81,7 @@ async def test_schema_callable_mismatch_is_proven_not_started_in_agent_pipeline(
     schema = resolved.args_schema.model_json_schema()
     assert "v__args" in schema["properties"]
     agent = object.__new__(BaseAgent)
+    agent._add_to_memory = AsyncMock()  # This fixture isolates pipeline behavior.
     agent.name = "binding-regression"
     agent.max_retries = 0
     agent.retry_interval = 0
@@ -360,6 +361,7 @@ def test_base_agent_registry_tracks_replaced_toolkit_collection():
 @pytest.mark.asyncio
 async def test_agent_tool_events_keep_original_function_arguments():
     agent = object.__new__(BaseAgent)
+    agent._add_to_memory = AsyncMock()  # This fixture isolates event projection.
     agent.name = "test-agent"
     agent.max_iterations = 2
     agent.max_retries = 0

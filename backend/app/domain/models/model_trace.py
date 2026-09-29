@@ -91,6 +91,16 @@ class ModelTraceRecord(ModelTraceView):
     session_id: str
     # Private audit metadata only; adding this must not expand the public API.
     scheduled_retry: ScheduledModelRetry | None = None
+    cache_read_tokens: int | None = Field(default=None, ge=0, strict=True)
+    cache_write_tokens: int | None = Field(default=None, ge=0, strict=True)
+    # Identity of the actual ordered tool schema array, not its raw contents.
+    # Optional for legacy records and memory-change events; zero is observed
+    # only when a physical request has no tools. No cache benefit is inferred.
+    tool_schema_sha256: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
+    tool_schema_count: int | None = Field(default=None, ge=0, strict=True)
 
     def public_view(self) -> ModelTraceView:
-        return ModelTraceView.model_validate(self.model_dump(exclude={"user_id", "session_id", "scheduled_retry"}))
+        return ModelTraceView.model_validate(self.model_dump(exclude={
+            "user_id", "session_id", "scheduled_retry", "cache_read_tokens", "cache_write_tokens",
+            "tool_schema_sha256", "tool_schema_count",
+        }))

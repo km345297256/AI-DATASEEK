@@ -294,7 +294,8 @@ async function save(): Promise<void> {
     newProfileName.value = '';
     selectedProfileId.value = updated.id;
     syncDraft(updated);
-    void refreshProfiles().catch(() => undefined);
+    // A read started before the save cannot confirm its new catalog contents.
+    void refreshProfiles({ force: true }).catch(() => undefined);
     showSuccessToast(t(index >= 0 ? 'Agent profile tool settings saved' : 'Agent profile created. Select it in a new chat to use it.'));
   } catch {
     showErrorToast(t(creatingNew.value ? 'Failed to create agent profile' : 'Failed to save agent profile tool settings'));

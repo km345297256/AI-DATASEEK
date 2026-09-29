@@ -254,6 +254,7 @@ async def test_failed_replace_then_read_correct_and_run_completes_in_same_agent_
               "exec_dir": "/home/ubuntu/output", "script_path": PATH}}]
     if repeat_unchanged:
         calls.insert(1, replace_call("unchanged-repeat"))
+    agent._add_to_memory = AsyncMock()  # Model/memory I/O is outside this recovery fixture.
     agent.ask = AsyncMock(return_value=AIMessage(content="", tool_calls=[calls[0]]))
     agent.ask_with_messages = AsyncMock(side_effect=[
         *(AIMessage(content="", tool_calls=[call]) for call in calls[1:]), AIMessage(content="done")])

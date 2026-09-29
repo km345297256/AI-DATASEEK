@@ -2,6 +2,10 @@
 
 `history.json` 顺序引用不可改写的已接受快照。快照覆盖 AgentEvent、Plan、Step、Memory、InputAdmission、ExecutionHistory 的读写 JSON Schema、实际写入版本和摘要。Plan/Step 使用所属事件版本；Memory 当前未显式版本化，记为 0。快照不包含用户数据、密钥或真实数据路径。
 
+2026-09-29 起还独立登记被通用字典隐藏的 MCPImageRef、SpillArtifactRef、SpillArtifactNotice、SpillArtifactRecord、AnswerReviewMarker，以及私有 ModelTraceRecord、TokenUsageRecord。`owners` 记录实际持久化入口/所属类型，改变归属也触发检查。MCP 引用版本来自实际 envelope key 的共享常量；spill 引用、notice 和 trace 使用 `schema_version`；answer-review 使用 `version`。SpillArtifactRecord、TokenUsageRecord 目前未版本化，诚实记录为 0，不能只修改快照数字冒充版本升级。
+
+AnswerReviewMarker 使用生产写入/读取模型，保留旧记录未知诊断字段，且序列化不填充原本缺失的可选字段。该根覆盖 review 信封的版本、状态、作用域和收尾标记；内部可扩展诊断字典的每个字段尚不由结构门禁逐一约束，仍需要科学审查/历史恢复的行为测试。结构合法不代表科学结论正确，更不授予执行、文件或数据集权限。
+
 从 backend 运行 `uv run python scripts/check_persistence_contracts.py --check`。该检查也在 pytest 和统一回归入口内执行；任何未登记的结构变化都会失败。只调换字段顺序或改说明文字不会失败。
 
 升级步骤：

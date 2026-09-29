@@ -226,6 +226,7 @@ async def test_error_status_cannot_preserve_a_successful_artifact():
 
 def looping_agent(limit):
     agent = object.__new__(BaseAgent)
+    agent._add_to_memory = AsyncMock()  # Scripted model; no memory repository.
     agent.max_iterations = limit
     loop = AIMessage(content="", tool_calls=[{"name": "unavailable", "args": {}, "id": "call"}])
     agent.ask = AsyncMock(return_value=loop)

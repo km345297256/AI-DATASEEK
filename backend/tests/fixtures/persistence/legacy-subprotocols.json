@@ -1,0 +1,75 @@
+{
+  "MCPImageRef": {
+    "index": 0,
+    "reference": {
+      "schema_version": 1,
+      "locator": "spill://artifact/11111111111111111111111111111111",
+      "byte_count": 123,
+      "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "media_type": "image/png",
+      "retrieval_hint": "Read with the existing owner-bound image tool."
+    },
+    "width": 16,
+    "height": 16,
+    "tokens": 256
+  },
+  "SpillArtifactRef": {
+    "schema_version": 1,
+    "locator": "spill://artifact/22222222222222222222222222222222",
+    "byte_count": 19,
+    "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "media_type": "text/plain; charset=utf-8",
+    "retrieval_hint": "Read with the existing owner-bound spill tool."
+  },
+  "SpillArtifactNotice": {
+    "schema_version": 1,
+    "status": "unavailable",
+    "reference": null,
+    "preview": "synthetic bounded preview",
+    "original_bytes": 100,
+    "retained_bytes": 24,
+    "omitted_bytes": 76
+  },
+  "SpillArtifactRecord": {
+    "artifact_id": "22222222222222222222222222222222",
+    "storage_file_id": "synthetic-file",
+    "owner_user_id": "synthetic-user",
+    "owner_session_id": "synthetic-session",
+    "byte_count": 19,
+    "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "media_type": "text/plain; charset=utf-8",
+    "source_tool_ref": "tool:sha256:111111111111",
+    "source_call_ref": "call:sha256:222222222222",
+    "created_at": "2026-09-24T00:00:00Z",
+    "expires_at": "2026-09-25T00:00:00Z"
+  },
+  "AnswerReviewMarker": {
+    "version": 1,
+    "status": "verified",
+    "dataset_ids": ["synthetic-dataset"],
+    "input_file_ids": ["synthetic-upload"],
+    "answer_scientific_review": {"version": 1, "review_kind": "answer_scientific", "status": "unavailable", "reason": "answer_check_invalid"},
+    "request_context_history": {"version": 1, "sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc", "spans": []}
+  },
+  "ModelTraceRecord": {
+    "schema_version": 1,
+    "trace_id": "33333333333333333333333333333333",
+    "user_id": "synthetic-user",
+    "session_id": "synthetic-session",
+    "task_id": "synthetic-task",
+    "created_at": "2026-09-24T00:00:00Z",
+    "status": "succeeded",
+    "actual_input_tokens": 100,
+    "actual_output_tokens": 10,
+    "actual_total_tokens": 110,
+    "usage_source": "provider"
+  },
+  "TokenUsageRecord": {
+    "id": "synthetic-usage",
+    "user_id": "synthetic-user",
+    "prompt_tokens": 100,
+    "completion_tokens": 10,
+    "total_tokens": 110,
+    "created_at": "2026-09-24T00:00:00Z"
+  }
+}

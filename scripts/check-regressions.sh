@@ -15,6 +15,7 @@ cd "$task_repo_root/frontend"
 npm run type-check
 npm test
 npm run build
+npm run test:browser
 cd "$task_repo_root/plugin-host"
 npm test
 cd "$task_repo_root"
