@@ -7,6 +7,8 @@ not a generic ``mkdir -p`` recovery for arbitrary FileNotFoundError failures.
 from __future__ import annotations
 
 import os
+import logging
+from contextlib import asynccontextmanager
 from pathlib import Path
 import stat
 import uuid
@@ -15,6 +17,20 @@ from app.core.exceptions import BadRequestException
 
 
 WORKSPACE_ROOT = Path("/home/ubuntu")
+
+
+@asynccontextmanager
+async def analysis_workspace_lifespan(_app):
+    """Prepare new sandboxes without making read-only preflight write files."""
+    try:
+        prepare_analysis_workspace()
+    except BadRequestException:
+        # Keep diagnostics/health APIs available if storage is unavailable;
+        # launches will fail safely and cannot mistake this for usable storage.
+        logging.getLogger(__name__).error(
+            "Analysis output workspace unavailable at startup; program launch remains blocked"
+        )
+    yield
 
 
 def prepare_analysis_workspace(*, workspace_root: Path | None = None) -> None:

@@ -132,12 +132,12 @@ class SandboxPool:
             return
         self._replenish_task = self._track_background_task(self._replenish())
 
-    async def _create_and_warm(self) -> 'DockerSandbox':
+    async def _create_and_warm(self, *, wait_for_capacity: bool = True) -> 'DockerSandbox':
         from app.infrastructure.external.sandbox.docker_sandbox import DockerSandbox
         from app.infrastructure.external.sandbox.runtime import LocalDockerRuntime
         from app.infrastructure.models.documents import SandboxRecordDocument
 
-        sandbox = await LocalDockerRuntime().allocate_local_warm()
+        sandbox = await LocalDockerRuntime().allocate_local_warm(wait_for_capacity=wait_for_capacity)
         await DockerSandbox.create_record(sandbox.id, sandbox.ip, status="warming")
         try:
             ensure_api_ready = getattr(sandbox, "ensure_api_ready", None)
@@ -166,7 +166,10 @@ class SandboxPool:
             deficit = self._pool_size - self._pool.qsize()
             logger.info(f"Replenishing sandbox pool ({deficit} needed, creating 1)")
             try:
-                sandbox = await self._create_and_warm()
+                # Background prewarming retries later when full; it must not
+                # hold the resize lock indefinitely. User-facing acquire still
+                # waits for capacity without a deadline.
+                sandbox = await self._create_and_warm(wait_for_capacity=False)
                 await self._pool.put(sandbox)
             except asyncio.CancelledError:
                 raise

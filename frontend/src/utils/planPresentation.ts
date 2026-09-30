@@ -3,6 +3,8 @@ import type { Message, MessageContent } from '../types/message';
 import type { AnalysisOutcome } from '../types/analysisOutcome';
 import { analysisOutcomeIsComplete, readAnalysisOutcome } from './analysisOutcome.ts';
 
+export { ANALYSIS_COMPLETION_DESCRIPTION } from './analysisOutcome.ts';
+
 export type PlanDisplayStatus = StepEventData['status'] | 'partial' | 'stopped';
 
 export const PLAN_STATUS_LABELS: Record<PlanDisplayStatus, string> = {

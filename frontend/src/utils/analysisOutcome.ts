@@ -4,6 +4,9 @@ import type { Message, MessageContent } from '../types/message';
 const CHECKPOINT_ID = /^[a-f0-9]{32}$/;
 const ISSUE_KINDS: Record<ArtifactIssueKind, string> = { image: '图表', table: '数据表', report: '报告', code: '代码', any: '结果文件' };
 
+// Completion describes execution and delivery, not scientific endorsement.
+export const ANALYSIS_COMPLETION_DESCRIPTION = '已完成表示执行与结果交付完成；分析方法和结论由您评估。';
+
 export const ARTIFACT_ISSUE_REASON_LABELS: Record<ArtifactIssueReasonCode, string> = {
   missing_artifact: '成果文件尚未生成。',
   invalid_content: '文件内容未通过校验。',

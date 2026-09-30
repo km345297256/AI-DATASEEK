@@ -5,6 +5,7 @@ import logging
 import os
 import shlex
 import uuid
+import httpx
 from urllib.parse import quote
 from pathlib import Path
 from typing import Any, Optional
@@ -26,6 +27,8 @@ from app.domain.services.tools.base import BaseToolkit
 logger = logging.getLogger(__name__)
 
 _MAX_NORMALIZED_OUTPUT_BYTES = 2 * 1024 * 1024
+_PLUGIN_OBSERVATION_SECONDS = 30
+_PLUGIN_RETRY_DELAY_SECONDS = 1
 _MAX_PATTERN_INSTANCE_STRING_CHARS = 4096
 _JSON_SCHEMA_DIALECT = "http://json-schema.org/draft-07/schema#"
 _PUBLIC_SCHEMA_PATH_KEYWORDS = frozenset({
@@ -348,13 +351,6 @@ class PluginToolkit(BaseToolkit):
         payload = base64.urlsafe_b64encode(
             json.dumps(arguments, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
         ).decode("ascii")
-        execution = definition.get("execution")
-        declared_timeout = (
-            execution.get("timeout_seconds", definition.get("timeout_seconds", 90))
-            if isinstance(execution, dict)
-            else definition.get("timeout_seconds", 90)
-        )
-        timeout = max(1, min(int(declared_timeout), 120))
         catalog_guard = (
             "--catalog-manifest-digest "
             f"{shlex.quote(self.catalog_manifest_digest)} "
@@ -408,38 +404,37 @@ class PluginToolkit(BaseToolkit):
         output_data = data
         transport_success = result.success
         if status == "running":
-            # The production timeout interceptor owns the exact deadline. Give
-            # the sandbox wait one extra second so that interceptor wins
-            # deterministically and runs its kill callback. This fallback also
-            # stops the process if the toolkit is invoked outside production.
-            try:
-                waited = await self.sandbox.wait_for_process(
-                    execution_session_id,
-                    timeout + 1,
-                )
-            except asyncio.CancelledError:
-                raise
-            except Exception as error:
-                logger.warning(
-                    "Plugin tool wait failed tool=%s error_type=%s",
-                    tool_name,
-                    type(error).__name__,
-                )
-                return await self._released_result(
-                    execution_session_id,
-                    self._transport_error(tool_name),
-                )
-            wait_data = self._result_data(waited)
+            # Observation windows are not execution budgets. Keep the same
+            # launch alive across arbitrarily many windows; only cancellation
+            # or an actual terminal process/error releases it.
+            while True:
+                observed_at = asyncio.get_running_loop().time()
+                try:
+                    waited = await self.sandbox.wait_for_process(
+                        execution_session_id, _PLUGIN_OBSERVATION_SECONDS,
+                    )
+                except asyncio.CancelledError:
+                    raise
+                except (TimeoutError, httpx.TransportError, ConnectionError):
+                    await asyncio.sleep(_PLUGIN_RETRY_DELAY_SECONDS)
+                    continue
+                except Exception as error:
+                    logger.warning(
+                        "Plugin tool wait failed tool=%s error_type=%s",
+                        tool_name, type(error).__name__,
+                    )
+                    return await self._released_result(
+                        execution_session_id, self._transport_error(tool_name),
+                    )
+                wait_data = self._result_data(waited)
+                if wait_data.get("status") != "running":
+                    break
+                if asyncio.get_running_loop().time() - observed_at < _PLUGIN_RETRY_DELAY_SECONDS:
+                    await asyncio.sleep(_PLUGIN_RETRY_DELAY_SECONDS)
             if wait_data.get("status") != "completed":
                 return await self._released_result(
                     execution_session_id,
-                    ToolResult(
-                        success=False,
-                        message=(
-                            f"Plugin tool exceeded its {timeout} second execution limit"
-                        ),
-                        data={"status": "timed_out", "tool": tool_name},
-                    ),
+                    self._transport_error(tool_name),
                 )
             try:
                 viewed = await self.sandbox.view_shell(execution_session_id)

@@ -5,17 +5,133 @@ from pathlib import Path
 import subprocess
 import sys
 import zipfile
+import xml.etree.ElementTree as ET
 
 import numpy as np
 import pytest
 
 from scripts.dataset_quicklook import (
     Limits,
+    PlotCollector,
     QuicklookError,
     _quicklook_evidence,
     _read_delimited,
     generate_quicklook,
 )
+
+
+@pytest.mark.parametrize("extension", ["csv", "xlsx"])
+@pytest.mark.parametrize("chart_formats", [None, ["svg"], ["png", "svg", "svg"]])
+def test_native_chart_exports_preserve_tabular_values_and_source(tmp_path, extension, chart_formats):
+    headers = ["Energy (GeV)", "Flux [cm^-2]", "Flux [cm^-2]", "", "E label"]
+    rows = [
+        ["1.0e-3", "4.2E+2", "-3e-2", "10", "1e"],
+        ["2.0e-3", "8.4E+2", "-6e-2", "20", "E2"],
+        ["3.0e-3", "1.26E+3", "-9e-2", "30", "E3"],
+    ]
+    source = tmp_path / f"observations.{extension}"
+    if extension == "csv":
+        import csv
+        with source.open("w", encoding="utf-8", newline="") as stream:
+            writer = csv.writer(stream)
+            writer.writerows([headers, *rows])
+    else:
+        from openpyxl import Workbook
+        workbook = Workbook()
+        for row in [headers, *rows]:
+            workbook.active.append(row)
+        workbook.save(source)
+        workbook.close()
+    original = source.read_bytes()
+    output = tmp_path / "output"
+    manifest = generate_quicklook(source, output, Limits(max_plots=1), chart_formats=chart_formats)
+
+    expected_formats = list(dict.fromkeys(chart_formats or ["png"]))
+    assert manifest["chart_formats"] == expected_formats
+    assert manifest["summary"]["plot_count"] == 1
+    assert manifest["summary"]["plot_file_count"] == len(expected_formats)
+    assert source.read_bytes() == original
+    dataset = manifest["datasets"][0]
+    table = dataset["sheets"][0]["table"] if extension == "xlsx" else dataset["table"]
+    assert table["rows_sampled"] == 3
+    assert [column["name"] for column in table["columns"]] == [
+        "Energy (GeV)", "Flux [cm^-2]", "Flux [cm^-2]_2", "column_4", "E label",
+    ]
+    assert [column["statistics"]["mean"] for column in table["columns"][:4]] == pytest.approx(
+        [0.002, 840.0, -0.06, 20.0]
+    )
+    assert table["columns"][4]["dtype"] == "text"
+    assert {item["value"] for item in table["columns"][4]["top_values"]} == {"1e", "E2", "E3"}
+    charts = [item for item in manifest["artifacts"] if item.get("role") == "visualization"]
+    assert len(charts) == len(expected_formats)
+    markdown = (output / "quicklook_summary.md").read_text(encoding="utf-8")
+    for chart in charts:
+        path = output / chart["path"]
+        assert chart["path"] in markdown
+        assert path.stat().st_size == chart["size"] > 0
+        if path.suffix == ".svg":
+            assert chart["media_type"] == "image/svg+xml"
+            root = ET.parse(path).getroot()
+            assert root.tag == "{http://www.w3.org/2000/svg}svg"
+            assert len(root.findall(".//{http://www.w3.org/2000/svg}path")) > 20
+            # Histograms and text are real vector paths, not an embedded PNG.
+            assert not root.findall(".//{http://www.w3.org/2000/svg}image")
+        else:
+            from PIL import Image
+            assert chart["media_type"] == "image/png"
+            with Image.open(path) as rendered:
+                rendered.verify()
+
+
+def test_native_format_count_does_not_reduce_number_of_distinct_charts(tmp_path):
+    source = tmp_path / "values.csv"
+    source.write_text("x,y\n1,2\n2,4\n3,6\n", encoding="utf-8")
+    manifest = generate_quicklook(
+        source, tmp_path / "output", Limits(max_plots=2), chart_formats=["png", "svg"],
+    )
+    charts = [item for item in manifest["artifacts"] if item.get("role") == "visualization"]
+    assert manifest["summary"]["plot_count"] == 2
+    assert manifest["summary"]["plot_file_count"] == 4
+    assert len(charts) == 4
+    assert len({Path(item["path"]).stem for item in charts}) == 2
+    # Exercise the same byte-level delivery validator as custom scripts. Both
+    # the vector histogram and heatmap (which legitimately contains an image
+    # layer) must remain safe, readable output files.
+    from app.services.artifact_validation import validate_artifacts
+    output = tmp_path / "output"
+    receipts = validate_artifacts(
+        [{"path": str(output / item["path"]), "kind": "image"} for item in charts], root=output,
+    )["files"]
+    assert all(item["valid"] for item in receipts), receipts
+    assert {item["metadata"]["format"] for item in receipts} == {"PNG", "SVG"}
+
+
+@pytest.mark.parametrize("formats", [[], ["pdf"], ["png", "html"], ["svg;touch nope"], "svg", [["svg"]]])
+def test_invalid_chart_formats_fail_before_creating_output(tmp_path, formats):
+    source = tmp_path / "values.csv"
+    source.write_text("x,y\n1,2\n", encoding="utf-8")
+    with pytest.raises(QuicklookError, match="chart_formats"):
+        generate_quicklook(source, tmp_path / "output", chart_formats=formats)
+    assert not (tmp_path / "output").exists()
+    assert not list(tmp_path.glob(".output.tmp-*"))
+
+
+def test_export_failure_does_not_publish_a_partial_format_set(tmp_path):
+    class Figure:
+        def savefig(self, target, *, format, **kwargs):
+            Path(target).write_bytes(b"partial")
+            if format == "svg":
+                raise OSError("export failed")
+
+    from unittest.mock import patch
+    collector = PlotCollector(tmp_path, 2, ["png", "svg"])
+    with patch("scripts.dataset_quicklook.plt.close") as close:
+        with pytest.raises(OSError, match="export failed"):
+            collector.save(Figure(), stem="chart", title="chart", source="values.csv")
+    close.assert_called_once()
+    assert collector.remaining == 2
+    assert collector.artifacts == []
+    assert list(tmp_path.iterdir()) == []
 
 
 @pytest.mark.parametrize("encoding", ["utf-8-sig", "utf-16", "utf-16-be", "utf-32", "gb18030"])
@@ -813,7 +929,8 @@ def test_cli_returns_nonzero_and_json_error_for_unsupported_input(tmp_path):
     assert "unsupported input" in payload["error"]
 
 
-def test_cli_returns_compact_evidence_for_one_turn_model_answer(tmp_path):
+@pytest.mark.parametrize("formats", [None, ["svg"]])
+def test_cli_returns_compact_evidence_for_one_turn_model_answer(tmp_path, formats):
     source = tmp_path / "values.csv"
     source.write_text(
         "年份,区域,降水量\n2019,北,10\n2020,北,20\n2021,南,30\n",
@@ -830,6 +947,7 @@ def test_cli_returns_compact_evidence_for_one_turn_model_answer(tmp_path):
             str(tmp_path / "out"),
             "--max-plots",
             "2",
+            *(["--chart-formats", *formats] if formats else []),
         ],
         check=False,
         capture_output=True,
@@ -843,7 +961,7 @@ def test_cli_returns_compact_evidence_for_one_turn_model_answer(tmp_path):
     assert payload["artifacts"]
     assert payload["artifacts"][0]["path"] in payload["files"]
     assert payload["artifacts"][0]["title"]
-    assert payload["artifacts"][0]["media_type"] == "image/png"
+    assert payload["artifacts"][0]["media_type"] == ("image/svg+xml" if formats else "image/png")
     assert payload["evidence"]["datasets"][0]["table"]["columns"][2][
         "statistics"
     ]["mean"] == 20.0

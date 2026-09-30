@@ -34,10 +34,65 @@ def test_ready_probe_is_read_only_and_does_not_disclose_source_or_paths(inputs):
     result = probe(root, path)
     assert result["status"] == "ready" and result["ready"] is True
     assert result["source"]["source_digest"] == hashlib.sha256(source.encode()).hexdigest()
+    assert result["syntax"] == {"state": "ready", "exception_type": None,
+                                "line": None, "offset": None}
     assert len(result["prerequisite_digest"]) == 64
     assert not marker.exists()
     serialized = json.dumps(result)
     assert str(root) not in serialized and source not in serialized
+
+
+@pytest.mark.parametrize("source,exception", [
+    ("if True print('sensitive source')\n", "SyntaxError"),
+    ("return 42\n", "SyntaxError"),
+    ("if True:\nprint('sensitive source')\n", "IndentationError"),
+])
+def test_invalid_syntax_is_actionable_without_executing_or_disclosing_source(inputs, source, exception):
+    root, path = inputs
+    path.write_text(source)
+    result = probe(root, path)
+    assert result["status"] == "blocked" and result["ready"] is False
+    assert result["source"]["state"] == "ready"
+    assert result["syntax"]["state"] == "invalid"
+    assert result["syntax"]["exception_type"] == exception
+    assert result["syntax"]["line"] >= 1
+    assert "sensitive source" not in json.dumps(result) and str(path) not in json.dumps(result)
+    path.write_text("print('fixed')\n")
+    corrected = probe(root, path)
+    assert corrected["ready"] is True
+    assert corrected["prerequisite_digest"] != result["prerequisite_digest"]
+
+
+def test_missing_script_does_not_claim_syntax_validated(inputs):
+    root, path = inputs
+    path.unlink()
+    result = probe(root, path)
+    assert result["syntax"] == {"state": "not_checked", "exception_type": None,
+                                "line": None, "offset": None}
+
+
+def test_syntax_probe_does_not_echo_source_warnings(inputs, recwarn):
+    root, path = inputs
+    path.write_text("assert 'sensitive code' is 'sensitive code'\n")
+    assert probe(root, path)["ready"] is True
+    assert not list(recwarn)
+
+
+def test_cancellation_during_final_parse_cannot_publish_ready_state(inputs, monkeypatch):
+    root, path = inputs
+    cancelled = threading.Event()
+    original = program._source_syntax
+    count = 0
+    def syntax(source):
+        nonlocal count
+        result = original(source)
+        count += 1
+        if count == 2:
+            cancelled.set()
+        return result
+    monkeypatch.setattr(program, "_source_syntax", syntax)
+    result = probe(root, path, cancelled=cancelled)
+    assert result["status"] == "unavailable" and result["prerequisite_digest"] is None
 
 
 def test_existing_source_with_missing_cwd_recovers_without_source_changes(inputs):
@@ -79,6 +134,23 @@ def test_timestamps_inode_and_same_byte_rewrite_are_not_prerequisite_progress(in
     assert probe(root, path)["prerequisite_digest"] == before["prerequisite_digest"]
     path.write_text("print('changed')\n")
     assert probe(root, path)["prerequisite_digest"] != before["prerequisite_digest"]
+
+
+def test_unrelated_ancestor_directory_writes_are_not_false_source_races(inputs, monkeypatch):
+    root, path = inputs
+    original = program._preflight_entry
+    calls = 0
+
+    def entry(*args, **kwargs):
+        nonlocal calls
+        value = original(*args, **kwargs)
+        calls += 1
+        (root / f"unrelated-{calls}.txt").write_text("another operation")
+        return value
+
+    monkeypatch.setattr(program, "_preflight_entry", entry)
+    result = probe(root, path)
+    assert result["ready"] is True
 
 
 @pytest.mark.parametrize("target", ["cwd", "source"])
@@ -149,7 +221,7 @@ def test_oversized_source_is_not_read(inputs, monkeypatch):
     assert result["source"]["state"] == "too_large"
 
 
-@pytest.mark.parametrize("kind", ["race", "io_error", "cancelled", "deadline"])
+@pytest.mark.parametrize("kind", ["race", "io_error", "cancelled"])
 def test_unknown_probe_never_supplies_a_recovery_digest(inputs, monkeypatch, kind):
     root, path = inputs
     kwargs = {}
@@ -172,12 +244,20 @@ def test_unknown_probe_never_supplies_a_recovery_digest(inputs, monkeypatch, kin
         cancelled = threading.Event()
         cancelled.set()
         kwargs["cancelled"] = cancelled
-    else:
-        kwargs["deadline"] = time.monotonic() - 1
     result = probe(root, path, **kwargs)
     assert result["status"] == "unavailable"
     assert result["prerequisite_digest"] is None
     assert "private" not in json.dumps(result)
+
+
+def test_slow_prerequisite_probe_is_not_rejected_by_elapsed_time(inputs, monkeypatch):
+    root, path = inputs
+    # A wall-clock jump must not turn stable readable input into unavailable.
+    ticks = iter((0.0, 100_000.0, 200_000.0))
+    monkeypatch.setattr(time, "monotonic", lambda: next(ticks, 300_000.0))
+    result = probe(root, path)
+    assert result["status"] == "ready"
+    assert result["source"]["source_digest"]
 
 
 @pytest.mark.parametrize("source,cwd", [

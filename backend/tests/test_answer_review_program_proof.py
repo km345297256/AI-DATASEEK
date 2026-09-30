@@ -50,7 +50,7 @@ def observing_runner(core, ledger, *, agent_key="execution"):
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("agent_key", ["execution", "statistics"])
-async def test_real_runner_flow_injects_private_source_proof_for_actual_step_executor(agent_key):
+async def test_real_runner_retains_private_source_proof_without_automatic_review(agent_key):
     chart = output("scatter.png", "image")
     runner, flow, step, message, state = scenario([[chart]], [{"kind": "image",
         "objective": "Plot the observed length and width"}], agent_key=agent_key)
@@ -93,7 +93,12 @@ async def test_real_runner_flow_injects_private_source_proof_for_actual_step_exe
     executor._execute_with_tool_scope = execute
     executor.review_delivery_answer = review
     events = await collect(runner, message)
-    assert step.success and step.outcome.status == "succeeded" and len(payloads) == 1
+    assert step.success and step.outcome.status == "succeeded" and len(payloads) == 0
+    sources = runner._analysis_answer_evidence.render_sources()
+    actual = next(source for source in sources if source.get("executed_source_id"))
+    saved = next(source for source in sources if source["source_id"] == actual["executed_source_id"])
+    assert saved["function"] == "file_write" and "ax.scatter" in saved["text"]
+    assert saved["step_id"] == actual["step_id"] == step.id
     assert len(state["prompts"]) == state["drained"] == 1
     attempt = next(iter(ledger._attempts.values()))
     public = json.dumps([item.model_dump(mode="json") for item in events])

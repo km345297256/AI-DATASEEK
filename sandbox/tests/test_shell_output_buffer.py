@@ -162,7 +162,11 @@ def service():
 def register(service, output=""):
     process = SimpleNamespace(returncode=0)
     record = ConsoleRecord(ps1="$", command="synthetic", output="")
-    shell = {"process": process, "output": "", "console": [record]}
+    # Real launches allocate the execution-owned buffer before stdout starts,
+    # including programs which have not emitted their first byte yet.
+    output_buffer = ShellOutputBuffer()
+    process._dataseek_output_buffer = output_buffer
+    shell = {"process": process, "output": "", "console": [record], "output_buffer": output_buffer}
     service.active_shells["test"] = shell
     service._append_process_output("test", process, record, output)
     return shell, process
@@ -215,6 +219,82 @@ async def test_service_final_drain_preserves_split_unicode_and_final_chunk(servi
     assert view.output_metadata["stream_complete"]
     page = await service.view_shell("test", output_id=view.output_metadata["output_id"], cursor=0)
     assert page.output_page["eof"]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("leader_exits_during_wait", [False, True])
+async def test_normal_completion_waits_for_slow_stdout_eof_without_a_drain_deadline(
+    service, leader_exits_during_wait,
+):
+    shell, process = register(service)
+    # Make the former collection deadline short without slowing the test down.
+    # It remains applicable only to explicit teardown, not normal completion.
+    service.OUTPUT_READER_DRAIN_GRACE_SECONDS = 0.01
+    started, release = asyncio.Event(), asyncio.Event()
+    chunks = ["最后的完整分析结果😀".encode(), b""]
+    async def read(_size):
+        started.set()
+        await release.wait()
+        return chunks.pop(0)
+    process.stdout = SimpleNamespace(read=read)
+    shell["reader_task"] = asyncio.create_task(service._start_output_reader("test", process))
+    if leader_exits_during_wait:
+        process.returncode = None
+        async def finish_at_observation_boundary():
+            process.returncode = 0
+            raise asyncio.TimeoutError()
+        process.wait = finish_at_observation_boundary
+    waiter = asyncio.create_task(service.wait_for_process("test", seconds=1))
+    try:
+        await started.wait()
+        await asyncio.sleep(0.05)
+        assert not waiter.done(), "leader exit must not publish incomplete stdout"
+        assert not shell["output_buffer"].stream_complete
+        release.set()
+        result = await waiter
+        assert result.status == "completed" and result.returncode == 0
+        view = await service.view_shell("test")
+        assert view.output == "最后的完整分析结果😀"
+        assert view.output_metadata["stream_complete"] is True
+    finally:
+        release.set()
+        await asyncio.gather(waiter, shell["reader_task"], return_exceptions=True)
+
+
+@pytest.mark.asyncio
+async def test_cancelling_normal_drain_does_not_cancel_its_shared_output_reader(service):
+    shell, process = register(service)
+    release = asyncio.Event()
+    async def read(_size):
+        await release.wait()
+        return b""
+    process.stdout = SimpleNamespace(read=read)
+    reader = shell["reader_task"] = asyncio.create_task(service._start_output_reader("test", process))
+    waiter = asyncio.create_task(service.wait_for_process("test", seconds=0))
+    await asyncio.sleep(0)
+    waiter.cancel()
+    try:
+        with pytest.raises(asyncio.CancelledError):
+            await waiter
+        assert not reader.done(), "cancelling a wait must not discard execution-owned output"
+        assert not shell["output_buffer"].stream_complete
+    finally:
+        release.set()
+        await reader
+    assert shell["output_buffer"].stream_complete
+
+
+@pytest.mark.asyncio
+async def test_explicit_cleanup_keeps_a_grace_period_for_a_stuck_reader(service):
+    shell, process = register(service)
+    service.OUTPUT_READER_DRAIN_GRACE_SECONDS = 0.01
+    reader = shell["reader_task"] = asyncio.create_task(asyncio.Event().wait())
+    await service._wait_for_output_reader("test", process, cleanup=True)
+    assert not reader.done()
+    assert not shell["output_buffer"].stream_complete
+    service._retire_output(shell)
+    await asyncio.gather(reader, return_exceptions=True)
+    assert reader.cancelled()
 
 
 @pytest.mark.asyncio

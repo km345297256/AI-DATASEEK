@@ -9,7 +9,7 @@ from pathlib import Path
 import uuid
 from urllib.parse import quote
 import pytest
-from test_database_visualization_http_safety import namespace as previous_namespace, fake_database, Response, CleanupClient
+from test_database_visualization_http_safety import namespace as previous_namespace, fake_database, Response, CleanupClient, unrelated_visualization_plugins
 from test_visualization_acceptance_safety import SAFETY, OWNER, OTHER_ID
 
 ROOT=Path(__file__).resolve().parents[2]
@@ -32,7 +32,8 @@ class Client(CleanupClient):
         super().__init__(db);self.plugins=plugins;self.states={p:False for p in plugins};self.patches=[];self.posts=0;self.lost=lost
     async def request(self,method,path,**kw):
         if method=="GET":
-            return Response({"engine":"cordis","plugins":[*[{"id":p,"reader":r,"adapter":"physical-database","contract_version":2,"enabled":self.states[p]} for p,r in self.plugins.items()],*[{"id":f"other-{i}","enabled":True} for i in range(81)]]})
+            others = unrelated_visualization_plugins(self.plugins)
+            return Response({"engine":"cordis","plugins":[*[{"id":p,"reader":r,"adapter":"physical-database","contract_version":2,"enabled":self.states[p]} for p,r in self.plugins.items()],*others]})
         if method=="PATCH":
             p=path.split("/")[-2];assert p in self.states;self.states[p]=kw["json"]["enabled"];self.patches.append(p)
             if self.lost=="patch" and len(self.patches)==1: raise TimeoutError("lost response")

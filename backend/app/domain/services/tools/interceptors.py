@@ -213,11 +213,11 @@ class ToolPolicyGuardInterceptor(ToolExecutionInterceptor):
         snapshot: ToolPolicySnapshot | PolicySnapshotProvider | None = None,
         *,
         evaluator: PolicyEvaluator | None = None,
-        evaluation_timeout_seconds: float = 2.0,
+        evaluation_timeout_seconds: float | None = None,
     ) -> None:
         self._snapshot = snapshot or ToolPolicySnapshot.deny_all()
         self._evaluator = evaluator or evaluate_snapshot_policy
-        self._evaluation_timeout_seconds = _positive_finite(
+        self._evaluation_timeout_seconds = None if evaluation_timeout_seconds is None else _positive_finite(
             evaluation_timeout_seconds,
             "evaluation_timeout_seconds",
         )
@@ -323,20 +323,24 @@ def evaluate_snapshot_policy(
 
 
 class ToolTimeoutInterceptor(ToolExecutionInterceptor):
-    """Apply an asyncio deadline while preserving external cancellation."""
+    """Preserve cancellation; production analysis has no execution deadline.
+
+    Explicit finite deadlines remain available to non-production callers, but
+    a tool/plugin declaration cannot opt an unlimited pipeline back into one.
+    """
 
     def __init__(
         self,
-        default_timeout_seconds: float = 120.0,
+        default_timeout_seconds: float | None = None,
         *,
-        maximum_timeout_seconds: float = 300.0,
+        maximum_timeout_seconds: float | None = None,
         cancellation_cleanup_timeout_seconds: float = 3.0,
     ) -> None:
-        self.default_timeout_seconds = _positive_finite(
+        self.default_timeout_seconds = None if default_timeout_seconds is None else _positive_finite(
             default_timeout_seconds,
             "default_timeout_seconds",
         )
-        self.maximum_timeout_seconds = _positive_finite(
+        self.maximum_timeout_seconds = None if maximum_timeout_seconds is None else _positive_finite(
             maximum_timeout_seconds,
             "maximum_timeout_seconds",
         )
@@ -344,7 +348,8 @@ class ToolTimeoutInterceptor(ToolExecutionInterceptor):
             cancellation_cleanup_timeout_seconds,
             "cancellation_cleanup_timeout_seconds",
         )
-        if self.default_timeout_seconds > self.maximum_timeout_seconds:
+        if (self.default_timeout_seconds is not None and self.maximum_timeout_seconds is not None
+                and self.default_timeout_seconds > self.maximum_timeout_seconds):
             raise ValueError("default timeout must not exceed maximum timeout")
 
     async def execute(
@@ -385,6 +390,8 @@ class ToolTimeoutInterceptor(ToolExecutionInterceptor):
             ) from error
 
     def _resolve_timeout_seconds(self, context: ToolExecutionContext) -> float | None:
+        if self.default_timeout_seconds is None:
+            return None
         from app.domain.services.program_execution import is_trusted_program_tool
         # Only this exact core implementation owns bounded launch/status I/O,
         # single-operation polling and cooperative cancellation. A plugin or
@@ -400,7 +407,7 @@ class ToolTimeoutInterceptor(ToolExecutionInterceptor):
             normalized = _positive_finite(float(configured), "tool timeout")
         except ValueError:
             return self.default_timeout_seconds
-        return min(normalized, self.maximum_timeout_seconds)
+        return min(normalized, self.maximum_timeout_seconds) if self.maximum_timeout_seconds is not None else normalized
 
     async def _notify_cancellation(
         self,
@@ -746,15 +753,15 @@ def create_production_tool_interceptors(
     policy_snapshot: ToolPolicySnapshot | PolicySnapshotProvider | None = None,
     trace_sink: ToolExecutionTraceSink | None = None,
     trace_attributes: Mapping[str, Any] | None = None,
-    default_timeout_seconds: float = 120.0,
-    maximum_timeout_seconds: float = 120.0,
+    default_timeout_seconds: float | None = None,
+    maximum_timeout_seconds: float | None = None,
     cancellation_cleanup_timeout_seconds: float = 5.0,
     spill_store: SpillArtifactStore | None = None,
     spill_owner: SpillArtifactOwner | None = None,
     spill_max_inline_bytes: int = 50_000,
     spill_max_artifact_bytes: int = 32 * 1024 * 1024,
     spill_preview_bytes: int = 12_000,
-    spill_store_timeout_seconds: float = 5.0,
+    spill_store_timeout_seconds: float | None = None,
     analysis_job_interceptor: ToolExecutionInterceptor | None = None,
     call_authorization_interceptor: ToolExecutionInterceptor | None = None,
 ) -> tuple[ToolExecutionInterceptor, ...]:

@@ -1,4 +1,4 @@
-"""Preserve grounded explanations when a real user request is only partly fulfilled."""
+"""Partial execution retains user-assessed prose and truthful delivery status."""
 import json
 from unittest.mock import AsyncMock
 
@@ -10,7 +10,7 @@ from test_analysis_repair_flow import collect, output, scenario, terminal_messag
 
 FACT = "value count=6 mean=7 min=2 max=12; missing_measurement column is absent, so its output was not generated."
 CHECKED = "value 列已完成统计：count=6、mean=7、min=2、max=12。missing_measurement 列不存在，因此未生成该列的统计文件。"
-DRAFT = "WRONG_MEAN_999：所有列已完成；缺失文件为 /home/ubuntu/output/private-repair-dir/missing_summary.csv。"
+DRAFT = CHECKED + " [缺失输出](/home/ubuntu/output/private-repair-dir/missing_summary.csv)"
 
 
 def partial_scenario(*, available=True, unknown=False, changed_protected=False):
@@ -80,7 +80,8 @@ async def test_missing_column_keeps_measured_statistics_and_explains_uncreated_r
     requests = ground_partial_review(flow)
     events = await collect(runner, message)
     assert len(state["prompts"]) == 2  # No further computation for final-answer repair.
-    assert len(requests) == 1 and flow.executor.review_delivery_answer.await_count == 1
+    assert not requests
+    flow.executor.review_delivery_answer.assert_not_awaited()
     assert step.outcome.status == "partial" and step.outcome.reason_code == "artifacts_missing"
     assert [item.output_paths[0].rsplit("/", 1)[-1] for item in step.outcome.missing] == ["missing_summary.csv"]
     assert CHECKED in step.result
@@ -90,19 +91,21 @@ async def test_missing_column_keeps_measured_statistics_and_explains_uncreated_r
     assert not step.outcome.can_resume
     delivered = [info for event in terminal_messages(events) for info in event.attachments or []]
     assert {info.filename for info in delivered} == {"value_summary.csv"}
-    assert "missing_summary.csv" not in next(item["text"] for item in requests[0]["sources"]
-                                            if item["source_id"] == "verified_files")
+    assert "](/home/ubuntu/output/private-repair-dir/missing_summary.csv)" not in step.result
+    assert "文件未交付" in step.result
+    assert step.outputs["result_assessment"]["scientific_review"] == "not_performed"
 
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("checks_met", [False, True])
-async def test_partial_review_can_never_erase_the_host_missing_file_verdict(checks_met):
+async def test_unused_partial_reviewer_can_never_erase_the_host_missing_file_verdict(checks_met):
     runner, flow, step, message, _ = partial_scenario()
     ground_partial_review(flow, checks_met=checks_met)
     await collect(runner, message)
     assert not step.success and step.outcome.status == "partial"
     assert step.outcome.reason_code == "artifacts_missing" and len(step.outcome.missing) == 1
     assert CHECKED in step.result
+    flow.executor.review_delivery_answer.assert_not_awaited()
 
 
 @pytest.mark.asyncio
@@ -110,20 +113,22 @@ async def test_unavailable_partial_review_keeps_original_reason_files_and_safe_m
     runner, flow, step, message, _ = partial_scenario()
     ground_partial_review(flow, unavailable=True)
     await collect(runner, message)
-    flow.executor.review_delivery_answer.assert_awaited_once()
+    flow.executor.review_delivery_answer.assert_not_awaited()
     assert step.outcome.status == "partial" and step.outcome.reason_code == "artifacts_missing"
     assert "WRONG_MEAN_999" not in step.result and "`missing_summary.csv`" in step.result
     assert len(runner._generated_files) == 1 and not step.outcome.can_resume
 
 
 @pytest.mark.asyncio
-async def test_unknown_operation_does_not_gain_completion_or_prose_from_partial_review():
+async def test_unknown_operation_preserves_prose_but_never_gains_completion():
     runner, flow, step, message, _ = partial_scenario(unknown=True)
     ground_partial_review(flow)
     await collect(runner, message)
     assert step.outcome.reason_code == "tool_execution_unknown" and not step.success
     flow.executor.review_delivery_answer.assert_not_awaited()
-    assert "WRONG_MEAN_999" not in step.result
+    assert CHECKED in step.result
+    assert step.result.startswith("本次分析部分完成。")
+    assert "部分操作的执行状态尚未确认" in step.result
 
 
 @pytest.mark.asyncio
@@ -138,7 +143,7 @@ async def test_no_deliverable_failure_retains_verified_input_limitation_without_
 
 
 @pytest.mark.asyncio
-async def test_absent_terminal_tool_evidence_never_promotes_a_bare_partial_draft():
+async def test_partial_draft_does_not_promote_missing_artifacts_into_completed_work():
     value = output("value_summary.csv", "table")
     missing = output("missing_summary.csv", "table", valid=False, reason="missing_artifact", uploaded=False)
     missing[0].update(sha256=None, size=None)
@@ -147,28 +152,29 @@ async def test_absent_terminal_tool_evidence_never_promotes_a_bare_partial_draft
     ground_partial_review(flow)
     await collect(runner, message)
     flow.executor.review_delivery_answer.assert_not_awaited()
-    assert step.outcome.status == "partial" and "Measured findings" not in step.result
+    assert step.outcome.status == "partial" and "Measured findings" in step.result
+    assert step.result.startswith("本次分析部分完成。")
 
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("changed_protected", [True, "deleted"])
-async def test_protected_file_change_keeps_original_facts_without_reviewing_replacement_evidence(changed_protected):
+async def test_protected_file_change_keeps_original_upload_and_explicit_failure_without_review(changed_protected):
     runner, flow, step, message, state = partial_scenario(changed_protected=changed_protected)
     requests = ground_partial_review(flow, checks_met=True)
     events = await collect(runner, message)
     assert len(state["prompts"]) == 2
-    assert len(requests) == 1 and flow.executor.review_delivery_answer.await_count == 1
+    assert not requests
+    flow.executor.review_delivery_answer.assert_not_awaited()
     assert not step.success and step.outcome.status == "partial"
     assert step.outcome.reason_code == "execution_failed" and len(step.outcome.missing) == 1
     assert CHECKED in step.result and "`missing_summary.csv`" in step.result
-    assert "已保留此前核验通过的版本" in step.result
+    assert "已保留此前交付的版本" in step.result
     assert "WRONG_MEAN_999" not in step.result and "CHANGED_FACT" not in step.result
     assert not step.outcome.can_resume
-    assert all("CHANGED_FACT" not in source["text"] for source in requests[0]["sources"])
     delivered = [info for event in terminal_messages(events) for info in event.attachments or []]
     assert len(delivered) == 1 and delivered[0].metadata["artifact_sha256"] == "a" * 64
-    assert step.outputs["answer_review"]["partial_delivery_review"] is True
-    assert step.outputs["answer_review"]["preserved_evidence_review"] is True
+    assert "answer_review" not in step.outputs
+    assert step.outputs["result_assessment"]["scientific_review"] == "not_performed"
 
 
 @pytest.mark.asyncio
@@ -182,8 +188,8 @@ async def test_protected_file_change_cannot_use_current_evidence_when_original_s
     events = await collect(runner, message)
     flow.executor.review_delivery_answer.assert_not_awaited()
     assert step.outcome.status == "partial" and step.outcome.reason_code == "execution_failed"
-    assert CHECKED not in step.result and "WRONG_MEAN_999" not in step.result
-    assert "已保留此前核验通过的版本" in step.result
+    assert CHECKED in step.result and "WRONG_MEAN_999" not in step.result
+    assert "已保留此前交付的版本" in step.result
     delivered = [info for event in terminal_messages(events) for info in event.attachments or []]
     assert len(delivered) == 1 and delivered[0].metadata["artifact_sha256"] == "a" * 64
 
@@ -193,9 +199,9 @@ async def test_protected_file_change_review_outage_keeps_original_delivery_and_f
     runner, flow, step, message, _ = partial_scenario(changed_protected=True)
     ground_partial_review(flow, unavailable=True)
     await collect(runner, message)
-    flow.executor.review_delivery_answer.assert_awaited_once()
+    flow.executor.review_delivery_answer.assert_not_awaited()
     assert step.outcome.status == "partial" and step.outcome.reason_code == "execution_failed"
     assert len(step.outcome.missing) == 1 and "`missing_summary.csv`" in step.result
     assert "WRONG_MEAN_999" not in step.result and "CHANGED_FACT" not in step.result
-    assert "已保留此前核验通过的版本" in step.result
+    assert "已保留此前交付的版本" in step.result
     assert len(runner._generated_files) == 1 and not step.outcome.can_resume

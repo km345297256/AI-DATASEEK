@@ -23,9 +23,9 @@ test('all visualization plugins use one capability contract as real Cordis regis
   const context = await buildVisualizationContext(productionDirectory)
   try {
     assert.equal(context.snapshot.engine, 'cordis')
-    assert.equal(context.pluginFibers.length, 83)
-    assert.equal(context.catalog.snapshot().plugins.length, 83)
-    assert.equal(context.snapshot.plugins.filter(item => item.contract_version === 2).length, 83)
+    assert.equal(context.pluginFibers.length, 84)
+    assert.equal(context.catalog.snapshot().plugins.length, 84)
+    assert.equal(context.snapshot.plugins.filter(item => item.contract_version === 2).length, 84)
     assert.ok(context.snapshot.plugins.every(item => !item.adapter.startsWith('v2-') && !('data_kind' in item)))
     assert.equal(context.snapshot.plugins.filter(item => item.capabilities.shared).length, 9)
     assert.match(context.snapshot.revision, /^[a-f0-9]{64}$/)

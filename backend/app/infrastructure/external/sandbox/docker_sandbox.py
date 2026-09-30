@@ -62,7 +62,7 @@ class DockerSandbox(Sandbox):
         runtime_kind: str | None = None,
     ):
         """Initialize Docker sandbox and API interaction client"""
-        self.client = httpx.AsyncClient(timeout=600)
+        self.client = httpx.AsyncClient(timeout=None)
         self._container_name = container_name
         self._docker_host = docker_host
         self._image_reference = image_reference
@@ -212,7 +212,9 @@ class DockerSandbox(Sandbox):
                 "detach": True,
                 "remove": True,
                 "environment": {
-                    "SERVICE_TIMEOUT_MINUTES": settings.sandbox_ttl_minutes,
+                    # Do not arm the supervisor's timed service shutdown:
+                    # long analysis/review requests must remain alive without
+                    # receiving unrelated HTTP requests as a keepalive.
                     "CHROME_ARGS": settings.sandbox_chrome_args,
                     "HTTPS_PROXY": settings.sandbox_https_proxy,
                     "HTTP_PROXY": settings.sandbox_http_proxy,
@@ -549,7 +551,7 @@ class DockerSandbox(Sandbox):
     async def program_preflight(self, exec_dir: str, script_path: str) -> ToolResult:
         response = await self.client.post(
             f"{self.base_url}/api/v1/shell/program-preflight",
-            json={"exec_dir": exec_dir, "script_path": script_path}, timeout=3.0,
+            json={"exec_dir": exec_dir, "script_path": script_path}, timeout=None,
         )
         response.raise_for_status()
         return ToolResult(**response.json())
@@ -578,7 +580,7 @@ class DockerSandbox(Sandbox):
     async def shell_operation_status(self, session_id: str, operation_id: str) -> ToolResult:
         response = await self.client.post(
             f"{self.base_url}/api/v1/shell/operation-status",
-            json={"id": session_id, "operation_id": operation_id}, timeout=3.0,
+            json={"id": session_id, "operation_id": operation_id}, timeout=None,
         )
         return ToolResult(**response.json())
 
@@ -847,7 +849,7 @@ class DockerSandbox(Sandbox):
             try:
                 response = await self.client.post(
                     f"{self.base_url}/api/v1/file/validate-artifacts",
-                    json={"items": items}, timeout=35.0,
+                    json={"items": items}, timeout=None,
                 )
                 response.raise_for_status()
                 result = ToolResult(**response.json())
@@ -881,7 +883,7 @@ class DockerSandbox(Sandbox):
         try:
             response = await self.client.post(
                 f"{self.base_url}/api/v1/file/analysis-fingerprints",
-                json={"paths": paths, "approved_upload_paths": list(approved_upload_paths or [])}, timeout=35.0,
+                json={"paths": paths, "approved_upload_paths": list(approved_upload_paths or [])}, timeout=None,
             )
             response.raise_for_status()
             result = ToolResult(**response.json())
@@ -1075,7 +1077,7 @@ class DockerSandbox(Sandbox):
                     return False
                 await DockerSandbox._update_record_resumed(self._container_name)
                 await DockerSandbox._update_allocation_status(self._container_name, "running")
-                self.client = httpx.AsyncClient(timeout=600)
+                self.client = httpx.AsyncClient(timeout=None)
                 return True
             finally:
                 close = getattr(docker_client, "close", None)

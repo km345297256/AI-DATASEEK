@@ -46,3 +46,16 @@ test('terminal status without an explicit result is not displayed as success', (
   assert.equal(toolOperationState(write('one', { status: 'calling' })), '进行中');
   assert.equal(toolOperationState(write('one', { execution_status: 'failed', content: { content: 'old script' } })), '失败');
 });
+
+test('host-confirmed pre-dispatch rejection is not a program runtime failure or a success', () => {
+  const blocked = write('prepare', { name: 'shell', function: 'program_run',
+    execution_status: 'not_started', content: { success: false } });
+  assert.equal(toolOperationState(blocked), '未执行');
+  const timeline = buildToolTimeline([blocked, { ...blocked, execution_status: null, content: null }]);
+  assert.equal(timeline.length, 1);
+  assert.equal(toolOperationState(timeline[0].tool), '未执行');
+  assert.equal(timeline[0].recoveredByCallId, undefined);
+  // Untrusted tool output must not downgrade a runtime failure.
+  assert.equal(toolOperationState(write('raw', { execution_status: 'failed',
+    content: { success: false, side_effect_state: 'not_started' } })), '失败');
+});

@@ -106,5 +106,6 @@ def saved_program_redirect(call: dict) -> str | None:
         "This saved Python program was NOT executed through the shell. Use program_run with its "
         "script_path, exec_dir, and argv as a list of literal program arguments. Do not add pipes, tail, or ls to the "
         "execution: the host captures bounded stdout/stderr and the program's actual exit status. "
-        "Use separate read-only inspection for files or logs."
+        "Use separate read-only inspection for files or logs. If preparation already reported a missing script "
+        "or directory, complete that preparation first; changing runners does not create missing source."
     )

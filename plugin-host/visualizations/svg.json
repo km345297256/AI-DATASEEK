@@ -1,0 +1,17 @@
+{
+  "contract_version": 2,
+  "id": "viz-svg",
+  "version": "1.0.0",
+  "name": "SVG 矢量图",
+  "description": "隔离、离线渲染静态 SVG 图表为安全预览，不加载脚本或外部资源；下载保留原始矢量文件。",
+  "extensions": ["svg"],
+  "filenames": [],
+  "view_kind": "image",
+  "adapter": "svg",
+  "reader": "svg",
+  "default_enabled": true,
+  "priority": 60,
+  "permissions": ["file:read"],
+  "limits": {"max_input_bytes": 8388608, "max_output_bytes": 8388608},
+  "capabilities": {"operations": ["preview"], "input_mode": "whole", "shared": false}
+}

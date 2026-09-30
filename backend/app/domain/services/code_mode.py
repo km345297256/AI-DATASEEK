@@ -123,7 +123,6 @@ class CodeModeLimits:
     max_ast_nodes: int = 512
     max_statements: int = 32
     max_calls: int = 16
-    timeout_seconds: float = 120.0
     max_value_bytes: int = 256_000
     max_result_bytes: int = 512_000
     max_depth: int = 16
@@ -143,13 +142,6 @@ class CodeModeLimits:
             value = getattr(self, field_name)
             if isinstance(value, bool) or not isinstance(value, int) or value < 1:
                 raise ValueError(f"{field_name} must be a positive integer")
-        if (
-            isinstance(self.timeout_seconds, bool)
-            or not isinstance(self.timeout_seconds, (int, float))
-            or not math.isfinite(float(self.timeout_seconds))
-            or self.timeout_seconds <= 0
-        ):
-            raise ValueError("timeout_seconds must be positive and finite")
 
 
 @dataclass(frozen=True, slots=True)
@@ -282,18 +274,9 @@ class CodeModeInterpreter:
     ) -> CodeModeExecutionResult:
         allowed_tools = _eligible_tool_map(tool_specs)
         program = self._validate(code, allowed_tools)
-        timeout = asyncio.timeout(float(self.limits.timeout_seconds))
-        try:
-            async with timeout:
-                return await self._execute(program, dispatcher, allowed_tools)
-        except asyncio.CancelledError:
-            # Budget, AnalysisJob, authorization, and user cancellation are
-            # control flow. Preserve the exact signal for the owning runtime.
-            raise
-        except TimeoutError:
-            if timeout.expired():
-                raise CodeModeLimitExceeded("duration") from None
-            raise
+        # Structural/value limits still protect the interpreter. A slow tool
+        # call is allowed to finish and user cancellation propagates unchanged.
+        return await self._execute(program, dispatcher, allowed_tools)
 
     def _validate(
         self,

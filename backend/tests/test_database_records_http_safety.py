@@ -12,7 +12,7 @@ from urllib.parse import quote
 import uuid
 
 from test_database_visualization_http_safety import (
-    namespace as previous_namespace, fake_database, Response, CleanupClient,
+    namespace as previous_namespace, fake_database, Response, CleanupClient, unrelated_visualization_plugins,
 )
 from test_visualization_acceptance_safety import SAFETY, UploadClient, FILE_ID, OTHER_ID, OWNER, REJECTED
 
@@ -108,7 +108,7 @@ class PreferenceClient(CleanupClient):
         return {"engine": "cordis", "plugins": [
             *[{"id": p, "enabled": self.states[p], "reader": r, "adapter": a, "contract_version": 2,
                "capabilities": {"operations": ["preview"], "shared": False}} for p, (r, a) in self.plugins.items()],
-            *[{"id": "unchanged-" + str(i), "enabled": True} for i in range(79)]]}
+            *unrelated_visualization_plugins(self.plugins)]}
 
     async def request(self, method, path, **kwargs):
         if method == "GET": return Response(self.catalog())

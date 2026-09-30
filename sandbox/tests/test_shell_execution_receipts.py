@@ -7,6 +7,8 @@ import json
 import os
 import uuid
 from collections import OrderedDict
+from contextlib import nullcontext
+from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
 import pytest
@@ -271,10 +273,35 @@ def test_retired_missing_or_unverifiable_group_is_not_quiescent(service, monkeyp
     assert not service._receipt_group_is_quiescent(group)
 
 
-def test_group_scan_has_a_hard_bound_and_does_not_infer_missing_evidence(service, monkeypatch):
+def test_group_scan_has_a_count_bound_and_does_not_infer_missing_evidence(service, monkeypatch):
     monkeypatch.setattr(os, "killpg", lambda *_args: None)
-    service.RECEIPT_PROCESS_SCAN_SECONDS = 0
+    monkeypatch.setattr(os.path, "isdir", lambda _path: True)
+    monkeypatch.setattr(os, "scandir", lambda _path: nullcontext([SimpleNamespace(name="12", path="/proc/12")]))
+    service.MAX_RECEIPT_PROCESS_SCAN_ENTRIES = 0
     assert not service._receipt_group_is_quiescent(Process()._dataseek_process_group)
+
+
+@pytest.mark.parametrize("member_state,expected", [("Z", True), ("X", True), ("S", False), ("R", False)])
+def test_slow_group_scan_finishes_without_elapsed_cutoff_and_keeps_live_member_checks(
+    service, monkeypatch, member_state, expected,
+):
+    clock = [0.0]
+    observed = []
+    entries = [SimpleNamespace(name=str(pid), path=f"/proc/{pid}") for pid in (11, 12, 900001)]
+    monkeypatch.setattr(os, "killpg", lambda pgid, sig: observed.append((pgid, sig)))
+    monkeypatch.setattr(os.path, "isdir", lambda _path: True)
+    monkeypatch.setattr(os, "scandir", lambda _path: nullcontext(entries))
+    monkeypatch.setattr(service, "_monotonic", lambda: clock[0])
+    checked = []
+    def slow_identity(pid):
+        clock[0] += 3600  # Simulated slow kernel reads, with no real delay.
+        checked.append(pid)
+        return {"process_group_id": pid, "state": member_state}
+    monkeypatch.setattr(service, "_read_linux_process_identity", slow_identity)
+    assert service._receipt_group_is_quiescent(Process()._dataseek_process_group) is expected
+    assert checked == [11, 12, 900001]
+    assert clock[0] == 3 * 3600
+    assert observed == [(900001, 0)]  # Read-only status query, never kill a process.
 
 
 @pytest.mark.asyncio

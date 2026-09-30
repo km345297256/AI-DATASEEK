@@ -1,6 +1,7 @@
 <template>
   <section class="rounded-lg border border-[var(--border-main)] bg-[var(--background-white-main)] px-3 py-2.5 text-sm" role="status" aria-live="polite" aria-label="分析完成情况">
-    <div class="font-medium" :class="analysisOutcomeIsComplete(outcome) ? 'text-[#247357]' : 'text-[var(--text-primary)]'">
+    <div class="font-medium" :class="analysisOutcomeIsComplete(outcome) ? 'text-[#247357]' : 'text-[var(--text-primary)]'"
+      :title="analysisOutcomeIsComplete(outcome) ? ANALYSIS_COMPLETION_DESCRIPTION : undefined">
       {{ analysisOutcomeTitle(outcome) }}
     </div>
     <p class="mt-1 text-xs leading-5 text-[var(--text-secondary)]">{{ analysisOutcomeReason(outcome, hasDeliveredFiles) }}</p>
@@ -30,7 +31,7 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import type { AnalysisOutcome } from '../types/analysisOutcome';
-import { analysisOutcomeIsComplete, analysisOutcomeIssues, analysisOutcomeMissing, analysisOutcomeReason, analysisOutcomeTitle } from '../utils/analysisOutcome';
+import { ANALYSIS_COMPLETION_DESCRIPTION, analysisOutcomeIsComplete, analysisOutcomeIssues, analysisOutcomeMissing, analysisOutcomeReason, analysisOutcomeTitle } from '../utils/analysisOutcome';
 
 const props = defineProps<{ outcome: AnalysisOutcome; allowResume?: boolean; hasDeliveredFiles?: boolean }>();
 const issues = computed(() => analysisOutcomeIssues(props.outcome));

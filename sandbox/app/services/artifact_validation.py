@@ -14,7 +14,6 @@ import os
 import re
 import stat
 import threading
-import time
 import warnings
 import zipfile
 from pathlib import Path
@@ -34,7 +33,6 @@ MAX_MARKDOWN_TABLES = 128
 MAX_ARCHIVE_BYTES = 64 * 1024 * 1024
 MAX_ARCHIVE_ENTRIES = 1_000
 READ_CHUNK_BYTES = 1024 * 1024
-BATCH_TIMEOUT_SECONDS = 30
 KINDS = frozenset({"image", "table", "report", "code"})
 IMAGE_FORMATS = {
     ".png": "PNG", ".jpg": "JPEG", ".jpeg": "JPEG", ".webp": "WEBP",
@@ -64,9 +62,9 @@ class _InvalidArtifact(Exception):
         self.diagnostics = _safe_diagnostics(diagnostics)
 
 
-def _check_cancelled(cancelled: threading.Event, deadline: float) -> None:
-    if cancelled.is_set() or time.monotonic() >= deadline:
-        raise _InvalidArtifact("validation_deadline")
+def _check_cancelled(cancelled: threading.Event) -> None:
+    if cancelled.is_set():
+        raise _InvalidArtifact("validation_cancelled")
 
 
 def _classify(path: str, expected_kind: str) -> str | None:
@@ -87,8 +85,8 @@ def _classify(path: str, expected_kind: str) -> str | None:
 
 
 def _read_stable_output(path: str, root: Path, cancelled: threading.Event,
-                        deadline: float, byte_budget: list[int]) -> bytes:
-    _check_cancelled(cancelled, deadline)
+                        byte_budget: list[int]) -> bytes:
+    _check_cancelled(cancelled)
     with _open_output(path, root) as stream:
         before = os.fstat(stream.fileno())
         if not stat.S_ISREG(before.st_mode):
@@ -102,7 +100,7 @@ def _read_stable_output(path: str, root: Path, cancelled: threading.Event,
         chunks: list[bytes] = []
         remaining = before.st_size + 1
         while remaining:
-            _check_cancelled(cancelled, deadline)
+            _check_cancelled(cancelled)
             chunk = stream.read(min(READ_CHUNK_BYTES, remaining))
             if not chunk:
                 break
@@ -134,8 +132,7 @@ def _text(content: bytes) -> str:
     return text
 
 
-def _image_metadata(content: bytes, suffix: str, cancelled: threading.Event,
-                    deadline: float) -> dict[str, Any]:
+def _image_metadata(content: bytes, suffix: str, cancelled: threading.Event) -> dict[str, Any]:
     from PIL import Image
 
     with warnings.catch_warnings():
@@ -153,7 +150,7 @@ def _image_metadata(content: bytes, suffix: str, cancelled: threading.Event,
         with Image.open(io.BytesIO(content)) as image:
             # Verify and decode every permitted frame, not just a valid header.
             while True:
-                _check_cancelled(cancelled, deadline)
+                _check_cancelled(cancelled)
                 try:
                     image.seek(frames)
                 except EOFError:
@@ -167,12 +164,12 @@ def _image_metadata(content: bytes, suffix: str, cancelled: threading.Event,
         return {"format": image_format, "width": width, "height": height, "frames": frames}
 
 
-def _table_metadata(rows, cancelled: threading.Event, deadline: float) -> dict[str, int]:
+def _table_metadata(rows, cancelled: threading.Event) -> dict[str, int]:
     row_count = 0
     columns: int | None = None
     cells = 0
     for row_number, row in enumerate(rows, start=1):
-        _check_cancelled(cancelled, deadline)
+        _check_cancelled(cancelled)
         if not row or all(value is None or value == "" for value in row):
             continue
         if columns is None:
@@ -194,7 +191,7 @@ def _table_metadata(rows, cancelled: threading.Event, deadline: float) -> dict[s
     return {"row_count": row_count, "column_count": columns}
 
 
-def _xlsx_metadata(content: bytes, cancelled: threading.Event, deadline: float) -> dict[str, Any]:
+def _xlsx_metadata(content: bytes, cancelled: threading.Event) -> dict[str, Any]:
     from openpyxl import load_workbook
 
     with zipfile.ZipFile(io.BytesIO(content)) as archive:
@@ -205,7 +202,7 @@ def _xlsx_metadata(content: bytes, cancelled: threading.Event, deadline: float) 
                 "max_archive_entries": MAX_ARCHIVE_ENTRIES, "archive_bytes": sum(entry.file_size for entry in entries),
                 "max_archive_bytes": MAX_ARCHIVE_BYTES})
         for entry in entries:
-            _check_cancelled(cancelled, deadline)
+            _check_cancelled(cancelled)
             if entry.flag_bits & 1:
                 raise _InvalidArtifact("encrypted_workbook")
             if entry.filename.casefold().endswith((".xml", ".rels")):
@@ -220,14 +217,14 @@ def _xlsx_metadata(content: bytes, cancelled: threading.Event, deadline: float) 
             raise _InvalidArtifact("worksheet_count_limit", {"sheet_count": len(workbook.worksheets), "max_sheets": 32})
         sheets = []
         for sheet in workbook.worksheets:
-            _check_cancelled(cancelled, deadline)
+            _check_cancelled(cancelled)
             if ((sheet.max_row or 0) > MAX_TABLE_ROWS or (sheet.max_column or 0) > MAX_TABLE_COLUMNS
                     or (sheet.max_row or 0) * (sheet.max_column or 0) > MAX_TABLE_CELLS):
                 raise _InvalidArtifact("table_size_limit", {"row_count": sheet.max_row or 0,
                     "column_count": sheet.max_column or 0, "max_rows": MAX_TABLE_ROWS,
                     "max_columns": MAX_TABLE_COLUMNS, "max_cells": MAX_TABLE_CELLS})
             try:
-                sheets.append(_table_metadata(sheet.iter_rows(values_only=True), cancelled, deadline))
+                sheets.append(_table_metadata(sheet.iter_rows(values_only=True), cancelled))
             except _InvalidArtifact as exc:
                 if exc.reason != "empty_table":
                     raise
@@ -305,7 +302,7 @@ def _markdown_row(line: str) -> list[str]:
     return cells
 
 
-def _markdown_metadata(text: str, cancelled: threading.Event, deadline: float) -> dict[str, Any]:
+def _markdown_metadata(text: str, cancelled: threading.Event) -> dict[str, Any]:
     """Recognize complete pipe tables without interpreting prose as a table.
 
     Ragged rows render with silently dropped/added cells in many Markdown
@@ -319,7 +316,7 @@ def _markdown_metadata(text: str, cancelled: threading.Event, deadline: float) -
     fence = None
     total_cells = 0
     for number, line in enumerate(text.splitlines(), 1):
-        _check_cancelled(cancelled, deadline)
+        _check_cancelled(cancelled)
         match = re.match(r"^ {0,3}(`{3,}|~{3,})(.*)$", line)
         if fence:
             if match and match[1][0] == fence[0] and len(match[1]) >= fence[1] and not match[2].strip():
@@ -364,7 +361,7 @@ def _markdown_metadata(text: str, cancelled: threading.Event, deadline: float) -
             **({"table_diagnostics": failures[0]} if failures else {})}
 
 
-def _notebook_metadata(text: str, cancelled: threading.Event, deadline: float) -> dict[str, Any]:
+def _notebook_metadata(text: str, cancelled: threading.Event) -> dict[str, Any]:
     """Validate nbformat 4 cell/output structure without repair or execution.
 
     This intentionally reports notebook_structure, not full JSON-schema or
@@ -387,7 +384,7 @@ def _notebook_metadata(text: str, cancelled: threading.Event, deadline: float) -
     require(len(value["cells"]) <= MAX_TABLE_CELLS)
     ids, code_cells, executed_cells, output_count = set(), 0, 0, 0
     for cell in value["cells"]:
-        _check_cancelled(cancelled, deadline)
+        _check_cancelled(cancelled)
         require(isinstance(cell, dict) and isinstance(cell.get("cell_type"), str)
                 and cell["cell_type"] in {"markdown", "raw", "code"}
                 and isinstance(cell.get("metadata"), dict) and source(cell.get("source")))
@@ -408,7 +405,7 @@ def _notebook_metadata(text: str, cancelled: threading.Event, deadline: float) -
         output_count += len(cell["outputs"])
         require(output_count <= MAX_TABLE_CELLS)
         for output in cell["outputs"]:
-            _check_cancelled(cancelled, deadline)
+            _check_cancelled(cancelled)
             require(isinstance(output, dict))
             kind = output.get("output_type")
             require(isinstance(kind, str))
@@ -430,25 +427,24 @@ def _notebook_metadata(text: str, cancelled: threading.Event, deadline: float) -
             "code_cell_count": code_cells, "executed_cell_count": executed_cells, "output_count": output_count}
 
 
-def _validate_content(content: bytes, suffix: str, kind: str, cancelled: threading.Event,
-                      deadline: float) -> dict[str, Any]:
-    _check_cancelled(cancelled, deadline)
+def _validate_content(content: bytes, suffix: str, kind: str, cancelled: threading.Event) -> dict[str, Any]:
+    _check_cancelled(cancelled)
     if suffix in VECTOR_IMAGE_SUFFIXES and kind == "image":
         from app.services.svg_validation import InvalidSvg, svg_metadata
         try:
             return svg_metadata(content, max_pixels=MAX_IMAGE_PIXELS,
-                                check=lambda: _check_cancelled(cancelled, deadline), deadline=deadline)
+                                check=lambda: _check_cancelled(cancelled))
         except InvalidSvg as error:
             raise _InvalidArtifact(error.reason, error.diagnostics) from None
     if kind == "image":
-        return _image_metadata(content, suffix, cancelled, deadline)
+        return _image_metadata(content, suffix, cancelled)
     if suffix == ".xlsx":
-        return _xlsx_metadata(content, cancelled, deadline)
+        return _xlsx_metadata(content, cancelled)
     text = _text(content)
     if suffix == ".json":
         return _json_metadata(text, kind)
     if suffix in {".md", ".markdown"}:
-        metadata = _markdown_metadata(text, cancelled, deadline)
+        metadata = _markdown_metadata(text, cancelled)
         if kind == "table":
             if metadata["table_validation"] == "inconsistent":
                 raise _InvalidArtifact("inconsistent_table_width", metadata["table_diagnostics"])
@@ -458,25 +454,24 @@ def _validate_content(content: bytes, suffix: str, kind: str, cancelled: threadi
     if kind == "table":
         rows = csv.reader(io.StringIO(text, newline=""), delimiter="\t" if suffix == ".tsv" else ",", strict=True)
         try:
-            return {"format": suffix[1:].upper(), **_table_metadata(rows, cancelled, deadline)}
+            return {"format": suffix[1:].upper(), **_table_metadata(rows, cancelled)}
         except csv.Error:
             raise _InvalidArtifact("invalid_csv_syntax", {"line_number": rows.line_num}) from None
     if kind == "code":
         if suffix == ".py":
             ast.parse(text)  # Parse only: never compile or execute user code.
         elif suffix == ".ipynb":
-            return _notebook_metadata(text, cancelled, deadline)
+            return _notebook_metadata(text, cancelled)
         return {"format": suffix[1:].upper(), "validation_level": "syntax" if suffix == ".py" else "nonempty_text"}
     return {"format": suffix[1:].upper(), "validation_level": "nonempty_text"}
 
 
 def validate_artifacts(items: list[dict[str, str]], *, root: Path = ARTIFACT_ROOT,
-                       cancelled: threading.Event | None = None, deadline: float | None = None) -> dict:
+                       cancelled: threading.Event | None = None) -> dict:
     """Return one receipt per requested file; never return file contents/errors."""
     if not items or len(items) > MAX_ITEMS:
         raise ValueError("invalid_item_count")
     cancelled = cancelled or threading.Event()
-    deadline = time.monotonic() + BATCH_TIMEOUT_SECONDS if deadline is None else deadline
     files = []
     byte_budget = [MAX_BATCH_BYTES]
     for item in items:
@@ -485,7 +480,7 @@ def validate_artifacts(items: list[dict[str, str]], *, root: Path = ARTIFACT_ROO
         receipt = {"path": path, "expected_kind": expected_kind, "kind": kind, "valid": False,
                    "reason": "invalid_content", "sha256": None, "size": None, "metadata": {}, "diagnostics": {}}
         try:
-            _check_cancelled(cancelled, deadline)
+            _check_cancelled(cancelled)
             if expected_kind not in KINDS:
                 raise _InvalidArtifact("unsupported_kind")
             if kind is None:
@@ -493,7 +488,7 @@ def validate_artifacts(items: list[dict[str, str]], *, root: Path = ARTIFACT_ROO
             if kind != expected_kind:
                 raise _InvalidArtifact("kind_mismatch")
             try:
-                content = _read_stable_output(path, root, cancelled, deadline, byte_budget)
+                content = _read_stable_output(path, root, cancelled, byte_budget)
             except MissingArtifact:
                 raise _InvalidArtifact("missing_artifact") from None
             except (OSError, ValueError):
@@ -504,8 +499,8 @@ def validate_artifacts(items: list[dict[str, str]], *, root: Path = ARTIFACT_ROO
                 raise _InvalidArtifact("unavailable_or_unsafe_path") from None
             receipt["size"] = len(content)
             receipt["sha256"] = hashlib.sha256(content).hexdigest()
-            metadata = _validate_content(content, Path(path).suffix.casefold(), kind, cancelled, deadline)
-            _check_cancelled(cancelled, deadline)
+            metadata = _validate_content(content, Path(path).suffix.casefold(), kind, cancelled)
+            _check_cancelled(cancelled)
             receipt.update(valid=True, reason="validated", metadata=metadata)
         except _InvalidArtifact as exc:
             receipt["reason"] = exc.reason

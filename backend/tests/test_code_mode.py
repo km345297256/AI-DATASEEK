@@ -297,18 +297,16 @@ async def test_utf8_code_bytes_ast_statements_and_depth_are_bounded():
 
 
 @pytest.mark.asyncio
-async def test_duration_and_result_size_are_bounded():
+async def test_slow_dispatch_completes_but_result_size_remains_bounded():
     async def slow_dispatch(_tool_name: str, _arguments: dict, *, call_id: str):
-        await asyncio.sleep(10)
+        await asyncio.sleep(0.02)
         return {"success": True}
 
     code = 'result = await tools.call("data_format_inspect", {})'
-    with pytest.raises(CodeModeLimitExceeded, match="duration"):
-        await CodeModeInterpreter(CodeModeLimits(timeout_seconds=0.01)).run(
-            code,
-            dispatcher=slow_dispatch,
-            tool_specs=[_spec()],
-        )
+    result = await CodeModeInterpreter().run(
+        code, dispatcher=slow_dispatch, tool_specs=[_spec()],
+    )
+    assert result.output == {"success": True}
 
     async def huge_dispatch(_tool_name: str, _arguments: dict, *, call_id: str):
         return {"success": True, "data": "x" * 1000}

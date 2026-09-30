@@ -74,9 +74,7 @@ async def delivery_recovery_fixture():
     runner._delivery_audit_store = SimpleNamespace(record=AsyncMock())
     source = input_message()
     message.datasets, message.controller_target_files = source.datasets, source.controller_target_files
-    # The first unavailable upload can now receive a read-only partial-answer
-    # review. Keep that provider unavailable here so this fixture still proves
-    # the later continuation does not trust or preserve its false draft.
+    # Reviewer availability cannot affect either initial delivery or recovery.
     async def unavailable_initial_review(**arguments):
         return await review_answer(ask=AsyncMock(side_effect=TimeoutError("initial reviewer unavailable")), **arguments)
     flow.executor.review_delivery_answer = AsyncMock(side_effect=unavailable_initial_review)
@@ -86,8 +84,12 @@ async def delivery_recovery_fixture():
     assert authority.checkpoint["session_id"] == runner._session_id
     assert "answer_evidence" in authority.checkpoint
     assert UNVERIFIED_DRAFT not in json.dumps(authority.checkpoint["answer_evidence"])
-    assert UNVERIFIED_DRAFT not in json.dumps(authority.checkpoint, default=str)
-    assert not any(UNVERIFIED_DRAFT in event.message for event in terminal_messages(first))
+    assert UNVERIFIED_DRAFT in authority.checkpoint["plan"]["steps"][0]["result"]
+    assert authority.checkpoint["plan"]["steps"][0]["success"] is False
+    assert authority.checkpoint["plan"]["steps"][0]["outputs"]["result_assessment"]["scientific_review"] == "not_performed"
+    assert any(UNVERIFIED_DRAFT in event.message and event.message.startswith("本次分析未完成。")
+               for event in terminal_messages(first))
+    flow.executor.review_delivery_answer.assert_not_awaited()
 
     resume = message.model_copy(deep=True)
     resume.resume_from = authority.checkpoint["id"]
@@ -130,20 +132,22 @@ async def test_upload_only_continuation_uses_frozen_execution_evidence_without_r
     recovered = flow.plan.steps[0]
     assert len(state["prompts"]) == 1, "Upload recovery must never run the analysis again"
     assert recovered.success and recovered.outcome.status == "succeeded"
-    assert recovered.result == FACT
-    assert requests[0]["current_step_id"] == recovered.id
-    original_fact = next(item for item in requests[0]["sources"] if item["kind"] == "tool_result" and FACT in item["text"])
+    assert recovered.result == "已完成已有成果的验证与交付。"
+    assert requests == []
+    sources = runner._analysis_answer_evidence.render_sources()
+    original_fact = next(item for item in sources if item["kind"] == "tool_result" and FACT in item["text"])
     assert original_fact["step_id"] == recovered.id
     assert original_fact["executed_source_coverage"] == "full"
-    assert original_fact["executed_source_id"] in {item["source_id"] for item in requests[0]["sources"]}
-    assert recovered.outputs["answer_review"]["answer_scientific_review"]["status"] == "verified"
+    assert original_fact["executed_source_id"] in {item["source_id"] for item in sources}
+    assert recovered.outputs["result_assessment"]["scientific_review"] == "not_performed"
+    assert "answer_review" not in recovered.outputs
     assert UNVERIFIED_DRAFT not in json.dumps(requests)
     assert uploaded.file_id in {info.file_id for event in terminal_messages(events) for info in event.attachments or []}
     assert "answer_evidence" not in json.dumps([event.model_dump(mode="json") for event in events])
 
 
 @pytest.mark.asyncio
-async def test_legacy_delivery_checkpoint_without_frozen_evidence_stays_partial_without_replay():
+async def test_delivery_recovery_does_not_require_a_scientific_evidence_snapshot():
     runner, flow, state, authority, resume, requests, _, uploaded = await delivery_recovery_fixture()
     authority.checkpoint.pop("answer_evidence")
     authority.checkpoint.pop("session_id")  # Compatibility with a genuine old checkpoint.
@@ -151,9 +155,9 @@ async def test_legacy_delivery_checkpoint_without_frozen_evidence_stays_partial_
     events = await collect(runner, resume)
     assert len(state["prompts"]) == 1
     recovered = flow.plan.steps[0]
-    assert not recovered.success and recovered.outcome.status == "partial"
-    assert recovered.outputs["answer_review"]["reason"] == "requirements_unverified"
-    assert not any(item["kind"] == "tool_result" for item in requests[0]["sources"])
+    assert recovered.success and recovered.outcome.status == "succeeded"
+    assert recovered.outputs["result_assessment"]["scientific_review"] == "not_performed"
+    assert requests == []
     assert uploaded.file_id in {info.file_id for event in terminal_messages(events) for info in event.attachments or []}
 
 
@@ -193,7 +197,7 @@ async def test_repeated_upload_outage_retains_the_same_evidence_until_delivery_r
     assert flow.plan.steps[0].outcome.can_resume
     assert authority.checkpoint["answer_evidence"] == frozen
     assert authority.checkpoint["source_seq"] == 2
-    assert len(requests) == 2  # Grounded answer + frozen review, never execution.
+    assert requests == []  # Neither another review nor another execution.
     resumed_again = resume.model_copy(deep=True)
     resumed_again.resume_from = authority.checkpoint["id"]
     resumed_again.client_message_id = "recovery-input-again"
@@ -204,7 +208,7 @@ async def test_repeated_upload_outage_retains_the_same_evidence_until_delivery_r
     runner._sync_file_to_storage.return_value = uploaded
     await collect(runner, resumed_again)
     assert flow.plan.steps[0].success and len(state["prompts"]) == 1
-    assert flow.plan.steps[0].result == FACT
+    assert flow.plan.steps[0].result == "已完成已有成果的验证与交付。"
 
 
 @pytest.mark.asyncio
@@ -225,9 +229,10 @@ async def test_ordinary_new_input_never_restores_previous_unreviewed_computation
 
     flow.run = new_execution
     await collect(runner, message)
-    assert not step.success and step.outcome.status == "partial"
-    assert step.outputs["answer_review"]["reason"] == "requirements_unverified"
-    assert not any(item["kind"] == "tool_result" for item in requests[0]["sources"])
+    assert step.success and step.outcome.status == "succeeded"
+    assert step.outputs["result_assessment"]["scientific_review"] == "not_performed"
+    assert requests == []
+    assert not any(item["kind"] == "tool_result" for item in runner._analysis_answer_evidence.render_sources())
 
 
 @pytest.mark.asyncio

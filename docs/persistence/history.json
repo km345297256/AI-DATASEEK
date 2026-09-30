@@ -59,6 +59,36 @@
           "test": "backend/tests/test_model_cache_observability.py"
         }
       }
+    },
+    {
+      "file": "2026-09-30-user-evaluated-results.json",
+      "changes": {
+        "ExecutionHistory": {
+          "reason": "Separate scoped delivered-result conversation context from independently reviewed scientific evidence.",
+          "compatibility": "Rebuildable cache writer advances from version 2 to 3. Older projections are discarded and rebuilt from the same immutable session events when read. No historical task result is changed or rerun, and no user-evaluated prose is promoted into reviewed evidence.",
+          "test": "backend/tests/test_user_evaluated_history.py"
+        },
+        "ResultAssessmentMarker": {
+          "reason": "Record host-controlled user-evaluated publication policy independently of scientific review status.",
+          "compatibility": "New strict version-1 marker owned by Step.outputs.result_assessment. All scope fields are required; it records scientific_review=not_performed and cannot grant execution, delivery, or scientific approval. Old events remain unchanged and need no migration.",
+          "test": "backend/tests/test_result_assessment_marker.py"
+        }
+      }
+    },
+    {
+      "file": "2026-09-30-program-preparation.json",
+      "changes": {
+        "AgentEvent": {
+          "reason": "Add host-owned dispatch_status display metadata to distinguish calls that never started from failed program executions.",
+          "compatibility": "Additive nullable field defaults to null and is omitted from canonical legacy recordings when absent. Only the dispatcher or an exact private confirmed not_started receipt can populate it; public tool data cannot grant replay authority. Historical events are not rewritten or rerun.",
+          "test": "backend/tests/test_program_dispatch_presentation.py"
+        },
+        "ExecutionHistory": {
+          "reason": "The cache embeds the ToolEvent schema with optional not-started display metadata.",
+          "compatibility": "Additive nullable field; existing version-3 caches remain readable without inferring execution success or recovery. Writer version remains 3, with no task migration or scientific evidence endorsement.",
+          "test": "backend/tests/test_program_dispatch_presentation.py"
+        }
+      }
     }
   ]
 }

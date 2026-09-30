@@ -155,7 +155,6 @@ async def test_committed_outcome_query_is_bound_to_exact_input_and_session(monke
 @pytest.mark.parametrize("provider_usage", [False, True])
 async def test_each_pre_sandbox_route_is_audited_even_when_all_three_preparations_fail(routing, monkeypatch, provider_usage, caplog):
     resolver, client, settings = routing
-    settings.dataset_request_resolver_timeout_seconds = 1
     client._responses = [decision(), decision(), decision()]
     original = RoutingClient._agenerate
 

@@ -8,11 +8,13 @@ from app.infrastructure.models.model_trace import ModelTraceDocument
 
 class MongoModelTraceRepository:
     async def put(self, record: ModelTraceRecord) -> None:
-        async with asyncio.timeout(get_settings().model_trace_store_timeout_seconds):
-            await ModelTraceDocument.get_pymongo_collection().update_one(
-                {"trace_id": record.trace_id, "user_id": record.user_id, "session_id": record.session_id},
-                {"$set": {"record": record.model_dump(mode="python")}}, upsert=True,
-            )
+        # This write is mandatory model admission/settlement evidence, not a
+        # best-effort metrics update. Slow storage must not terminate analysis;
+        # direct awaiting preserves cancellation and genuine database errors.
+        await ModelTraceDocument.get_pymongo_collection().update_one(
+            {"trace_id": record.trace_id, "user_id": record.user_id, "session_id": record.session_id},
+            {"$set": {"record": record.model_dump(mode="python")}}, upsert=True,
+        )
 
     async def list_for_owner(
         self,

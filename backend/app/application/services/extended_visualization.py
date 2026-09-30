@@ -26,6 +26,7 @@ MAX_INPUT = 64 * 1024 * 1024
 MAX_OUTPUT = 8 * 1024 * 1024
 _SLOTS = asyncio.Semaphore(2)
 _KINDS = {
+    "svg": {"image"},
     "mysql-sdi": {"tree"}, "sst-records": {"tree"},
     "sql-dump": {"tree", "table"}, "pg-dump": {"tree"},
     "bson": {"tree", "table"}, "redis-rdb": {"tree", "table"},
@@ -43,6 +44,7 @@ _KINDS = {
     "geoformat": {"map"}, "czi": {"tree", "image"}, "mca": {"series"},
 }
 _OPTIONS = {
+    "svg": set(),
     "mysql-sdi": set(), "sst-records": set(),
     "sql-dump": {"dialect", "table", "columns", "row_offset", "row_limit"}, "pg-dump": set(),
     "bson": {"group_id", "offset", "limit"}, "redis-rdb": {"group_id", "offset", "limit"},
@@ -69,6 +71,7 @@ _DEFAULT_KIND.update({"mysql-sdi": "tree", "sst-records": "tree"})
 _DEFAULT_KIND.update({reader: "tree" for reader in ("sql-dump", "pg-dump", "bson", "redis-rdb")})
 _DEFAULT_KIND.update({"mass-spectrum": "tree", "diffraction": "tree"})
 _DEFAULT_KIND.update({"gro-trajectory": "tree", "simulation-mesh": "tree"})
+_DEFAULT_KIND["svg"] = "image"
 _KINDS.update(migration.KINDS)
 _DEFAULT_KIND.update({reader: "tree" for reader in migration.KINDS})
 
@@ -150,6 +153,9 @@ def validate_options(reader: str, options: dict) -> None:
 
 
 def validate_payload(payload: Any, reader: str, kind: str, limit: int) -> dict:
+    if reader == "svg":
+        from app.application.services.svg_visualization import validate_svg_preview_payload
+        return validate_svg_preview_payload(payload, kind=kind, limit=limit)
     if reader in {"sql-dump", "pg-dump", "bson", "redis-rdb", "mysql-sdi", "sst-records"}:
         from app.application.services.database_file_visualization import validate_payload as validate_database_file
         return validate_database_file(payload, reader, kind, limit=limit)
@@ -464,6 +470,8 @@ async def extended_visualization(file_service, catalog, image: str | None, file_
         reader_limit = 16 * 1024 * 1024
     if reader in migration.INPUT_LIMITS:
         reader_limit = migration.INPUT_LIMITS[reader]
+    if reader == "svg":
+        reader_limit = 8 * 1024 * 1024
     if type(info.size) is not int or not 0 < info.size <= min(reader_limit, plugin.limits.max_input_bytes):
         raise ScientificPreviewRejected("文件超过此交互式插件的安全上限，请使用分析工具处理。")
     version = preview_version(info)

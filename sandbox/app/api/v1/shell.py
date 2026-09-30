@@ -1,6 +1,5 @@
-from fastapi import APIRouter
-import asyncio
-import threading
+from fastapi import APIRouter, Request
+from app.core.cancellable_checks import run_cancellable_check
 from app.schemas.shell import (
     ShellExecRequest, ShellViewRequest, ShellWaitRequest,
     ShellWriteToProcessRequest, ShellKillProcessRequest,
@@ -17,15 +16,11 @@ router = APIRouter()
 
 
 @router.post("/program-preflight", response_model=Response)
-async def program_preflight(request: ProgramPreflightRequest):
+async def program_preflight(request: ProgramPreflightRequest, http_request: Request):
     """Observe startup prerequisites without creating a process or receipt."""
-    cancelled = threading.Event()
-    try:
-        result = await asyncio.to_thread(probe_program_prerequisites, request.exec_dir,
-                                         request.script_path, cancelled=cancelled)
-        return Response(success=True, data=result)
-    finally:
-        cancelled.set()
+    result = await run_cancellable_check(http_request, probe_program_prerequisites,
+                                         request.exec_dir, request.script_path)
+    return Response(success=True, data=result)
 
 
 @router.post("/program", response_model=Response)

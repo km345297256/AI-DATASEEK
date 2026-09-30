@@ -2,7 +2,7 @@ from typing import Optional, Type, Sequence
 import asyncio
 import logging
 from datetime import datetime, UTC
-import time
+from contextlib import asynccontextmanager
 
 import httpx
 import docker
@@ -22,7 +22,7 @@ _SANDBOX_ADMISSION_LOCK = asyncio.Lock()
 
 
 class SandboxCapacityError(RuntimeError):
-    """Raised when no execution slot becomes available within the queue window."""
+    """The eligible execution nodes currently have no free slot."""
 
 
 async def _ensure_local_default_node() -> None:
@@ -63,35 +63,46 @@ async def _list_execution_node_candidates(required_node_ids: set[str] | None = N
     return [node for node in candidates if node.capacity.max_sandboxes > node.health.running_sandboxes]
 
 
+@asynccontextmanager
+async def _admit_execution_node_candidates(
+    required_node_ids: set[str] | None = None,
+    *,
+    wait_for_capacity: bool = True,
+):
+    """Wait without a deadline; serialize capacity checks with actual admission.
+
+    Never hold the admission lock while sleeping for capacity. A full local
+    node (including a background warm-pool request) must not block work whose
+    eligible remote node still has space. Cancellation releases the lock.
+    """
+    settings = get_settings()
+    poll_seconds = max(0.1, float(settings.sandbox_capacity_poll_seconds))
+    logged_wait = False
+    while True:
+        async with _SANDBOX_ADMISSION_LOCK:
+            try:
+                candidates = (
+                    await _list_execution_node_candidates(required_node_ids)
+                    if required_node_ids is not None
+                    else await _list_execution_node_candidates()
+                )
+            except SandboxCapacityError:
+                if not wait_for_capacity:
+                    raise
+            else:
+                yield candidates
+                return
+        if not logged_wait:
+            logger.info("Sandbox capacity is full; waiting for an available slot")
+            logged_wait = True
+        await asyncio.sleep(poll_seconds)
+
+
 async def _wait_for_execution_node_candidates(
     required_node_ids: set[str] | None = None,
 ) -> list[ExecutionNodeDocument]:
-    settings = get_settings()
-    wait_seconds = max(0.0, float(settings.sandbox_capacity_wait_seconds))
-    poll_seconds = max(0.1, float(settings.sandbox_capacity_poll_seconds))
-    deadline = time.monotonic() + wait_seconds
-    logged_wait = False
-    while True:
-        try:
-            return (
-                await _list_execution_node_candidates(required_node_ids)
-                if required_node_ids is not None
-                else await _list_execution_node_candidates()
-            )
-        except SandboxCapacityError as exc:
-            remaining = deadline - time.monotonic()
-            if remaining <= 0:
-                raise SandboxCapacityError(
-                    "Analysis environments are busy; no sandbox slot became available "
-                    f"within {wait_seconds:.0f} seconds"
-                ) from exc
-            if not logged_wait:
-                logger.info(
-                    "Sandbox capacity is full; queueing allocation for up to %.1fs",
-                    wait_seconds,
-                )
-                logged_wait = True
-            await asyncio.sleep(min(poll_seconds, remaining))
+    async with _admit_execution_node_candidates(required_node_ids) as candidates:
+        return candidates
 
 
 async def _select_execution_node() -> ExecutionNodeDocument:
@@ -134,8 +145,7 @@ class NodeBoundSandbox:
         # A resumed container consumes the same active slot as a newly-created
         # one. Serialize both paths so concurrent requests cannot overcommit a
         # node after observing the same stale health snapshot.
-        async with _SANDBOX_ADMISSION_LOCK:
-            await _wait_for_execution_node_candidates({self.node.node_id})
+        async with _admit_execution_node_candidates({self.node.node_id}):
             return await self.sandbox.resume()
 
 
@@ -162,7 +172,7 @@ class WorkerAgentSandbox(DockerSandbox):
     ):
         self._worker_url = worker_url.rstrip("/")
         self._worker_headers = headers or {}
-        self.client = httpx.AsyncClient(timeout=600)
+        self.client = httpx.AsyncClient(timeout=None)
         self._container_name = sandbox_id
         self._docker_host = None
         self._image_reference = image_reference
@@ -395,8 +405,7 @@ class LocalDockerRuntime:
                 user_id=session.user_id if session else None,
             )
         last_error: Optional[Exception] = None
-        async with _SANDBOX_ADMISSION_LOCK:
-            candidates = await _wait_for_execution_node_candidates(required_node_ids)
+        async with _admit_execution_node_candidates(required_node_ids) as candidates:
             for node in candidates:
                 try:
                     mounts = (
@@ -452,11 +461,13 @@ class LocalDockerRuntime:
             await _upsert_allocation(sandbox=sandbox, node_id=node.node_id, session=session)
         return NodeBoundSandbox(sandbox, node)
 
-    async def allocate_local_warm(self) -> Sandbox:
+    async def allocate_local_warm(self, *, wait_for_capacity: bool = True) -> Sandbox:
         """Allocate a warm-pool sandbox only on this backend's Docker node."""
 
-        async with _SANDBOX_ADMISSION_LOCK:
-            node = (await _wait_for_execution_node_candidates({LOCAL_DEFAULT_NODE_ID}))[0]
+        async with _admit_execution_node_candidates(
+            {LOCAL_DEFAULT_NODE_ID}, wait_for_capacity=wait_for_capacity,
+        ) as candidates:
+            node = candidates[0]
             sandbox = await self._allocate_on_node(node)
             await _upsert_allocation(
                 sandbox=sandbox,

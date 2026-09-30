@@ -28,7 +28,7 @@ REPAIRABLE_REASONS = frozenset({
 })
 NON_REPAIRABLE_REASONS = frozenset({
     "unsupported_kind", "unsupported_format", "validator_unavailable",
-    "validation_deadline", "unavailable_or_unsafe_path", "not_regular_file",
+    "validation_deadline", "validation_cancelled", "unavailable_or_unsafe_path", "not_regular_file",
     "changed_during_read", "file_size_limit", "batch_size_limit", "image_size_limit",
     "table_size_limit", "archive_size_limit", "worksheet_count_limit",
     "encrypted_workbook", "unsafe_workbook_xml",

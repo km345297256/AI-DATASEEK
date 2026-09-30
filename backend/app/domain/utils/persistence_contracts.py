@@ -16,6 +16,7 @@ from pydantic import TypeAdapter
 from app.domain.models.event import AgentEvent, PlanEvent, StepEvent
 from app.domain.models.input_admission import InputAdmission
 from app.domain.models.answer_review import AnswerReviewMarker
+from app.domain.models.result_assessment import ResultAssessmentMarker
 from app.domain.models.memory import Memory
 from app.domain.models.model_trace import ModelTraceRecord
 from app.domain.models.plan import Plan, Step
@@ -69,6 +70,7 @@ def current_catalog() -> dict:
         "SpillArtifactNotice": (TypeAdapter(SpillArtifactNotice), writer_version(SpillArtifactNotice, "schema_version"), "durable"),
         "SpillArtifactRecord": (TypeAdapter(SpillArtifactRecord), writer_version(SpillArtifactRecord), "durable"),
         "AnswerReviewMarker": (TypeAdapter(AnswerReviewMarker), writer_version(AnswerReviewMarker), "event-owned"),
+        "ResultAssessmentMarker": (TypeAdapter(ResultAssessmentMarker), writer_version(ResultAssessmentMarker), "event-owned"),
         "ModelTraceRecord": (TypeAdapter(ModelTraceRecord), writer_version(ModelTraceRecord, "schema_version"), "durable"),
         "TokenUsageRecord": (TypeAdapter(TokenUsageRecord), writer_version(TokenUsageRecord), "durable"),
     }
@@ -78,6 +80,7 @@ def current_catalog() -> dict:
         "SpillArtifactNotice": ["ToolResult.data.spill"],
         "SpillArtifactRecord": ["SpillArtifactDocument"],
         "AnswerReviewMarker": ["Step.outputs.answer_review"],
+        "ResultAssessmentMarker": ["Step.outputs.result_assessment"],
         "ModelTraceRecord": ["ModelTraceDocument"],
         "TokenUsageRecord": ["TokenUsageDocument"],
     }

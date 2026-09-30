@@ -116,7 +116,7 @@ class AnalysisDeliveryAuditStore:
 
     async def record(self, *, user_id, session_id, input_seq, step_id,
                      records, requirements, outcome, repair_reason) -> None:
-        """Persist one check. The caller owns its cancellation/3-second timeout.
+        """Persist one check. The caller owns cancellation, without an elapsed cutoff.
 
         No receipt list is embedded in a Mongo document, and only one bounded
         batch is retained locally. Invalid raw fields are discarded, not logged.

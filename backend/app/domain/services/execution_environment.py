@@ -222,9 +222,7 @@ def _front_controller_identity(
         "model": model,
         "temperature": 0,
         "max_tokens": effective_max_tokens,
-        "timeout_seconds": _safe_number(
-            get_settings().dataset_request_resolver_timeout_seconds
-        ),
+        "timeout_seconds": None,
         "prompt_version": prompt_version,
         "prompt_digest": prompt_digest,
     }

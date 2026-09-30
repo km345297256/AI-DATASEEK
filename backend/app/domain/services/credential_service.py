@@ -22,7 +22,6 @@ from app.domain.repositories.credential_repository import (
 _MIN_SECRET_BYTES = 8
 _MAX_SECRET_BYTES = 8192
 _CAS_RETRIES = 4
-_REPOSITORY_TIMEOUT_SECONDS = 5.0
 _T = TypeVar("_T")
 
 
@@ -86,21 +85,13 @@ class CredentialService:
         return self._fernet is not None
 
     @staticmethod
-    def _repository_deadline() -> float:
-        return asyncio.get_running_loop().time() + _REPOSITORY_TIMEOUT_SECONDS
-
-    @staticmethod
     async def _repository_call(
         operation: Callable[[], Awaitable[_T]],
-        *,
-        deadline: float,
     ) -> _T:
-        remaining = deadline - asyncio.get_running_loop().time()
-        if remaining <= 0:
-            raise CredentialStateUnavailableError()
         try:
-            async with asyncio.timeout(remaining):
-                return await operation()
+            # Slow persistence is not a credential failure. Await the actual
+            # outcome while letting explicit task cancellation propagate.
+            return await operation()
         except asyncio.CancelledError:
             raise
         except CredentialRepositoryConflictError:
@@ -176,11 +167,9 @@ class CredentialService:
         except (TypeError, ValueError, UnicodeError, ValidationError):
             raise CredentialContractError() from None
 
-        deadline = self._repository_deadline()
         try:
             persisted = await self._repository_call(
                 lambda: self._repository.insert(record),
-                deadline=deadline,
             )
         except CredentialRepositoryConflictError:
             raise CredentialBindingConflictError() from None
@@ -192,13 +181,11 @@ class CredentialService:
         *,
         limit: int = 200,
     ) -> list[CredentialView]:
-        deadline = self._repository_deadline()
         records = await self._repository_call(
             lambda: self._repository.list_for_owner(
                 user_id,
                 limit=max(1, min(int(limit), 200)),
             ),
-            deadline=deadline,
         )
         return [record.public_view() for record in records]
 
@@ -207,11 +194,9 @@ class CredentialService:
         user_id: str,
         reference: str,
     ) -> CredentialView | None:
-        deadline = self._repository_deadline()
         for _ in range(_CAS_RETRIES):
             record = await self._repository_call(
                 lambda: self._repository.find_for_owner(user_id, reference),
-                deadline=deadline,
             )
             if record is None:
                 return None
@@ -223,7 +208,6 @@ class CredentialService:
                     reference,
                     expected_revision=record.revision,
                 ),
-                deadline=deadline,
             )
             if updated is not None:
                 return updated.public_view()
@@ -236,7 +220,6 @@ class CredentialService:
         requirements: Sequence[CredentialRequirement | Mapping[str, Any]],
     ) -> list[CredentialView]:
         normalized = self._requirements(requirements)
-        deadline = self._repository_deadline()
         views: list[CredentialView] = []
         for requirement in normalized:
             record = await self._repository_call(
@@ -245,7 +228,6 @@ class CredentialService:
                     tool_name,
                     requirement.slot,
                 ),
-                deadline=deadline,
             )
             if (
                 record is None
@@ -270,7 +252,6 @@ class CredentialService:
         if fernet is None:
             raise CredentialVaultUnavailableError()
 
-        deadline = self._repository_deadline()
         resolved: dict[str, str] = {}
         for view in views:
             if view.tool_name != tool_name or view.revoked:
@@ -280,7 +261,6 @@ class CredentialService:
                     user_id,
                     view.reference,
                 ),
-                deadline=deadline,
             )
             if (
                 record is None

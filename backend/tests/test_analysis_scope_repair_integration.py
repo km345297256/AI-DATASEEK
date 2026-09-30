@@ -144,7 +144,7 @@ async def test_rejection_anywhere_cannot_hide_behind_scope_reason(key):
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize('change',['candidate','request','scope','science_only','schema_repair','citation_repair','final_schema_repair','final_error','final_missing','final_bool_attempts','files','requirements','resume','denied','not_started','unknown','lease','deadline','input_version','no_read','side_effect'])
+@pytest.mark.parametrize('change',['candidate','request','scope','science_only','schema_repair','citation_repair','final_schema_repair','final_error','final_missing','final_bool_attempts','files','requirements','resume','denied','not_started','unknown','lease','input_version','no_read','side_effect'])
 async def test_actual_runner_does_not_turn_missing_or_uncertain_evidence_into_permission(change):
     result=await reviewed();ctx=fixture();runner,step,message,budget,execution,_,event=ctx
     kwargs={}
@@ -165,12 +165,19 @@ async def test_actual_runner_does_not_turn_missing_or_uncertain_evidence_into_pe
     elif change=='not_started':execution['code']='execution_failed'
     elif change=='unknown':execution['has_unconfirmed_tool_execution']=True
     elif change=='lease':runner._input_delivery._require_live.side_effect=RuntimeError('not live')
-    elif change=='deadline':budget.snapshot.return_value=replace(budget.snapshot.return_value,deadline_at=datetime.now(timezone.utc)-timedelta(seconds=1))
     elif change=='input_version':runner._sandbox.analysis_fingerprints.return_value=ToolResult(success=True,data={'version':1,'errors':[],'files':[{'path':PATH,'size':len(CONTENT),'sha256':'b'*64}]})
     elif change=='no_read':runner._analysis_scope_observations={}
     else:runner._analysis_scope_observations[step.id]['blocked']=True
     assert not await attempt(ctx,result,**kwargs)
     assert not runner._flow._artifact_repair_requests
+
+
+@pytest.mark.asyncio
+async def test_elapsed_time_does_not_disable_verified_scope_completion():
+    ctx=fixture()
+    ctx[3].snapshot.return_value=replace(ctx[3].snapshot.return_value,
+        deadline_at=datetime.now(timezone.utc)-timedelta(days=1))
+    assert await attempt(ctx,await reviewed())
 
 
 @pytest.mark.asyncio
@@ -255,7 +262,7 @@ def test_blocker_is_a_fixed_optional_enum_not_a_new_instruction_channel(value):
 
 
 @pytest.mark.asyncio
-async def test_real_flow_drains_then_completes_once_with_same_runtime_and_no_new_files():
+async def test_real_flow_completes_once_without_automatic_scope_review_or_extra_execution():
     from unittest.mock import Mock
     from app.domain.models.event import MessageEvent, DoneEvent
     from app.domain.services.model_runtime import current_analysis_budget
@@ -294,12 +301,12 @@ async def test_real_flow_drains_then_completes_once_with_same_runtime_and_no_new
     with analysis_budget_scope(budget):
         async for event in runner._run_flow(message,trigger_event_seq=7):
             events.append(event.model_copy(deep=True))
-    assert len(state['prompts'])==2 and state['drained']==2
-    assert observed_budgets==[budget,budget]
-    assert 'host_scope_completion_feedback' in state['prompts'][1]
-    assert 'This does not require a program' in state['prompts'][1]
+    assert len(state['prompts'])==1 and state['drained']==1
+    assert observed_budgets==[budget]
+    assert step.success and step.outcome.status=='succeeded'
+    agent.review_delivery_answer.assert_not_awaited()
     assert message._artifact_repair_context is None and not message.deliverables
-    assert runner._scope_repair_audit_store.claim.await_count==1
+    assert runner._scope_repair_audit_store.claim.await_count==0
     assert sum(isinstance(e,DoneEvent) for e in events)==1
     assert not any(e.attachments for e in events if isinstance(e,MessageEvent))
     public=json.dumps([e.model_dump(mode='json') for e in events])

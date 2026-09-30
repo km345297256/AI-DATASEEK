@@ -8,12 +8,10 @@ Its bounded evidence is private and must not be serialized into public events.
 from __future__ import annotations
 
 from collections import Counter, OrderedDict
-import asyncio
 import copy
 import hashlib
 from dataclasses import dataclass, field
 import json
-import math
 from pathlib import PurePosixPath
 import re
 from typing import Any, Awaitable, Callable, Literal, Sequence
@@ -45,7 +43,6 @@ MAX_PROGRAM_SOURCE_TOTAL_CHARS = 48000
 MAX_PROGRAM_SOURCE_FILES = 4
 # These are private model-context and network-call bounds, not task-consumption
 # quotas. They never authorize replay or stop useful executor work.
-REVIEW_TIMEOUT_SECONDS = 45
 MAX_CITATION_EXCERPT_CHARS = 800
 
 
@@ -1571,8 +1568,7 @@ def _citation_failure_class(error: Exception) -> str:
 
 async def _correct_citations(*, ask: Callable[[list], Awaitable[Any]], result: dict,
                              payload: dict, lookup: dict[str, dict], inventory: list[dict],
-                             input_paths: set[str], requirement_data: list[dict],
-                             timeout_seconds: float) -> tuple[dict, dict]:
+                             input_paths: set[str], requirement_data: list[dict]) -> tuple[dict, dict]:
     """One scoped correction, with one same-evidence protocol-only retry.
 
     Schema failures do not start repair. Paragraph-level semantic failures
@@ -1670,8 +1666,7 @@ async def _correct_citations(*, ask: Callable[[list], Awaitable[Any]], result: d
                     "Keep the original paragraph/check item schemas. Use paragraph=null to withdraw unsupported text, "
                     "and unclear with evidence=[] for unconfirmed requirements. Do not invent evidence, change "
                     "accepted paragraphs, assert completion just to satisfy the protocol, or request new execution.")
-            response = await asyncio.wait_for(ask([
-                SystemMessage(content=system), frozen_correction_payload]), timeout=timeout_seconds)
+            response = await ask([SystemMessage(content=system), frozen_correction_payload])
             correction = _parse_response(response)
             try:
                 _validate_citation_correction_shape(correction, bad_paragraphs, bad_checks)
@@ -1826,8 +1821,7 @@ async def _correct_citations(*, ask: Callable[[list], Awaitable[Any]], result: d
 async def _review_answer(*, ask: Callable[[list], Awaitable[Any]], question: str, draft: str,
                         files: Sequence[FileInfo], evidence: AnswerEvidence, language: str = "zh",
                         requirements: Sequence[DeliverableRequirement] = (),
-                        report_targets=(), answer_scientific_scope: bool = False,
-                        timeout_seconds: float | None = None) -> AnswerReviewResult:
+                        report_targets=(), answer_scientific_scope: bool = False) -> AnswerReviewResult:
     """Tool-free review with one schema recovery and one scoped citation correction.
 
     ``ask`` must be a fresh-context, tool-disabled model invocation. No model
@@ -1835,16 +1829,12 @@ async def _review_answer(*, ask: Callable[[list], Awaitable[Any]], question: str
     Schema recovery is allowed only before accepting any paragraph, carries no
     rejected response, and cannot authorize execution. The separate scoped
     correction uses frozen evidence and cannot request analytical execution.
-    A transport-owning caller supplies the deadline for its complete bounded
-    request/retry policy. It must not be cancelled by a shorter unrelated
-    wrapper timeout before its first read-only retry can take place.
+    No elapsed-time limit applies to review, correction or final verification.
+    Awaited calls remain cancellable, and actual provider/protocol errors retain
+    their existing retry policy without reopening analytical execution.
     """
-    review_deadline = REVIEW_TIMEOUT_SECONDS if timeout_seconds is None else timeout_seconds
     if type(answer_scientific_scope) is not bool:
         raise ValueError("invalid_answer_scientific_scope")
-    if (isinstance(review_deadline, bool) or not isinstance(review_deadline, (int, float))
-            or not math.isfinite(review_deadline) or review_deadline <= 0):
-        raise ValueError("invalid_review_deadline")
     inventory = _inventory(files)
     observed = evidence.render_sources()
     input_paths = evidence.input_paths()
@@ -1962,8 +1952,7 @@ async def _review_answer(*, ask: Callable[[list], Awaitable[Any]], question: str
                            "The host will freeze, number and independently review the final rendered paragraphs. "
                            "Preserve coverage of the complete current request; do not replace requested explanations "
                            "with a generic disclaimer or an attachment list.")
-            response = await asyncio.wait_for(ask([SystemMessage(content=system), frozen_payload]),
-                                              timeout=review_deadline)
+            response = await ask([SystemMessage(content=system), frozen_payload])
             result = _parse_response(response)
             try:
                 _validate_review_shape(result, requirement_data, recovery=bool(protocol_attempt) and not answer_scientific_scope,
@@ -2006,8 +1995,7 @@ async def _review_answer(*, ask: Callable[[list], Awaitable[Any]], question: str
                 result.pop("scientific_checks", None), citations=_citations, lookup=lookup,
                 evidence_complete=method_complete)
         result, citation_metadata = await _correct_citations(ask=ask, result=result, payload=payload,
-            lookup=lookup, inventory=inventory, input_paths=input_paths, requirement_data=requirement_data,
-            timeout_seconds=review_deadline)
+            lookup=lookup, inventory=inventory, input_paths=input_paths, requirement_data=requirement_data)
         correction_metadata.update(citation_metadata)
         paragraphs = [_paragraph_text(paragraph, lookup, inventory, input_paths, language)
                       for paragraph in result["paragraphs"]]
@@ -2091,7 +2079,7 @@ async def _review_answer(*, ask: Callable[[list], Awaitable[Any]], question: str
                 request=request_source["text"], objectives=objectives,
                 paragraphs=[{"text": rendered, "kind": item["kind"]}
                             for item, rendered in zip(result["paragraphs"], paragraphs)],
-                timeout_seconds=review_deadline, request_truncated=request_source["truncated"],
+                request_truncated=request_source["truncated"],
                 request_sha256=request_source["request_sha256"])
             correction_metadata["answer_coverage"] = {"status": coverage.status, **coverage.metadata}
             if coverage.status != "verified":
@@ -2117,7 +2105,7 @@ async def _review_answer(*, ask: Callable[[list], Awaitable[Any]], question: str
                 parse_response=_parse_response, failure_code=_review_failure_code,
                 method_complete=method_complete,
                 request_complete=not (question_cut or request_source["truncated"]),
-                draft_complete=not draft_cut, timeout_seconds=review_deadline,
+                draft_complete=not draft_cut,
                 schema_actions=_REVIEW_SCHEMA_ACTIONS))
         status = "corrected" if result["unsupported_claims"] or correction_metadata.get("review_schema_repair_attempted") else "verified"
         return AnswerReviewResult(text, status, {"status": status, "source_count": source_count,
@@ -2155,8 +2143,7 @@ async def _review_answer(*, ask: Callable[[list], Awaitable[Any]], question: str
 async def review_answer(*, ask: Callable[[list], Awaitable[Any]], question: str, draft: str,
                         files: Sequence[FileInfo], evidence: AnswerEvidence, language: str = "zh",
                         requirements: Sequence[DeliverableRequirement] = (), report_targets=(),
-                        answer_scientific_scope: bool = False,
-                        timeout_seconds: float | None = None) -> AnswerReviewResult:
+                        answer_scientific_scope: bool = False) -> AnswerReviewResult:
     """One review request for chat and complete uploaded report versions.
 
     Report rejection cannot erase independently grounded chat, rewrite files or
@@ -2165,7 +2152,7 @@ async def review_answer(*, ask: Callable[[list], Awaitable[Any]], question: str,
     targets = tuple(report_targets)
     reviewed = await _review_answer(ask=ask, question=question, draft=draft, files=files,
         evidence=evidence, language=language, requirements=requirements, report_targets=targets,
-        timeout_seconds=timeout_seconds, answer_scientific_scope=answer_scientific_scope)
+        answer_scientific_scope=answer_scientific_scope)
     report = reviewed.metadata.get("report_review")
     scientific = reviewed.metadata.get("scientific_review")
     answer_science = reviewed.metadata.get("answer_scientific_review")

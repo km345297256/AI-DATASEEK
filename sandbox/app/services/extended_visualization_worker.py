@@ -48,6 +48,7 @@ OFFICE_PDF_SETTINGS = {
     "ExportFormFields": False,
 }
 FORMATS = {
+    "svg": {"svg"},
     "mysql-sdi": {"ibd"}, "sst-records": {"sst", "ldb"},
     "database-table": {"duckdb", "ddb", "dbf", "mdb", "accdb"},
     "sql-dump": {"sql"}, "pg-dump": {"pgdump", "dump", "backup", "tar"},
@@ -70,6 +71,7 @@ FORMATS = {
     "geoformat": {"asc", "grd", "kml"}, "mca": {"mca"}, "czi": {"czi"},
 }
 KINDS = {
+    "svg": {"image"},
     "mysql-sdi": {"tree"}, "sst-records": {"tree"},
     "database-table": {"tree", "table"},
     "sql-dump": {"tree", "table"}, "pg-dump": {"tree"},
@@ -88,6 +90,7 @@ KINDS = {
     "geoformat": {"map"}, "mca": {"series"}, "czi": {"tree", "image"},
 }
 OPTIONS = {
+    "svg": set(),
     "mysql-sdi": set(), "sst-records": set(),
     "database-table": {"table", "columns", "row_offset", "row_limit"},
     "sql-dump": {"dialect", "table", "columns", "row_offset", "row_limit"}, "pg-dump": set(),
@@ -1064,14 +1067,24 @@ FORMATS.update(migration.FORMATS)
 KINDS.update(migration.KINDS)
 
 
+def _input_limit(reader):
+    return 8 * 1024 * 1024 if reader == "svg" else migration.input_limit(reader)
+
+
 def preview_bytes(data, reader, kind, options=None, *, format=None, truncated=False):
     if reader not in FORMATS or kind not in KINDS[reader] or format not in FORMATS[reader]:
         raise PreviewError("未注册的扩展读取器、视图或格式。")
     options = _options(reader, {} if options is None else options)
     if type(truncated) is not bool or truncated:
         raise PreviewError("此扩展读取器需要完整的有界文件。")
-    if not isinstance(data, bytes) or not 0 < len(data) <= migration.input_limit(reader):
+    if not isinstance(data, bytes) or not 0 < len(data) <= _input_limit(reader):
         raise PreviewError("文件为空或超出此读取器的独立预算。")
+    if reader == "svg":
+        from app.services.svg_preview import svg_preview
+        try:
+            return svg_preview(data)
+        except (ValueError, TypeError):
+            raise PreviewError("SVG 内容或大小不符合静态预览要求；不支持脚本、外部资源或动态内容。") from None
     if reader in {"sql-dump", "pg-dump", "bson", "redis-rdb", "mysql-sdi", "sst-records"}:
         if len(data) > 16 * 1024 * 1024:
             raise PreviewError("数据库文件超过独立只读预算。")
@@ -1202,7 +1215,7 @@ def _encoded_result(stream=None):
         if (not isinstance(header, dict)
                 or set(header) - {"contract_version", "size", "reader", "kind", "format", "options", "truncated"}
                 or type(header.get("contract_version")) is not int or header["contract_version"] != 2
-                or type(header.get("size")) is not int or not 0 < header["size"] <= migration.input_limit(header.get("reader"))):
+                or type(header.get("size")) is not int or not 0 < header["size"] <= _input_limit(header.get("reader"))):
             raise PreviewError("无效的预览协议版本或大小。")
         data = stream.read(header["size"])
         if len(data) != header["size"] or stream.read(1):

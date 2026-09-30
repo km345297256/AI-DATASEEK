@@ -847,29 +847,21 @@ class DatasetRequestResolver:
     async def _invoke_with_transport_retry(cls, runnable: Any, messages: list[Any], *, settings: Any) -> Any:
         """Retry only the tool-free classifier transport, never an unsafe verdict.
 
-        The configured timeout applies to one provider request. A single slow
-        call must not exhaust the entire routing operation before its bounded
-        transport recovery can run. Parsing, safety validation and the one
-        scoped routing-schema correction remain outside this loop.
+        A slow request stays pending until it completes or the user cancels.
+        Actual transport errors may be retried; elapsed time is not a failure.
+        Parsing, safety validation and scoped routing-schema correction remain
+        outside this loop.
         """
         from app.domain.services.agents.base import _is_retryable_llm_error
         from app.domain.services.model_retry import model_retry_decision
-        from app.domain.services.model_runtime import model_call_role, model_request_timeout, record_model_retry
+        from app.domain.services.model_runtime import model_call_role, record_model_retry
         from app.domain.models.model_trace import ScheduledModelRetry
 
         maximum = max(1, getattr(settings, "llm_retry_attempts", 4))
-        timeout = settings.dataset_request_resolver_timeout_seconds
-        trace_timeout = getattr(settings, "model_trace_store_timeout_seconds", 3.0)
         with model_call_role("front_controller"):
             for attempt in range(1, maximum + 1):
                 try:
-                    # Time out inside the governed driver so audit metadata
-                    # distinguishes provider slowness from user cancellation.
-                    # This outer watchdog also bounds nonstandard runnables
-                    # and permits the driver's bounded metadata writes.
-                    with model_request_timeout(timeout):
-                        return await cls._invoke_before_deadline(runnable, messages,
-                            deadline=asyncio.get_running_loop().time() + timeout + 3 * trace_timeout + 1.0)
+                    return await runnable.ainvoke(messages)
                 except Exception as error:
                     if attempt == maximum or not (isinstance(error, TimeoutError) or _is_retryable_llm_error(error)):
                         raise
@@ -884,21 +876,6 @@ class DatasetRequestResolver:
                     logger.info("Front Controller transport retry attempt=%d error_type=%s", attempt, type(error).__name__)
                     if retry.delay_seconds:
                         await asyncio.sleep(retry.delay_seconds)
-
-    @staticmethod
-    async def _invoke_before_deadline(
-        runnable: Any,
-        messages: list[Any],
-        *,
-        deadline: float,
-    ) -> Any:
-        remaining = deadline - asyncio.get_running_loop().time()
-        if remaining <= 0:
-            raise TimeoutError("front controller deadline exhausted")
-        return await asyncio.wait_for(
-            runnable.ainvoke(messages),
-            timeout=remaining,
-        )
 
     @staticmethod
     def _rejection_decision(safety: SafetyReview) -> RequestDecision:

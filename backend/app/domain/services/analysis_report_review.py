@@ -5,7 +5,6 @@ Only the runner's already-validated uploaded objects may enter this boundary.
 """
 from __future__ import annotations
 
-import asyncio
 import csv
 from dataclasses import dataclass, field, replace
 import hashlib
@@ -24,7 +23,6 @@ from app.domain.services.tools.spill_projection import (
 MAX_REPORT_BYTES = 128 * 1024
 MAX_REPORT_BATCH_BYTES = 256 * 1024
 MAX_REPORT_COUNT = 16
-REPORT_READ_TIMEOUT = 10
 REPORT_BLOCK_CHARS = 3000
 _HOST_ROOT = re.compile(r"(?:/(?:Users|private|etc|root|var|mnt|opt|srv)(?:/|\b)|"
                         r"/home/(?!ubuntu(?:/|\b))|[A-Za-z]:[\\/]|\\\\)")
@@ -157,7 +155,6 @@ async def load_report_targets(*, files: Sequence[FileInfo], storage, user_id: st
     # and concurrent session updates must not change the expected manifest.
     reports = [item.model_copy(deep=True) for item in files if is_report(item)]
     targets, consumed = [], 0
-    deadline = asyncio.get_running_loop().time() + REPORT_READ_TIMEOUT
     for index, info in enumerate(reports):
         metadata = info.metadata or {}
         size, digest = info.size, metadata.get("artifact_sha256")
@@ -183,19 +180,16 @@ async def load_report_targets(*, files: Sequence[FileInfo], storage, user_id: st
             reason = "unsupported_report_format"
         elif index >= MAX_REPORT_COUNT or size > MAX_REPORT_BYTES or consumed + size > MAX_REPORT_BATCH_BYTES:
             reason = "report_read_limit"
-        elif asyncio.get_running_loop().time() >= deadline:
-            reason = "report_read_unavailable"
         if reason:
             targets.append(replace(target, reason=reason))
             continue
         consumed += size
         try:
-            async with asyncio.timeout_at(deadline):
-                before = await storage.get_file_info(info.file_id, user_id)
-                if not _manifest_matches(before, info, user_id, session_id):
-                    targets.append(replace(target, reason="version_unverified"))
-                    continue
-                data, current = await storage.download_file_range(info.file_id, user_id, offset=0, length=size)
+            before = await storage.get_file_info(info.file_id, user_id)
+            if not _manifest_matches(before, info, user_id, session_id):
+                targets.append(replace(target, reason="version_unverified"))
+                continue
+            data, current = await storage.download_file_range(info.file_id, user_id, offset=0, length=size)
             if (not _manifest_matches(current, info, user_id, session_id) or not isinstance(data, bytes)
                     or len(data) != size or hashlib.sha256(data).hexdigest() != digest):
                 targets.append(replace(target, reason="version_unverified"))

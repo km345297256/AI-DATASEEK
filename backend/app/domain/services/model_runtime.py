@@ -101,7 +101,6 @@ _FAILED_ATTEMPT_ATTRIBUTE = "_dataseek_failed_model_attempt"
 
 _SCOPE: ContextVar[ModelExecutionScope | None] = ContextVar("model_execution_scope", default=None)
 _ROLE: ContextVar[tuple[str, str | None]] = ContextVar("model_call_role", default=("auxiliary", None))
-_REQUEST_TIMEOUT: ContextVar[float | None] = ContextVar("model_provider_request_timeout", default=None)
 _RESPONSE_VALIDATOR: ContextVar[Callable[[Any], Any] | None] = ContextVar("model_response_validator", default=None)
 _ANALYSIS_BUDGET: ContextVar[Any] = ContextVar("analysis_budget", default=None)
 
@@ -155,22 +154,6 @@ def model_call_role(role: str):
 
 
 @contextmanager
-def model_request_timeout(seconds: float):
-    """Set a caller-owned timeout inside the physical request audit boundary.
-
-    Most callers leave this unset. Timing out outside the driver instead would
-    turn a provider timeout into user cancellation and lose its retry trace.
-    """
-    if isinstance(seconds, bool) or not isinstance(seconds, (int, float)) or not math.isfinite(seconds) or seconds <= 0:
-        raise ValueError("Provider request timeout must be positive and finite")
-    token = _REQUEST_TIMEOUT.set(float(seconds))
-    try:
-        yield
-    finally:
-        _REQUEST_TIMEOUT.reset(token)
-
-
-@contextmanager
 def model_response_validation(validator: Callable[[Any], Any]):
     """Run a trusted, synchronous response parser inside the request audit.
 
@@ -189,17 +172,9 @@ def model_response_validation(validator: Callable[[Any], Any]):
 
 
 async def _invoke_provider(invoke, messages, max_output_tokens):
-    seconds = _REQUEST_TIMEOUT.get()
-    if seconds is None:
-        return await invoke(messages, max_output_tokens)
-    window = asyncio.timeout(seconds)
-    try:
-        async with window:
-            return await invoke(messages, max_output_tokens)
-    except TimeoutError:
-        if window.expired():
-            raise ModelProviderTimeout("provider_request_timeout") from None
-        raise
+    # Physical provider requests have no application deadline. Explicit user
+    # cancellation remains a distinct, audited control-flow signal.
+    return await invoke(messages, max_output_tokens)
 
 
 def _message_payload(messages) -> list:
@@ -248,8 +223,7 @@ async def _store(scope, record) -> None:
     if scope is None or scope.store is None:
         return
     try:
-        async with asyncio.timeout(get_settings().model_trace_store_timeout_seconds):
-            await scope.store.put(record)
+        await scope.store.put(record)
     except asyncio.CancelledError:
         raise
     except Exception as error:
@@ -398,20 +372,7 @@ async def invoke_model_request(*, messages, tool_schemas=(), response_format=Non
     try:
         if durable_budget is not None and durable_budget.require_live is not None:
             await durable_budget.require_live()
-        if durable_budget is not None and admission.deadline_at is not None:
-            remaining = (admission.deadline_at - datetime.now(UTC)).total_seconds()
-            if remaining <= 0:
-                raise ModelBudgetStopped("analysis_budget_deadline_exceeded")
-            deadline_window = asyncio.timeout(remaining)
-            try:
-                async with deadline_window:
-                    message = await _invoke_provider(invoke, prepared.messages, max_output_tokens)
-            except TimeoutError:
-                if deadline_window.expired():
-                    raise ModelBudgetStopped("analysis_budget_deadline_exceeded") from None
-                raise
-        else:
-            message = await _invoke_provider(invoke, prepared.messages, max_output_tokens)
+        message = await _invoke_provider(invoke, prepared.messages, max_output_tokens)
     except BaseException as error:
         trace.timings.provider_call_ms = (time.perf_counter() - phase_started) * 1000
         trace.status = "cancelled" if isinstance(error, asyncio.CancelledError) else "failed"

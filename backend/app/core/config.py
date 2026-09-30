@@ -75,21 +75,8 @@ class Settings(BaseSettings):
     llm_retry_attempts: int = 4
     llm_retry_base_seconds: float = 1.0
     llm_retry_max_seconds: float = 8.0
-    # Independent, read-only answer review requests may retry transient model
-    # timeouts. This is one provider request, not a cumulative analysis quota.
-    answer_review_request_timeout_seconds: float = Field(default=60.0, ge=1.0, le=300.0)
-    # Once the bounded tool budget is exhausted, the Agent gets one tool-free
-    # turn to synthesize the evidence it already collected. Keep this separate
-    # from provider/network retries and from the dataset quicklook synthesis
-    # deadline, which has its own larger professional-analysis budget.
-    agent_finalization_timeout_seconds: float = 45.0
-    # The unified routing/safety decision runs before any sandbox allocation.
-    # Give each provider request the same default window as answer review;
-    # unavailable or invalid safety decisions still fail closed after bounded
-    # transport retries. This is not a cumulative analysis/task time limit.
-    dataset_request_resolver_timeout_seconds: float = Field(
-        default=60.0, ge=1.0, le=300.0, allow_inf_nan=False,
-    )
+    # Analysis, routing and final review wait until completion or explicit
+    # cancellation. Removed *_TIMEOUT_SECONDS values cannot reinstate a quota.
     # Suggested questions are optional page bootstrap data. Keep their model
     # call below the browser API timeout so an unavailable provider can fall
     # back to local questions without turning the whole panel into an error.
@@ -103,7 +90,6 @@ class Settings(BaseSettings):
     safety_review_model_api_key: str | None = None
     safety_review_temperature: float = 0.0
     safety_review_max_tokens: int = 600
-    safety_review_timeout_seconds: float = 20.0
 
     # Vision model configuration
     vision_model_name: str | None = None
@@ -163,7 +149,6 @@ class Settings(BaseSettings):
     spill_max_artifact_bytes: int = 32 * 1024 * 1024
     spill_preview_bytes: int = 12_000
     spill_read_chunk_bytes: int = 16_000
-    spill_store_timeout_seconds: float = 5.0
     spill_artifact_retention_hours: int = 168
     spill_reaper_interval_seconds: int = 300
     spill_artifact_identity_key: str | None = None
@@ -194,7 +179,8 @@ class Settings(BaseSettings):
     sandbox_isolation: str = "session"  # "session" creates one sandbox per session; "shared" uses SANDBOX_ADDRESS
     sandbox_image: str | None = None
     sandbox_name_prefix: str | None = None
-    sandbox_ttl_minutes: int | None = 30
+    # Analysis sandboxes have no elapsed-time expiry. Their lifecycle is owned
+    # by task completion, explicit stop, and inactive-container reclamation.
     sandbox_network: str | None = None  # Docker network bridge name
     sandbox_chrome_args: str | None = ""
     sandbox_https_proxy: str | None = None
@@ -216,9 +202,8 @@ class Settings(BaseSettings):
     # task's Sandbox browser. It has no published host port.
     jupyter_network_disabled: bool = False
     jupyter_ttl_minutes: int = 60
-    # A short bounded queue absorbs normal bursts instead of surfacing a raw
-    # scheduler capacity error to the user.
-    sandbox_capacity_wait_seconds: float = 60.0
+    # Capacity admission waits until a slot is available or the user cancels.
+    # This controls polling only, never a task/queue deadline.
     sandbox_capacity_poll_seconds: float = 1.0
     # Paused containers preserve a session filesystem but still retain host
     # memory and Docker metadata. Reclaim them after an inactivity window.
@@ -352,8 +337,6 @@ class Settings(BaseSettings):
             raise ValueError(
                 "SPILL_READ_CHUNK_BYTES is too large for SPILL_MAX_INLINE_BYTES"
             )
-        if self.spill_store_timeout_seconds <= 0:
-            raise ValueError("SPILL_STORE_TIMEOUT_SECONDS must be positive")
         if self.spill_artifact_retention_hours <= 0:
             raise ValueError("SPILL_ARTIFACT_RETENTION_HOURS must be positive")
         if self.spill_reaper_interval_seconds <= 0:

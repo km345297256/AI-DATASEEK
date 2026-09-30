@@ -98,14 +98,14 @@ def provider_failure(status):
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("first_failure", [0.1, provider_failure(503)])
+@pytest.mark.parametrize("first_failure", [runtime.ModelProviderTimeout(), provider_failure(503)])
 async def test_synthesis_retries_physical_request_without_replaying_completed_tools(settings, first_failure):
     final = AIMessage(content="The verified count is 7.")
     agent, provider = make_agent([first_failure, final])
     store = TraceStore()
     with runtime.model_execution_scope(user_id="owner", session_id="synthetic", task_id="task", store=store) as scope:
         result = await agent._ask_without_tools(
-            [HumanMessage(content="Return the final answer")], request_timeout=0.01,
+            [HumanMessage(content="Return the final answer")],
         )
         assert scope.ledger.calls == 2
         assert scope.ledger.call_limit is None and scope.ledger.token_limit is None
@@ -118,26 +118,24 @@ async def test_synthesis_retries_physical_request_without_replaying_completed_to
     assert sum(message.content == "Return the final answer" for message in agent.memory.messages) == 1
     amended = next(record for record in store.history if record.scheduled_retry is not None)
     assert amended.status == "failed"
-    assert amended.error_code == ("provider_timeout" if isinstance(first_failure, float) else "provider_error")
+    assert amended.error_code == ("provider_timeout" if isinstance(first_failure, runtime.ModelProviderTimeout) else "provider_error")
     assert amended.scheduled_retry.next_attempt == 2
     assert all(record.status != "cancelled" for record in store.history)
     assert store.history[-1].status == "succeeded"
-    assert runtime._REQUEST_TIMEOUT.get() is None
     agent.invoke_tool.assert_not_awaited()
     agent.get_tools.assert_not_called()
 
 
 @pytest.mark.asyncio
 async def test_synthesis_transient_failure_exhaustion_remains_honest_and_bounded(settings):
-    agent, provider = make_agent([0.1, 0.1, 0.1])
+    agent, provider = make_agent([runtime.ModelProviderTimeout() for _ in range(3)])
     store = TraceStore()
     with runtime.model_execution_scope(user_id="owner", session_id="synthetic", task_id="task", store=store):
         with pytest.raises(base_module.LLMServiceUnavailableError):
-            await agent._ask_without_tools([], request_timeout=0.01)
+            await agent._ask_without_tools([])
     assert len(provider._requests) == 3
     assert len([record for record in store.history if record.scheduled_retry is not None]) == 2
     assert store.history[-1].error_code == "provider_timeout"
-    assert runtime._REQUEST_TIMEOUT.get() is None
     agent.invoke_tool.assert_not_awaited()
 
 
@@ -146,7 +144,7 @@ async def test_synthesis_cancellation_is_not_timeout_and_never_retries(settings)
     agent, provider = make_agent([10.0, AIMessage(content="must not run")])
     store = TraceStore()
     with runtime.model_execution_scope(user_id="owner", session_id="synthetic", task_id="task", store=store):
-        task = asyncio.create_task(agent._ask_without_tools([], request_timeout=1.0))
+        task = asyncio.create_task(agent._ask_without_tools([]))
         await provider._entered.wait()
         task.cancel()
         with pytest.raises(asyncio.CancelledError):
@@ -160,7 +158,7 @@ async def test_synthesis_cancellation_is_not_timeout_and_never_retries(settings)
 async def test_synthesis_permanent_provider_error_does_not_retry(settings):
     agent, provider = make_agent([provider_failure(400), AIMessage(content="must not run")])
     with pytest.raises(APIStatusError):
-        await agent._ask_without_tools([], request_timeout=0.1)
+        await agent._ask_without_tools([])
     assert len(provider._requests) == 1
     agent.invoke_tool.assert_not_awaited()
 
@@ -174,14 +172,14 @@ async def test_no_tool_synthesis_never_repairs_or_executes_forbidden_calls(setti
     agent, provider = make_agent([forbidden])
     monkeypatch.setattr(base_module.RobustJsonParser, "from_llm", MagicMock(
         side_effect=AssertionError("Do not repair tool arguments in a no-tool synthesis")))
-    result = await agent._ask_without_tools([], request_timeout=0.1)
+    result = await agent._ask_without_tools([])
     assert not agent._tool_free_completion_is_valid(result)
     assert len(provider._requests) == 1
     agent.invoke_tool.assert_not_awaited()
 
 
 @pytest.mark.asyncio
-async def test_outer_watchdog_still_cancels_stuck_nonprovider_work(settings):
+async def test_synthesis_waiting_on_history_can_be_cancelled_by_user(settings):
     agent, provider = make_agent([])
     cancelled = asyncio.Event()
 
@@ -192,20 +190,23 @@ async def test_outer_watchdog_still_cancels_stuck_nonprovider_work(settings):
             cancelled.set()
 
     agent._add_to_memory = stuck_history
-    agent._no_tool_synthesis_watchdog_seconds = lambda _timeout: 0.01
-    with pytest.raises(TimeoutError):
-        await agent._ask_without_tools([], request_timeout=0.1)
+    task = asyncio.create_task(agent._ask_without_tools([]))
+    await asyncio.sleep(0.02)
+    assert not task.done() and not cancelled.is_set()
+    task.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await task
     assert cancelled.is_set()
     assert provider._requests == []
-    assert runtime._REQUEST_TIMEOUT.get() is None
 
 
-def test_watchdog_covers_all_transport_attempts_backoff_and_trace_io(settings):
-    agent, _provider = make_agent([], attempts=4)
-    agent._llm_retry_max_seconds = 8.0
-    assert agent._no_tool_synthesis_watchdog_seconds(75) == (
-        4 * 75 + 3 * 8 + 13 * settings.model_trace_store_timeout_seconds + 5
-    )
+@pytest.mark.asyncio
+async def test_slow_synthesis_finishes_without_retry_or_deadline(settings):
+    agent, provider = make_agent([0.05])
+    result = await agent._ask_without_tools([])
+    assert result.content == "late response"
+    assert len(provider._requests) == 1
+    agent.invoke_tool.assert_not_awaited()
 
 
 def test_only_driver_provider_timeout_is_retryable_not_arbitrary_callback_timeouts():

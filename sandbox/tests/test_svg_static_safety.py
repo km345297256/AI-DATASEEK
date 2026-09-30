@@ -1,5 +1,6 @@
 """Small synthetic SVGs: browser/render parity, local assets and hard cleanup."""
 import base64
+import hashlib
 import io
 import subprocess
 import sys
@@ -89,34 +90,34 @@ def test_xml_name_accepts_non_ascii_letters_and_combining_characters():
     assert local_reference("#曲线")
 
 
-@pytest.mark.parametrize("cancel", [False, True])
-def test_renderer_timeout_or_cancel_terminates_and_reaps_native_worker(monkeypatch, cancel):
+def test_renderer_cancel_terminates_and_reaps_native_worker(monkeypatch):
     actual_popen = subprocess.Popen
     children = []
+    sources = []
     def stalled(command, **kwargs):
         assert command[0] == sys.executable and command[1].endswith("svg_render_worker.py")
         assert kwargs["shell"] is False and kwargs["stderr"] is subprocess.DEVNULL
+        assert len(command) == 3  # No CPU/wall deadline passed to the worker.
+        sources.append(kwargs["stdin"])
         child = actual_popen([sys.executable, "-c", "import signal,time; signal.signal(signal.SIGTERM,signal.SIG_IGN); time.sleep(20)"], **kwargs)
         children.append(child)
         return child
     monkeypatch.setattr(svg_render.subprocess, "Popen", stalled)
     stop = threading.Event()
-    timer = threading.Timer(0.12, stop.set) if cancel else None
-    if timer:
-        timer.start()
+    timer = threading.Timer(0.12, stop.set)
+    timer.start()
     start = time.monotonic()
-    deadline = start + (5 if cancel else 0.2)
     try:
         with pytest.raises((validation._InvalidArtifact, svg_render.SvgRenderError)) as caught:
             svg_render.render_svg(b'<svg/>', max_pixels=100,
-                check=lambda: validation._check_cancelled(stop, deadline), deadline=deadline)
-        assert caught.value.reason == "validation_deadline"
+                check=lambda: validation._check_cancelled(stop))
+        assert caught.value.reason == "validation_cancelled"
         assert time.monotonic() - start < 2
         assert children and all(child.poll() is not None for child in children)
-        assert all(child.stdin.closed and child.stdout.closed for child in children)
+        assert all(child.stdout.closed for child in children)
+        assert all(source.closed for source in sources)
     finally:
-        if timer:
-            timer.cancel()
+        timer.cancel()
 
 
 def test_renderer_start_failure_is_service_unavailability_not_bad_user_file(monkeypatch):
@@ -124,6 +125,49 @@ def test_renderer_start_failure_is_service_unavailability_not_bad_user_file(monk
         raise OSError("PRIVATE_HOST_PATH")
     monkeypatch.setattr(svg_render.subprocess, "Popen", failed)
     with pytest.raises(svg_render.SvgRenderError) as caught:
-        svg_render.render_svg(b'<svg/>', max_pixels=100, check=lambda: None, deadline=time.monotonic()+1)
+        svg_render.render_svg(b'<svg/>', max_pixels=100, check=lambda: None)
     assert caught.value.reason == "validator_unavailable"
     assert "PRIVATE_HOST_PATH" not in str(caught.value)
+
+
+def test_slow_worker_receives_complete_input_after_many_cancellation_polls(monkeypatch):
+    """More than a pipe buffer, consumed after several old communicate windows."""
+    actual_popen = subprocess.Popen
+    source = b"synthetic-vector-document\n" * 65536
+    sources, children = [], []
+    def delayed_reader(command, **kwargs):
+        sources.append(kwargs["stdin"])
+        script = (
+            "import hashlib,json,sys,time; time.sleep(0.35); data=sys.stdin.buffer.read(); "
+            f"assert len(data)=={len(source)}; "
+            f"assert hashlib.sha256(data).hexdigest()=={hashlib.sha256(source).hexdigest()!r}; "
+            "print(json.dumps({'valid':True,'width':200,'height':100}))"
+        )
+        child = actual_popen([sys.executable, "-c", script], **kwargs)
+        children.append(child)
+        return child
+    monkeypatch.setattr(svg_render.subprocess, "Popen", delayed_reader)
+    checks = []
+    metadata = svg_render.render_svg(source, max_pixels=100000, check=lambda: checks.append(True))
+    assert metadata["width"] == 200 and metadata["height"] == 100
+    assert len(checks) >= 5
+    assert all(source.closed for source in sources)
+    assert all(child.returncode == 0 and child.stdout.closed for child in children)
+
+
+def test_large_synthetic_svg_survives_real_offline_renderer_handoff(tmp_path):
+    # A general pipe-backpressure regression, not a task/dataset-name exception.
+    body = '<path d="M0 0 L10 10" stroke="blue"/>' * 15000
+    source = svg(body)
+    assert len(source.encode()) > 512 * 1024
+    result = receipt(tmp_path, source)
+    assert result["valid"], result
+
+
+def test_renderer_cancellation_before_launch_never_starts_a_worker(monkeypatch):
+    monkeypatch.setattr(svg_render.subprocess, "Popen", lambda *a, **k: pytest.fail("cancelled launch"))
+    stop = threading.Event()
+    stop.set()
+    with pytest.raises(validation._InvalidArtifact) as caught:
+        svg_render.render_svg(b'<svg/>', max_pixels=100, check=lambda: validation._check_cancelled(stop))
+    assert caught.value.reason == "validation_cancelled"

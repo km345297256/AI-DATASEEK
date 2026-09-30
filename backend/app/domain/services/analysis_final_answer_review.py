@@ -5,7 +5,6 @@ It cannot rewrite the candidate, request tools, or replay analytical execution.
 """
 from __future__ import annotations
 
-import asyncio
 import json
 from collections.abc import Awaitable, Callable, Sequence
 from typing import Any
@@ -26,7 +25,7 @@ async def review_final_candidate(*, ask: Callable[[list], Awaitable[Any]], reque
                                  historical_sources: dict[str, str],
                                  parse_response: Callable, failure_code: Callable,
                                  method_complete: bool, request_complete: bool,
-                                 draft_complete: bool, timeout_seconds: float,
+                                 draft_complete: bool,
                                  schema_actions: dict[str, str] | None = None) -> dict:
     """One final-version check with at most one same-evidence schema recovery.
 
@@ -85,8 +84,7 @@ async def review_final_candidate(*, ask: Callable[[list], Awaitable[Any]], reque
                        "Do not change any judgment to satisfy the schema; unclear is allowed. "
                        "Do not return replacement paragraphs, extra fields, reasoning or tools.")
         try:
-            response = await asyncio.wait_for(ask([SystemMessage(content=system), frozen]),
-                                              timeout=timeout_seconds)
+            response = await ask([SystemMessage(content=system), frozen])
             try:
                 value = parse_response(response)
                 error = ("final_review_schema_root" if not isinstance(value, dict) or set(value) != {

@@ -42,7 +42,7 @@ export interface ToolEventData extends BaseEventData {
   tool_call_id: string;
   name: string;
   status: "calling" | "called";
-  execution_status?: 'succeeded' | 'failed' | null;
+  execution_status?: 'succeeded' | 'failed' | 'not_started' | null;
   function: string;
   args: {[key: string]: any};
   content?: any;

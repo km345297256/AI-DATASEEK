@@ -206,12 +206,12 @@ class ToolExecutionLedger:
             return "unknown"
         return "not_started" if summary["replay_safe"] else "confirmed_terminal"
 
-    async def reconcile_pending(self, *, max_operations: int = 4, timeout_seconds: float = 3,
+    async def reconcile_pending(self, *, max_operations: int = 4, timeout_seconds: float | None = None,
                                 phase: Literal["intermediate", "final"] = "intermediate") -> dict[str, Any]:
-        # Hard local ceilings apply even when a caller supplies a larger value.
+        # Bound fan-out, not the lifetime of a production status observation.
         limit = max(0, min(max_operations, 8)) if type(max_operations) is int else 0
         duration = (max(0.05, min(timeout_seconds, 5))
-                    if type(timeout_seconds) in {int, float} and math.isfinite(timeout_seconds) else 3)
+                    if type(timeout_seconds) in {int, float} and math.isfinite(timeout_seconds) else None)
         now = time.monotonic()
         selected = [attempt for attempt in sorted(self._attempts.values(), key=lambda item: item.last_query_at)
                     if _can_observe(attempt) and not attempt.query_in_flight
@@ -233,7 +233,7 @@ def _observation_failure_reason(attempt: ShellExecutionAttempt) -> str:
 
 
 async def _bounded_observation_batch(
-    attempts: list[ShellExecutionAttempt], duration: float,
+    attempts: list[ShellExecutionAttempt], duration: float | None,
 ) -> tuple[int, int]:
     """Observe only original operations, with a shared deadline and no replay.
 
@@ -242,7 +242,7 @@ async def _bounded_observation_batch(
     """
     attempted = changed = 0
     tasks: dict[asyncio.Task, ShellExecutionAttempt] = {}
-    deadline = asyncio.get_running_loop().time() + duration
+    deadline = asyncio.get_running_loop().time() + duration if duration is not None else None
 
     async def fetch(attempt: ShellExecutionAttempt):
         nonlocal attempted
@@ -264,7 +264,8 @@ async def _bounded_observation_batch(
         if not tasks:
             return 0, 0
         # Keep a small part of the same hard deadline for cancellation cleanup.
-        done, pending = await asyncio.wait(tasks, timeout=max(0, duration - min(0.05, duration / 5)))
+        done, pending = await asyncio.wait(tasks, timeout=(
+            max(0, duration - min(0.05, duration / 5)) if duration is not None else None))
         for task in done:
             attempt = tasks[task]
             previous = attempt.receipt
@@ -282,7 +283,8 @@ async def _bounded_observation_batch(
             tasks[task].consecutive_query_failures += 1
             task.cancel()
         if pending:
-            await asyncio.wait(pending, timeout=max(0, deadline - asyncio.get_running_loop().time()))
+            await asyncio.wait(pending, timeout=(max(0, deadline - asyncio.get_running_loop().time())
+                                                if deadline is not None else None))
             for task in pending:
                 if not task.done():
                     tasks[task].observation_block_reason = "execution_status_query_unresponsive"

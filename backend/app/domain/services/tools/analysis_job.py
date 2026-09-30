@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import inspect
 import logging
 from typing import Any, Awaitable, Callable
 
@@ -26,6 +27,28 @@ class AnalysisJobCancelled(asyncio.CancelledError):
 
 class AnalysisJobInterrupted(asyncio.CancelledError):
     """The worker lost its execution lease; do not silently retry side effects."""
+
+
+def _host_cancellable_sandbox_plugin(tool: Any) -> bool:
+    """Recognize our process-owning wrapper, not a plugin's self-declaration.
+
+    Local sandbox plugins always register a private process kill/release
+    callback. Their legacy manifest flag must not remove the user's stop
+    control now that execution is unlimited. Arbitrary/remote adapters retain
+    their declared contract; a matching name or metadata grants nothing.
+    """
+    from app.domain.services.tools.plugin import PluginToolkit, _PluginToolWrapper
+    from app.infrastructure.external.sandbox.docker_sandbox import DockerSandbox
+    from app.infrastructure.external.sandbox.runtime import NodeBoundSandbox
+
+    if type(tool) is not _PluginToolWrapper or type(tool.toolkit) is not PluginToolkit:
+        return False
+    if tool.toolkit._definitions.get(tool.name) is not tool.definition:
+        return False
+    sandbox = tool.toolkit.sandbox
+    if type(sandbox) is NodeBoundSandbox:
+        sandbox = inspect.getattr_static(sandbox, "sandbox", None)
+    return type(sandbox) is DockerSandbox and sandbox.supports_execution_receipts is True
 
 
 class AnalysisJobInterceptor(ToolExecutionInterceptor):
@@ -54,17 +77,9 @@ class AnalysisJobInterceptor(ToolExecutionInterceptor):
             raise RuntimeError("Analysis job requires a pinned task identity")
         contract = context.metadata.get("execution_contract") or getattr(context.tool, "execution_contract", {})
         contract = contract if isinstance(contract, dict) else {}
-        timeout = contract.get("timeout_seconds", 120)
-        if context.tool_name in JOB_CORE_TOOLS:
-            timeout = context.arguments.get("timeout_seconds", 30 if context.tool_name in {"shell_run", "program_run"} else 120)
-        if isinstance(timeout, bool) or not isinstance(timeout, (float, int)):
-            timeout = 120
-        timeout = max(1, min(float(timeout), 120))
-        from app.domain.services.program_execution import is_trusted_program_tool
-        if not context.metadata.get("plugin") and is_trusted_program_tool(context.tool):
-            # program_run's argument controls one status observation window,
-            # not the lifetime of the cancellable, continuously leased job.
-            timeout = None
+        # Durations in tool schemas are observation windows, not job lifetimes.
+        # Neither core tools nor plugins have an elapsed-time analysis quota.
+        timeout = None
 
         async def publish(view: AnalysisJobView) -> None:
             if self._event_sink is not None:
@@ -76,7 +91,8 @@ class AnalysisJobInterceptor(ToolExecutionInterceptor):
             tool_call_id=str(context.tool_call_id),
             execution_snapshot_id=identity.get("execution_snapshot_id"),
             catalog_revision=identity.get("catalog_revision"),
-            cancellable=contract.get("cancellable") is not False,
+            cancellable=(_host_cancellable_sandbox_plugin(context.tool)
+                         or contract.get("cancellable") is not False),
             timeout_seconds=timeout, on_update=publish,
         )
         context.metadata[JOB_CONTEXT_KEY] = record

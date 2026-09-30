@@ -228,7 +228,8 @@ async def test_failed_replace_then_read_correct_and_run_completes_in_same_agent_
         if endpoint == "program-preflight":
             result = response({"version": 1, "status": "ready", "ready": True,
                 "prerequisite_digest": "b" * 64, "cwd": {"state": "ready"},
-                "source": {"state": "ready", "source_digest": hashlib.sha256(source.encode()).hexdigest()}}, success=True)
+                "source": {"state": "ready", "source_digest": hashlib.sha256(source.encode()).hexdigest()},
+                "syntax": {"state": "ready"}}, success=True)
             result.raise_for_status = lambda: None
             return result
         if endpoint == "program":

@@ -12,6 +12,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from app.domain.models.event import BaseEvent, MessageEvent, PlanEvent, ToolEvent, ToolStatus, MAX_EVENT_SEQUENCE
 from app.domain.models.plan import ExecutionStatus, Step
+from app.domain.models.result_assessment import has_user_evaluated_result
 from app.domain.utils.message_text import is_non_substantive_message_text
 from app.domain.services.tools.spill_projection import spill_notice_from_result
 
@@ -43,10 +44,22 @@ def _remember_reviewed_plan(index: dict[str, list[Step]], event: PlanEvent) -> N
         index[event.plan.id] = reviewed
 
 
+def _is_contextual_result(step: Step) -> bool:
+    """An executed result is conversation context, not scientific certification."""
+    return _is_reviewed_result(step) or has_user_evaluated_result(step)
+
+
+def _remember_contextual_plan(index: dict[str, list[Step]], event: PlanEvent) -> None:
+    index.pop(event.plan.id, None)
+    completed = [step.model_copy(deep=True) for step in event.plan.steps if _is_contextual_result(step)]
+    if completed:
+        index[event.plan.id] = completed
+
+
 class ExecutionHistory(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    version: Literal[2] = 2
+    version: Literal[3] = 3
     seq: int = Field(default=0, strict=True, ge=0, le=MAX_EVENT_SEQUENCE)
     event_count: int = Field(default=0, strict=True, ge=0)
     latest_plan: PlanEvent | None = None
@@ -54,6 +67,9 @@ class ExecutionHistory(BaseModel):
     # truncate by global recency: unrelated scopes cannot evict the only valid
     # result for a selected dataset. Oversized projections bypass persistence.
     reviewed_steps_by_plan: dict[str, list[Step]] = Field(default_factory=dict)
+    # Kept separate from reviewed evidence: user-evaluated results support
+    # explanation/follow-up without being promoted to independently checked facts.
+    contextual_steps_by_plan: dict[str, list[Step]] = Field(default_factory=dict)
     latest_dataset_ids: list[str] = Field(default_factory=list)
     # Nine substantive messages retain eight after excluding the current input.
     conversation: list[MessageEvent] = Field(default_factory=list, max_length=9)
@@ -94,6 +110,7 @@ class ExecutionHistory(BaseModel):
         if isinstance(event, PlanEvent):
             self.latest_plan = event
             _remember_reviewed_plan(self.reviewed_steps_by_plan, event)
+            _remember_contextual_plan(self.contextual_steps_by_plan, event)
             for step in event.plan.steps:
                 if step.agent == "vision" and step.result:
                     self.vision_results = [*self.vision_results, step.result][-3:]
@@ -152,6 +169,40 @@ def reviewed_history_steps(
     for steps in reversed(list(index.values())):
         for step in reversed(steps):
             marker = step.outputs.get("answer_review", {})
+            scopes = (marker.get("dataset_ids"), marker.get("input_file_ids"))
+            if not all(isinstance(value, list) and all(isinstance(item, str) and item for item in value)
+                       for value in scopes):
+                continue
+            if dataset_ids == set(scopes[0]) and input_file_ids == set(scopes[1]):
+                selected.append(step)
+                if len(selected) == 3:
+                    return selected
+    return selected
+
+
+def analysis_history_steps(
+    history: ExecutionHistory | list[BaseEvent] | None, *,
+    dataset_ids: set[str], input_file_ids: set[str],
+) -> list[Step]:
+    """Latest delivered results for follow-up, without requiring model approval.
+
+    The exact authorized input scope remains mandatory. This view must not be
+    passed to AnswerEvidence as scientific proof or reused as a new execution.
+    """
+    if isinstance(history, ExecutionHistory):
+        index = dict(history.contextual_steps_by_plan)
+        if history.latest_plan is not None:
+            _remember_contextual_plan(index, history.latest_plan)
+    else:
+        index = {}
+        for event in history or []:
+            if isinstance(event, PlanEvent):
+                _remember_contextual_plan(index, event)
+
+    selected: list[Step] = []
+    for steps in reversed(list(index.values())):
+        for step in reversed(steps):
+            marker = step.outputs.get("result_assessment" if has_user_evaluated_result(step) else "answer_review", {})
             scopes = (marker.get("dataset_ids"), marker.get("input_file_ids"))
             if not all(isinstance(value, list) and all(isinstance(item, str) and item for item in value)
                        for value in scopes):

@@ -124,7 +124,7 @@ class MCPImageContext:
             if not done.cancelled():
                 done.exception()
         task.add_done_callback(settled)
-        return await asyncio.wait_for(asyncio.shield(task), self.settings.spill_store_timeout_seconds)
+        return await asyncio.shield(task)
 
     async def drain(self) -> None:
         cancelled = None

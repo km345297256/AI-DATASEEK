@@ -2,7 +2,7 @@ import hashlib
 import json
 import os
 import threading
-import time
+from types import SimpleNamespace
 import zipfile
 
 import pytest
@@ -258,17 +258,60 @@ def test_file_and_batch_size_limits_are_fail_closed(tmp_path, monkeypatch):
     assert files[1]["reason"] == "batch_size_limit"
 
 
-@pytest.mark.parametrize("condition", ["cancelled", "deadline"])
-def test_cancelled_or_expired_batch_never_opens_files(tmp_path, monkeypatch, condition):
+def test_cancelled_batch_never_opens_files(tmp_path, monkeypatch):
     def unexpected_open(*args):
         raise AssertionError("cancelled validation must not open output")
     monkeypatch.setattr(validation, "_open_output", unexpected_open)
     cancelled = threading.Event()
-    if condition == "cancelled":
-        cancelled.set()
-    receipt = _receipt(tmp_path / "report.md", "report", tmp_path, cancelled=cancelled,
-                       deadline=time.monotonic() - 1 if condition == "deadline" else time.monotonic() + 10)
-    assert receipt["reason"] == "validation_deadline"
+    cancelled.set()
+    receipt = _receipt(tmp_path / "report.md", "report", tmp_path, cancelled=cancelled)
+    assert receipt["reason"] == "validation_cancelled"
+
+
+def test_mixed_batch_does_not_expire_after_slow_checks_or_one_bad_file(tmp_path, monkeypatch):
+    """Simulate hours passing without making the test suite actually wait."""
+    clock = [0.0]
+    monkeypatch.setattr(validation, "time", SimpleNamespace(monotonic=lambda: clock[0]), raising=False)
+    original = validation._validate_content
+    visited = []
+    def slow(content, suffix, kind, cancelled):
+        clock[0] += 3600
+        visited.append(suffix)
+        return original(content, suffix, kind, cancelled)
+    monkeypatch.setattr(validation, "_validate_content", slow)
+    image, broken, table, report = [tmp_path / name for name in ("plot.png", "broken.csv", "table.csv", "report.md")]
+    Image.new("RGB", (8, 8), "red").save(image)
+    broken.write_text("a,b\n1,2,3\n")
+    table.write_text("a,b\n1,2\n")
+    report.write_text("A verified summary.")
+    files = validation.validate_artifacts([
+        {"path": str(path), "kind": kind} for path, kind in
+        [(image, "image"), (broken, "table"), (table, "table"), (report, "report")]
+    ], root=tmp_path)["files"]
+    assert [item["valid"] for item in files] == [True, False, True, True]
+    assert files[1]["reason"] == "inconsistent_table_width"
+    assert visited == [".png", ".csv", ".csv", ".md"]
+    assert clock[0] == 4 * 3600
+
+
+def test_explicit_cancellation_preserves_previously_verified_receipts(tmp_path, monkeypatch):
+    stop = threading.Event()
+    original = validation._validate_content
+    calls = 0
+    def cancel_second(content, suffix, kind, cancelled):
+        nonlocal calls
+        calls += 1
+        if calls == 2:
+            stop.set()
+        return original(content, suffix, kind, cancelled)
+    monkeypatch.setattr(validation, "_validate_content", cancel_second)
+    paths = [tmp_path / f"report{i}.md" for i in range(3)]
+    for path in paths:
+        path.write_text("Actual report")
+    files = validation.validate_artifacts([
+        {"path": str(path), "kind": "report"} for path in paths
+    ], root=tmp_path, cancelled=stop)["files"]
+    assert [item["reason"] for item in files] == ["validated", "validation_cancelled", "validation_cancelled"]
 
 
 def test_changed_file_receives_no_trusted_receipt(tmp_path, monkeypatch):

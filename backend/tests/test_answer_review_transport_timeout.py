@@ -1,11 +1,11 @@
-"""Real driver/middleware timeout semantics with an offline provider double."""
+"""Deadline-free review and cancellable audited transport with an offline provider."""
 import asyncio
 from unittest.mock import AsyncMock
 
 from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from langchain_core.outputs import ChatGeneration, ChatResult
-from pydantic import PrivateAttr, ValidationError
+from pydantic import PrivateAttr
 import pytest
 
 from app.core.config import Settings
@@ -19,7 +19,7 @@ from app.infrastructure.external.llm.chat_model import LangChainModelDriver
 
 class ReviewClient(BaseChatModel):
     _requests: list = PrivateAttr(default_factory=list)
-    _delays: list[float | None] = PrivateAttr(default_factory=list)
+    _delays: list = PrivateAttr(default_factory=list)
     _cancelled: int = PrivateAttr(default=0)
     _started: asyncio.Event = PrivateAttr(default_factory=asyncio.Event)
 
@@ -31,6 +31,8 @@ class ReviewClient(BaseChatModel):
         self._requests.append({"messages": messages, **kwargs})
         self._started.set()
         delay = self._delays.pop(0) if self._delays else 0
+        if isinstance(delay, Exception):
+            raise delay
         try:
             if delay is None:
                 await asyncio.Event().wait()
@@ -57,19 +59,15 @@ class TraceStore:
 def scenario(monkeypatch):
     settings = Settings(_env_file=None, api_key="unit-test-review-identity", llm_retry_attempts=2,
                         llm_retry_base_seconds=0, llm_retry_max_seconds=0)
-    # A sub-second fixture deadline keeps cancellation tests fast; deployed
-    # configuration is separately validated at the supported 1..300 seconds.
-    settings.answer_review_request_timeout_seconds = 0.02
     monkeypatch.setattr(execution_module, "get_settings", lambda: settings)
     monkeypatch.setattr(runtime, "get_settings", lambda: settings)
     monkeypatch.setattr("app.domain.services.execution_identity.get_settings", lambda: settings)
     captured = {}
 
-    async def review(*, ask, timeout_seconds, **kwargs):
-        captured["timeout_seconds"] = timeout_seconds
-        async with asyncio.timeout(timeout_seconds):
-            return await ask([SystemMessage(content="Review evidence and return JSON."),
-                              HumanMessage(content="Private fixture, never stored in model trace.")])
+    async def review(*, ask, **kwargs):
+        captured.update(kwargs)
+        return await ask([SystemMessage(content="Review evidence and return JSON."),
+                          HumanMessage(content="Private fixture, never stored in model trace.")])
 
     monkeypatch.setattr("app.domain.services.analysis_answer_review.review_answer", review)
     client = ReviewClient(cache=False)
@@ -90,7 +88,7 @@ async def review(agent):
 @pytest.mark.asyncio
 async def test_provider_timeout_is_auditable_and_retry_can_succeed_without_tools(scenario):
     agent, client, settings, captured = scenario
-    client._delays = [None, 0]
+    client._delays = [runtime.ModelProviderTimeout(), 0]
     store = TraceStore()
     with runtime.model_execution_scope(user_id="u", session_id="s", task_id="review", store=store) as scope:
         response = await review(agent)
@@ -103,8 +101,8 @@ async def test_provider_timeout_is_auditable_and_retry_can_succeed_without_tools
     assert second.status == "succeeded" and second.scheduled_retry is None
     assert first.logical_call_id == second.logical_call_id
     assert {first.role, second.role} == {"answer_review"}
-    assert client._cancelled == 1 and len(client._requests) == 2
-    assert captured["timeout_seconds"] > 2 * settings.answer_review_request_timeout_seconds
+    assert client._cancelled == 0 and len(client._requests) == 2
+    assert "timeout_seconds" not in captured
     for request in client._requests:
         assert request["response_format"] == {"type": "json_object"}
         assert request["max_tokens"] == 4096 and "tools" not in request
@@ -115,9 +113,9 @@ async def test_provider_timeout_is_auditable_and_retry_can_succeed_without_tools
 
 
 @pytest.mark.asyncio
-async def test_all_slow_requests_exhaust_transport_attempts_not_the_analysis_scope(scenario):
+async def test_actual_transport_errors_exhaust_retry_attempts_not_the_analysis_scope(scenario):
     agent, client, _, _ = scenario
-    client._delays = [None, None]
+    client._delays = [runtime.ModelProviderTimeout(), runtime.ModelProviderTimeout()]
     store = TraceStore()
     with runtime.model_execution_scope(user_id="u", session_id="s", task_id="slow", store=store) as scope:
         with pytest.raises(runtime.ModelProviderTimeout):
@@ -126,13 +124,12 @@ async def test_all_slow_requests_exhaust_transport_attempts_not_the_analysis_sco
     first, second = list(store.records.values())
     assert [first.error_code, second.error_code] == ["provider_timeout", "provider_timeout"]
     assert first.scheduled_retry and second.scheduled_retry is None
-    assert client._cancelled == 2
+    assert client._cancelled == 0
 
 
 @pytest.mark.asyncio
 async def test_user_cancellation_is_not_timeout_and_never_retries(scenario):
     agent, client, settings, _ = scenario
-    settings.answer_review_request_timeout_seconds = 10
     client._delays = [None]
     store = TraceStore()
     with runtime.model_execution_scope(user_id="u", session_id="s", task_id="cancel", store=store):
@@ -147,36 +144,32 @@ async def test_user_cancellation_is_not_timeout_and_never_retries(scenario):
 
 
 @pytest.mark.asyncio
-async def test_standalone_review_is_timed_out_and_context_does_not_leak_to_other_requests(scenario):
+async def test_slow_review_and_other_requests_finish_without_time_based_retry(scenario):
     agent, client, _, _ = scenario
-    client._delays = [None, 0]
+    client._delays = [0.04]
     assert (await review(agent)).content == '{"checked":true}'
-    assert len(client._requests) == 2
+    assert len(client._requests) == 1
     # The same real driver outside answer review retains its established
     # network behavior, even when slower than the review-specific fixture cap.
     client._delays = [0.04]
     assert (await agent._model.ainvoke([HumanMessage(content="Other work")])).content == '{"checked":true}'
-    assert client._cancelled == 1
+    assert client._cancelled == 0
 
 
 @pytest.mark.asyncio
-async def test_review_outer_wait_covers_attempts_backoff_and_trace_io(scenario):
+async def test_review_does_not_install_an_outer_deadline(scenario):
     agent, _, settings, captured = scenario
-    settings.answer_review_request_timeout_seconds = 60
     settings.llm_retry_attempts = 4
     settings.llm_retry_max_seconds = 8
     await review(agent)
-    assert captured["timeout_seconds"] >= 4 * 60 + 3 * 8 + 3 * settings.model_trace_store_timeout_seconds
+    assert "timeout_seconds" not in captured
 
 
-@pytest.mark.parametrize("seconds", [0, -1, float("inf"), float("nan"), True])
-def test_private_request_timeout_rejects_invalid_values(seconds):
-    with pytest.raises(ValueError):
-        with runtime.model_request_timeout(seconds):
-            raise AssertionError("Invalid timeout was accepted")
+def test_private_request_timeout_context_has_been_removed():
+    assert not hasattr(runtime, "model_request_timeout")
 
 
 @pytest.mark.parametrize("seconds", [0, 301, float("inf"), float("nan")])
-def test_review_configuration_rejects_unsupported_timeout(seconds):
-    with pytest.raises(ValidationError):
-        Settings(_env_file=None, answer_review_request_timeout_seconds=seconds)
+def test_old_review_configuration_cannot_restore_timeout(seconds):
+    settings = Settings(_env_file=None, answer_review_request_timeout_seconds=seconds)
+    assert not hasattr(settings, "answer_review_request_timeout_seconds")

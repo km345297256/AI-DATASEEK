@@ -53,9 +53,9 @@ async def test_saved_script_cannot_complete_visualization(model_success):
     assert step.outcome.status == "failed" and step.outcome.missing[0].kind == "image"
     assert step.outcome.can_resume is False  # no source snapshot
     assert step.result.startswith("本次分析未完成。")
-    # An unrequested helper script is not progress on the requested chart.
-    assert findings not in step.result
-    assert "分析说明尚未通过完整核验" in step.result
+    # Explanations remain available; a helper script still cannot fulfil the chart.
+    assert findings in step.result
+    assert "分析说明尚未通过完整核验" not in step.result
     assert not step.result.startswith("本次分析已完成")
     assert files == []
 
@@ -112,7 +112,7 @@ async def test_runner_never_repeats_success_prose_after_failed_delivery_contract
     assert len(answers) == 1
     assert answers[0].metadata["analysis_outcome"]["status"] == "failed"
     assert answers[0].message.startswith("本次分析未完成。")
-    assert findings not in answers[0].message
+    assert findings in answers[0].message
     assert "已全部完成，所有图表已交付。" not in answers[0].message
     assert answers[0].metadata["analysis_outcome"]["missing"][0]["kind"] == "image"
     assert not answers[0].attachments

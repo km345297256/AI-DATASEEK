@@ -9,7 +9,6 @@ from __future__ import annotations
 import base64
 import io
 import re
-import time
 import warnings
 from typing import Callable
 from app.services.svg_styles import (
@@ -19,6 +18,7 @@ from app.services.svg_render import SvgRenderError, render_svg
 
 
 SVG_NS = "http://www.w3.org/2000/svg"
+XLINK_HREF = "{http://www.w3.org/1999/xlink}href"
 MAX_ELEMENTS = 100_000
 MAX_DEPTH = 128
 _DRAWABLE = {"path", "rect", "circle", "ellipse", "line", "polyline", "polygon", "text", "image", "use"}
@@ -70,12 +70,17 @@ def _embedded_raster(value: str, max_pixels: int, check: Callable[[], None]) -> 
             return image.width * image.height, "data:image/png;base64," + base64.b64encode(normalized.getvalue()).decode("ascii")
 
 
-def svg_metadata(content: bytes, *, max_pixels: int, check: Callable[[], None], deadline: float | None = None) -> dict:
+def static_svg_document(content: bytes, *, max_pixels: int, check: Callable[[], None]) -> bytes:
+    """Return only the statically validated XML tree for offline rendering.
+
+    Shared by artifact inspection and image preview: a preview cannot weaken
+    the active-content, local-resource, CSS or reference-expansion rules.
+    This function never rewrites the source artifact.
+    """
     from defusedxml import ElementTree as SafeTree
     from defusedxml.common import DefusedXmlException
     from xml.etree import ElementTree
 
-    deadline = time.monotonic() + 30 if deadline is None else deadline
     depth = count = metadata_depth = embedded_pixels = 0
     ids: dict = {}
     references: list[str] = []
@@ -103,6 +108,18 @@ def svg_metadata(content: bytes, *, max_pixels: int, check: Callable[[], None], 
                     metadata_depth += 1
                 if namespace not in {"", SVG_NS} and not (metadata_depth and namespace in _METADATA_NS):
                     raise InvalidSvg()
+                # MuPDF accepts SVG2 href but misses ElementTree's generated
+                # aliases (ns1:href) for XLink. Normalize by namespace URI, not
+                # a guessed prefix, BEFORE the unchanged resource/reference
+                # checks below. Never select between conflicting references.
+                href_keys = [key for key in node.attrib if _local_name(key).lower() == "href"]
+                if any(key not in {"href", XLINK_HREF} for key in href_keys):
+                    raise InvalidSvg()
+                if XLINK_HREF in node.attrib:
+                    value = node.attrib.pop(XLINK_HREF)
+                    if "href" in node.attrib and node.attrib["href"] != value:
+                        raise InvalidSvg()
+                    node.set("href", value)
                 for key, value in node.attrib.items():
                     name = _local_name(key).lower()
                     if name.startswith("on") or name in {"base", "src"}:
@@ -159,8 +176,12 @@ def svg_metadata(content: bytes, *, max_pixels: int, check: Callable[[], None], 
         raise InvalidSvg() from None
     # Serializing removes the DTD and all XML parser directives. SVG attributes
     # have already been checked, including decoded character references.
+    return ElementTree.tostring(root, encoding="utf-8")
+
+
+def svg_metadata(content: bytes, *, max_pixels: int, check: Callable[[], None]) -> dict:
+    document = static_svg_document(content, max_pixels=max_pixels, check=check)
     try:
-        return render_svg(ElementTree.tostring(root, encoding="utf-8"), max_pixels=max_pixels,
-                          check=check, deadline=deadline)
+        return render_svg(document, max_pixels=max_pixels, check=check)
     except SvgRenderError as error:
         raise InvalidSvg(error.reason) from None

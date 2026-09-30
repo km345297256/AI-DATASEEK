@@ -3,6 +3,7 @@
 import asyncio
 import copy
 import json
+import httpx
 from collections.abc import Callable, Sequence
 from typing import Any, Optional
 
@@ -349,11 +350,16 @@ def create_chat_model(
             kwargs["client_kwargs"] = {"headers": dict(settings.extra_headers)}
         else:
             kwargs["default_headers"] = settings.extra_headers
-    if ov.get("timeout") is not None:
-        if provider == "ollama":
-            kwargs.setdefault("client_kwargs", {})["timeout"] = ov["timeout"]
-        else:
-            kwargs["timeout"] = ov["timeout"]
+    # SDK defaults (often ten minutes) are still task cutoffs. Explicitly
+    # disable them for every analysis/review route, including cloned clients.
+    # Legacy timeout overrides must not silently restore an elapsed-time cap.
+    if provider == "ollama":
+        kwargs.setdefault("client_kwargs", {})["timeout"] = None
+    else:
+        # ChatDeepSeek drops None constructor values and would restore the
+        # OpenAI SDK's 600-second default. An explicit disabled Timeout object
+        # survives that filtering and disables all four transport timers.
+        kwargs["timeout"] = httpx.Timeout(None) if provider == "deepseek" else None
     if provider == "deepseek":
         from langchain_deepseek import ChatDeepSeek
         client = ChatDeepSeek(**kwargs, extra_body={"thinking": {"type": "disabled"}})

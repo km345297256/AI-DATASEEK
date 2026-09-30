@@ -47,6 +47,11 @@
         "shared": true
       }
     },
+    "svg": {
+      "readers": ["svg"],
+      "view_kind": "image",
+      "capabilities": {"operations": ["preview"], "input_mode": "whole", "shared": false}
+    },
     "tiff": {
       "readers": [
         "binary"

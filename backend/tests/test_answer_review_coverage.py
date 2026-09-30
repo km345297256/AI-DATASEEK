@@ -117,7 +117,7 @@ async def test_oversize_explicit_objective_matrix_is_unknown_not_silently_shorte
     assert len(objectives) == 1 and objectives[0].aspect == "coverage_scope_exceeds_limit"
     ask = AsyncMock()
     result = await review_coverage(ask=ask, parse_response=review._parse_response, request=request,
-        objectives=objectives, paragraphs=[{"text": "Supported answer", "kind": "analysis"}], timeout_seconds=1)
+        objectives=objectives, paragraphs=[{"text": "Supported answer", "kind": "analysis"}])
     assert result.status == "unavailable" and result.metadata["reason"] == "coverage_input_incomplete"
     ask.assert_not_awaited()
 

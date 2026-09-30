@@ -147,6 +147,16 @@ test('actual PlanPanel renders consistent status labels, icons and successful-st
   }
 });
 
+test('completed plan accepts execution delivery outcomes without a scientific review and clarifies the label', async () => {
+  const messages = [user(), answer('step-0', outcome('succeeded'))];
+  assert.equal(messages[1].content.metadata.answer_review, undefined);
+  assert.equal(presentation.presentPlan(plan('completed'), messages).status, 'completed');
+  const html = await renderToString(vue.createSSRApp(componentModule.exports.default, { plan: plan('completed'), messages }));
+  assert.match(html, /任务已完成/);
+  assert.ok(html.includes(`title="${presentation.ANALYSIS_COMPLETION_DESCRIPTION}"`));
+  assert.doesNotMatch(html, /证据核验|科学验证|任务失败|任务部分完成/);
+});
+
 test('interactive chat and read-only replay both pass current messages to the shared panel', () => {
   for (const path of ['../src/pages/ChatPage.vue', '../src/pages/SharePage.vue']) {
     assert.match(readFileSync(new URL(path, import.meta.url), 'utf8'), /<PlanPanel\b[^\n]*:messages="messages"/);

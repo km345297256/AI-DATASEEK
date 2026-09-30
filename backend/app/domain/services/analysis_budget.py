@@ -140,9 +140,10 @@ class AnalysisBudgetService:
         settings = get_settings()
         self.repository = repository
         self.policy = policy or BudgetPolicy.from_settings(settings)
-        self.store_timeout_seconds = (settings.model_trace_store_timeout_seconds
-                                      if store_timeout_seconds is None else store_timeout_seconds)
-        if not 0 < self.store_timeout_seconds <= 30:
+        # Durable analysis metering must not borrow the best-effort log sink's
+        # deadline. A slow write waits until completion or explicit cancellation.
+        self.store_timeout_seconds = store_timeout_seconds
+        if self.store_timeout_seconds is not None and not 0 < self.store_timeout_seconds <= 30:
             raise ValueError("Invalid budget store timeout")
 
     async def _store(self, awaitable):

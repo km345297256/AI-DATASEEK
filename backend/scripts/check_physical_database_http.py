@@ -105,7 +105,7 @@ async def acceptance(database, client, data, user_id):
             return v
     try:
         catalog=await api("GET","/api/v1/visualizations")
-        assert catalog["engine"]=="cordis" and len(catalog["plugins"])==83
+        assert catalog["engine"]=="cordis" and len(catalog["plugins"])==84
         by_id={p["id"]:p for p in catalog["plugins"]}
         for plugin,reader in PLUGINS.items():
             p=by_id[plugin];assert p["reader"]==reader and p["adapter"]=="physical-database" and p["contract_version"]==2

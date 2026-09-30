@@ -36,6 +36,9 @@
                   :class="recoveredByCallId ? 'text-[var(--text-tertiary)]' : 'text-amber-700'"
                   :title="recoveredByCallId ? '这次执行失败后，同一步骤中的同一程序已成功执行。点击仍可查看这次失败的记录；不代表整个分析任务已完成。' : undefined"
                 >{{ recoveredByCallId ? '执行失败，后续已恢复' : '执行失败' }}</span>
+                <span v-else-if="tool.execution_status === 'not_started'" class="ml-2 text-[11px] text-[var(--text-tertiary)]"
+                  title="本次调用未启动执行，需要先完成准备或纠正调用；不代表脚本运行后出错。"
+                >未执行</span>
                 <span v-if="collapsedCount > 1" class="ml-1 rounded-full border border-[var(--border-main)] px-1.5 py-[1px] text-[11px] text-[var(--text-tertiary)]">
                   x{{ collapsedCount }}
                 </span>

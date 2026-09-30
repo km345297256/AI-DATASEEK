@@ -33,7 +33,8 @@
                   style="color: var(--text-primary);">
                   {{ step.description }}
                 </div>
-                <span class="text-xs text-[var(--text-tertiary)]">{{ t(PLAN_STATUS_LABELS[step.displayStatus]) }}</span>
+                <span class="text-xs text-[var(--text-tertiary)]"
+                  :title="step.displayStatus === 'completed' ? ANALYSIS_COMPLETION_DESCRIPTION : undefined">{{ t(PLAN_STATUS_LABELS[step.displayStatus]) }}</span>
               </div>
             </div>
           </div>
@@ -52,7 +53,7 @@
               <CirclePause v-else-if="presentation.status === 'stopped'" class="relative top-[2px] flex-shrink-0 text-[var(--icon-tertiary)]" :size="16" />
               <Clock v-else class="relative top-[2px] flex-shrink-0" :size="16" />
               <div class="flex flex-col w-full gap-[2px] truncate">
-                <div class="text-sm truncate" :title="currentStep" style="color: var(--text-tertiary);">
+                <div class="text-sm truncate" :title="presentation.status === 'completed' ? ANALYSIS_COMPLETION_DESCRIPTION : currentStep" style="color: var(--text-tertiary);">
                   {{ currentStep }}
                 </div>
               </div>
@@ -76,7 +77,7 @@ import { ChevronUp, ChevronDown, Clock, CircleX, CircleAlert, CirclePause } from
 import StepSuccessIcon from './icons/StepSuccessIcon.vue';
 import type { PlanEventData } from '../types/event';
 import type { Message } from '../types/message';
-import { PLAN_STATUS_LABELS, presentPlan } from '../utils/planPresentation';
+import { ANALYSIS_COMPLETION_DESCRIPTION, PLAN_STATUS_LABELS, presentPlan } from '../utils/planPresentation';
 
 interface Props {
   plan: PlanEventData;

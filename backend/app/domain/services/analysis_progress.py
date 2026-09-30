@@ -102,22 +102,65 @@ class AnalysisProgressGuard:
         self.last_notice: str | None = None
         self.blocked_without_progress = 0
         self._blocked_targets: set[str | None] = set()
+        # Preparation/dispatch corrections are not failed executions. Keep a
+        # small diagnostic state machine per cause instead of letting two
+        # different correctable calls terminate an otherwise recoverable task.
+        self._recovery_checkpoints: dict[tuple[str | None, str], int] = {}
+        self._preparation_observations: dict[tuple[str | None, str], set[str]] = {}
 
-    def record_blocked(self, call: dict, reason: str, *, program_path: str | None = None) -> None:
+    def record_blocked(self, call: dict, reason: str, *, program_path: str | None = None,
+                       recovery_kind: str | None = None, preparation_observation: str | None = None) -> None:
         """Track dispatches that did no work; they cannot spin until a quota.
 
         This is a consecutive no-progress condition, not a task-wide limit.
         Concrete new evidence or a valid observation clears it.
         """
+        target = program_identity(program_path) if program_path else self._code_target(call)
+        if recovery_kind in {"program_preparation", "program_tool_redirect", "program_diagnosis"}:
+            key = (target, recovery_kind)
+            if recovery_kind == "program_preparation" and preparation_observation:
+                observed = self._preparation_observations.setdefault(key, set())
+                if preparation_observation not in observed:
+                    # Resolving the directory and then creating source are
+                    # distinct, measured preparation advances. A cosmetic code
+                    # edit or cycling back to an earlier state is not one.
+                    observed.add(preparation_observation)
+                    self._recovery_checkpoints.pop(key, None)
+            phase = self._recovery_checkpoints.get(key, 0) + 1
+            self._recovery_checkpoints[key] = phase
+            self.stalled = True
+            self.last_notice = reason + (
+                " DIAGNOSTIC RECOVERY: this preparation/dispatch condition is unchanged. "
+                "Do not issue another execution request or blind rewrite. Use the indicated read or preparation "
+                "tool now, correct the concrete prerequisite, then request execution once. "
+                "If the same blocked action is requested again without relevant progress, report the concrete blocker."
+                if phase >= 2 else "")
+            return
         self._increment(self.failures, call_identity(call))
         self.blocked_without_progress += 1
-        self._blocked_targets.add(program_identity(program_path) if program_path else self._code_target(call))
+        self._blocked_targets.add(target)
         self.stalled = True
         self.last_notice = reason
 
     @property
     def should_stop(self) -> bool:
-        return self.blocked_without_progress >= 2
+        return self.blocked_without_progress >= 2 or any(phase >= 3 for phase in self._recovery_checkpoints.values())
+
+    def resolve_preparation(self, path: str) -> None:
+        """A fresh trusted ready probe resolves preparation, never launch UNKNOWN."""
+        target = program_identity(path)
+        for kind in ("program_preparation", "program_tool_redirect"):
+            self._recovery_checkpoints.pop((target, kind), None)
+            self._preparation_observations.pop((target, kind), None)
+        if not self._blocked_targets and not self._recovery_checkpoints and not any(
+                state.diagnostic_required for state in self.programs.values()):
+            self.stalled = False
+
+    def is_diagnostic_correction(self, call: dict, program_path: str | None = None) -> bool:
+        target = program_identity(program_path) if program_path else self._code_target(call)
+        state = self.programs.get(target) if target else None
+        return bool(state and (state.diagnostic_required or self.writes.get(target, 0) >= 2)
+                    and call_identity(call) not in self.unsafe_failed_calls)
 
     def record_observation(self) -> None:
         """A trusted original-operation observation is legitimate work."""
@@ -179,6 +222,11 @@ class AnalysisProgressGuard:
               and (call.get("args") or {}).get("append") is not True
               and self.writes.get(target, 0) >= 2):
             reason = (
+                "The saved program has already been written twice, and its prerequisites are still not ready. "
+                "This additional whole-program rewrite was NOT dispatched. Inspect the source or working directory "
+                "identified by program_preflight, then use file_str_replace for the concrete source correction "
+                "or prepare the missing directory. Do not attempt execution before that prerequisite is fixed."
+                if state and state.prerequisites_observed and not state.prerequisites_ready else
                 "The saved program has already been written twice without a confirmed execution. "
                 "This additional rewrite was NOT executed. Inspect the existing program if needed, "
                 "then execute it once with program_run and validate the required outputs. "
@@ -236,7 +284,9 @@ class AnalysisProgressGuard:
         failure.not_started_operation = operation
         self._clear_recovered_prelaunch_block(key, failure.target)
 
-    def record_program_prerequisites(self, *, path: str, prerequisite_digest: str, ready: bool = True) -> None:
+    def record_program_prerequisites(self, *, path: str, prerequisite_digest: str, ready: bool = True,
+                                    cwd_state: str | None = None, source_state: str | None = None,
+                                    syntax: dict | None = None) -> None:
         """Observe exact launch prerequisites through a trusted read-only probe.
 
         This is prerequisite repair, not scientific evidence or execution.
@@ -251,6 +301,8 @@ class AnalysisProgressGuard:
                                                               "content": prerequisite_digest})
         state.prerequisites_ready = ready is True
         state.prerequisites_observed = True
+        if ready:
+            self.resolve_preparation(path)
         for key, failure in self.program_launch_failures.items():
             if failure.target == target:
                 self._clear_recovered_prelaunch_block(key, target)
@@ -321,6 +373,7 @@ class AnalysisProgressGuard:
         self.writes.pop(target, None)
         self.reads.clear()  # The program may have changed derived outputs.
         if returncode == 0:
+            self._recovery_checkpoints.pop((target, "program_diagnosis"), None)
             state.failures.clear()
             state.diagnostic_required = False
             state.diagnostic_exception = None
@@ -420,6 +473,7 @@ class AnalysisProgressGuard:
             return
         state.joint_diagnostic_trials.update(bundles)
         state.diagnostic_required = False
+        self._recovery_checkpoints.pop((target, "program_diagnosis"), None)
         if self._blocked_targets <= {target}:
             self.blocked_without_progress = 0
             self._blocked_targets.clear()
@@ -461,6 +515,7 @@ class AnalysisProgressGuard:
         if not state.diagnostic_required:
             return
         state.diagnostic_required = False
+        self._recovery_checkpoints.pop((target, "program_diagnosis"), None)
         if self._blocked_targets <= {target}:
             self.blocked_without_progress = 0
             self._blocked_targets.clear()
@@ -544,6 +599,7 @@ class AnalysisProgressGuard:
                             # the failed execution history. Another failure
                             # after the checkpoint needs another diagnosis.
                             state.diagnostic_required = False
+                            self._recovery_checkpoints.pop((target, "program_diagnosis"), None)
                             recovered.add(target)
                     if self._blocked_targets <= recovered or not self.programs:
                         self.blocked_without_progress = 0

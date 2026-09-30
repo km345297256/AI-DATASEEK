@@ -17,7 +17,6 @@ from app.domain.models.tool_approval import (
 from app.domain.repositories.tool_approval_repository import ToolApprovalRepository
 
 
-_REPOSITORY_TIMEOUT_SECONDS = 5.0
 _MAINTENANCE_BATCH_SIZE = 500
 _T = TypeVar("_T")
 
@@ -37,7 +36,7 @@ class ToolApprovalConflictError(RuntimeError):
 
 
 class ToolApprovalStateError(RuntimeError):
-    """A bounded persistence operation failed without exposing private data."""
+    """A persistence operation failed without exposing private data."""
 
     def __init__(self) -> None:
         super().__init__("Tool approval state operation failed")
@@ -89,8 +88,9 @@ class ToolApprovalService:
     @staticmethod
     async def _repository_call(operation: Callable[[], Awaitable[_T]]) -> _T:
         try:
-            async with asyncio.timeout(_REPOSITORY_TIMEOUT_SECONDS):
-                return await operation()
+            # DB latency must not turn a valid analysis call into a denial.
+            # User cancellation and genuine persistence failures still apply.
+            return await operation()
         except asyncio.CancelledError:
             raise
         except Exception:
@@ -258,6 +258,10 @@ class ToolApprovalService:
         if updated is None:
             raise ToolApprovalConflictError()
         await self._drop_creation_context(approval_id)
+        # The DB's atomic comparison uses the request's timestamp. A slow
+        # response must not extend that authorization until execution starts.
+        if updated.expires_at <= self._now():
+            raise ToolApprovalConflictError()
         return updated
 
     async def cancel(self, approval_id: str) -> ToolApprovalRecord:

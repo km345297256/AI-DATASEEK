@@ -3,7 +3,7 @@ import json
 import logging
 import shlex
 import httpx
-from typing import Any, Awaitable, Callable, ClassVar, Optional
+from typing import Any, Awaitable, Callable, ClassVar, Literal, Optional
 from app.domain.external.sandbox import Sandbox
 from app.domain.services.tools.base import BaseToolkit
 from langchain.tools import tool
@@ -12,11 +12,8 @@ from app.domain.models.tool_result import ToolResult
 
 logger = logging.getLogger(__name__)
 
-_MAX_BOUNDED_TIMEOUT_SECONDS = 120
-_OUTER_DEADLINE_RESERVE_SECONDS = 0.5
-_SANDBOX_WAIT_TRANSPORT_GRACE_SECONDS = 1
+_MAX_OBSERVATION_WINDOW_SECONDS = 120
 _PROCESS_CANCELLATION_TIMEOUT_SECONDS = 5
-_PROGRAM_LAUNCH_TIMEOUT_SECONDS = 30
 _PROGRAM_OBSERVATION_GRACE_SECONDS = 5
 _PROGRAM_RETRY_DELAY_SECONDS = 1
 
@@ -70,7 +67,7 @@ class ShellToolkit(BaseToolkit):
         exec_dir: str,
         command: str
     ) -> ToolResult:
-        """Start a command in a specified shell session. Use for interactive or long-running processes; prefer shell_run for bounded non-interactive commands.
+        """Start a command in a specified shell session. Use for interactive or long-running processes; prefer shell_run for non-interactive commands.
         
         Args:
             id: Unique identifier of the target shell session
@@ -90,13 +87,13 @@ class ShellToolkit(BaseToolkit):
         command: str,
         timeout_seconds: int = 30,
     ) -> ToolResult:
-        """Run a bounded shell command and wait once for its result. Use for inspection and utilities; run custom Python analysis with program_run so shell pipelines cannot mask its exit status.
+        """Run a shell command to completion or cancellation with no elapsed-time cutoff. Use for inspection and utilities; run custom Python analysis with program_run so shell pipelines cannot mask its exit status.
 
         Args:
             id: Unique identifier of the target shell session
             exec_dir: Working directory for command execution (must use absolute path)
             command: Shell command to execute
-            timeout_seconds: Maximum bounded wait in seconds, clamped to 1-120
+            timeout_seconds: Status observation window in seconds (1-120), not a total runtime limit
         """
         return await self._run_bounded_command(
             id=id,
@@ -139,7 +136,7 @@ class ShellToolkit(BaseToolkit):
         """
         from app.domain.services.execution_evidence import current_shell_attempt
 
-        poll_seconds = max(1, min(timeout_seconds, _MAX_BOUNDED_TIMEOUT_SECONDS))
+        poll_seconds = max(1, min(timeout_seconds, _MAX_OBSERVATION_WINDOW_SECONDS))
         uses_receipts = getattr(self.sandbox, "supports_execution_receipts", False) is True
         previous = current_shell_attempt(self.sandbox, id) if uses_receipts else None
         attempt = None
@@ -164,8 +161,7 @@ class ShellToolkit(BaseToolkit):
 
         try:
             try:
-                async with asyncio.timeout(_PROGRAM_LAUNCH_TIMEOUT_SECONDS):
-                    result = await launch()
+                result = await launch()
             except (TimeoutError, httpx.TransportError, ConnectionError):
                 # A launch timeout is ambiguous. Only an already registered
                 # private operation gives us an identity to observe safely.
@@ -243,7 +239,7 @@ class ShellToolkit(BaseToolkit):
                     id=id, command=command, returncode=data["returncode"], retry_observation=True,
                 )
         except asyncio.CancelledError:
-            await self._kill_after_bounded_timeout(kill_once, reason="cancelled")
+            await self._cancel_process(kill_once, reason="cancelled")
             raise
         finally:
             dispose()
@@ -257,13 +253,13 @@ class ShellToolkit(BaseToolkit):
         timeout_seconds: int = 120,
         source_root: Optional[str] = None,
     ) -> ToolResult:
-        """Safely extract a ZIP, RAR, or 7z dataset, including nested archives, in one bounded call. Prefer this over manually chaining archive commands. It rejects traversal, links, encrypted members, and excessive expansion, and returns a final-file manifest.
+        """Safely extract a ZIP, RAR, or 7z dataset, including nested archives, to completion without an elapsed-time cutoff. Prefer this over manually chaining archive commands. It rejects traversal, links, encrypted members, and excessive expansion, and returns a final-file manifest.
 
         Args:
             id: Unique identifier of the target shell session
             archive_path: Absolute path to the source archive inside the sandbox
             output_dir: Absolute path to a new output directory under /home/ubuntu/output
-            timeout_seconds: Maximum bounded wait in seconds, clamped to 1-120
+            timeout_seconds: Status observation window in seconds (1-120), not a total runtime limit
             source_root: Optional trusted dataset root; the resolved archive must remain below it
         """
         source_root_option = (
@@ -273,7 +269,6 @@ class ShellToolkit(BaseToolkit):
             f"ai-dataseek-unpack {shlex.quote(archive_path)} "
             f"--output {shlex.quote(output_dir)} "
             f"{source_root_option}"
-            f"--timeout-seconds {max(1, min(timeout_seconds, 120))}"
         )
         return await self._run_bounded_command(
             id=id,
@@ -290,23 +285,34 @@ class ShellToolkit(BaseToolkit):
         output_dir: str,
         max_plots: int = 4,
         timeout_seconds: int = 90,
+        chart_formats: Optional[list[Literal["png", "svg"]]] = None,
     ) -> ToolResult:
-        """Create a bounded model-free profile, compact evidence, and 1-4 useful PNG charts for one selected CSV/TSV, Excel, GeoTIFF, directory, or ZIP/RAR/7z input. Archives, including nested archives, are extracted safely. This returns evidence and artifacts; use it only when its scope directly matches the user's request, then decide whether the evidence fully answers that request. Use a new output directory under /home/ubuntu/output.
+        """Create a bounded model-free profile, compact evidence, and 1-4 useful charts for one selected CSV/TSV, Excel, GeoTIFF, directory, or ZIP/RAR/7z input. PNG is the default; request SVG or both formats without writing a custom export script. Archives, including nested archives, are extracted safely. This returns evidence and artifacts; use it only when its scope directly matches the user's request, then decide whether the evidence fully answers that request. Use a new output directory under /home/ubuntu/output.
 
         Args:
             id: Unique identifier of the target shell session
             input_path: Absolute dataset file, archive, or directory path inside the sandbox
             output_dir: Absolute new output directory under /home/ubuntu/output
-            max_plots: Maximum number of PNG charts, clamped to 1-4
-            timeout_seconds: Maximum bounded wait in seconds, clamped to 5-120
+            max_plots: Maximum number of distinct charts, clamped to 1-4; each is exported in all requested formats
+            timeout_seconds: Status observation window in seconds (5-120), not a total runtime limit
+            chart_formats: Native chart exports, png and/or svg; omitted defaults to png. SVG retains vector marks and text paths; raster source layers remain raster.
         """
+        if chart_formats is not None and (
+            not isinstance(chart_formats, list) or not chart_formats
+            or any(not isinstance(value, str) or value not in {"png", "svg"} for value in chart_formats)
+        ):
+            return ToolResult(success=False, message="chart_formats must be a nonempty list of png or svg",
+                              data={"reason": "tool_arguments_invalid", "execution_started": False})
+        formats_option = (
+            " --chart-formats " + " ".join(dict.fromkeys(chart_formats))
+            if chart_formats is not None else ""
+        )
         bounded_plots = max(1, min(max_plots, 4))
         bounded_timeout = max(5, min(timeout_seconds, 120))
         command = (
             f"ai-dataseek-quicklook {shlex.quote(input_path)} "
             f"--output {shlex.quote(output_dir)} "
-            f"--max-plots {bounded_plots} "
-            f"--timeout-seconds {bounded_timeout}"
+            f"--max-plots {bounded_plots}{formats_option}"
         )
         return await self._run_bounded_command(
             id=id,
@@ -327,7 +333,7 @@ class ShellToolkit(BaseToolkit):
         Args:
             id: Unique identifier of the target shell session
             input_path: Absolute NetCDF or GeoTIFF path inside the sandbox
-            timeout_seconds: Maximum bounded wait in seconds, clamped to 5-120
+            timeout_seconds: Status observation window in seconds (5-120), not a total runtime limit
         """
         return await self._run_scientific_command(
             id=id,
@@ -354,7 +360,7 @@ class ShellToolkit(BaseToolkit):
             variable: NetCDF data variable name; optional only when exactly one candidate exists
             band: One-based GeoTIFF band index
             dimension_indices: Optional NetCDF dimension-to-integer-index selection
-            timeout_seconds: Maximum bounded wait in seconds, clamped to 5-120
+            timeout_seconds: Status observation window in seconds (5-120), not a total runtime limit
         """
         return await self._run_scientific_command(
             id=id,
@@ -390,7 +396,7 @@ class ShellToolkit(BaseToolkit):
             start: Optional inclusive coordinate-range start for the selected dimension
             end: Optional inclusive coordinate-range end for the selected dimension
             output_path: Optional NetCDF path below /home/ubuntu/output; use it for non-scalar results
-            timeout_seconds: Maximum bounded wait in seconds, clamped to 5-120
+            timeout_seconds: Status observation window in seconds (5-120), not a total runtime limit
         """
         bounded_timeout = max(5, min(timeout_seconds, 120))
         parts = [
@@ -436,7 +442,7 @@ class ShellToolkit(BaseToolkit):
             time_start: Optional inclusive time-coordinate start
             time_end: Optional inclusive time-coordinate end
             dimension_indices: Optional NetCDF dimension-to-integer-index selection
-            timeout_seconds: Maximum bounded wait in seconds, clamped to 5-120
+            timeout_seconds: Status observation window in seconds (5-120), not a total runtime limit
         """
         return await self._run_scientific_command(
             id=id, operation="subset", input_path=input_path, output_path=output_path,
@@ -462,7 +468,7 @@ class ShellToolkit(BaseToolkit):
             output_path: New GeoTIFF path below /home/ubuntu/output
             variable: NetCDF data variable name; required when multiple numeric variables exist
             dimension_indices: Required selections for non-spatial NetCDF dimensions when applicable
-            timeout_seconds: Maximum bounded wait in seconds, clamped to 5-120
+            timeout_seconds: Status observation window in seconds (5-120), not a total runtime limit
         """
         return await self._run_scientific_command(
             id=id, operation="convert", input_path=input_path, output_path=output_path,
@@ -491,7 +497,7 @@ class ShellToolkit(BaseToolkit):
             resolution: Optional positive target resolution in target-CRS units
             bbox: Optional [left, bottom, right, top] in the source CRS
             resampling: nearest, bilinear, cubic, or average
-            timeout_seconds: Maximum bounded wait in seconds, clamped to 5-120
+            timeout_seconds: Status observation window in seconds (5-120), not a total runtime limit
         """
         return await self._run_scientific_command(
             id=id, operation="transform", input_path=input_path, output_path=output_path,
@@ -517,7 +523,7 @@ class ShellToolkit(BaseToolkit):
             output_path: New single-band GeoTIFF path below /home/ubuntu/output
             index_name: ndvi, evi, ndwi, or nbr
             bands: Exact semantic band mapping, such as {"nir": 4, "red": 3}
-            timeout_seconds: Maximum bounded wait in seconds, clamped to 5-120
+            timeout_seconds: Status observation window in seconds (5-120), not a total runtime limit
         """
         return await self._run_scientific_command(
             id=id, operation="raster-index", input_path=input_path, output_path=output_path,
@@ -543,7 +549,7 @@ class ShellToolkit(BaseToolkit):
             output_path: New single-band GeoTIFF path below /home/ubuntu/output
             operation: slope or aspect
             band: One-based DEM band index
-            timeout_seconds: Maximum bounded wait in seconds, clamped to 5-120
+            timeout_seconds: Status observation window in seconds (5-120), not a total runtime limit
         """
         return await self._run_scientific_command(
             id=id, operation="terrain", input_path=input_path, output_path=output_path,
@@ -571,7 +577,7 @@ class ShellToolkit(BaseToolkit):
             variable: NetCDF data variable name; optional only when exactly one candidate exists
             band: One-based GeoTIFF band index
             dimension_indices: Optional NetCDF dimension-to-integer-index selection
-            timeout_seconds: Maximum bounded wait in seconds, clamped to 5-120
+            timeout_seconds: Status observation window in seconds (5-120), not a total runtime limit
         """
         return await self._run_scientific_command(
             id=id,
@@ -604,7 +610,7 @@ class ShellToolkit(BaseToolkit):
             variable: Optional explicit NetCDF variable; omit only when one numeric candidate exists
             max_plots: Maximum representative PNG count, clamped to 1-4
             dimension_indices: Indices for additional non-spatial dimensions that must be fixed
-            timeout_seconds: Maximum bounded wait in seconds, clamped to 5-120
+            timeout_seconds: Status observation window in seconds (5-120), not a total runtime limit
         """
         return await self._run_scientific_command(
             id=id,
@@ -643,7 +649,7 @@ class ShellToolkit(BaseToolkit):
             longitude_coordinate: Optional one-dimensional longitude coordinate name
             dimension_indices: Explicit selections for all extra dimensions
             max_points: Maximum returned points, clamped to 2-2000
-            timeout_seconds: Maximum bounded wait in seconds, clamped to 5-120
+            timeout_seconds: Status observation window in seconds (5-120), not a total runtime limit
         """
         return await self._run_recipe_command(
             id=id, operation="point-timeseries", input_path=input_path,
@@ -683,7 +689,7 @@ class ShellToolkit(BaseToolkit):
             longitude_coordinate: Optional one-dimensional longitude coordinate name
             dimension_indices: Explicit selections for all extra dimensions
             max_points: Maximum returned points, clamped to 2-2000
-            timeout_seconds: Maximum bounded wait in seconds, clamped to 5-120
+            timeout_seconds: Status observation window in seconds (5-120), not a total runtime limit
         """
         return await self._run_recipe_command(
             id=id, operation="region-timeseries", input_path=input_path,
@@ -719,7 +725,7 @@ class ShellToolkit(BaseToolkit):
             latitude_coordinate: Optional one-dimensional latitude coordinate name
             longitude_coordinate: Optional one-dimensional longitude coordinate name
             dimension_indices: Explicit selections for all non-spatial dimensions
-            timeout_seconds: Maximum bounded wait in seconds, clamped to 5-120
+            timeout_seconds: Status observation window in seconds (5-120), not a total runtime limit
         """
         return await self._run_recipe_command(
             id=id, operation="region-statistics", input_path=input_path,
@@ -748,7 +754,7 @@ class ShellToolkit(BaseToolkit):
             variable: NetCDF data variable name; required when multiple numeric variables exist
             dimension_indices: Optional dimensions to select before averaging the rest
             max_points: Maximum returned profile points, clamped to 2-2000
-            timeout_seconds: Maximum bounded wait in seconds, clamped to 5-120
+            timeout_seconds: Status observation window in seconds (5-120), not a total runtime limit
         """
         return await self._run_recipe_command(
             id=id, operation="last-dimension-profile", input_path=input_path,
@@ -833,56 +839,14 @@ class ShellToolkit(BaseToolkit):
         launch: Callable[[], Awaitable[ToolResult]] | None = None,
         recover_output: bool = True,
     ) -> ToolResult:
-        timeout_seconds = max(
-            1,
-            min(timeout_seconds, _MAX_BOUNDED_TIMEOUT_SECONDS),
+        # Shell utilities and native tools have the same lifecycle as Python
+        # analysis: launch exactly once, observe until terminal, kill only on
+        # cancellation. The parameter selects a poll interval, never a cutoff.
+        result = await self._run_analysis_program(
+            id=id, exec_dir=exec_dir, command=command,
+            timeout_seconds=timeout_seconds,
+            launch=launch or (lambda: self.sandbox.exec_command(id, exec_dir, command)),
         )
-        dispose_cancellation, kill_once = self._process_cancellation(id)
-        exec_result = await launch() if launch is not None else await self.sandbox.exec_command(id, exec_dir, command)
-        exec_data = self._result_data(exec_result)
-        if exec_data.get("status") != "running":
-            dispose_cancellation()
-            return await self._recover_contract_output(id, exec_result) if recover_output else exec_result
-
-        # The production interceptor owns a 120 second outer deadline. Asking
-        # the sandbox to wait for that exact duration lets the outer deadline
-        # win just before the sandbox can report its bounded running state.
-        # Reserve transport/cleanup headroom only at that shared ceiling.
-        sandbox_wait_seconds = timeout_seconds
-        if timeout_seconds == _MAX_BOUNDED_TIMEOUT_SECONDS:
-            sandbox_wait_seconds -= _SANDBOX_WAIT_TRANSPORT_GRACE_SECONDS
-        local_wait_deadline = min(
-            timeout_seconds + _SANDBOX_WAIT_TRANSPORT_GRACE_SECONDS,
-            _MAX_BOUNDED_TIMEOUT_SECONDS - _OUTER_DEADLINE_RESERVE_SECONDS,
-        )
-
-        try:
-            async with asyncio.timeout(local_wait_deadline):
-                wait_result = await self.sandbox.wait_for_process(
-                    id,
-                    sandbox_wait_seconds,
-                )
-        except TimeoutError:
-            await self._kill_after_bounded_timeout(kill_once)
-            dispose_cancellation()
-            return self._bounded_timeout_result(
-                id=id,
-                command=command,
-                timeout_seconds=timeout_seconds,
-            )
-
-        wait_data = self._result_data(wait_result)
-        if wait_data.get("status") != "completed":
-            await self._kill_after_bounded_timeout(kill_once)
-            dispose_cancellation()
-            return self._bounded_timeout_result(
-                id=id,
-                command=command,
-                timeout_seconds=timeout_seconds,
-            )
-
-        result = await self._completed_command_result(id=id, command=command, returncode=wait_data.get("returncode"))
-        dispose_cancellation()
         return await self._recover_contract_output(id, result) if recover_output else result
 
     async def _recover_contract_output(self, id: str, result: ToolResult) -> ToolResult:
@@ -972,9 +936,9 @@ class ShellToolkit(BaseToolkit):
         return disposer, kill_once
 
     @staticmethod
-    async def _kill_after_bounded_timeout(
+    async def _cancel_process(
         kill_once: Callable[[str], Awaitable[None]],
-        *, reason: str = "bounded_timeout",
+        *, reason: str = "cancelled",
     ) -> None:
         try:
             async with asyncio.timeout(_PROCESS_CANCELLATION_TIMEOUT_SECONDS):
@@ -982,33 +946,12 @@ class ShellToolkit(BaseToolkit):
         except asyncio.CancelledError:
             raise
         except Exception as error:
-            # The command result must remain a timeout failure even when a
+            # Cancellation must remain cancellation even when a
             # best-effort sandbox cleanup endpoint is temporarily unavailable.
             logger.warning(
-                "Bounded shell cleanup failed error_type=%s",
+                "Cancelled shell cleanup failed error_type=%s",
                 type(error).__name__,
             )
-
-    @staticmethod
-    def _bounded_timeout_result(
-        *,
-        id: str,
-        command: str,
-        timeout_seconds: int,
-    ) -> ToolResult:
-        return ToolResult(
-            success=False,
-            message=(
-                f"Command timed out after {timeout_seconds} seconds; "
-                "process termination was requested"
-            ),
-            data={
-                "session_id": id,
-                "command": command,
-                "status": "timed_out",
-                "returncode": None,
-            },
-        )
 
     @staticmethod
     def _result_data(result: ToolResult) -> dict[str, Any]:

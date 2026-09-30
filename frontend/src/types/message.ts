@@ -43,7 +43,7 @@ export interface ToolContent extends BaseContent {
   tool_approval?: ToolApprovalView | null;
   program_attempt?: ProgramAttemptView | null;
   status: "calling" | "called";
-  execution_status?: 'succeeded' | 'failed' | null;
+  execution_status?: 'succeeded' | 'failed' | 'not_started' | null;
 }
 
 export interface StepContent extends BaseContent {

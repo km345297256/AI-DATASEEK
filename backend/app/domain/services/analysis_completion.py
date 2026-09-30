@@ -80,7 +80,7 @@ DIAGNOSTIC_KEYS = frozenset({
     "actual_cells", "width", "height", "frames", "max_pixels", "max_frames", "sheet_count", "max_sheets",
     "archive_entries", "max_archive_entries", "archive_bytes", "max_archive_bytes",
 })
-UNAVAILABLE_REASONS = frozenset({"validation_unavailable", "validator_unavailable", "validation_deadline"})
+UNAVAILABLE_REASONS = frozenset({"validation_unavailable", "validator_unavailable", "validation_deadline", "validation_cancelled"})
 
 
 def safe_diagnostics(value: Any) -> dict[str, int]:
@@ -138,6 +138,11 @@ def _inspect_records(records, delivered, validation_available, *, _selected_deli
 
     def failed(item, reason):
         item = item if isinstance(item, dict) else {}
+        # Request cancellation is normally propagated by the task runner. If
+        # a receipt outlives its caller, it proves unavailable validation, not
+        # malformed bytes and never permission to regenerate the file.
+        if reason == "validation_cancelled":
+            reason = "validation_unavailable"
         path = item.get("path")
         kind = item.get("expected_kind") or item.get("kind")
         if not isinstance(kind, str) or kind not in KINDS:

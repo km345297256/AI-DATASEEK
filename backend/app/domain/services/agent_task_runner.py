@@ -1160,8 +1160,7 @@ class AgentTaskRunner(TaskRunner):
         for offset in range(0, len(items), 32):
             batch = items[offset:offset + 32]
             try:
-                async with asyncio.timeout(35):
-                    result = await validate(batch)
+                result = await validate(batch)
                 data = getattr(result, "data", None)
                 batch_ok = (getattr(result, "success", None) is True and isinstance(data, dict)
                             and type(data.get("version")) is int and data["version"] == 1)
@@ -2044,10 +2043,9 @@ class AgentTaskRunner(TaskRunner):
                 from app.domain.services.analysis_delivery_audit import AnalysisDeliveryAuditStore
                 audit = self._delivery_audit_store = AnalysisDeliveryAuditStore()
             try:
-                async with asyncio.timeout(3):
-                    await audit.record(user_id=self._user_id, session_id=self._session_id,
-                        input_seq=source_seq, step_id=step.id, records=records, requirements=requirements,
-                        outcome=outcome, repair_reason=repair_reason)
+                await audit.record(user_id=self._user_id, session_id=self._session_id,
+                    input_seq=source_seq, step_id=step.id, records=records, requirements=requirements,
+                    outcome=outcome, repair_reason=repair_reason)
             except Exception as error:
                 audit_ok = False
                 logger.warning("Analysis delivery audit unavailable error_type=%s", type(error).__name__)
@@ -2225,17 +2223,15 @@ class AgentTaskRunner(TaskRunner):
                     candidate_complete=True, read_only_observations=True, prerequisites_met=scope.get("completion_blocker")=="none",
                     no_user_input_required=scope.get("completion_blocker")=="none", no_policy_refusal=True, runtime_live=True,
                     no_artifacts_or_requirements=True, no_review_repair=True),
-                now=datetime.now(UTC), deadline_at=snapshot.deadline_at)
+                now=datetime.now(UTC), deadline_at=None)
             if not decision.allowed:
                 return False
             audit = getattr(self, "_scope_repair_audit_store", None) or ScopeRepairAuditStore()
-            async with asyncio.timeout(3):
-                recorded = await audit.claim(user_id=self._user_id, session_id=self._session_id, snapshot=tracker.snapshot())
+            recorded = await audit.claim(user_id=self._user_id, session_id=self._session_id, snapshot=tracker.snapshot())
             if not recorded:
                 return False
             await delivery._require_live(self._session_id, identity)
-            if (getattr(self, "_accepted_input_key", None) != identity or message.message != original or model_stop_reason()
-                    or snapshot.deadline_at is not None and datetime.now(UTC) >= snapshot.deadline_at):
+            if (getattr(self, "_accepted_input_key", None) != identity or message.message != original or model_stop_reason()):
                 return False
             feedback = dict(decision.feedback)
             feedback["previous_analysis"] = "\n\n".join(candidate)
@@ -2390,8 +2386,16 @@ class AgentTaskRunner(TaskRunner):
         current_plan = getattr(self._flow, "plan", None)
         matches = [item for item in getattr(current_plan, "steps", []) if item.id == public_step.id]
         step = matches[0] if len(matches) == 1 else public_step
+        # This is a host publication policy, not a scientific endorsement and
+        # never a model-authored assertion that an independent review passed.
+        from app.domain.models.result_assessment import ResultAssessmentMarker
+        step.outputs.pop("answer_review", None)
+        step.outputs["result_assessment"] = ResultAssessmentMarker(
+            version=1, mode="user_evaluated", scientific_review="not_performed",
+            dataset_ids=sorted({item.dataset_id for item in message.datasets}),
+            input_file_ids=sorted(set(message.attachment_file_ids)),
+        ).model_dump()
         step.outputs["model_execution_success"] = bool(step.success)
-        declared_paths = tuple(step.attachments or [])
         requirements = requirements_for_step(step, message)
         step.deliverables = requirements
         requested_code = list(getattr(self, "_requested_code_deliverables", []))
@@ -2407,12 +2411,6 @@ class AgentTaskRunner(TaskRunner):
         candidates.update(getattr(self, "_pending_artifact_paths", set()))
         pinned = getattr(self, "_analysis_verified_files", {}).get(step.id, {})
         candidates.update(pinned)
-        intent = (step.inputs or {}).get("dataset_intent")
-        handler = getattr(self._flow, "enabled_subagents", {}).get(step.agent)
-        review_prose = (getattr(handler, "handler_type", None) == "execution"
-                        and intent not in {"file_preview", "catalog_metadata", "catalog_description"})
-        if not requirements and not candidates and step.success and not unconfirmed and not review_prose:
-            return files
         if requirements:
             candidates.update(path for path in await self._list_sandbox_artifacts()
                               if path not in getattr(self, "_artifact_baseline_paths", set()))
@@ -2473,29 +2471,12 @@ class AgentTaskRunner(TaskRunner):
         outcome = assess_delivery(requirements, records, checked_files,
                                   execution_success=bool(step.success and not unconfirmed), stop_code=stop_code,
                                   validation_available=available)
-        answer_review = None
-        if review_prose and outcome.status == "succeeded":
-            answer_review = await self._review_analysis_answer(step, message, checked_files, requirements, outcome)
+        # Completion is an execution/delivery contract. Scientific merit and
+        # interpretation belong to the user; a second model must not suppress
+        # the answer or create a new semantic execution obligation.
         repair_pending, protected_changed = await self._review_artifact_repair(
             step, message, records, checked_files, requirements, outcome, execution,
-            validation_available=available, source_seq=source_seq,
-            semantic_missing=([requirements[index] for index in answer_review.missing_requirement_indices]
-                              if answer_review is not None and answer_review.status != "unavailable" else ()))
-        if not repair_pending and not protected_changed and answer_review is not None:
-            repair_pending = await self._review_scope_completion(step, message, checked_files, requirements,
-                outcome, execution, answer_review, source_seq=source_seq)
-        if answer_review is not None and answer_review.status == "corrected" and not repair_pending:
-            from app.domain.services.analysis_answer_review import rejected_missing_claim_paths
-            from app.domain.services.analysis_completion import issues_from_records
-            rejected = rejected_missing_claim_paths(declared_paths=declared_paths, requirements=requirements,
-                records=records, evidence=self._analysis_answer_evidence)
-            # Full receipts were already recorded privately above. Only pure
-            # rejected draft assertions disappear from public diagnostics;
-            # actual attempts, required outputs and uncertain provenance stay.
-            outcome.issues = issues_from_records(requirements,
-                [item for item in records if item.get("path") not in rejected], checked_files,
-                validation_available=available)
-            step.outputs["answer_review"]["discarded_attachment_claim_count"] = len(rejected)
+            validation_available=available, source_seq=source_seq)
         if protected_changed:
             # Previously uploaded bytes are immutable. Do not substitute a
             # changed working copy or claim the repair preserved its evidence.
@@ -2515,7 +2496,7 @@ class AgentTaskRunner(TaskRunner):
                 # A later validation outage must not erase durable, previously
                 # validated results from the user's completion status.
                 outcome.status = "partial"
-            if preserved and answer_review is None and outcome.status != "succeeded":
+            if preserved and outcome.status != "succeeded":
                 # Required files already delivered as immutable uploads remain
                 # fulfilled even if the working copy cannot be checked now.
                 # This reconciles only missing file slots, never semantic review
@@ -2534,18 +2515,22 @@ class AgentTaskRunner(TaskRunner):
             # Future plans, summaries and checkpoints must not retain rejected
             # model attachment claims after exact-byte delivery reconciliation.
             step.attachments = [item.file_path for item in checked_files]
+            from app.domain.services.delivery_links import reconcile_delivery_links
+            step.result = reconcile_delivery_links(step.result or "", checked_files,
+                known_paths=getattr(self, "_analysis_historical_delivery_paths", ()))
         step.success = outcome.status == "succeeded"
         step.status = ExecutionStatus.COMPLETED if step.success else ExecutionStatus.FAILED
         event.status = StepStatus.COMPLETED if step.success else StepStatus.FAILED
         if not step.success:
-            had_unverified_draft = bool(step.result)
-            partial_draft = step.result or ""
-            grounded_answer = answer_review is not None
-            if not repair_pending and not grounded_answer:
-                # Clear before saving a continuation: its plan/progress must
-                # not label an unverified draft as evidence for a later turn.
-                # Local repair already received the draft privately above.
-                step.result = None
+            if not repair_pending:
+                # Publish useful explanations, but never let model prose hide
+                # an engineering failure. Checkpoints carry this same explicit
+                # status and the non-reviewed marker, not verified conclusions.
+                draft = step.result or ""
+                status_text = outcome_message(outcome, delivered_files=checked_files)
+                step.result = status_text + ("\n\n" + draft if draft else "")
+                if protected_changed:
+                    step.result += "\n\n补齐过程中已有文件发生变化，已保留此前交付的版本。"
             # An uncertain side-effecting call must not be offered as an
             # automatically replayable script. Only explicit safe checkpoints.
             safe = not execution.get("has_unconfirmed_tool_execution", False)
@@ -2562,14 +2547,9 @@ class AgentTaskRunner(TaskRunner):
             if safe and budget is not None:
                 try:
                     snapshot = await budget.snapshot()
-                    from datetime import UTC, datetime
-                    deadline = snapshot.deadline_at
-                    if deadline is not None:
-                        deadline = deadline.replace(tzinfo=UTC) if deadline.tzinfo is None else deadline
                     # Production requests are metered, not quota-limited. A
                     # missing ceiling must not disable a safe checkpoint.
-                    safe = (deadline is None or datetime.now(UTC) < deadline) and (
-                        outcome.reason_code == "delivery_failed" or all(
+                    safe = (outcome.reason_code == "delivery_failed" or all(
                             limit is None or used < limit for used, limit in (
                                 (snapshot.tool_batches_used, snapshot.hard_limit),
                                 (snapshot.model_calls, snapshot.model_call_limit),
@@ -2579,7 +2559,7 @@ class AgentTaskRunner(TaskRunner):
                     )
                 except Exception:
                     safe = False
-            if (safe and not repair_pending and not protected_changed and answer_review is None
+            if (safe and not repair_pending and not protected_changed
                     and message.datasets and source_seq is not None):
                 try:
                     token = await save_checkpoint(
@@ -2593,37 +2573,8 @@ class AgentTaskRunner(TaskRunner):
                         outcome.can_resume, outcome.resume_from = True, token
                 except Exception as error:
                     logger.warning("Analysis checkpoint unavailable error_type=%s", type(error).__name__)
-            evidence = (getattr(self, "_analysis_preserved_answer_evidence", {}).get(step.id)
-                        if protected_changed else getattr(self, "_analysis_answer_evidence", None))
-            has_terminal_observations = evidence is not None and any(
-                item.get("kind") == "tool_result" and item.get("state") in {"succeeded", "failed"}
-                and not item.get("write_only") for item in evidence.render_sources())
-            if (review_prose and not repair_pending and not unconfirmed
-                    and answer_review is None and has_terminal_observations):
-                # Missing files must not erase independently observed statistics
-                # or the reason an input cannot support the requested analysis.
-                # Review the draft read-only after all repair decisions and safe
-                # checkpoint capture; keep the host's original failure verdict.
-                step.result = partial_draft
-                answer_review = await self._review_analysis_answer(
-                    step, message, checked_files, requirements, outcome.model_copy(deep=True), evidence=evidence)
-                grounded_answer = True
-                step.outputs["answer_review"]["partial_delivery_review"] = True
-                if protected_changed:
-                    step.outputs["answer_review"]["preserved_evidence_review"] = True
-                step.result = outcome_message(outcome, delivered_files=checked_files) + "\n\n" + answer_review.text
             if not step.result:
                 step.result = outcome_message(outcome, delivered_files=checked_files)
-            if protected_changed and not repair_pending:
-                step.result += "\n\n补齐过程中已有文件发生变化，已保留此前核验通过的版本。"
-            if had_unverified_draft and not repair_pending and not grounded_answer:
-                # A disclaimer cannot turn an unexecuted draft into evidence.
-                # Keep the original draft in the private execution memory and
-                # repair feedback, not in a final answer beside failed receipts.
-                # Already verified uploads and other successful steps survive.
-                step.result += (
-                    "\n\n本步骤的分析说明尚未通过完整核验，未作为已确认结论发布。"
-                )
             step.error = outcome.reason_code
         logger.info("analysis_outcome status=%s reason=%s missing=%d delivered=%d resumable=%s",
                     outcome.status, outcome.reason_code, len(outcome.missing), len(checked_files), outcome.can_resume)
@@ -2762,50 +2713,50 @@ class AgentTaskRunner(TaskRunner):
                     bounded = False
                     break
         if review_needed:
-            # Each extension rechecks sources and real output bytes, under one
-            # bounded deadline. Scripts are deliberately not delivery progress.
+            # Each extension rechecks sources and real output bytes. Scripts
+            # are deliberately not delivery progress. Verification is cancellable,
+            # but elapsed time cannot turn valid progress into a failed grant.
             try:
-                async with asyncio.timeout(10):
-                    if source_paths(message):
-                        current_sources = await fingerprints(self._sandbox, source_paths(message),
-                            approved_upload_paths=message.analysis_inputs.upload_paths if message.analysis_inputs else [])
-                        sources_stable = bool(current_sources and current_sources == self._analysis_source_fingerprints)
-                    if (message.attachments or message.attachment_file_ids) and not message.analysis_inputs:
-                        # The current fingerprint protocol covers mounted
-                        # datasets/output, not arbitrary attachment paths.
-                        sources_stable = False
-                    candidates = [path for path in await self._list_sandbox_artifacts()
-                                  if path not in getattr(self, "_artifact_baseline_paths", set())
-                                  and artifact_kind(path) not in {None, "code"}][:32]
-                    valid = []
-                    if candidates:
-                        result = await self._sandbox.validate_artifacts([
-                            {"path": path, "kind": artifact_kind(path)} for path in candidates])
-                        if not result.success or not isinstance(result.data, dict) or result.data.get("version") != 1:
-                            raise ValueError("artifact_review_unavailable")
-                        records = result.data.get("files", [])
-                        if len(records) != len(candidates) or {item["path"] for item in records} != set(candidates):
-                            raise ValueError("artifact_review_incomplete")
-                        valid = [item for item in records if item.get("valid") is True
-                                 and type(item.get("size")) is int and item["size"] > 0
-                                 and isinstance(item.get("sha256"), str) and re.fullmatch(r"[0-9a-f]{64}", item["sha256"])]
-                        for item in valid:
-                            if len(recovery.artifact_evidence) < 128:
-                                recovery.artifact_evidence.add(private_identity_hmac({"purpose": "analysis-verified-artifact/v1",
-                                    "path": item["path"], "sha256": item["sha256"], "kind": item["kind"]}))
-                    running_steps = [step for step in getattr(getattr(self._flow, "plan", None), "steps", [])
-                                     if getattr(step.status, "value", step.status) == "running"]
-                    requirements = (list(running_steps[0].deliverables) if len(running_steps) == 1
-                                    else list(message.deliverables))
-                    if requirements:
-                        from app.domain.services.analysis_completion import assess_delivery
-                        # Provisional records are used only for the required-
-                        # output comparison; they are never uploaded/persisted.
-                        inspected = [FileInfo(file_id=f"review-{index}", file_path=item["path"],
-                            filename=PurePosixPath(item["path"]).name, size=item["size"],
-                            metadata={"artifact_sha256": item["sha256"]}) for index, item in enumerate(valid)]
-                        required_work = bool(assess_delivery(requirements, valid, inspected,
-                            execution_success=True, stop_code="completed", validation_available=True).missing)
+                if source_paths(message):
+                    current_sources = await fingerprints(self._sandbox, source_paths(message),
+                        approved_upload_paths=message.analysis_inputs.upload_paths if message.analysis_inputs else [])
+                    sources_stable = bool(current_sources and current_sources == self._analysis_source_fingerprints)
+                if (message.attachments or message.attachment_file_ids) and not message.analysis_inputs:
+                    # The current fingerprint protocol covers mounted
+                    # datasets/output, not arbitrary attachment paths.
+                    sources_stable = False
+                candidates = [path for path in await self._list_sandbox_artifacts()
+                              if path not in getattr(self, "_artifact_baseline_paths", set())
+                              and artifact_kind(path) not in {None, "code"}][:32]
+                valid = []
+                if candidates:
+                    result = await self._sandbox.validate_artifacts([
+                        {"path": path, "kind": artifact_kind(path)} for path in candidates])
+                    if not result.success or not isinstance(result.data, dict) or result.data.get("version") != 1:
+                        raise ValueError("artifact_review_unavailable")
+                    records = result.data.get("files", [])
+                    if len(records) != len(candidates) or {item["path"] for item in records} != set(candidates):
+                        raise ValueError("artifact_review_incomplete")
+                    valid = [item for item in records if item.get("valid") is True
+                             and type(item.get("size")) is int and item["size"] > 0
+                             and isinstance(item.get("sha256"), str) and re.fullmatch(r"[0-9a-f]{64}", item["sha256"])]
+                    for item in valid:
+                        if len(recovery.artifact_evidence) < 128:
+                            recovery.artifact_evidence.add(private_identity_hmac({"purpose": "analysis-verified-artifact/v1",
+                                "path": item["path"], "sha256": item["sha256"], "kind": item["kind"]}))
+                running_steps = [step for step in getattr(getattr(self._flow, "plan", None), "steps", [])
+                                 if getattr(step.status, "value", step.status) == "running"]
+                requirements = (list(running_steps[0].deliverables) if len(running_steps) == 1
+                                else list(message.deliverables))
+                if requirements:
+                    from app.domain.services.analysis_completion import assess_delivery
+                    # Provisional records are used only for the required-
+                    # output comparison; they are never uploaded/persisted.
+                    inspected = [FileInfo(file_id=f"review-{index}", file_path=item["path"],
+                        filename=PurePosixPath(item["path"]).name, size=item["size"],
+                        metadata={"artifact_sha256": item["sha256"]}) for index, item in enumerate(valid)]
+                    required_work = bool(assess_delivery(requirements, valid, inspected,
+                        execution_success=True, stop_code="completed", validation_available=True).missing)
             except Exception:
                 sources_stable = False
                 bounded = False
@@ -3010,6 +2961,17 @@ class AgentTaskRunner(TaskRunner):
                 step_ids={step["id"] for step in checkpoint["plan"]["steps"]})
         from app.domain.services.execution_history import reviewed_history_steps
         history = getattr(message, "_session_events_snapshot", None)
+        from app.domain.services.execution_history import analysis_history_steps
+        historical_steps = analysis_history_steps(history,
+            dataset_ids={item.dataset_id for item in message.datasets},
+            input_file_ids=set(message.attachment_file_ids))
+        # Already delivered paths are usable references, not newly generated
+        # artifacts and never scientific evidence from the previous answer.
+        self._analysis_historical_delivery_paths = {
+            path for previous_step in historical_steps for path in previous_step.attachments
+            if isinstance(path, str) and path.startswith("/home/ubuntu/output/")
+            and str(PurePosixPath(path)) == path and ".." not in PurePosixPath(path).parts
+        }
         for previous_step in reviewed_history_steps(
             history, dataset_ids={item.dataset_id for item in message.datasets},
             input_file_ids=set(message.attachment_file_ids),
@@ -3169,13 +3131,12 @@ class AgentTaskRunner(TaskRunner):
                 if is_summary and last_analysis_outcome and last_analysis_outcome.status != "succeeded":
                     event.metadata = {**(event.metadata or {}), "analysis_outcome": last_analysis_outcome.model_dump(exclude_none=True)}
                 if is_summary and withheld_step_outcomes:
-                    # A later summarizer has no new execution evidence and must
-                    # not resurrect a withheld draft, including when a later
-                    # step succeeded after an earlier one failed.
-                    event.message = "部分步骤尚未完成核验；已确认的分析与文件请以上方各步骤的交付结果为准。"
+                    # A model-only summary cannot erase an engineering failure.
+                    # Keep the delivered explanations with their host statuses.
+                    checked_steps = getattr(getattr(self._flow, "plan", None), "steps", [])
+                    event.message = "\n\n".join(item.result for item in checked_steps if item.outcome and item.result)
                 elif is_summary and last_analysis_outcome is not None:
-                    # No new execution evidence exists in a model-only summary.
-                    # Reuse reviewed step text, never re-author scientific facts.
+                    # Reuse delivered step text without a second model review.
                     checked_steps = getattr(getattr(self._flow, "plan", None), "steps", [])
                     event.message = "\n\n".join(item.result for item in checked_steps if item.outcome and item.result)
                 if (

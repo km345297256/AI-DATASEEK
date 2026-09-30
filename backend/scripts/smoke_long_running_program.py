@@ -29,7 +29,7 @@ async def run(sandbox_url: str, sandbox_id: str, seconds: int) -> None:
     sandbox.base_url = sandbox_url.rstrip("/")
     toolkit = ShellToolkit(NodeBoundSandbox(sandbox, SimpleNamespace(node_id="synthetic-long-smoke")))
     toolkit.tool_execution_pipeline = ToolExecutionPipeline(interceptors=[
-        ToolTimeoutInterceptor(default_timeout_seconds=120, maximum_timeout_seconds=120)])
+        ToolTimeoutInterceptor()])
     program = toolkit.get_tool("program_run")
     unique = uuid4().hex
     directory = f"/home/ubuntu/output/long-program-smoke-{unique}"

@@ -154,7 +154,7 @@ async def test_schema_recovery_keeps_complete_scientific_contract():
 
 
 @pytest.mark.asyncio
-async def test_real_runner_reads_current_csv_and_retains_download_without_semantic_green():
+async def test_real_runner_delivers_byte_valid_csv_without_scientific_review_gate():
     from types import SimpleNamespace
     from test_analysis_repair_flow import scenario, output, collect
     from test_analysis_answer_review_flow import with_observed_results, real_reviewer
@@ -171,8 +171,9 @@ async def test_real_runner_reads_current_csv_and_retains_download_without_semant
     ask = AsyncMock(side_effect=lambda messages: checked_answer(messages, include=False))
     real_reviewer(agent, ask)
     await collect(runner, message)
-    assert step.outcome.status == 'partial' and step.outcome.reason_code == 'scientific_validation_unavailable'
-    assert len(state['prompts']) == 1 and ask.await_count == 1
+    assert step.outcome.status == 'succeeded' and step.outcome.reason_code == 'completed'
+    assert len(state['prompts']) == 1 and ask.await_count == 0
     assert not step.outcome.can_resume and not flow._artifact_repair_requests
     assert file.file_id in {item.file_id for item in runner._generated_files}
-    runner._file_storage.download_file_range.assert_awaited_once()
+    runner._file_storage.download_file_range.assert_not_awaited()
+    assert step.outputs['result_assessment']['scientific_review'] == 'not_performed'

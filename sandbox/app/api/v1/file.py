@@ -1,10 +1,9 @@
 """
 File operation API interfaces
 """
-from fastapi import APIRouter, UploadFile, File, Form
+from fastapi import APIRouter, UploadFile, File, Form, Request
 from fastapi.responses import FileResponse
-import asyncio
-import threading
+from app.core.cancellable_checks import run_cancellable_check
 from app.schemas.file import (
     FileReadRequest, FileWriteRequest, FileReplaceRequest,
     FileSearchRequest, FileFindRequest, ArtifactFingerprintsRequest,
@@ -20,40 +19,26 @@ router = APIRouter()
 
 
 @router.post("/validate-artifacts", response_model=Response)
-async def validate_output_artifacts(request: ArtifactValidationRequest):
-    cancelled = threading.Event()
-    try:
-        result = await asyncio.to_thread(
-            validate_artifacts, [item.model_dump() for item in request.items], cancelled=cancelled,
-        )
-        return Response(success=True, data=result)
-    finally:
-        cancelled.set()
+async def validate_output_artifacts(request: ArtifactValidationRequest, http_request: Request):
+    result = await run_cancellable_check(
+        http_request, validate_artifacts, [item.model_dump() for item in request.items],
+    )
+    return Response(success=True, data=result)
 
 
 @router.post("/analysis-fingerprints", response_model=Response)
-async def analysis_fingerprints(request: AnalysisFingerprintsRequest):
-    cancelled = threading.Event()
-    try:
-        result = await asyncio.to_thread(
-            fingerprint_analysis_files, request.paths,
-            approved_upload_paths=request.approved_upload_paths, cancelled=cancelled,
-        )
-        return Response(success=True, data=result)
-    finally:
-        cancelled.set()
+async def analysis_fingerprints(request: AnalysisFingerprintsRequest, http_request: Request):
+    result = await run_cancellable_check(
+        http_request, fingerprint_analysis_files, request.paths,
+        approved_upload_paths=request.approved_upload_paths,
+    )
+    return Response(success=True, data=result)
 
 
 @router.post("/fingerprints", response_model=Response)
-async def artifact_fingerprints(request: ArtifactFingerprintsRequest):
-    cancelled = threading.Event()
-    try:
-        result = await asyncio.to_thread(fingerprint_artifacts, request.paths, cancelled=cancelled)
-        return Response(success=True, data=result)
-    finally:
-        # to_thread itself cannot stop a cancelled worker. Hashing cooperates
-        # between bounded reads and also has an independent batch deadline.
-        cancelled.set()
+async def artifact_fingerprints(request: ArtifactFingerprintsRequest, http_request: Request):
+    result = await run_cancellable_check(http_request, fingerprint_artifacts, request.paths)
+    return Response(success=True, data=result)
 
 @router.post("/read", response_model=Response)
 async def read_file(request: FileReadRequest):

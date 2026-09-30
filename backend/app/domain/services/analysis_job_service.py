@@ -25,7 +25,6 @@ logger = logging.getLogger(__name__)
 AnalysisJobUpdateCallback = Callable[[AnalysisJobView], Awaitable[None]]
 
 _UPDATE_TIMEOUT_SECONDS = 1.0
-_STATE_DEADLINE_SECONDS = 5.0
 _MAINTENANCE_BATCH_SIZE = 500
 _CAS_RETRIES = 8
 _DEFAULT_ERROR_CODES = {
@@ -83,20 +82,18 @@ class AnalysisJobService:
         return self._runtime_id
 
     @staticmethod
-    def _state_deadline() -> float:
-        return asyncio.get_running_loop().time() + _STATE_DEADLINE_SECONDS
+    def _state_deadline() -> None:
+        # A slow durable state write is not a failed analysis. Lease renewal
+        # and owner fencing remain separate from elapsed task execution time.
+        return None
 
     @staticmethod
     async def _repository_call(
         operation: Callable[[], Awaitable[_T]],
         *,
-        deadline: float,
+        deadline: float | None,
     ) -> _T:
-        remaining = deadline - asyncio.get_running_loop().time()
-        if remaining <= 0:
-            raise TimeoutError("analysis job state deadline exceeded")
-        async with asyncio.timeout(remaining):
-            return await operation()
+        return await operation()
 
     async def create(
         self,
@@ -481,7 +478,7 @@ class AnalysisJobService:
         record: AnalysisJobRecord,
         *,
         before: datetime,
-        deadline: float,
+        deadline: float | None,
     ) -> AnalysisJobRecord | None:
         now = datetime.now(UTC)
         return await self._repository_call(
@@ -505,7 +502,7 @@ class AnalysisJobService:
         self,
         record: AnalysisJobRecord,
         *,
-        deadline: float,
+        deadline: float | None,
     ) -> AnalysisJobRecord | None:
         now = datetime.now(UTC)
         return await self._repository_call(
@@ -543,7 +540,7 @@ class AnalysisJobService:
         self,
         job_id: str,
         *,
-        deadline: float,
+        deadline: float | None,
     ) -> AnalysisJobRecord:
         record = await self._repository_call(
             lambda: self._repository.find_by_id(job_id),

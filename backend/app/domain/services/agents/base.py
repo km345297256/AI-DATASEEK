@@ -2,7 +2,6 @@ import logging
 import asyncio
 import hashlib
 import json
-import math
 import re
 import time
 import uuid
@@ -59,11 +58,12 @@ from app.domain.services.analysis_protocol_recovery import (
     TerminalProtocolRecovery, confirmed_program_preparation, native_operation_identity,
     confirmed_native_success,
 )
-from app.domain.services.analysis_program_dispatch import saved_program_redirect
+from app.domain.services.analysis_program_dispatch import saved_program_redirect, shell_saved_program
 from app.domain.services.analysis_program_diagnostics import program_diagnostic_read_digest, program_diagnostic_read_lines
 from app.domain.services.program_execution import (
     resolved_program_path, trusted_program_execution_feedback,
     trusted_program_prelaunch_failure, trusted_program_prerequisites,
+    program_preparation_failure,
 )
 from app.domain.services.analysis_recovery import current_analysis_recovery
 from app.domain.utils.message_text import NON_SUBSTANTIVE_MESSAGE_PATTERN, is_non_substantive_message_text
@@ -71,7 +71,7 @@ from app.domain.services.execution_evidence import ToolExecutionLedger, tool_exe
 from app.domain.services.model_runtime import (
     USAGE_RECORDED_KEY, flush_memory_changes, memory_checkpoint, model_call_role,
     note_memory_change, current_analysis_budget, record_model_retry,
-    ModelProviderTimeout, model_request_timeout,
+    ModelProviderTimeout,
 )
 from app.domain.models.model_trace import ScheduledModelRetry
 from app.domain.services.model_retry import model_retry_decision
@@ -126,13 +126,6 @@ class BaseAgent(ABC):
     # every model call.  Larger raw outputs remain available in task events and
     # generated files; only the active reasoning context is bounded here.
     MAX_MEMORY_BYTES = 96 * 1024
-    # Configurable through AGENT_FINALIZATION_TIMEOUT_SECONDS.  This class
-    # default remains useful for light-weight test agents created without the
-    # normal constructor.
-    FINALIZATION_TIMEOUT_SECONDS = 45.0
-    FINALIZATION_TIMEOUT_ERROR = (
-        "finalization_timeout: the tool-free final response exceeded its configured deadline"
-    )
     FINALIZATION_FAILED_ERROR = (
         "finalization_failed: the tool-free final response could not be generated"
     )
@@ -153,7 +146,6 @@ class BaseAgent(ABC):
     # Specialized agents can terminate a narrowly classified tool request with
     # one logical tool-free synthesis turn. Physical provider timeouts retry
     # within that turn; the ordinary multi-step analysis loop is unchanged.
-    TOOL_FREE_COMPLETION_TIMEOUT_SECONDS = 30.0
     TOOL_FREE_COMPLETION_MAX_TOKENS: Optional[int] = 1024
     RUNTIME_INSTALL_COMMAND_PATTERN = re.compile(
         r"(?im)(?:^|&&|\|\||[;|\n]|\bthen\b)\s*(?:\(\s*)?(?:sudo\s+)?(?:"
@@ -194,25 +186,6 @@ class BaseAgent(ABC):
         self._llm_retry_attempts = max(1, settings.llm_retry_attempts)
         self._llm_retry_base_seconds = max(0.0, settings.llm_retry_base_seconds)
         self._llm_retry_max_seconds = max(0.0, settings.llm_retry_max_seconds)
-        configured_finalization_timeout = getattr(
-            settings,
-            "agent_finalization_timeout_seconds",
-            self.FINALIZATION_TIMEOUT_SECONDS,
-        )
-        try:
-            # Prevent an accidental zero/negative deadline or an effectively
-            # unbounded deployment setting.  Tests that bypass __init__ can
-            # still install a smaller instance value for fast timeout checks.
-            self.FINALIZATION_TIMEOUT_SECONDS = max(
-                1.0,
-                min(float(configured_finalization_timeout), 300.0),
-            )
-        except (TypeError, ValueError):
-            logger.warning(
-                "Ignoring invalid agent_finalization_timeout_seconds %r",
-                configured_finalization_timeout,
-            )
-            self.FINALIZATION_TIMEOUT_SECONDS = type(self).FINALIZATION_TIMEOUT_SECONDS
         llm_overrides = dict(llm_overrides or {})
         # Profiles must not silently reinstate a task-consumption hard stop.
         llm_overrides.pop("max_iterations", None)
@@ -561,35 +534,14 @@ class BaseAgent(ABC):
                         self._mark_tool_invocation(call_id)
                         result = normalize_failed_tool_result(await tool.ainvoke(invocation))
                     else:
-                        from datetime import UTC, datetime
                         from app.domain.services.model_runtime import ModelBudgetStopped
                         from app.domain.services.analysis_budget import BudgetUnavailableError
                         try:
-                            snapshot = await budget.snapshot()
+                            await budget.snapshot()
                         except BudgetUnavailableError:
                             raise ModelBudgetStopped("trace_store_unavailable") from None
-                        deadline = snapshot.deadline_at
-                        if deadline is None:
-                            # Single-operation deadlines remain in the normal
-                            # tool pipeline; no cumulative task deadline wraps it.
-                            self._mark_tool_invocation(call_id)
-                            result = normalize_failed_tool_result(await tool.ainvoke(invocation))
-                        else:
-                            # Explicit isolated bounded policies remain usable
-                            # for tests; production policies have no deadline.
-                            deadline = deadline.replace(tzinfo=UTC) if deadline.tzinfo is None else deadline
-                            remaining = (deadline - datetime.now(UTC)).total_seconds()
-                            if remaining <= 0:
-                                raise ModelBudgetStopped("analysis_budget_deadline_exceeded")
-                            deadline_guard = asyncio.timeout(remaining)
-                            try:
-                                async with deadline_guard:
-                                    self._mark_tool_invocation(call_id)
-                                    result = normalize_failed_tool_result(await tool.ainvoke(invocation))
-                            except TimeoutError:
-                                if deadline_guard.expired():
-                                    raise ModelBudgetStopped("analysis_budget_deadline_exceeded") from None
-                                raise
+                        self._mark_tool_invocation(call_id)
+                        result = normalize_failed_tool_result(await tool.ainvoke(invocation))
                 if result_failed(result):
                     result.status = "error"
                     artifact = result.artifact
@@ -687,7 +639,7 @@ class BaseAgent(ABC):
             "avoid optional exploration, repeated inspections, or drafting without execution. "
             "Do not replay operations with unconfirmed side effects. Observe an already running "
             "operation through its original identity before starting another write. "
-            "Single-operation timeouts, authorization, and cancellation still apply."
+            "Authorization and user cancellation still apply."
             + ("\n" + guard.instruction() if guard else "")
         )
 
@@ -834,18 +786,17 @@ class BaseAgent(ABC):
                 state.memory_response = response
                 additions.append(response)
         try:
-            async with asyncio.timeout(5):
-                require_live = getattr(self, "_tool_settlement_require_live", None)
-                if require_live is not None:
-                    await require_live()
-                if additions:
-                    for response in additions:
-                        batch[response.tool_call_id].persistence_attempted = True
-                    await self._add_to_memory(additions)
-                elif any(not state.persisted for state in batch.values()):
-                    await self._persist_memory()
-                for state in batch.values():
-                    state.persisted = True
+            require_live = getattr(self, "_tool_settlement_require_live", None)
+            if require_live is not None:
+                await require_live()
+            if additions:
+                for response in additions:
+                    batch[response.tool_call_id].persistence_attempted = True
+                await self._add_to_memory(additions)
+            elif any(not state.persisted for state in batch.values()):
+                await self._persist_memory()
+            for state in batch.values():
+                state.persisted = True
         except BaseException as error:
             if not suppress_errors:
                 raise
@@ -1101,6 +1052,7 @@ class BaseAgent(ABC):
                         )
                 blocked_reason = self._blocked_runtime_install_reason(tool_call)
                 blocked_code = "tool_permission_denied"
+                preparation_failure = None
                 if not blocked_reason:
                     blocked_reason = compacted_content_write_reason(tool, tool_call)
                     blocked_code = "compacted_content_not_source"
@@ -1142,9 +1094,29 @@ class BaseAgent(ABC):
                         # have completed during the bounded observation above.
                         blocked_reason = replay_reason
                         blocked_code = "tool_replay_suppressed"
+                if not blocked_reason and function_name == "program_run":
+                    preparation_failure = program_preparation_failure(tool, tool_call, prerequisites)
+                    if preparation_failure:
+                        blocked_reason = preparation_failure["message"]
+                        blocked_code = "program_prerequisites_not_ready"
                 if blocked_reason:
-                    self._analysis_progress.record_blocked(tool_call, blocked_reason, program_path=program_path)
-                    self._record_tool_failure({"error_code": blocked_code, "side_effect_state": "not_started"})
+                    recovery_kind = ("program_preparation" if preparation_failure else
+                        "program_tool_redirect" if blocked_code == "program_execution_required" else
+                        "program_diagnosis" if blocked_code == "analysis_no_progress_loop" and
+                            self._analysis_progress.is_diagnostic_correction(tool_call, program_path) else None)
+                    self._analysis_progress.record_blocked(tool_call, blocked_reason,
+                        program_path=program_path or (shell_saved_program(tool_call) if recovery_kind == "program_tool_redirect" else None),
+                        recovery_kind=recovery_kind,
+                        preparation_observation=private_identity_hmac({"purpose": "program-preparation-state/v1",
+                            "cwd": prerequisites["cwd_state"], "source": prerequisites["source_state"],
+                            "syntax": prerequisites["syntax"]["state"],
+                            "exception": prerequisites["syntax"]["exception_type"]})
+                            if preparation_failure and prerequisites else None)
+                    failure_data = {"error_code": blocked_code, "side_effect_state": "not_started"}
+                    if preparation_failure:
+                        failure_data.update({key: value for key, value in preparation_failure.items()
+                                             if key not in {"success", "message"}})
+                    self._record_tool_failure(failure_data)
                     logger.warning(
                         "Blocked analysis operation from agent=%s tool=%s",
                         self.name,
@@ -1154,7 +1126,12 @@ class BaseAgent(ABC):
                         "success": False,
                         "message": blocked_reason,
                         "blocked_by_policy": "runtime_dependency_installation" if blocked_code == "tool_permission_denied" else blocked_code,
+                        "error_code": failure_data["error_code"], "side_effect_state": "not_started",
                     }
+                    if preparation_failure:
+                        blocked_result.update(preparation_failure)
+                    if recovery_kind:
+                        blocked_result["message"] = self._analysis_progress.last_notice
                     settlement.event = ToolEvent(
                         status=ToolStatus.CALLED,
                         tool_call_id=tool_call_id,
@@ -1163,13 +1140,14 @@ class BaseAgent(ABC):
                         function_args=display_args,
                         function_result=blocked_result,
                         presentation=tool_presentation,
+                        dispatch_status="not_started",
                     )
                     tool_responses.append(
                         ToolMessage(
                             tool_call_id=tool_call_id,
                             name=function_name,
                             content=json.dumps(blocked_result, ensure_ascii=False),
-                            artifact=ToolResult(success=False, message=blocked_reason, data={"error_code": blocked_code, "side_effect_state": "not_started"}),
+                            artifact=ToolResult(success=False, message=blocked_result["message"], data=failure_data),
                             status="error",
                         )
                     )
@@ -1188,6 +1166,19 @@ class BaseAgent(ABC):
                 await self._remember_tool_response(response)
                 tool_responses.append(response)
                 call_evidence = self._tool_execution_ledger.call_summary(tool_call_id)
+                not_started = trusted_program_prelaunch_failure(tool, tool_call, self._tool_execution_ledger) if program_path else None
+                # The source/working directory can disappear between the probe
+                # and launch. Only this exact private terminal receipt proves
+                # the attempted launch did not start; public failure prose does
+                # not. Capture fresh prerequisites before storing the failure
+                # so restoring the same source bytes can still be a real repair.
+                not_started = not_started if not_started and not_started["tool_call_id"] == tool_call_id else None
+                if not_started:
+                    current_prerequisites = await trusted_program_prerequisites(tool, tool_call)
+                    if current_prerequisites:
+                        self._analysis_progress.record_program_prerequisites(path=program_path, **current_prerequisites)
+                    else:
+                        self._analysis_progress.invalidate_program_prerequisites(path=program_path)
                 if call_evidence["tracked_operation_count"]:
                     protocol_recovery.observe_launch(tool, tool_call, prerequisites=prerequisites)
                 protocol_recovery.refresh_confirmed_executions(self._tool_execution_ledger)
@@ -1204,6 +1195,9 @@ class BaseAgent(ABC):
                     read_content_digest=diagnostic_digest,
                     program_path=program_path,
                     confirmed_execution=bool(call_evidence["tracked_operation_count"] and call_evidence["execution_confirmed"]))
+                if not_started:
+                    self._analysis_progress.record_program_prelaunch_failure(
+                        call=tool_call, path=program_path, operation_id=not_started["operation_id"])
                 if program_path:
                     feedback = trusted_program_execution_feedback(tool, tool_call, tool_result, self._tool_execution_ledger)
                     if feedback:
@@ -1239,6 +1233,7 @@ class BaseAgent(ABC):
                     function_args=display_args,
                     function_result=projected_tool_artifact(tool_result),
                     presentation=tool_presentation,
+                    dispatch_status="not_started" if not_started else None,
                     program_attempt=trusted_program_attempt_view(
                         tool, tool_call, tool_result, self._tool_execution_ledger),
                 )
@@ -1293,16 +1288,7 @@ class BaseAgent(ABC):
                             HumanMessage(content=tool_free_instruction),
                         ],
                         format,
-                        request_timeout=self.TOOL_FREE_COMPLETION_TIMEOUT_SECONDS,
                         max_tokens=self.TOOL_FREE_COMPLETION_MAX_TOKENS,
-                    )
-                except asyncio.TimeoutError:
-                    failure_reason = "finalization_timeout"
-                    logger.warning(
-                        "Agent %s terminal synthesis watchdog expired (per-request timeout %.1fs) after %d tool batch(es)",
-                        self.name,
-                        self.TOOL_FREE_COMPLETION_TIMEOUT_SECONDS,
-                        iterations,
                     )
                 except Exception as exc:
                     failure_reason = "finalization_failed"
@@ -1331,7 +1317,6 @@ class BaseAgent(ABC):
                         message = AIMessage(content=fallback_completion)
                     else:
                         error = {
-                            "finalization_timeout": self.FINALIZATION_TIMEOUT_ERROR,
                             "finalization_failed": self.FINALIZATION_FAILED_ERROR,
                         }.get(failure_reason, self.INVALID_FINAL_RESULT_ERROR)
                         yield ErrorEvent(
@@ -1373,25 +1358,7 @@ class BaseAgent(ABC):
                     message = await self._ask_without_tools(
                         [*tool_responses, final_instruction],
                         format,
-                        request_timeout=self.FINALIZATION_TIMEOUT_SECONDS,
                     )
-                except asyncio.TimeoutError:
-                    self._set_execution_outcome("finalization_timeout")
-                    logger.warning(
-                        "Agent %s no-tool finalization watchdog expired (per-request timeout %.1fs) after %d batches",
-                        self.name,
-                        self.FINALIZATION_TIMEOUT_SECONDS,
-                        iterations,
-                    )
-                    fallback_completion = self._completion_from_finalization_failure(
-                        successful_tool_calls,
-                        reason="finalization_timeout",
-                    )
-                    if fallback_completion is not None:
-                        yield MessageEvent(message=fallback_completion)
-                    else:
-                        yield ErrorEvent(error=self.FINALIZATION_TIMEOUT_ERROR)
-                    return
                 except Exception as exc:
                     self._set_execution_outcome("finalization_failed")
                     logger.warning(
@@ -1500,46 +1467,21 @@ class BaseAgent(ABC):
         self.memory.roll_back()
         await self._persist_memory()
 
-    def _no_tool_synthesis_watchdog_seconds(self, request_timeout: float) -> float:
-        """Bound a logical request without cancelling its legal transport retries.
-
-        Only the governed driver exposes a per-physical-request timeout. Other
-        injected adapters retain a single watchdog; claiming they can retry a
-        timed-out request here would bypass the audited transport boundary.
-        This is not an analysis/task deadline and never reopens execution tools.
-        """
-        if not self._uses_model_driver():
-            return request_timeout
-        attempts = max(1, getattr(self, "_llm_retry_attempts", self.max_retries))
-        retry_maximum = getattr(self, "_llm_retry_max_seconds", 8.0)
-        retry_maximum = retry_maximum if math.isfinite(retry_maximum) and retry_maximum >= 0 else 0.0
-        store_timeout = get_settings().model_trace_store_timeout_seconds
-        # Each physical request may store admission and terminal traces; a
-        # failed attempt also stores its retry schedule. Allow final memory IO
-        # outside those traces, rather than expiring during the first attempt.
-        return (attempts * request_timeout + (attempts - 1) * retry_maximum
-                + (3 * attempts + 1) * store_timeout + 5.0)
-
     async def _ask_without_tools(
         self,
         messages: List[Dict[str, Any]],
         format: Optional[str] = None,
         *,
-        request_timeout: float,
         max_tokens: Optional[int] = None,
     ) -> AIMessage:
         """Synthesize existing evidence, retrying only physical model requests.
 
-        A slow provider call must become a retryable ``ModelProviderTimeout``
-        inside the driver, not cancellation of the entire synthesis/retry loop.
-        Cancellation still propagates, and an independent outer watchdog keeps
-        a stuck adapter, history store or callback from hanging indefinitely.
+        Elapsed time never terminates synthesis. Actual transport errors retain
+        their retry policy, and user cancellation propagates through the await.
         """
-        with model_request_timeout(request_timeout):
-            async with asyncio.timeout(self._no_tool_synthesis_watchdog_seconds(request_timeout)):
-                return await self.ask_with_messages(
-                    messages, format, allow_tools=False, max_tokens=max_tokens,
-                )
+        return await self.ask_with_messages(
+            messages, format, allow_tools=False, max_tokens=max_tokens,
+        )
 
     async def ask_with_messages(
         self,

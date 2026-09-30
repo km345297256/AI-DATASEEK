@@ -4,7 +4,6 @@ import pytest
 
 from app.domain.models.tool_result import ToolResult
 from app.domain.services.tools.interceptors import (
-    ToolExecutionTimeoutError,
     ToolTimeoutInterceptor,
 )
 from app.domain.services.tools.pipeline import ToolExecutionPipeline
@@ -146,18 +145,35 @@ async def test_shell_run_preserves_nonzero_return_code_and_output():
     assert result.data["output"] == "analysis complete\n"
 
 
-async def test_shell_run_terminates_process_when_bounded_wait_expires_without_interceptor():
+async def test_native_commands_finish_after_arbitrarily_many_observation_windows(monkeypatch):
+    monkeypatch.setattr("app.domain.services.tools.shell._PROGRAM_RETRY_DELAY_SECONDS", 0)
+    sandbox = _Sandbox()
+    windows = 0
+    original_wait = sandbox.wait_for_process
+
+    async def wait(session_id, seconds):
+        nonlocal windows
+        windows += 1
+        sandbox.still_running = windows <= 130
+        return await original_wait(session_id, seconds)
+
+    sandbox.wait_for_process = wait
+    result = await _invoke_shell_run(sandbox, timeout_seconds=1)
+    assert result.success and windows == 131
+    assert sandbox.kill_calls == []
+
+
+async def test_shell_run_remains_running_until_explicit_cancellation():
     sandbox = _Sandbox(still_running=True)
-
-    result = await _invoke_shell_run(sandbox, timeout_seconds=500)
-
-    # Leave host-side headroom below the production interceptor's 120 second
-    # outer deadline so this fallback can clean up and return deterministically.
-    assert sandbox.wait_seconds == 119
+    task = asyncio.create_task(_invoke_shell_run(sandbox, timeout_seconds=500))
+    await asyncio.sleep(0.02)
+    assert not task.done()
+    assert sandbox.wait_seconds == 120
+    assert sandbox.kill_calls == []
+    task.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await task
     assert sandbox.kill_calls == ["shell-1"]
-    assert result.success is False
-    assert result.data["status"] == "timed_out"
-    assert result.data["returncode"] is None
 
 
 class _BlockingShellSandbox(_Sandbox):
@@ -178,15 +194,14 @@ class _BlockingShellSandbox(_Sandbox):
         await asyncio.Event().wait()
 
 
-async def test_shell_exec_pipeline_timeout_cooperatively_kills_process_once():
+async def test_shell_exec_ignores_runtime_deadline_but_cancellation_kills_once():
     sandbox = _BlockingShellSandbox()
     toolkit = ShellToolkit(sandbox)
     toolkit.tool_execution_pipeline = ToolExecutionPipeline([
-        ToolTimeoutInterceptor(0.01, maximum_timeout_seconds=1),
+        ToolTimeoutInterceptor(),
     ])
 
-    with pytest.raises(ToolExecutionTimeoutError):
-        await toolkit.get_tool("shell_exec").ainvoke({
+    task = asyncio.create_task(toolkit.get_tool("shell_exec").ainvoke({
             "id": "call-shell-exec",
             "name": "shell_exec",
             "args": {
@@ -194,8 +209,13 @@ async def test_shell_exec_pipeline_timeout_cooperatively_kills_process_once():
                 "exec_dir": "/home/ubuntu",
                 "command": "sleep 600",
             },
-        })
-
+        }))
+    await sandbox.started.wait()
+    await asyncio.sleep(0.03)
+    assert not task.done() and sandbox.kill_calls == []
+    task.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await task
     assert sandbox.kill_calls == ["process-1"]
 
 
@@ -220,20 +240,24 @@ async def test_shell_wait_external_cancellation_kills_process_once():
     assert sandbox.kill_calls == ["process-2"]
 
 
-async def test_shell_view_timeout_does_not_kill_unrelated_process():
+async def test_shell_view_has_no_runtime_cutoff_and_cancel_does_not_kill_process():
     sandbox = _BlockingShellSandbox()
     toolkit = ShellToolkit(sandbox)
     toolkit.tool_execution_pipeline = ToolExecutionPipeline([
-        ToolTimeoutInterceptor(0.01, maximum_timeout_seconds=1),
+        ToolTimeoutInterceptor(),
     ])
 
-    with pytest.raises(ToolExecutionTimeoutError):
-        await toolkit.get_tool("shell_view").ainvoke({
+    task = asyncio.create_task(toolkit.get_tool("shell_view").ainvoke({
             "id": "call-shell-view",
             "name": "shell_view",
             "args": {"id": "process-3"},
-        })
-
+        }))
+    await sandbox.started.wait()
+    await asyncio.sleep(0.03)
+    assert not task.done()
+    task.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await task
     assert sandbox.kill_calls == []
 
 
@@ -252,10 +276,10 @@ async def test_dataset_unpack_uses_one_quoted_bounded_command():
 
     assert result.success is True
     assert sandbox.exec_dir == "/home/ubuntu"
-    assert sandbox.wait_seconds == 119
+    assert sandbox.wait_seconds == 120
     assert sandbox.command == (
         "ai-dataseek-unpack '/home/ubuntu/datasets/demo/a file; touch nope.zip' "
-        "--output '/home/ubuntu/output/unpacked demo' --timeout-seconds 120"
+        "--output '/home/ubuntu/output/unpacked demo' "
     )
 
 
@@ -275,11 +299,40 @@ async def test_dataset_quicklook_uses_one_quoted_bounded_command():
 
     assert result.success is True
     assert sandbox.exec_dir == "/home/ubuntu"
-    assert sandbox.wait_seconds == 119
+    assert sandbox.wait_seconds == 120
     assert sandbox.command == (
         "ai-dataseek-quicklook '/home/ubuntu/datasets/demo/data; touch nope.zip' "
-        "--output '/home/ubuntu/output/quick look' --max-plots 4 --timeout-seconds 120"
+        "--output '/home/ubuntu/output/quick look' --max-plots 4"
     )
+
+
+async def test_dataset_quicklook_requests_native_formats_without_custom_scripts():
+    sandbox = _Sandbox(returncode=0)
+    quicklook = ShellToolkit(sandbox).get_tool("dataset_quicklook")
+    result = await quicklook._arun(
+        id="native-formats", input_path="/home/ubuntu/datasets/table.xlsx",
+        output_dir="/home/ubuntu/output/plots", chart_formats=["svg", "png", "svg"],
+    )
+    assert result.success is True
+    assert sandbox.command == (
+        "ai-dataseek-quicklook /home/ubuntu/datasets/table.xlsx "
+        "--output /home/ubuntu/output/plots --max-plots 4 --chart-formats svg png"
+    )
+    schema = quicklook.args_schema.model_json_schema()
+    alternatives = schema["properties"]["chart_formats"]["anyOf"]
+    assert next(item for item in alternatives if item["type"] == "array")["items"]["enum"] == ["png", "svg"]
+
+
+@pytest.mark.parametrize("formats", [[], ["pdf"], ["svg; touch nope"], "svg", [["png"]]])
+async def test_dataset_quicklook_rejects_invalid_formats_before_launch(formats):
+    sandbox = _Sandbox(returncode=0)
+    result = await ShellToolkit(sandbox).get_tool("dataset_quicklook")._arun(
+        id="invalid-format", input_path="/home/ubuntu/datasets/table.csv",
+        output_dir="/home/ubuntu/output/plots", chart_formats=formats,
+    )
+    assert result.success is False
+    assert result.data == {"reason": "tool_arguments_invalid", "execution_started": False}
+    assert sandbox.command is None
 
 
 async def test_scientific_tools_build_one_quoted_bounded_command():
@@ -299,7 +352,7 @@ async def test_scientific_tools_build_one_quoted_bounded_command():
     )
 
     assert result.success is True
-    assert sandbox.wait_seconds == 119
+    assert sandbox.wait_seconds == 120
     assert sandbox.command == (
         "ai-dataseek-scientific subset '/home/ubuntu/datasets/demo/a file; touch nope.nc' "
         "--variable 'rain rate' --dimension-indices '{\"time\": 0}' "
@@ -324,7 +377,7 @@ async def test_netcdf_visualization_bundle_builds_one_bounded_command():
     )
 
     assert result.success is True
-    assert sandbox.wait_seconds == 119
+    assert sandbox.wait_seconds == 120
     assert sandbox.command == (
         "ai-dataseek-scientific visualize-bundle "
         "'/home/ubuntu/datasets/demo/a file; touch nope.nc' "
@@ -353,7 +406,7 @@ async def test_scientific_recipe_tools_build_one_quoted_bounded_command():
 
     assert result.success is True
     assert sandbox.exec_dir == "/home/ubuntu"
-    assert sandbox.wait_seconds == 119
+    assert sandbox.wait_seconds == 120
     assert sandbox.command == (
         "ai-dataseek-scientific-recipe region-timeseries "
         "'/home/ubuntu/datasets/demo/a file; touch nope.nc' "

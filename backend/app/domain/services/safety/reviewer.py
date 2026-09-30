@@ -1,4 +1,3 @@
-import asyncio
 import json
 import logging
 from typing import Any
@@ -60,7 +59,6 @@ class SafetyReviewAgent:
             if value is not None:
                 overrides[key] = value
         self._model = create_chat_model(settings, overrides=overrides)
-        self._timeout_seconds = settings.safety_review_timeout_seconds
         self._usage_context = usage_context or {}
         self._token_usage_service = TokenUsageService()
         self._policy_store = get_safety_policy_store()
@@ -83,13 +81,12 @@ class SafetyReviewAgent:
                 return deterministic
 
             runnable = self._model.bind(response_format={"type": "json_object"}, tool_choice="none")
-            async with asyncio.timeout(self._timeout_seconds):
-                response = await runnable.ainvoke(
-                    [
-                        SystemMessage(content=SAFETY_REVIEW_SYSTEM_PROMPT),
-                        HumanMessage(content=json.dumps(payload, ensure_ascii=False)),
-                    ]
-                )
+            response = await runnable.ainvoke(
+                [
+                    SystemMessage(content=SAFETY_REVIEW_SYSTEM_PROMPT),
+                    HumanMessage(content=json.dumps(payload, ensure_ascii=False)),
+                ]
+            )
             await self._record_token_usage(response)
             content = response.content if hasattr(response, "content") else response
             raw = content if isinstance(content, str) else json.dumps(content, ensure_ascii=False)

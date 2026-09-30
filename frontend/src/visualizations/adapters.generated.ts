@@ -56,6 +56,19 @@ export const VISUALIZATION_ADAPTERS = {
       "shared": true
     }
   },
+  "svg": {
+    "readers": [
+      "svg"
+    ],
+    "view_kind": "image",
+    "capabilities": {
+      "operations": [
+        "preview"
+      ],
+      "input_mode": "whole",
+      "shared": false
+    }
+  },
   "tiff": {
     "readers": [
       "binary"
@@ -1014,7 +1027,7 @@ export const VISUALIZATION_ADAPTERS = {
   }
 } as const;
 export type VisualizationAdapter = keyof typeof VISUALIZATION_ADAPTERS;
-export type VisualizationReader = "alignment-browser" | "archive" | "archive-member" | "array-window" | "astronomy-workbench" | "binary" | "blast-hits" | "bson" | "columnar-window" | "csv" | "czi" | "czi-window" | "database-table" | "dicom-window" | "diffraction" | "edf" | "envi-window" | "excel" | "fastq" | "fastqc" | "fcs-window" | "fits" | "genome-tracks" | "geoformat" | "grib-window" | "gro-trajectory" | "hdf5" | "instrument-window" | "jcamp" | "mass-spectrum" | "matrix-workbench" | "mca" | "metpy" | "molecular" | "mysql-sdi" | "netcdf" | "nexus-window" | "office" | "office-viewer" | "ome-zarr" | "pg-dump" | "phylogeny" | "pointcloud-window" | "radar-window" | "rdkit" | "redis-rdb" | "ripple-window" | "root" | "scientific-graph" | "seismic-window" | "sequence-browser" | "shapefile" | "simulation-mesh" | "spatial-window" | "sql-dump" | "sqlite-table" | "sst-records" | "structure" | "tabular" | "text" | "ugrid-window";
+export type VisualizationReader = "alignment-browser" | "archive" | "archive-member" | "array-window" | "astronomy-workbench" | "binary" | "blast-hits" | "bson" | "columnar-window" | "csv" | "czi" | "czi-window" | "database-table" | "dicom-window" | "diffraction" | "edf" | "envi-window" | "excel" | "fastq" | "fastqc" | "fcs-window" | "fits" | "genome-tracks" | "geoformat" | "grib-window" | "gro-trajectory" | "hdf5" | "instrument-window" | "jcamp" | "mass-spectrum" | "matrix-workbench" | "mca" | "metpy" | "molecular" | "mysql-sdi" | "netcdf" | "nexus-window" | "office" | "office-viewer" | "ome-zarr" | "pg-dump" | "phylogeny" | "pointcloud-window" | "radar-window" | "rdkit" | "redis-rdb" | "ripple-window" | "root" | "scientific-graph" | "seismic-window" | "sequence-browser" | "shapefile" | "simulation-mesh" | "spatial-window" | "sql-dump" | "sqlite-table" | "sst-records" | "structure" | "svg" | "tabular" | "text" | "ugrid-window";
 export type VisualizationOperation = "bytes" | "page" | "preview" | "prepare" | "job";
 export type VisualizationInputMode = "whole" | "page" | "prefix" | "window";
 export type VisualizationKind = "image" | "map" | "series" | "table" | "text" | "structure" | "document" | "tree" | "media" | "graph";

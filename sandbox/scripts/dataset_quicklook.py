@@ -23,11 +23,9 @@ import math
 import os
 from pathlib import Path, PurePosixPath
 import re
-import signal
 import shutil
 import sys
 import tempfile
-import threading
 import time
 from typing import Any, Iterable
 
@@ -54,6 +52,7 @@ EXCEL_SUFFIXES = {".xlsx": "excel", ".xlsm": "excel", ".xls": "excel"}
 RASTER_SUFFIXES = {".tif": "geotiff", ".tiff": "geotiff"}
 NETCDF_SUFFIXES = {".nc": "netcdf", ".nc4": "netcdf", ".cdf": "netcdf"}
 SUPPORTED_SUFFIXES = {**TABULAR_SUFFIXES, **EXCEL_SUFFIXES, **RASTER_SUFFIXES, **NETCDF_SUFFIXES}
+CHART_MEDIA_TYPES = {"png": "image/png", "svg": "image/svg+xml"}
 NULL_TEXT = {"", "na", "n/a", "nan", "null", "none", "-"}
 TOOL_EVIDENCE_MAX_DATASETS = 4
 TOOL_EVIDENCE_MAX_COLUMNS = 8
@@ -86,7 +85,6 @@ class Limits:
     max_raster_bands: int = 8
     max_plot_points: int = 2_000
     max_plots: int = 4
-    max_runtime_seconds: int = 90
     max_archive_expanded_bytes: int = 2 * 1024 * 1024 * 1024
     # File-organization output is intentionally smaller than discovery.  It is
     # returned to the conversation, so it must remain readable even when a
@@ -136,100 +134,80 @@ class ArchiveBudget:
     expanded_bytes: int = 0
 
 
-class Deadline:
-    def __init__(self, seconds: int) -> None:
-        self.started = time.monotonic()
-        self.seconds = seconds
-        self._old_handler: Any = None
-        self._old_timer: tuple[float, float] | None = None
-        self._armed = False
 
-    def check(self) -> None:
-        if time.monotonic() - self.started > self.seconds:
-            raise QuicklookError(
-                f"quicklook exceeded its {self.seconds}-second runtime budget"
-            )
-
-    @property
-    def elapsed(self) -> float:
-        return time.monotonic() - self.started
-
-    @property
-    def remaining(self) -> float:
-        return max(0.0, self.seconds - self.elapsed)
-
-    def arm(self) -> None:
-        """Enforce the deadline even while Python is reading a large archive."""
-        if (
-            self._armed
-            or not hasattr(signal, "setitimer")
-            or threading.current_thread() is not threading.main_thread()
-        ):
-            return
-
-        def timeout_handler(_signum: int, _frame: Any) -> None:
-            raise QuicklookError(
-                f"quicklook exceeded its {self.seconds}-second runtime budget"
-            )
-
-        self._old_handler = signal.getsignal(signal.SIGALRM)
-        self._old_timer = signal.getitimer(signal.ITIMER_REAL)
-        signal.signal(signal.SIGALRM, timeout_handler)
-        signal.setitimer(signal.ITIMER_REAL, max(0.001, self.remaining))
-        self._armed = True
-
-    def cancel(self) -> None:
-        if not self._armed:
-            return
-        signal.setitimer(signal.ITIMER_REAL, 0)
-        signal.signal(signal.SIGALRM, self._old_handler)
-        if self._old_timer and self._old_timer[0] > 0:
-            restored = max(0.001, self._old_timer[0] - self.elapsed)
-            signal.setitimer(signal.ITIMER_REAL, restored, self._old_timer[1])
-        self._armed = False
+def _chart_formats(values: Iterable[str] | None) -> tuple[str, ...]:
+    if values is None:
+        return ("png",)
+    # Do not silently replace an unsupported requested format with a PNG.
+    if isinstance(values, (str, bytes)):
+        raise QuicklookError("chart_formats must be a nonempty list of png or svg")
+    supplied = tuple(values)
+    if not supplied or any(not isinstance(value, str) or value not in CHART_MEDIA_TYPES for value in supplied):
+        raise QuicklookError("chart_formats must be a nonempty list of png or svg")
+    return tuple(dict.fromkeys(supplied))
 
 
 class PlotCollector:
-    def __init__(self, root: Path, maximum: int) -> None:
+    def __init__(self, root: Path, maximum: int, chart_formats: Iterable[str] | None = None) -> None:
         self.root = root
         self.maximum = maximum
+        self.chart_formats = _chart_formats(chart_formats)
+        self.chart_count = 0
         self.artifacts: list[dict[str, Any]] = []
 
     @property
     def remaining(self) -> int:
-        return max(0, self.maximum - len(self.artifacts))
+        return max(0, self.maximum - self.chart_count)
 
     def save(self, figure: Any, *, stem: str, title: str, source: str) -> bool:
         if not self.remaining:
             plt.close(figure)
             return False
-        number = len(self.artifacts) + 1
+        number = self.chart_count + 1
         digest = hashlib.sha1(source.encode("utf-8")).hexdigest()[:8]
         safe_stem = re.sub(r"[^A-Za-z0-9_-]+", "_", stem).strip("_") or "dataset"
-        filename = f"quicklook_{number:02d}_{safe_stem[:40]}_{digest}.png"
-        temporary = self.root / f".{filename}.tmp"
-        final = self.root / filename
+        basename = f"quicklook_{number:02d}_{safe_stem[:40]}_{digest}"
+        staged: list[tuple[Path, Path, str]] = []
         try:
-            figure.savefig(
-                temporary,
-                format="png",
-                dpi=140,
-                bbox_inches="tight",
-                metadata={"Software": "AI-DataSeek dataset quicklook"},
-            )
-            os.replace(temporary, final)
+            # Export the original figure through each native backend. In
+            # particular, SVG is not a wrapper around a rendered PNG.
+            for chart_format in self.chart_formats:
+                filename = f"{basename}.{chart_format}"
+                temporary = self.root / f".{filename}.tmp"
+                final = self.root / filename
+                staged.append((temporary, final, chart_format))
+                figure.savefig(
+                    temporary,
+                    format=chart_format,
+                    dpi=140,
+                    bbox_inches="tight",
+                    metadata={
+                        "Software" if chart_format == "png" else "Creator":
+                        "AI-DataSeek dataset quicklook"
+                    },
+                )
+            for temporary, final, _ in staged:
+                os.replace(temporary, final)
+        except Exception:
+            # A partially exported figure is not a successful format set.
+            for _, final, _ in staged:
+                final.unlink(missing_ok=True)
+            raise
         finally:
-            temporary.unlink(missing_ok=True)
+            for temporary, _, _ in staged:
+                temporary.unlink(missing_ok=True)
             plt.close(figure)
-        self.artifacts.append(
+        self.chart_count += 1
+        self.artifacts.extend(
             {
-                "path": filename,
-                "media_type": "image/png",
+                "path": final.name,
+                "media_type": CHART_MEDIA_TYPES[chart_format],
                 "role": "visualization",
                 "title": title,
                 "source": source,
                 "size": final.stat().st_size,
             }
+            for _, final, chart_format in staged
         )
         return True
 
@@ -515,7 +493,10 @@ def _read_excel(path: Path, limits: Limits) -> tuple[list[tuple[str, pd.DataFram
                     worksheet.iter_rows(
                         min_row=1,
                         max_row=limits.max_rows_per_table + 2,
-                        max_col=limits.max_columns,
+                        # openpyxl pads every requested column, even beyond
+                        # the sheet's actual extent. Such padding is not a
+                        # source field and must not create phantom columns.
+                        max_col=min(limits.max_columns, worksheet.max_column or limits.max_columns),
                         values_only=True,
                     ),
                     limits,
@@ -1417,7 +1398,6 @@ def _unpack_directory_archives(
     *,
     staging: Path,
     limits: Limits,
-    deadline: Deadline,
     discovery_state: DiscoveryState,
     selected_count: int,
 ) -> tuple[
@@ -1436,7 +1416,6 @@ def _unpack_directory_archives(
     archive_layers_truncated = False
     extracted_tree_truncated = False
     for index, archive in enumerate(archives, start=1):
-        deadline.check()
         if selected_count + len(selected) >= limits.max_files_analyze:
             items.append(
                 {
@@ -1494,9 +1473,6 @@ def _unpack_directory_archives(
                     max_single_file_bytes=min(
                         limits.max_source_bytes,
                         limits.max_archive_expanded_bytes,
-                    ),
-                    timeout_seconds=max(
-                        1, min(int(math.ceil(deadline.remaining)), 600)
                     ),
                 ),
             )
@@ -2342,14 +2318,21 @@ def _write_markdown(manifest: dict[str, Any], target: Path) -> None:
             )
     lines.extend(["", "## 输出图表", ""])
     for artifact in manifest["artifacts"]:
-        if artifact["media_type"] == "image/png":
+        if artifact.get("role") == "visualization":
             lines.append(f"- [{artifact['title']}]({artifact['path']})")
     target.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
-def generate_quicklook(source: Path, output: Path, limits: Limits | None = None) -> dict[str, Any]:
+def generate_quicklook(
+    source: Path,
+    output: Path,
+    limits: Limits | None = None,
+    *,
+    chart_formats: Iterable[str] | None = None,
+) -> dict[str, Any]:
     """Generate a quicklook directory and return its persisted manifest."""
     limits = limits or Limits()
+    formats = _chart_formats(chart_formats)
     source = source.expanduser().resolve(strict=True)
     output = output.expanduser().resolve(strict=False)
     if not source.is_file() and not source.is_dir():
@@ -2364,8 +2347,7 @@ def generate_quicklook(source: Path, output: Path, limits: Limits | None = None)
     original_tree = _original_source_tree(source, limits)
     output.parent.mkdir(parents=True, exist_ok=True)
     staging = Path(tempfile.mkdtemp(prefix=f".{output.name}.tmp-", dir=output.parent))
-    deadline = Deadline(limits.max_runtime_seconds)
-    deadline.arm()
+    started = time.monotonic()
     archive_manifest: dict[str, Any] | None = None
     archive_organization: dict[str, Any] = {
         "archive_layers": [],
@@ -2391,7 +2373,6 @@ def generate_quicklook(source: Path, output: Path, limits: Limits | None = None)
                         max_single_file_bytes=min(
                             limits.max_source_bytes, limits.max_archive_expanded_bytes
                         ),
-                        timeout_seconds=min(limits.max_runtime_seconds, 600),
                     ),
                 )
             except Exception as exc:
@@ -2406,7 +2387,6 @@ def generate_quicklook(source: Path, output: Path, limits: Limits | None = None)
                         include_type=False,
                     )
                 ) from exc
-            deadline.check()
             discovery_state = DiscoveryState(maximum=limits.max_files_scan)
             discovered, _nested_archives = _discover(
                 unpacked,
@@ -2472,7 +2452,6 @@ def generate_quicklook(source: Path, output: Path, limits: Limits | None = None)
                     directory_archives,
                     staging=staging,
                     limits=limits,
-                    deadline=deadline,
                     discovery_state=discovery_state,
                     selected_count=len(candidates),
                 )
@@ -2495,12 +2474,11 @@ def generate_quicklook(source: Path, output: Path, limits: Limits | None = None)
         if not candidates:
             raise QuicklookError("no supported CSV/TSV, Excel, NetCDF, or GeoTIFF files found")
 
-        plots = PlotCollector(staging, max(1, min(limits.max_plots, 4)))
+        plots = PlotCollector(staging, max(1, min(limits.max_plots, 4)), formats)
         datasets: list[dict[str, Any]] = []
         errors: list[dict[str, str]] = list(pre_analysis_errors)
         first_table: tuple[pd.DataFrame, str, str, str] | None = None
         for candidate in candidates:
-            deadline.check()
             if candidate.size > limits.max_source_bytes:
                 errors.append(
                     {
@@ -2553,7 +2531,6 @@ def generate_quicklook(source: Path, output: Path, limits: Limits | None = None)
                     }
                 )
 
-        deadline.check()
         if first_table is not None and plots.remaining:
             frame, label, stem, display_path = first_table
             _plot_table_extras(
@@ -2574,7 +2551,6 @@ def generate_quicklook(source: Path, output: Path, limits: Limits | None = None)
         # result would make artifact discovery upload the entire dataset again.
         for workspace in temporary_workspaces:
             shutil.rmtree(workspace, ignore_errors=True)
-        deadline.check()
 
         manifest: dict[str, Any] = {
             "version": 1,
@@ -2600,12 +2576,14 @@ def generate_quicklook(source: Path, output: Path, limits: Limits | None = None)
                 },
             },
             "limits": asdict(limits),
+            "chart_formats": list(formats),
             "discovery": discovery,
             "summary": {
                 "files_analyzed": len(datasets),
                 "files_failed": len(errors),
-                "plot_count": len(plots.artifacts),
-                "elapsed_seconds": round(deadline.elapsed, 3),
+                "plot_count": plots.chart_count,
+                "plot_file_count": len(plots.artifacts),
+                "elapsed_seconds": round(time.monotonic() - started, 3),
             },
             "datasets": datasets,
             "errors": errors,
@@ -2637,15 +2615,14 @@ def generate_quicklook(source: Path, output: Path, limits: Limits | None = None)
     except Exception:
         shutil.rmtree(staging, ignore_errors=True)
         raise
-    finally:
-        deadline.cancel()
 
 
 def parse_arguments(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(
-            "Generate a bounded CSV/TSV, Excel, NetCDF, or GeoTIFF quicklook with 1-4 PNG "
-            "charts plus JSON and Markdown summaries. Archives are unpacked safely."
+            "Generate a bounded CSV/TSV, Excel, NetCDF, or GeoTIFF quicklook with 1-4 "
+            "charts (PNG by default, optionally SVG) "
+            "plus JSON and Markdown summaries. Archives are unpacked safely."
         )
     )
     parser.add_argument("input", type=Path, help="dataset file, archive, or directory")
@@ -2660,7 +2637,10 @@ def parse_arguments(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--max-rows", type=int, default=20_000)
     parser.add_argument("--max-columns", type=int, default=80)
     parser.add_argument("--max-plots", type=int, default=4)
-    parser.add_argument("--timeout-seconds", type=int, default=90)
+    parser.add_argument(
+        "--chart-formats", nargs="+", choices=tuple(CHART_MEDIA_TYPES), default=["png"],
+        help="native export formats for every chart; defaults to png",
+    )
     return parser.parse_args(argv)
 
 
@@ -2672,10 +2652,9 @@ def main(argv: list[str] | None = None) -> int:
         max_rows_per_table=max(10, min(args.max_rows, 100_000)),
         max_columns=max(1, min(args.max_columns, 256)),
         max_plots=max(1, min(args.max_plots, 4)),
-        max_runtime_seconds=max(5, min(args.timeout_seconds, 600)),
     )
     try:
-        manifest = generate_quicklook(args.input, args.output, limits)
+        manifest = generate_quicklook(args.input, args.output, limits, chart_formats=args.chart_formats)
     except (OSError, UnpackError, QuicklookError) as exc:
         public_error = _public_error_text(
             exc,

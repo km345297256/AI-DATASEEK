@@ -125,9 +125,11 @@ class BlockingCredentialRepository(InMemoryCredentialRepository):
     def __init__(self) -> None:
         super().__init__()
         self.block: str | None = None
+        self.entered = asyncio.Event()
 
     async def _wait_if_blocked(self, operation: str) -> None:
         if self.block == operation:
+            self.entered.set()
             await asyncio.Event().wait()
 
     async def insert(self, record: CredentialRecord) -> CredentialRecord:
@@ -337,14 +339,7 @@ async def test_invalid_requirements_and_expected_duplicates_fail_closed():
 
 
 @pytest.mark.asyncio
-async def test_all_repository_entry_points_have_a_fixed_bounded_failure(
-    monkeypatch: pytest.MonkeyPatch,
-):
-    monkeypatch.setattr(
-        credential_service_module,
-        "_REPOSITORY_TIMEOUT_SECONDS",
-        0.01,
-    )
+async def test_all_repository_entry_points_propagate_explicit_cancellation():
     repository = BlockingCredentialRepository()
     vault, _, _ = service(repository)
     expected = CredentialView(
@@ -383,17 +378,25 @@ async def test_all_repository_entry_points_have_a_fixed_bounded_failure(
     ]
     for operation, invoke in operations:
         repository.block = operation
-        with pytest.raises(CredentialStateUnavailableError) as captured:
-            await invoke()
-        assert str(captured.value) == "credential_state_unavailable"
-        assert "private-secret-value" not in str(captured.value)
+        repository.entered.clear()
+        pending = asyncio.create_task(invoke())
+        await asyncio.wait_for(repository.entered.wait(), timeout=1)
+        assert not pending.done()
+        pending.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await pending
+    assert repository.records == {}
 
 
 @pytest.mark.asyncio
-async def test_multiple_binding_queries_share_one_repository_deadline(
+async def test_multiple_slow_binding_queries_have_no_shared_repository_deadline(
     monkeypatch: pytest.MonkeyPatch,
 ):
     class DelayedRepository(InMemoryCredentialRepository):
+        async def find_for_owner(self, user_id, reference):
+            await asyncio.sleep(0.02)
+            return await super().find_for_owner(user_id, reference)
+
         async def find_active_binding(
             self,
             user_id: str,
@@ -416,17 +419,33 @@ async def test_multiple_binding_queries_share_one_repository_deadline(
         credential_service_module,
         "_REPOSITORY_TIMEOUT_SECONDS",
         0.03,
+        raising=False,
     )
 
-    with pytest.raises(CredentialStateUnavailableError):
-        await vault.describe_bindings(
-            "user-1",
-            "dataset_analysis",
-            [
-                {"provider": "deepseek", "slot": "api_key"},
-                {"provider": "storage", "slot": "access_token"},
-            ],
-        )
+    views = await vault.describe_bindings(
+        "user-1",
+        "dataset_analysis",
+        [
+            {"provider": "deepseek", "slot": "api_key"},
+            {"provider": "storage", "slot": "access_token"},
+        ],
+    )
+    assert [view.slot for view in views] == ["api_key", "access_token"]
+    assert await vault.resolve_bindings("user-1", "dataset_analysis", views) == {
+        "api_key": "secret-value", "access_token": "storage-token",
+    }
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("failure", [RuntimeError, TimeoutError])
+async def test_real_credential_repository_failures_remain_private_and_fail_closed(failure):
+    async def broken():
+        raise failure("private-secret-value")
+
+    with pytest.raises(CredentialStateUnavailableError) as captured:
+        await CredentialService._repository_call(broken)
+    assert str(captured.value) == "credential_state_unavailable"
+    assert "private-secret-value" not in str(captured.value)
 
 
 def test_credential_routes_require_write_intent_and_enforce_owner_scope():

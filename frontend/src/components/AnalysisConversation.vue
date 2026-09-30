@@ -26,7 +26,7 @@
           <button v-for="file in deliveredImages(message)" :key="file.file_id" type="button"
             class="overflow-hidden rounded-lg border border-[var(--border-main)] bg-[var(--background-gray-main)] text-left"
             @click="showFilePanel(file, deliveredFiles(message))">
-            <img v-if="previewUrl(file)" :src="previewUrl(file)" :alt="file.filename" loading="lazy" class="max-h-[520px] w-full bg-white object-contain" />
+            <AnalysisResultImage :file="file" />
             <span class="flex items-center justify-between gap-3 px-3 py-2 text-xs">
               <span class="truncate font-medium">{{ file.filename }}</span><span class="shrink-0 text-[var(--text-tertiary)]">查看成果</span>
             </span>
@@ -59,8 +59,7 @@
 import { computed, ref, watch } from 'vue';
 import { ChevronRight, Image as ImageIcon } from 'lucide-vue-next';
 import ChatMessage from './ChatMessage.vue';
-import { API_CONFIG } from '../api/client';
-import type { FileInfo } from '../api/file';
+import AnalysisResultImage from './AnalysisResultImage.vue';
 import { prepareShapefilePreview } from '../api/file';
 import type { CompletionAdviceData } from '../types/event';
 import { isConsecutiveAssistant, type Message, type ToolContent } from '../types/message';
@@ -100,10 +99,6 @@ function showMessage(message: Message, _index: number) {
   if (message.type !== 'step') return true;
   const summary = presentation.summaryFor(message);
   return !summary || expanded.value.has(props.messageKey(summary));
-}
-function previewUrl(file: FileInfo) {
-  if (!file.file_url) return '';
-  return /^https?:\/\//i.test(file.file_url) ? file.file_url : `${API_CONFIG.host}${file.file_url}`;
 }
 async function openShapefilePreview() {
   if (previewLoading.value) return;

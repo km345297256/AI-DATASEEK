@@ -1,0 +1,78 @@
+{
+  "dataset_id": "viz-test-svg",
+  "external_id": "viz-test-svg",
+  "data_center_id": "reviewed-visualization-plugin-tests",
+  "data_center_name": "逐插件可视化测试样例",
+  "name": "插件测试 · SVG 静态矢量图",
+  "description": "原创合成 SVG 折线图测试夹具，四个虚构值 1、3、2、4，仅验证文字、本地 CSS、路径与本地引用的安全预览；不是科学观测，不包含用户数据。",
+  "domain": "image_science",
+  "data_type": "svg",
+  "temporal_coverage": "",
+  "spatial_coverage": "",
+  "tags": [
+    "插件测试样例",
+    "viz-svg",
+    "project_fixture",
+    "image",
+    "image_science"
+  ],
+  "metadata": {
+    "curated": true,
+    "source_catalog": "plugin-tests",
+    "catalog_version": 1,
+    "source_descriptor_sha256": "79e4a1af2d71130d59ae38cbd9f50da7d976a57c467c120f2ad06d57fee960f0",
+    "download_date": "2026-09-30",
+    "inventory_complete": true,
+    "recursive_file_count": 2,
+    "total_size_bytes": 2805,
+    "visualization_view_kind": "image",
+    "visualization_plugin_id": "viz-svg",
+    "visualization_entry_file": "static-chart.svg",
+    "sample_note": "640 × 360 的静态矢量图，四个合成数据点；测试文字、本地 CSS 与本地 use 引用。没有外部资源、脚本或用户数据。",
+    "provenance": [
+      {
+        "path": "static-chart.svg",
+        "size": 1142,
+        "sha256": "6b4001a37f49b18690956dc2578c0fe71e0ddb884b2547117fb982c428f8df77",
+        "role": "data",
+        "origin": {
+          "kind": "project_fixture",
+          "repository_file": "sandbox/tests/fixtures/svg/viz-test-svg/static-chart.svg",
+          "sha256": "6b4001a37f49b18690956dc2578c0fe71e0ddb884b2547117fb982c428f8df77"
+        }
+      }
+    ],
+    "publisher": "AI-DataSeek 测试夹具",
+    "source_url": "https://github.com/km345297256/AI-DATASEEK",
+    "license": "MIT",
+    "license_url": "https://github.com/km345297256/AI-DATASEEK/blob/v2/LICENSE",
+    "license_details": "原创项目合成测试夹具，按项目 MIT 许可提供。仅用于渲染功能测试，不用于科学结论。",
+    "authors": [
+      "AI-DataSeek 测试夹具"
+    ],
+    "source_version": "static SVG fixture v1 (2026-09-30)",
+    "sample_scope": "640 × 360 的静态矢量图，四个合成数据点；测试文字、本地 CSS 与本地 use 引用。没有外部资源、脚本或用户数据。",
+    "sample_kind": "project_fixture",
+    "test_steps": [
+      "打开 static-chart.svg，选择 SVG 矢量图（viz-svg）预览。",
+      "核对折线、四个圆点与 A–D 标签；预览通过安全 PNG 显示，长边不超过 2048 像素。",
+      "下载保留原始 SVG；关闭 viz-svg 后不回退到通用图片字节预览。"
+    ]
+  },
+  "files": [
+    {
+      "path": "SOURCE.md",
+      "size": 1663,
+      "sha256": "f263e4b93d70ae2b6247bb8a8e9921441e176d4e336b1f5b9f8e28cfbda9b183",
+      "role": "documentation",
+      "content_type": "text/markdown"
+    },
+    {
+      "path": "static-chart.svg",
+      "size": 1142,
+      "sha256": "6b4001a37f49b18690956dc2578c0fe71e0ddb884b2547117fb982c428f8df77",
+      "role": "data",
+      "content_type": "image/svg+xml"
+    }
+  ]
+}

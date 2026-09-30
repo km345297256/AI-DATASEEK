@@ -13,15 +13,13 @@ from app.domain.models.dataset import MountedDataset
 from app.domain.models.event import DoneEvent, PlanEvent, PlanStatus, ToolEvent
 from app.domain.models.plan import ExecutionStatus, Plan, Step
 from app.domain.services.analysis_answer_review import AnswerEvidence, review_answer
-from app.domain.services.analysis_scientific_review import SCIENTIFIC_DIMENSIONS
-from app.domain.services.execution_history import ExecutionHistory, reviewed_history_steps
+from app.domain.services.execution_history import ExecutionHistory, analysis_history_steps, reviewed_history_steps
 from app.domain.services.flows.plan_act import AgentStatus, PlanActFlow
 from test_analysis_answer_review_flow import (
     real_reviewer, terminal_payload, with_observed_results,
 )
 from test_analysis_repair_flow import collect, scenario, terminal_messages
 from test_execution_history_repository import repository
-from test_answer_scientific_scope_routing import with_answer_scope_checks
 
 
 FACT = "The historical sample has 12 observations and a median of 4.5 mm."
@@ -37,6 +35,17 @@ def reviewed_plan(*, plan_id="original-plan", dataset_ids=(), input_file_ids=(),
                 outputs={"answer_review": {"version": 1, "status": status,
                     "dataset_ids": list(dataset_ids), "input_file_ids": list(input_file_ids)}})
     return PlanEvent(seq=seq, status=PlanStatus.COMPLETED, plan=Plan(id=plan_id, steps=[step]))
+
+
+def delivered_plan(**kwargs):
+    """Current host marker records delivery, not a model's scientific verdict."""
+    event = reviewed_plan(**kwargs)
+    step = event.plan.steps[0]
+    previous = step.outputs.pop("answer_review")
+    step.outputs["result_assessment"] = {"version": 1, "mode": "user_evaluated",
+        "scientific_review": "not_performed", "dataset_ids": previous["dataset_ids"],
+        "input_file_ids": previous["input_file_ids"]}
+    return event
 
 
 def history_view(events, compact):
@@ -136,7 +145,7 @@ async def test_prior_projection_version_is_rebuilt_privately_without_rewriting_e
     sessions.document["execution_history_projection"] = previous
     result = await repo.get_execution_history("s", before_seq=3)
     assert collection.body_reads == 2
-    assert result.version == 2
+    assert result.version == 3
     assert [step.result for step in reviewed_history_steps(result, dataset_ids=set(), input_file_ids=set())] == [FACT]
     assert documents == collection.documents
     assert all(set(change["$set"]) == {"execution_history_projection"} for change in sessions.updates)
@@ -155,13 +164,13 @@ async def test_future_or_other_session_result_is_never_loaded_by_reviewed_histor
     assert "Other session" not in result.model_dump_json()
 
 
-def followup_scenario(history):
-    runner, flow, step, message, state = scenario([[]], [])
+def followup_scenario(history, *, unknown=False):
+    runner, flow, step, message, state = scenario([[]], [], unknown=unknown)
     # Production's fast path reuses this id across independently identified
     # plans; history admission must not confuse it with the prior turn.
     step.id = "dataset-fast-path"
     step.inputs["artifact_policy"] = "optional"
-    message.message = "Explain the preceding verified result in more detail."
+    message.message = "Explain the preceding result in more detail."
     message._session_events_snapshot = history
     new_plan_event = flow._session_repository.get_events.return_value[0]
 
@@ -182,110 +191,41 @@ def followup_scenario(history):
 @pytest.mark.parametrize("compact", [False, True])
 @pytest.mark.parametrize("input_file_ids", [[], ["synthetic-upload-selection"]])
 @pytest.mark.parametrize("correction_mode", ["reclassify", "withdraw", "no_coverage", "malformed", "unavailable"])
-async def test_followup_recovers_older_history_and_repairs_one_paragraph_without_reexecution(
+async def test_followup_reuses_delivered_history_without_automatic_correction_or_reexecution(
         compact, input_file_ids, correction_mode):
-    original = reviewed_plan(text=FACT + "\n\n" + HISTORICAL_NOTE, input_file_ids=input_file_ids)
-    failed = reviewed_plan(plan_id="failed-followup", status="unavailable", success=False, input_file_ids=input_file_ids)
+    original = delivered_plan(text=FACT + "\n\n" + HISTORICAL_NOTE, input_file_ids=input_file_ids)
+    failed = delivered_plan(plan_id="failed-followup", success=False, input_file_ids=input_file_ids)
     runner, flow, step, message, state, agent = followup_scenario(history_view([original, failed], compact))
     message.attachment_file_ids = list(input_file_ids)
-    payloads = []
-
-    async def response(messages):
-        payload = json.loads(messages[-1].content)
-        payloads.append(payload)
-        historical = next(source for source in payload["sources"] if source["kind"] == "prior_review")
-        if "frozen_paragraphs" in payload:
-            assert input_file_ids and correction_mode in {"reclassify", "withdraw"}
-            assert len(payloads) == 3
-            expected_paragraphs = [FACT]
-            if correction_mode == "reclassify":
-                expected_paragraphs.append("此前已核验的结果说明：" + HISTORICAL_NOTE)
-            assert payload["frozen_paragraphs"] == expected_paragraphs
-            assert payload["historical_source_ids"] == [historical["source_id"]]
-            assert not any(source["kind"] == "tool_result" for source in payload["sources"])
-            indices = list(range(len(expected_paragraphs)))
-            # The final protocol judges frozen published text; it cannot return
-            # replacement paragraphs, new work or the initial review root.
-            return json.dumps({"answer_scientific_checks": [{"dimension": dimension,
-                "status": "verified", "paragraph_indices": indices,
-                "evidence_scope": "historical_explanation",
-                "evidence": [{"source_id": historical["source_id"], "quote": FACT}]}
-                for dimension in SCIENTIFIC_DIMENSIONS],
-                "answer_scope_check": {"status": "complete", "paragraph_indices": indices,
-                                       "completion_blocker": "none"}})
-        if len(payloads) == 1:
-            assert [source["kind"] for source in payload["sources"]] == ["catalog", "prior_review", "current_request", "delivery_inventory"]
-            request = next(source for source in payload["sources"] if source["kind"] == "current_request")
-            assert request["state"] == "requested" and request["text"] == message.message
-            assert all(source["kind"] != "tool_result" for source in payload["sources"])
-            inventory = next(source for source in payload["sources"] if source["kind"] == "delivery_inventory")
-            assert json.loads(inventory["text"]) == []
-            result = with_answer_scope_checks(payload, {"unsupported_claims": False, "paragraphs": [
-                {"text": FACT, "kind": "analysis", "evidence": [{"source_id": historical["source_id"], "quote": FACT}]},
-                {"text": HISTORICAL_NOTE, "kind": "limitation", "evidence": [{"source_id": historical["source_id"], "quote": HISTORICAL_NOTE}]},
-            ], "requirement_checks": []}, status="verified",
-                evidence=[{"source_id": historical["source_id"], "quote": FACT}])
-            for check in result.get("answer_scientific_checks", []):
-                assert payload["historical_source_ids"] == [historical["source_id"]]
-                check["evidence_scope"] = "historical_explanation"
-            return json.dumps(result)
-        assert [item["index"] for item in payload["failed_paragraphs"]] == [1]
-        assert payload["accepted_paragraphs"][0]["paragraph"]["text"] == FACT
-        if correction_mode == "unavailable":
-            raise RuntimeError("Synthetic correction transport failure")
-        if correction_mode == "malformed":
-            return json.dumps({"not_the_correction_contract": True})
-        paragraph = ({"text": HISTORICAL_NOTE, "kind": "analysis",
-                      "evidence": [historical["excerpts"][0]["evidence_id"]]}
-                     if correction_mode in {"reclassify", "no_coverage"} else None)
-        correction = {"paragraph_corrections": [{"index": 1, "paragraph": paragraph}],
-                      "requirement_corrections": []}
-        if correction_mode != "no_coverage":
-            correction["answer_complete"] = True
-        return json.dumps(correction)
-
-    ask = AsyncMock(side_effect=response)
+    # Any old review outcome, including refusal or transport failure, must be
+    # irrelevant: ordinary publication no longer calls that reviewer at all.
+    ask = (AsyncMock(side_effect=RuntimeError("Synthetic reviewer unavailable"))
+           if correction_mode == "unavailable" else
+           AsyncMock(return_value=json.dumps({"obsolete_review_result": correction_mode})))
     real_reviewer(agent, ask)
     events = await collect(runner, message)
 
-    has_final_check = bool(input_file_ids) and correction_mode in {"reclassify", "withdraw"}
-    has_schema_retry = correction_mode == "malformed"
-    assert ask.await_count == (3 if has_final_check or has_schema_retry else 2)
-    if has_schema_retry:
-        assert payloads[1] == payloads[2]  # Retry the frozen correction, never analysis.
+    ask.assert_not_awaited()
+    agent.review_delivery_answer.assert_not_awaited()
     assert len(state["prompts"]) == state["drained"] == 1
     assert not any(isinstance(event, ToolEvent) for event in events)
     assert not runner._generated_files and step.attachments == []
     assert not flow._artifact_repair_requests
     assert not step.outcome.can_resume
-    assert step.outputs["answer_review"]["input_file_ids"] == input_file_ids
-    assert step.outputs["answer_review"]["source_count"] == 2  # Observed catalog + history; not request/inventory.
+    assert "answer_review" not in step.outputs
+    assert step.outputs["result_assessment"] == {"version": 1, "mode": "user_evaluated",
+        "scientific_review": "not_performed", "dataset_ids": [], "input_file_ids": input_file_ids}
     assert sum(isinstance(event, DoneEvent) for event in events) == 1
-    assert FACT in step.result
-    assert json.loads(flow.session_context)["prior_analysis_results"][0]["result"] == original.plan.steps[0].result
+    assert step.result == FACT + "\n\n" + HISTORICAL_NOTE
+    historical = json.loads(flow.session_context)["prior_analysis_results"][0]
+    assert historical["result"] == original.plan.steps[0].result
+    assert historical["assessment"] == {"mode": "user_evaluated", "scientific_review": "not_performed"}
     public = terminal_payload(events)
     assert "目前没有可确认交付的文件" not in public
-    if correction_mode in {"reclassify", "withdraw"}:
-        assert step.success and step.outcome.status == "succeeded"
-        assert step.outputs["answer_review"]["status"] == "corrected"
-        assert "分析说明尚未完成证据核验" not in public
-        assert any(FACT in event.message for event in terminal_messages(events))
-        if input_file_ids:
-            # Selected inputs activate science, but an authenticated, explicitly
-            # historical explanation does not require a new measurement.
-            review = step.outputs["answer_review"]
-            assert review["answer_scientific_review"]["status"] == "verified"
-            assert review["answer_scope_review"]["status"] == "verified"
-            assert review["answer_scientific_review"]["candidate_version_status"] == "original"
-    else:
-        # Missing coverage, malformed correction and transport failure are
-        # incomplete review, not evidence that the historical finding is false.
-        assert not step.success and step.outcome.reason_code == "answer_validation_unavailable"
-    assert (HISTORICAL_NOTE in step.result) is (correction_mode in {"reclassify", "no_coverage"})
-    if correction_mode in {"reclassify", "no_coverage"}:
-        assert "此前已核验的结果说明：" + HISTORICAL_NOTE in step.result
-    if correction_mode == "no_coverage":
-        assert step.outputs["answer_review"]["answer_coverage_unverified"]
+    assert step.success and step.outcome.status == "succeeded"
+    assert "分析说明尚未完成证据核验" not in public
+    assert "此前已核验的结果说明" not in public
+    assert any(event.message == step.result for event in terminal_messages(events))
 
 
 @pytest.mark.asyncio
@@ -322,36 +262,54 @@ async def test_recovered_history_cannot_attest_new_calculation_or_current_file_d
 async def test_current_selected_input_preserves_historical_explanation_without_scientific_promotion(selection):
     dataset_ids = ["same-dataset"] if selection == "dataset" else []
     file_ids = ["same-upload"] if selection == "upload" else []
-    history = reviewed_plan(dataset_ids=dataset_ids, input_file_ids=file_ids)
+    history = delivered_plan(dataset_ids=dataset_ids, input_file_ids=file_ids)
     runner, flow, step, message, state, agent = followup_scenario(history_view([history], True))
     message.attachment_file_ids = file_ids
     if dataset_ids:
         message.datasets = [MountedDataset(dataset_id=dataset_ids[0], data_center_id="fixture",
             data_center_name="Synthetic", name="Historical selection",
             sandbox_path="/home/ubuntu/datasets/same")]
-    payloads = []
-
-    async def response(messages):
-        payload = json.loads(messages[-1].content)
-        payloads.append(payload)
-        source = next(item for item in payload["sources"] if item["kind"] == "prior_review")
-        citation = {"source_id": source["source_id"], "quote": FACT}
-        # Deliberately overconfident model judgment: host source validation
-        # must deny science green without deleting accurate historical prose.
-        return json.dumps(with_answer_scope_checks(payload, {"unsupported_claims": False,
-            "paragraphs": [{"text": FACT, "kind": "analysis", "evidence": [citation]}],
-            "requirement_checks": []}, status="verified", evidence=[citation]))
-
-    ask = AsyncMock(side_effect=response)
+    ask = AsyncMock(side_effect=AssertionError("No automatic historical science certification"))
     real_reviewer(agent, ask)
     events = await collect(runner, message)
-    assert ask.await_count == 2  # Authoring cannot self-certify historical science.
-    assert FACT in step.result
-    assert not step.success and step.outcome.reason_code == "scientific_validation_unavailable"
-    science = step.outputs["answer_review"]["answer_scientific_review"]
-    assert science["status"] == "unavailable"
-    assert {item["reason"] for item in science["dimensions"]} == {"answer_scientific_source_not_independent"}
-    assert not any(item["kind"] == "tool_result" for item in payloads[0]["sources"])
+    ask.assert_not_awaited()
+    agent.review_delivery_answer.assert_not_awaited()
+    assert step.result == FACT + "\n\n" + HISTORICAL_NOTE
+    assert step.success and step.outcome.reason_code == "completed"
+    assert "answer_review" not in step.outputs
+    assert step.outputs["result_assessment"]["scientific_review"] == "not_performed"
+    assert not any(item["kind"] == "prior_review" for item in runner._analysis_answer_evidence.render_sources())
     assert not any(isinstance(event, ToolEvent) for event in events)
     assert len(state["prompts"]) == 1 and not flow._artifact_repair_requests
     assert not step.outcome.can_resume
+
+
+@pytest.mark.asyncio
+async def test_user_evaluated_history_cannot_turn_unknown_current_execution_into_completion():
+    history = history_view([delivered_plan()], True)
+    runner, flow, step, message, state, agent = followup_scenario(history, unknown=True)
+    events = await collect(runner, message)
+    agent.review_delivery_answer.assert_not_awaited()
+    assert not step.success and step.outcome.reason_code == "tool_execution_unknown"
+    assert FACT in step.result  # Useful prose survives, but the engineering status stays honest.
+    assert "answer_review" not in step.outputs
+    assert not step.outcome.can_resume and not flow._artifact_repair_requests
+    assert len(state["prompts"]) == 1 and not runner._generated_files
+    combined = [delivered_plan(), PlanEvent(status=PlanStatus.COMPLETED, plan=flow.plan)]
+    selected = analysis_history_steps(history_view(combined, True), dataset_ids=set(), input_file_ids=set())
+    assert [item.result for item in selected] == [FACT]
+    assert any(item.metadata.get("analysis_outcome", {}).get("reason_code") == "tool_execution_unknown"
+               for item in terminal_messages(events) if item.metadata)
+
+
+@pytest.mark.asyncio
+async def test_user_evaluated_followup_does_not_admit_different_input_scope():
+    history = history_view([delivered_plan(input_file_ids=["other-upload"])], True)
+    runner, flow, step, message, state, agent = followup_scenario(history)
+    message.attachment_file_ids = ["selected-upload"]
+    await collect(runner, message)
+    assert not flow.session_context  # No ordinary messages were supplied in this fixture.
+    assert not runner._analysis_historical_delivery_paths
+    assert not any(item["kind"] == "prior_review" for item in runner._analysis_answer_evidence.render_sources())
+    assert step.outputs["result_assessment"]["input_file_ids"] == ["selected-upload"]
+    agent.review_delivery_answer.assert_not_awaited()

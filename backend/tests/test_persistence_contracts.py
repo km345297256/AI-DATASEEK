@@ -32,6 +32,13 @@ def test_frozen_catalog_matches_current_code():
 def test_frozen_legacy_records_read_and_roundtrip_without_silent_evidence_loss(name):
     fixtures = json.loads((Path(__file__).parent / "fixtures/persistence/legacy-records.json").read_text())
     adapter = ADAPTERS[name]
+    if name == "ExecutionHistory":
+        # A projection is a rebuildable cache, not an immutable task/event.
+        # Version 2 lacks the delivered-result index and must not be accepted
+        # with an empty default that silently loses follow-up context.
+        with pytest.raises(ValidationError):
+            adapter.validate_python(fixtures[name])
+        return
     value = adapter.validate_python(fixtures[name])
     encoded = adapter.dump_json(value)
     assert adapter.dump_json(adapter.validate_json(encoded)) == encoded
@@ -44,9 +51,10 @@ def test_frozen_legacy_records_read_and_roundtrip_without_silent_evidence_loss(n
         assert value.version == 1 and value.seq is None
 
 
-def test_old_execution_cache_is_invalidated_not_misread_as_current():
+@pytest.mark.parametrize("version", [1, 2])
+def test_old_execution_cache_is_invalidated_not_misread_as_current(version):
     with pytest.raises(ValidationError):
-        ExecutionHistory.model_validate({"version": 1, "seq": 0})
+        ExecutionHistory.model_validate({"version": version, "seq": 0})
 
 
 def test_additive_attempt_metadata_does_not_invent_recovery_for_pre_upgrade_events_or_cache():
@@ -57,7 +65,7 @@ def test_additive_attempt_metadata_does_not_invent_recovery_for_pre_upgrade_even
     assert "program_attempt" not in legacy_tool
     restored = ADAPTERS["AgentEvent"].validate_python(legacy_tool)
     assert isinstance(restored, ToolEvent) and restored.program_attempt is None
-    cache = ExecutionHistory.model_validate({"version": 2, "seq": 4,
+    cache = ExecutionHistory.model_validate({"version": 3, "seq": 4,
         "event_count": 1, "archive_events": [legacy_tool]})
     encoded = cache.model_dump_json()
     restored_cache = ExecutionHistory.model_validate_json(encoded)

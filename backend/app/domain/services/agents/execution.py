@@ -4,7 +4,6 @@ from collections import Counter
 import glob as globlib
 import json
 import logging
-import math
 import re
 import shlex
 import time
@@ -58,8 +57,6 @@ class ExecutionAgent(BaseAgent):
     format: str = "json_object"
     # These limits protect synthesis after a tool call; quicklook itself is an
     # ordinary tool chosen by the agent, never a preselected terminal workflow.
-    DATASET_SYNTHESIS_TIMEOUT_SECONDS = 75.0
-    DATASET_SYNTHESIS_REPAIR_TIMEOUT_SECONDS = 45.0
     # The professional synthesis is a concise user report, not another data
     # dump. Per-call output budgets reduce tail latency without shrinking the
     # normal ExecutionAgent model budget used by custom analysis.
@@ -741,7 +738,7 @@ class ExecutionAgent(BaseAgent):
                 )
         if not catalog_only:
             lines.append(
-                "Method and limits: only manifest-relative paths are shown; real host paths remain private, and extraction is bounded by file-count, size, depth, and timeout limits."
+                "Method and limits: only manifest-relative paths are shown; real host paths remain private, and extraction is bounded by file-count, size, and depth limits."
             )
         return "\n".join(lines)
 
@@ -2474,12 +2471,11 @@ class ExecutionAgent(BaseAgent):
                     f"[ \"$actual_size\" -le {self.FILE_PREVIEW_MAX_BYTES} ] && "
                     "mkdir -p -- /home/ubuntu/output && "
                     "mkdir -- \"$output_dir\" && "
-                    "timeout --signal=KILL 25s cp -- \"$resolved_source\" \"$partial_path\" && "
+                    "cp -- \"$resolved_source\" \"$partial_path\" && "
                     "chmod 0644 -- \"$partial_path\" && "
                     "mv -T -- \"$partial_path\" \"$output_path\" && "
                     "trap - EXIT HUP INT TERM"
                 ),
-                "timeout_seconds": 30,
             },
             "id": f"file-preview-call-{token}",
         }
@@ -2716,7 +2712,6 @@ class ExecutionAgent(BaseAgent):
                     "id": f"inventory-{token}",
                     "archive_path": str(candidates[0]),
                     "output_dir": f"/home/ubuntu/output/unpacked-{token}",
-                    "timeout_seconds": 120,
                     "source_root": str(dataset_root),
                 },
                 "id": f"inventory-unpack-{token}",
@@ -2835,7 +2830,6 @@ class ExecutionAgent(BaseAgent):
                     "input_path": str(input_path),
                     "output_dir": f"/home/ubuntu/output/quicklook-{token}",
                     "max_plots": 4,
-                    "timeout_seconds": 90,
                 },
                 "id": f"quicklook-call-{token}",
             }
@@ -2972,7 +2966,6 @@ class ExecutionAgent(BaseAgent):
                 f"artifact records, without inventing chart types or filenames: {artifact_descriptions}.\n\n"
                 f"{hard_constraints}"
             ))
-            active_synthesis_timeout = self.DATASET_SYNTHESIS_TIMEOUT_SECONDS
             try:
                 model_message = await self._ask_without_tools(
                     [
@@ -2982,7 +2975,6 @@ class ExecutionAgent(BaseAgent):
                         synthesis_instruction,
                     ],
                     self.format,
-                    request_timeout=self.DATASET_SYNTHESIS_TIMEOUT_SECONDS,
                     max_tokens=self.DATASET_SYNTHESIS_MAX_TOKENS,
                 )
                 response = (
@@ -2997,7 +2989,6 @@ class ExecutionAgent(BaseAgent):
                     logger.warning(
                         "Dataset quicklook synthesis returned a blank/invalid result; retrying once without tools"
                     )
-                    active_synthesis_timeout = self.DATASET_SYNTHESIS_REPAIR_TIMEOUT_SECONDS
                     repair_message = await self._ask_without_tools(
                         [HumanMessage(content=(
                             "Your previous synthesis result was blank or invalid. Return exactly one valid "
@@ -3010,7 +3001,6 @@ class ExecutionAgent(BaseAgent):
                             "do not return whitespace, a new plan, or tool calls."
                         ))],
                         self.format,
-                        request_timeout=self.DATASET_SYNTHESIS_REPAIR_TIMEOUT_SECONDS,
                         max_tokens=self.DATASET_SYNTHESIS_REPAIR_MAX_TOKENS,
                     )
                     response = (
@@ -3037,22 +3027,6 @@ class ExecutionAgent(BaseAgent):
                 yield MessageEvent(
                     message=json.dumps(response, ensure_ascii=False)
                 )
-            except asyncio.TimeoutError:
-                logger.warning(
-                    "Dataset synthesis watchdog expired (per-request timeout %.1fs); returning deterministic evidence",
-                    active_synthesis_timeout,
-                )
-                fallback_completion = self._quicklook_stage_completion(
-                    tool_result,
-                    reason="finalization_timeout",
-                    message=message,
-                )
-                if fallback_completion is None:
-                    yield ErrorEvent(
-                        error="finalization_timeout: dataset evidence synthesis exceeded its configured deadline"
-                    )
-                else:
-                    yield MessageEvent(message=fallback_completion)
             except Exception as exc:
                 logger.warning(
                     "Dataset quicklook synthesis failed (%s); returning deterministic evidence",
@@ -3245,13 +3219,19 @@ class ExecutionAgent(BaseAgent):
             "and limitations only when requested or when observed evidence makes them material to the answer. "
             "Do not invent a limitation, disclaim a missing deliverable that was not requested, or add claims "
             "about this turn's execution merely to fill a section.\n"
-            "When reusing a historical data finding, use only a supplied host-reviewed result for the same "
-            "authorized inputs and explicitly attribute it to that earlier verified result. State that the "
-            "finding comes from the previous verified analysis; do not say you read, inspected, calculated, "
+            "When reusing a historical data finding, use a supplied earlier result for the same "
+            "authorized inputs and explicitly attribute it to that earlier analysis. Historical results "
+            "marked user_evaluated are conversation context, not independently verified scientific facts. "
+            "Their lack of model review does not require repeating execution or withholding an explanation. "
+            "Do not call them verified conclusions; do not say you read, inspected, calculated, "
             "or generated it again in the current turn unless a current tool result proves that action. "
-            "Ordinary conversation text, unverified drafts and filenames are not verified evidence. If the "
-            "requested fact is absent from compatible verified history, perform the smallest authorized "
+            "Ordinary conversation text, drafts and filenames do not prove a computation was performed. If the "
+            "requested fact is absent from compatible prior results, perform the smallest authorized "
             "inspection needed instead of guessing or treating previous prose as a new observation.\n"
+            "Deliver the requested explanation normally. No model self-review approval or citation protocol "
+            "is required before publishing it. Leave scientific judgment to the user while retaining actual "
+            "sources, methods, code and observed limitations when relevant. When the user explicitly requests "
+            "a review, perform that review as the requested analysis, not as a hidden gate on publication.\n"
             "New execution, new calculations and current file availability or delivery require current "
             "successful tool and file-validation evidence. Historical results do not satisfy a new execution "
             "or delivery requirement. Preserve the distinction between prior findings and current observations.\n"
@@ -3832,29 +3812,20 @@ class ExecutionAgent(BaseAgent):
         rejected answer can never turn this boundary into another tool loop.
         """
         from app.domain.services.analysis_answer_review import _parse_response, review_answer
-        from app.domain.services.model_runtime import model_call_role, model_request_timeout, model_response_validation, record_model_retry
+        from app.domain.services.model_runtime import model_call_role, model_response_validation, record_model_retry
         from app.domain.services.model_retry import model_retry_decision
         from app.domain.services.agents.base import _is_retryable_llm_error
         from app.domain.models.model_trace import ScheduledModelRetry
 
         settings = get_settings()
         maximum = max(1, settings.llm_retry_attempts)
-        request_timeout = getattr(settings, "answer_review_request_timeout_seconds", 60.0)
-        retry_maximum = settings.llm_retry_max_seconds
-        retry_maximum = retry_maximum if math.isfinite(retry_maximum) and retry_maximum >= 0 else 0.0
-        store_timeout = getattr(settings, "model_trace_store_timeout_seconds", 3.0)
-        # The reviewer callback owns multiple physical requests. Its outer
-        # watchdog must permit those attempts, provider backoff and trace IO;
-        # it must not cancel the first slow call before transport can retry.
-        review_timeout = (maximum * request_timeout + (maximum - 1) * retry_maximum
-                          + (4 * maximum + 1) * store_timeout + 5.0)
 
         async def ask(messages):
             retry_messages = messages
             with model_call_role("answer_review"):
                 for attempt in range(1, maximum + 1):
                     try:
-                        with model_request_timeout(request_timeout), model_response_validation(_parse_response):
+                        with model_response_validation(_parse_response):
                             response = await self._model.bind(response_format={"type": "json_object"}).ainvoke(retry_messages)
                         # Some compatible JSON-mode providers return empty or
                         # malformed content with HTTP 200. Keep the original
@@ -3893,8 +3864,7 @@ class ExecutionAgent(BaseAgent):
         return await review_answer(ask=ask, question=question, draft=draft, files=files,
                                    evidence=evidence, requirements=requirements, language=language,
                                    report_targets=report_targets,
-                                   answer_scientific_scope=answer_scientific_scope,
-                                   timeout_seconds=review_timeout)
+                                   answer_scientific_scope=answer_scientific_scope)
 
     async def summarize(self) -> AsyncGenerator[BaseEvent, None]:
         checked_steps = list(getattr(self._current_plan, "steps", []) or [])

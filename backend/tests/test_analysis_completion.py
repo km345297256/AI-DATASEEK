@@ -24,6 +24,15 @@ def assess(requirements, artifacts, **kwargs):
                            execution_success=True, **kwargs)
 
 
+def test_cancelled_validation_never_becomes_invalid_file_or_rewrite_permission():
+    record, uploaded = artifact()
+    record.update(valid=False, reason="validation_cancelled")
+    outcome = assess([{"kind": "image"}], [(record, uploaded)])
+    assert outcome.status == "failed"
+    assert outcome.reason_code == "validation_unavailable"
+    assert outcome.issues[0].reason_code == "validation_unavailable"
+
+
 @pytest.mark.parametrize("kind", ["image", "any"])
 def test_code_attachment_never_satisfies_a_result_requirement(kind):
     outcome = assess([{"kind": kind}], [artifact("script.py", "code")])

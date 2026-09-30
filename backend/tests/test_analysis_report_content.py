@@ -338,27 +338,36 @@ async def test_cancellation_propagates_before_later_report_reads(phase):
 
 
 @pytest.mark.asyncio
-async def test_read_timeout_never_becomes_ready(monkeypatch):
-    monkeypatch.setattr(subject,'REPORT_READ_TIMEOUT',0.01)
+async def test_pending_report_read_is_cancelled_only_explicitly():
     storage=OwnerRangeStore([])
-    async def slow(*_args):await asyncio.sleep(1)
+    entered=asyncio.Event()
+    async def slow(*_args):
+        entered.set()
+        await asyncio.Event().wait()
     storage.get_file_info=slow
-    target=await load(manifest(),storage)
-    assert target.reason=='report_read_unavailable' and target.text is None
+    task=asyncio.create_task(load(manifest(),storage))
+    await entered.wait()
+    await asyncio.sleep(0.02)
+    assert not task.done()
+    task.cancel()
+    with pytest.raises(asyncio.CancelledError):await task
 
 
 @pytest.mark.asyncio
-async def test_batch_deadline_prevents_later_reads_after_first_report_timeout(monkeypatch):
-    monkeypatch.setattr(subject,'REPORT_READ_TIMEOUT',0.01)
-    a,b=manifest(),manifest(identity='minio:later');storage=OwnerRangeStore([])
+async def test_slow_report_does_not_exhaust_a_shared_batch_deadline():
+    body=b'A verified report.'
+    a,b=manifest(body),manifest(body,identity='minio:later')
+    storage=OwnerRangeStore([(a,body),(b,body)])
+    original=storage.get_file_info
     async def slow(*_args):
-        await asyncio.sleep(1)
+        await asyncio.sleep(0.02)
+        return await original(*_args)
     storage.get_file_info=AsyncMock(side_effect=slow)
     targets=await subject.load_report_targets(files=[a,b],storage=storage,user_id=USER,session_id=SESSION)
-    assert [t.reason for t in targets]==['report_read_unavailable']*2
-    assert all(t.text is None and not t.read_complete for t in targets)
-    storage.get_file_info.assert_awaited_once_with(a.file_id,USER)
-    assert not storage.range_calls
+    assert [t.reason for t in targets]==['ready']*2
+    assert all(t.text==body.decode() and t.read_complete for t in targets)
+    assert storage.get_file_info.await_count==2
+    assert len(storage.range_calls)==2
 
 
 @pytest.mark.asyncio

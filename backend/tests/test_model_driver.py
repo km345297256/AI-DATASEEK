@@ -79,6 +79,20 @@ TOOL = {"type": "function", "function": {"name": "measure", "description": "Meas
 }}}
 
 
+@pytest.mark.parametrize("provider", ["openai", "deepseek"])
+def test_provider_sdk_has_no_hidden_request_deadline(provider):
+    import httpx
+    model = create_chat_model(
+        Settings(model_provider=provider, model_name="test-model", api_key="offline-key"),
+        # A stale saved override must not restore the retired cutoff.
+        {"timeout": 0.001},
+    )
+    for sdk in (model._client.root_client, model._client.root_async_client):
+        timeout = sdk.timeout
+        assert timeout is None or (isinstance(timeout, httpx.Timeout)
+            and all(getattr(timeout, part) is None for part in ("connect", "read", "write", "pool")))
+
+
 @pytest.mark.asyncio
 async def test_bind_then_bind_tools_preserves_format_output_and_driver_boundary():
     model, client, middleware = driver()

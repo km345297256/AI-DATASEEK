@@ -40,8 +40,8 @@ async def recover_shell_output(sandbox, session_id: str, data: dict[str, Any]) -
             or re.fullmatch(r"[0-9a-f]{32}", output_id) is None):
         raise ShellOutputUnavailable()
     cursor, parts = 0, []
-    # One result-observation deadline, never a total task runtime budget.
-    async with asyncio.timeout(30):
+    # Preserve byte/identity checks, but a slow result read is not a failure.
+    async with asyncio.timeout(None):
         for _ in range(512):
             result = await sandbox.view_shell(session_id, output_id=output_id, cursor=cursor, max_bytes=16384)
             value = result.data if isinstance(result.data, dict) else {}

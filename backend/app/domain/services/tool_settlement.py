@@ -54,12 +54,11 @@ async def tool_settlement_scope(publish: Callable[[ToolEvent], Awaitable[None]])
 
     async def drain() -> None:
         for cleanup in reversed(tuple(cleanups)):
-            async with asyncio.timeout(5):
-                events = await cleanup()
-                for event in events:
-                    # Reuse the producer event identity if delivery failed
-                    # after commit. The normal repository deduplicates it.
-                    await publish(event)
+            events = await cleanup()
+            for event in events:
+                # Reuse the producer event identity if delivery failed
+                # after commit. The normal repository deduplicates it.
+                await publish(event)
             if cleanup in cleanups:
                 cleanups.remove(cleanup)
 

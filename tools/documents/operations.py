@@ -60,7 +60,7 @@ def document_text(path: str, max_chars: int) -> tuple[str,list[str]]:
         doc=Document(source); parts=[p.text for p in doc.paragraphs]; parts += ["\t".join(cell.text for cell in row.cells) for table in doc.tables for row in table.rows]; text="\n".join(parts)
     elif suffix==".doc":
         with tempfile.TemporaryDirectory() as temp:
-            completed=subprocess.run(["libreoffice","--headless","--convert-to","txt:Text","--outdir",temp,str(source)],capture_output=True,text=True,timeout=90)
+            completed=subprocess.run(["libreoffice","--headless","--convert-to","txt:Text","--outdir",temp,str(source)],capture_output=True,text=True)
             converted=Path(temp)/(source.stem+".txt")
             if completed.returncode or not converted.exists(): raise ValueError("legacy DOC conversion failed")
             text=converted.read_text(encoding="utf-8",errors="replace")
@@ -168,7 +168,7 @@ def pdf_ocr(a: dict[str,Any]) -> dict[str,Any]:
             pix=doc[index].get_pixmap(matrix=fitz.Matrix(dpi/72,dpi/72),colorspace=fitz.csRGB,alpha=False)
             completed=subprocess.run(
                 ["tesseract","stdin","stdout","-l",languages,"--dpi",str(dpi),"--psm","6"],
-                input=pix.tobytes("png"),capture_output=True,timeout=90,
+                input=pix.tobytes("png"),capture_output=True,
             )
             if completed.returncode:
                 raise ValueError(f"OCR failed on page {index+1}: {completed.stderr.decode('utf-8',errors='replace')[:500]}")
@@ -226,7 +226,7 @@ def compare_documents(a: dict[str,Any]) -> dict[str,Any]:
 
 
 def render_word_to_pdf(source: Path, directory: Path) -> Path:
-    completed=subprocess.run(["libreoffice","--headless","--convert-to","pdf","--outdir",str(directory),str(source)],capture_output=True,text=True,timeout=90)
+    completed=subprocess.run(["libreoffice","--headless","--convert-to","pdf","--outdir",str(directory),str(source)],capture_output=True,text=True)
     result=directory/(source.stem+".pdf")
     if completed.returncode or not result.exists(): raise ValueError("LibreOffice could not render the Word document")
     return result

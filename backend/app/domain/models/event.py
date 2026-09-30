@@ -135,6 +135,9 @@ class ToolEvent(BaseEvent):
     tool_approval: Optional[ToolApprovalView] = None
     # First-party execution ledger projection, not derived from tool text.
     program_attempt: Optional[ProgramAttemptView] = None
+    # Host dispatcher only: a rejected invocation never reached the tool.
+    # Display metadata, not permission to replay a previously unknown call.
+    dispatch_status: Optional[Literal["not_started"]] = None
 
 class TitleEvent(BaseEvent):
     """Title event"""

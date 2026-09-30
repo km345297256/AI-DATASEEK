@@ -487,18 +487,18 @@ async def test_mongo_admission_uses_server_clock_gate_but_settlement_cas_can_run
 
 
 @pytest.mark.asyncio
-async def test_model_request_deadline_stops_in_flight_without_provider_retry(model_runtime_settings):
+async def test_admitted_model_request_has_no_in_flight_deadline(model_runtime_settings):
     _, handle, repository = await opened(policy=BudgetPolicy(deadline_seconds=1))
     doc = repository.docs[handle.lineage_id]
-    doc["created_at"] = datetime.now(UTC) - timedelta(seconds=0.8)
+    doc["created_at"] = datetime.now(UTC) - timedelta(seconds=0.95)
     doc["deadline_at"] = doc["created_at"] + timedelta(seconds=1)
     async def slow(*args):
-        await asyncio.sleep(10)
+        await asyncio.sleep(0.08)
+        return AIMessage(content="completed after the former deadline")
     invoke = AsyncMock(side_effect=slow)
     with runtime.model_execution_scope(user_id="owner", session_id="session", task_id="task", durable_budget=handle):
-        with pytest.raises(runtime.ModelBudgetStopped) as stopped:
-            await physical_model_call(invoke)
-        assert stopped.value.code == "analysis_budget_deadline_exceeded"
+        result = await physical_model_call(invoke)
+        assert result.content == "completed after the former deadline"
     invoke.assert_awaited_once()
     assert repository.docs[handle.lineage_id]["model_calls"] == 1
 

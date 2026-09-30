@@ -314,21 +314,25 @@ async def test_provider_failure_retains_truthful_delivery_and_no_exception_detai
 
 
 @pytest.mark.asyncio
-async def test_review_call_timeout_is_bounded_but_cancellation_propagates(monkeypatch):
-    monkeypatch.setattr(review, "REVIEW_TIMEOUT_SECONDS", 0.001)
+async def test_review_waits_until_explicit_cancellation():
+    entered = asyncio.Event()
     async def stalled(messages):
+        entered.set()
         await asyncio.Event().wait()
-    result = await review.review_answer(ask=stalled, question="", draft="", files=[file()], evidence=review.AnswerEvidence())
-    assert result.status == "unavailable"
-    assert result.metadata["reason"] == "review_timeout"
+    task = asyncio.create_task(review.review_answer(ask=stalled, question="", draft="", files=[file()], evidence=review.AnswerEvidence()))
+    await entered.wait()
+    await asyncio.sleep(0.02)
+    assert not task.done()
+    task.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await task
     ask = AsyncMock(side_effect=asyncio.CancelledError())
     with pytest.raises(asyncio.CancelledError):
         await review.review_answer(ask=ask, question="", draft="", files=[], evidence=review.AnswerEvidence())
 
 
 @pytest.mark.asyncio
-async def test_transport_retry_window_is_not_cut_off_by_default_review_deadline(monkeypatch):
-    monkeypatch.setattr(review, "REVIEW_TIMEOUT_SECONDS", 0.001)
+async def test_slow_review_is_not_cut_off_by_a_local_deadline():
     evidence = review.AnswerEvidence()
     evidence.observe(tool())
     async def retrying_transport(messages):
@@ -336,18 +340,13 @@ async def test_transport_retry_window_is_not_cut_off_by_default_review_deadline(
         await asyncio.sleep(0.01)
         return response(paragraph())
     result = await review.review_answer(ask=retrying_transport, question="", draft="", files=[file()],
-        evidence=evidence, timeout_seconds=1.0)
+        evidence=evidence)
     assert result.status == "verified"
 
 
-@pytest.mark.asyncio
-@pytest.mark.parametrize("deadline", [0, -1, float("inf"), float("nan"), True, "45"])
-async def test_review_deadline_must_be_finite_positive_operator_value(deadline):
-    ask = AsyncMock()
-    with pytest.raises(ValueError, match="invalid_review_deadline"):
-        await review.review_answer(ask=ask, question="", draft="", files=[],
-            evidence=review.AnswerEvidence(), timeout_seconds=deadline)
-    ask.assert_not_awaited()
+def test_review_does_not_expose_a_deadline_setting():
+    import inspect
+    assert "timeout_seconds" not in inspect.signature(review.review_answer).parameters
 
 
 def requirement():
@@ -666,28 +665,33 @@ async def test_correction_cannot_recover_omitted_text_or_use_truncation_as_negat
 
 
 @pytest.mark.asyncio
-async def test_citation_correction_timeout_preserves_valid_text_and_cancellation_propagates(monkeypatch):
-    monkeypatch.setattr(review, "REVIEW_TIMEOUT_SECONDS", 0.001)
+async def test_citation_correction_waits_until_explicit_cancellation():
     evidence = review.AnswerEvidence()
     evidence.observe(tool())
     first = response(paragraph(), paragraph("UNSUPPORTED", quote="invalid"))
     calls = []
+    entered = asyncio.Event()
 
     async def stalled(messages):
         calls.append(messages)
         if len(calls) == 1:
             return first
+        entered.set()
         await asyncio.Event().wait()
 
-    result = await review.review_answer(ask=stalled, question="", draft="", files=[file()], evidence=evidence)
-    assert result.status == "unavailable" and "Observed mean is 3 mg." in result.text and len(calls) == 2
+    task = asyncio.create_task(review.review_answer(ask=stalled, question="", draft="", files=[file()], evidence=evidence))
+    await entered.wait()
+    await asyncio.sleep(0.02)
+    assert not task.done() and len(calls) == 2
+    task.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await task
     with pytest.raises(asyncio.CancelledError):
         await run_correction(first, asyncio.CancelledError())
 
 
 @pytest.mark.asyncio
-async def test_citation_correction_also_honors_complete_transport_window(monkeypatch):
-    monkeypatch.setattr(review, "REVIEW_TIMEOUT_SECONDS", 0.001)
+async def test_slow_citation_correction_also_has_no_deadline():
     evidence = review.AnswerEvidence()
     evidence.observe(tool())
     calls = []
@@ -698,7 +702,7 @@ async def test_citation_correction_also_honors_complete_transport_window(monkeyp
         await asyncio.sleep(0.01)
         return citation_correction(messages)
     result = await review.review_answer(ask=ask, question="", draft="", files=[file()],
-        evidence=evidence, timeout_seconds=1.0)
+        evidence=evidence)
     assert result.status == "corrected"
     assert result.metadata["citation_repair_status"] == "corrected"
     assert len(calls) == 2

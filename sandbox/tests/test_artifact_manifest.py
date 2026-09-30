@@ -151,13 +151,36 @@ def test_manifest_detects_replaced_parent_directory(tmp_path, monkeypatch):
     assert result["files"] == [] and result["errors"]
 
 
-@pytest.mark.parametrize("reason", ["cancelled", "deadline"])
-def test_manifest_cancellation_and_deadline_do_not_open_files(tmp_path, monkeypatch, reason):
+def test_manifest_cancellation_does_not_open_files(tmp_path, monkeypatch):
     from app.services import artifact_manifest as module
     stop = threading.Event()
-    if reason == "cancelled":
-        stop.set()
-    monkeypatch.setattr(module, "_open_output", lambda *args: pytest.fail("must not open after cancellation/deadline"))
-    result = fingerprint_artifacts([str(tmp_path / "file")], root=tmp_path, cancelled=stop,
-                                  deadline=0 if reason == "deadline" else None)
-    assert result["files"] == [] and result["errors"]
+    stop.set()
+    monkeypatch.setattr(module, "_open_output", lambda *args: pytest.fail("must not open after cancellation"))
+    result = fingerprint_artifacts([str(tmp_path / "file")], root=tmp_path, cancelled=stop)
+    assert result["files"] == []
+    assert result["errors"] == [{"path": str(tmp_path / "file"), "code": "fingerprint_cancelled"}]
+
+
+def test_slow_manifest_hash_has_no_shared_batch_deadline(tmp_path, monkeypatch):
+    from types import SimpleNamespace
+    from app.services import artifact_manifest as module
+    clock = [0.0]
+    monkeypatch.setattr(module, "time", SimpleNamespace(monotonic=lambda: clock[0]), raising=False)
+    monkeypatch.setattr(module, "HASH_CHUNK_BYTES", 2)
+    real_sha = hashlib.sha256
+    class SlowHash:
+        def __init__(self):
+            self.digest = real_sha()
+        def update(self, data):
+            clock[0] += 3600
+            self.digest.update(data)
+        def hexdigest(self):
+            return self.digest.hexdigest()
+    monkeypatch.setattr(module.hashlib, "sha256", SlowHash)
+    paths = [tmp_path / name for name in ("one.bin", "two.bin")]
+    for path in paths:
+        path.write_bytes(b"123456")
+    result = fingerprint_artifacts([str(path) for path in paths], root=tmp_path)
+    assert result["errors"] == [] and len(result["files"]) == 2
+    assert {item["sha256"] for item in result["files"]} == {real_sha(b"123456").hexdigest()}
+    assert clock[0] == 6 * 3600

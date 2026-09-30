@@ -18,6 +18,7 @@ const isMutation = (tool: ToolContent): boolean => tool.name === 'file'
 
 export const toolOperationState = (tool: ToolContent): string => {
   if (tool.status !== 'called') return '进行中';
+  if (tool.execution_status === 'not_started') return '未执行';
   if (tool.execution_status === 'failed') return '失败';
   if (tool.execution_status === 'succeeded') return '已完成';
   const result = tool.content?.result ?? tool.content;

@@ -1,4 +1,4 @@
-from app.domain.services.prompts.execution import EXECUTION_PROMPT
+from app.domain.services.prompts.execution import EXECUTION_PROMPT, EXECUTION_SYSTEM_PROMPT, SUMMARIZE_PROMPT
 from app.domain.services.prompts.system import SYSTEM_PROMPT
 
 
@@ -11,6 +11,15 @@ def _rendered_prompts():
         dataset_contract="(No mounted-dataset fast-path contract applies to this step.)",
     )
     return SYSTEM_PROMPT, execution_prompt
+
+
+def test_generation_and_summary_leave_scientific_assessment_to_the_user():
+    for prompt in (SYSTEM_PROMPT, EXECUTION_SYSTEM_PROMPT, SUMMARIZE_PROMPT):
+        assert "self-review" in prompt
+        assert "citation-approval" in prompt
+    assert "data sources, processing methods, code and logs" in SYSTEM_PROMPT
+    assert "When explicitly asked to review or verify" in SYSTEM_PROMPT
+    assert "Do not call an ordinary delivered result scientifically verified" in SUMMARIZE_PROMPT
 
 
 def test_visualization_prompts_define_the_chinese_font_policy():
@@ -37,7 +46,7 @@ def test_custom_program_policy_separates_validation_execution_and_delivery():
     for required in ("program_run", "script_path", "own exit code", "literal `argv`",
                      "representative actual records", "not just leading comments",
                      "--validate-only", "rows seen/accepted/rejected", "assertions",
-                     "same failure recurs", "citation repair must not rerun analysis"):
+                     "same failure recurs", "answer wording corrections must not rerun analysis"):
         assert required in prompt
     assert "one `shell_run` call" not in prompt
     assert "a zero exit code alone does not prove scientific correctness" in prompt
@@ -95,6 +104,14 @@ def test_quicklook_policy_requires_matching_scope_and_uses_returned_evidence():
         assert "evidence, not" in prompt
     assert "Do not manually unpack" in execution_prompt
     assert "recreate quicklook charts" in execution_prompt
+
+
+def test_quicklook_native_exports_do_not_replace_a_requested_custom_chart():
+    for prompt in _rendered_prompts():
+        assert "chart_formats" in prompt
+        assert '["png", "svg"]' in prompt
+        assert "scientific notation" in prompt
+        assert "custom chart" in prompt or "custom figure" in prompt
 
 
 def test_visualization_prompts_define_unicode_and_png_output_policy():

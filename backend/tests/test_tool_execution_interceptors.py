@@ -36,6 +36,54 @@ class _CaptureSink:
         self.events.append(event)
 
 
+@pytest.mark.asyncio
+async def test_production_pipeline_never_adopts_plugin_elapsed_time_limit():
+    sink = _CaptureSink()
+    pipeline = ToolExecutionPipeline(create_production_tool_interceptors(
+        policy_snapshot=ToolPolicySnapshot.for_registered_tools(["demo_tool"]),
+        trace_sink=sink,
+    ))
+
+    async def run(context):
+        assert context.metadata["execution_timeout_seconds"] is None
+        await asyncio.sleep(0.03)
+        return "completed"
+
+    assert await pipeline.invoke(
+        tool=_tool(execution={"timeout_seconds": 0.001, "cancellable": True}),
+        tool_call={"name": "demo_tool", "id": "long-analysis", "args": {}},
+        execute=run,
+    ) == "completed"
+    assert sink.events[-1].timeout_seconds is None
+
+
+@pytest.mark.asyncio
+async def test_unlimited_production_pipeline_still_cancels_and_cleans_up():
+    started = asyncio.Event()
+    reasons = []
+    pipeline = ToolExecutionPipeline(create_production_tool_interceptors(
+        policy_snapshot=ToolPolicySnapshot.for_registered_tools(["demo_tool"]),
+    ))
+
+    async def run(context):
+        context.register_cancellation_callback(reasons.append)
+        started.set()
+        await asyncio.Event().wait()
+
+    task = asyncio.create_task(pipeline.invoke(
+        tool=_tool(execution={"timeout_seconds": 0.001, "cancellable": True}),
+        tool_call={"name": "demo_tool", "id": "cancel-analysis", "args": {}},
+        execute=run,
+    ))
+    await asyncio.wait_for(started.wait(), 1)
+    await asyncio.sleep(0.03)
+    assert not task.done()
+    task.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await asyncio.wait_for(task, 1)
+    assert reasons == ["cancelled"]
+
+
 def _tool(
     name: str = "demo_tool",
     *,

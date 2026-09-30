@@ -1,4 +1,5 @@
 import asyncio
+import errno
 from collections import OrderedDict
 import hashlib
 import json
@@ -10,7 +11,7 @@ import pytest
 from app.core.exceptions import AppException, BadRequestException
 from app.services.program import (
     MAX_PROGRAM_OUTPUT_CHARS, PROGRAM_OUTPUT_OMISSION, append_program_output,
-    prepare_program, program_command,
+    prepare_program, program_command, ProgramPreparationError,
 )
 from app.services.shell import ShellService
 from conftest import BASE_URL
@@ -184,12 +185,110 @@ def test_program_paths_and_arguments_are_validated(path, args):
 @pytest.mark.asyncio
 async def test_unreadable_source_is_proven_not_started(service, tmp_path):
     operation_id = uuid.uuid4().hex
-    with pytest.raises(AppException):
+    with pytest.raises(ProgramPreparationError) as failure:
         await service.exec_program("missing", str(tmp_path), str(tmp_path / "missing.py"), [],
                                    operation_id=operation_id)
+    assert failure.value.status_code == 400
+    assert failure.value.data["program_preparation"]["reason"] == "script_missing"
     receipt = await service.operation_status("missing", operation_id)
     assert receipt.state == "not_started"
     assert receipt.process_tree_quiescent is True
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("kind,reason", [
+    ("missing_script", "script_missing"), ("missing_cwd", "cwd_missing"),
+    ("file_cwd", "cwd_not_directory"), ("syntax", "syntax_error"),
+    ("source_link", "unsafe_path"), ("parent_link", "unsafe_path"),
+])
+async def test_program_preparation_failure_never_spawns_or_becomes_generic_500(
+    service, tmp_path, monkeypatch, kind, reason,
+):
+    from unittest.mock import AsyncMock
+    root = tmp_path.resolve()
+    script = root / "private-source.py"
+    script.write_text("print('private source')\n")
+    cwd = root
+    if kind == "missing_script":
+        script.unlink()
+    elif kind == "missing_cwd":
+        cwd = root / "absent"
+    elif kind == "file_cwd":
+        cwd = script
+    elif kind == "syntax":
+        script.write_text("return 'private source'\n")
+    elif kind == "source_link":
+        target = root / "actual.py"
+        script.rename(target)
+        script.symlink_to(target)
+    elif kind == "parent_link":
+        linked = root / "linked"
+        linked.symlink_to(root, target_is_directory=True)
+        script = linked / script.name
+    spawn = AsyncMock()
+    monkeypatch.setattr(asyncio, "create_subprocess_exec", spawn)
+    identity = uuid.uuid4().hex
+    with pytest.raises(ProgramPreparationError) as failure:
+        await service.exec_program(identity, str(cwd), str(script), [], operation_id=identity)
+    assert failure.value.status_code == 400
+    diagnostic = failure.value.data["program_preparation"]
+    assert diagnostic["reason"] == reason and diagnostic["phase"] == "not_started"
+    assert str(root) not in json.dumps(diagnostic) and "private source" not in json.dumps(diagnostic)
+    spawn.assert_not_awaited()
+    receipt = await service.operation_status(identity, identity)
+    assert receipt.state == "not_started" and receipt.process_tree_quiescent is True
+
+
+def test_missing_script_api_keeps_safe_preparation_diagnosis_and_private_receipt(client, tmp_path):
+    identity = uuid.uuid4().hex
+    result = client.post(f"{BASE_URL}/api/v1/shell/program", json={
+        "id": identity, "operation_id": identity, "exec_dir": str(tmp_path),
+        "script_path": str(tmp_path / "not-saved.py"), "args": [],
+    })
+    assert result.status_code == 400, result.text
+    body = result.json()
+    assert body["success"] is False
+    assert body["data"]["program_preparation"]["reason"] == "script_missing"
+    assert str(tmp_path) not in result.text and "command_bytes" not in result.text
+    # Diagnostics are not receipts. Independent observation remains mandatory.
+    assert "execution_receipt" not in body["data"]
+    receipt = client.post(f"{BASE_URL}/api/v1/shell/operation-status", json={
+        "id": identity, "operation_id": identity,
+    }).json()["data"]
+    assert receipt["state"] == "not_started" and receipt["process_tree_quiescent"] is True
+
+
+def test_permission_error_is_classified_without_leaking_source_path(tmp_path, monkeypatch):
+    from app.services import program
+    script = tmp_path / "sensitive.py"
+    script.write_text("print(42)\n")
+    original = program.os.open
+    def restricted_open(path, *args, **kwargs):
+        if path == script.name:
+            raise PermissionError(errno.EACCES, "private host detail", str(script))
+        return original(path, *args, **kwargs)
+    monkeypatch.setattr(program.os, "open", restricted_open)
+    with pytest.raises(ProgramPreparationError) as failure:
+        prepare_program(str(script), [])
+    assert failure.value.data["program_preparation"]["reason"] == "permission_denied"
+    assert str(script) not in str(failure.value) and "private host" not in str(failure.value)
+
+
+@pytest.mark.asyncio
+async def test_spawn_race_stays_unknown_not_replayable_preparation_failure(service, tmp_path, monkeypatch):
+    script = tmp_path / "ready.py"
+    script.write_text("print(42)\n")
+    async def uncertain_spawn(*args, **kwargs):
+        raise OSError("private runtime spawn details")
+    monkeypatch.setattr(asyncio, "create_subprocess_exec", uncertain_spawn)
+    identity = uuid.uuid4().hex
+    with pytest.raises(AppException) as failure:
+        await service.exec_program(identity, str(tmp_path), str(script), [], operation_id=identity)
+    assert failure.value.status_code == 500
+    assert "program_preparation" not in failure.value.data
+    assert "private" not in str(failure.value)
+    receipt = await service.operation_status(identity, identity)
+    assert receipt.state == "unknown" and receipt.process_tree_quiescent is False
 
 
 @pytest.mark.parametrize("exit_code", [0, 1])

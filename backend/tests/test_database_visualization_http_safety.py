@@ -28,6 +28,14 @@ TREE = ast.parse(SCRIPT.read_text())
 RUN = "database-viz-http-" + "a" * 32
 
 
+def unrelated_visualization_plugins(excluded):
+    """Use shipped IDs so catalog growth cannot bypass rollback fault cases."""
+    directory = Path(__file__).resolve().parents[2] / "plugin-host/visualizations"
+    plugins = [json.loads(path.read_text()) for path in sorted(directory.glob("*.json"))]
+    assert set(excluded).issubset({plugin["id"] for plugin in plugins})
+    return [{**plugin, "enabled": True} for plugin in plugins if plugin["id"] not in excluded]
+
+
 def namespace(**extra):
     definitions = [copy.deepcopy(n) for n in TREE.body if isinstance(n, (ast.Assign, ast.FunctionDef, ast.AsyncFunctionDef))]
     state = {"asyncio": asyncio, "base64": base64, "hashlib": hashlib, "json": json, "re": re, "uuid": uuid,
@@ -143,7 +151,7 @@ class PreferenceClient(CleanupClient):
         return {"engine":"cordis", "plugins":[
             *[{"id":p,"enabled":v,"reader":"database-table","adapter":"database-table","contract_version":2,
                "capabilities":{"operations":["preview"],"shared":False}} for p,v in self.states.items()],
-            *[{"id":"unchanged-"+str(i),"enabled":True} for i in range(80)]]}
+            *unrelated_visualization_plugins(self.states)]}
 
     async def request(self, method, path, **kwargs):
         if method == "GET":

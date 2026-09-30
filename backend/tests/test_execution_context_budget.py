@@ -156,7 +156,7 @@ async def test_execution_step_passes_bounded_structured_prior_results_after_rese
     assert "Render the requested chart" in requests[0]
     assert current.result == "new result"
     assert "<answer_evidence_contract>" in requests[0]
-    assert "explicitly attribute it to that earlier verified result" in requests[0]
+    assert "explicitly attribute it to that earlier analysis" in requests[0]
 
 
 @pytest.mark.parametrize("source", ["registered", "upload", "general"])
@@ -177,8 +177,12 @@ def test_factual_and_historical_answers_do_not_require_boilerplate_or_claim_new_
     assert "For simple factual questions or explanations of prior results" in contract
     assert "do not append method or limitation sections merely to follow a reporting template" in contract
     assert "Include methods and limitations only when requested" in contract
-    assert "supplied host-reviewed result for the same authorized inputs" in contract
-    assert "explicitly attribute it to that earlier verified result" in contract
+    assert "supplied earlier result for the same authorized inputs" in contract
+    assert "explicitly attribute it to that earlier analysis" in contract
+    assert "not independently verified scientific facts" in contract
+    assert "Their lack of model review does not require repeating execution or withholding an explanation" in contract
+    assert "No model self-review approval or citation protocol is required" in contract
+    assert "perform that review as the requested analysis, not as a hidden gate" in contract
     assert "unless a current tool result proves that action" in contract
     assert "perform the smallest authorized inspection needed" in contract
     assert "Historical results do not satisfy a new execution or delivery requirement" in contract
@@ -237,7 +241,8 @@ async def test_file_preview_copies_exact_inventory_jpg_to_unique_attachment():
     assert 'case "$resolved_source" in "$resolved_root"/*)' in command
     assert 'actual_size=$(stat -c %s -- "$resolved_source")' in command
     assert "mkdir -p -- /home/ubuntu/output" in command
-    assert 'timeout --signal=KILL 25s cp -- "$resolved_source" "$partial_path"' in command
+    assert 'cp -- "$resolved_source" "$partial_path"' in command
+    assert 'timeout --' not in command
     assert 'mv -T -- "$partial_path" "$output_path"' in command
     tool_events = [event for event in events if isinstance(event, ToolEvent)]
     assert [(event.status, event.function_name) for event in tool_events] == [
@@ -929,8 +934,7 @@ def test_execution_iteration_override_is_ignored_and_not_forwarded_to_model():
     assert agent._execution_model_configuration["max_iterations"] is None
     assert agent._execution_model_configuration["model_runtime"]["task_token_budget"] is None
     assert agent._execution_model_configuration["model_runtime"]["task_call_budget"] is None
-    assert agent.FINALIZATION_TIMEOUT_SECONDS == 61
-    assert BaseAgent.FINALIZATION_TIMEOUT_SECONDS == 45
+    assert not hasattr(agent, "FINALIZATION_TIMEOUT_SECONDS")
     forwarded_overrides = create_model.call_args.kwargs["overrides"]
     assert "max_iterations" not in forwarded_overrides
 
@@ -986,7 +990,7 @@ async def test_iteration_override_does_not_force_tool_free_synthesis():
 
 
 @pytest.mark.asyncio
-async def test_no_progress_finalization_has_a_single_call_timeout():
+async def test_slow_no_progress_finalization_is_allowed_to_finish():
     agent = object.__new__(BaseAgent)
     agent._add_to_memory = AsyncMock()
     agent.max_iterations = 1
@@ -1001,26 +1005,23 @@ async def test_no_progress_finalization_has_a_single_call_timeout():
     async def slow_finalizer(*_args, **_kwargs):
         if _kwargs.get("allow_tools", True):
             return tool_message
-        await asyncio.sleep(1)
-        return AIMessage(content="too late")
+        await asyncio.sleep(0.02)
+        return AIMessage(content="finished after waiting")
 
     agent.ask_with_messages = slow_finalizer
     agent.get_tool = lambda _name: None
 
     events = [event async for event in agent.execute("bounded task")]
 
-    assert any(
-        isinstance(event, ErrorEvent) and "finalization_timeout" in event.error
-        for event in events
-    )
-    assert not any(isinstance(event, MessageEvent) for event in events)
+    assert not any(isinstance(event, ErrorEvent) for event in events)
+    assert any(isinstance(event, MessageEvent) and event.message == "finished after waiting" for event in events)
 
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
     ("failure_mode", "expected_fragment"),
     [
-        ("timeout", "自动综合未在等待时限内完成"),
+        ("timeout", "自动综合未生成可用结果"),
         ("exception", "自动综合未生成可用结果"),
     ],
 )
@@ -1048,8 +1049,7 @@ async def test_budget_finalization_failure_preserves_successful_tool_evidence(
         if _kwargs.get("allow_tools", True):
             return AIMessage(content="", tool_calls=[{"name": "unavailable", "args": {}, "id": "blocked"}])
         if failure_mode == "timeout":
-            await asyncio.sleep(1)
-            return AIMessage(content="too late")
+            raise TimeoutError("external provider connection lost")
         raise RuntimeError("provider unavailable")
 
     agent.ask_with_messages = failed_finalizer
@@ -1080,7 +1080,7 @@ async def test_budget_finalization_failure_preserves_successful_tool_evidence(
 
 
 @pytest.mark.asyncio
-async def test_budget_timeout_does_not_promote_arbitrary_shell_output_to_final_result():
+async def test_provider_failure_does_not_promote_arbitrary_shell_output_to_final_result():
     agent = object.__new__(ExecutionAgent)
     agent._add_to_memory = AsyncMock()
     agent.max_iterations = 1
@@ -1101,8 +1101,7 @@ async def test_budget_timeout_does_not_promote_arbitrary_shell_output_to_final_r
     async def slow_finalizer(*_args, **_kwargs):
         if _kwargs.get("allow_tools", True):
             return AIMessage(content="", tool_calls=[{"name": "unavailable", "args": {}, "id": "blocked"}])
-        await asyncio.sleep(1)
-        return AIMessage(content="too late")
+        raise RuntimeError("external provider connection lost")
 
     agent.ask_with_messages = slow_finalizer
     agent.get_tool = lambda _name: None if _name == "unavailable" else SimpleNamespace(
@@ -1126,7 +1125,7 @@ async def test_budget_timeout_does_not_promote_arbitrary_shell_output_to_final_r
     events = [event async for event in agent.execute("analyze")]
 
     assert any(
-        isinstance(event, ErrorEvent) and "finalization_timeout" in event.error
+        isinstance(event, ErrorEvent) and "finalization_failed" in event.error
         for event in events
     )
     assert not any(isinstance(event, MessageEvent) for event in events)
@@ -1197,8 +1196,7 @@ async def test_analysis_quicklook_synthesis_failure_returns_validated_interim_ev
 
     async def failed_synthesis(*_args, **_kwargs):
         if failure_mode == "timeout":
-            await asyncio.sleep(1)
-            return AIMessage(content="too late")
+            raise TimeoutError("external provider connection lost")
         raise RuntimeError("provider unavailable")
 
     agent.ask_with_messages = failed_synthesis
@@ -1222,7 +1220,7 @@ async def test_analysis_quicklook_synthesis_failure_returns_validated_interim_ev
         )
     ]
 
-    assert ExecutionAgent.DATASET_SYNTHESIS_TIMEOUT_SECONDS == 75
+    assert not hasattr(ExecutionAgent, "DATASET_SYNTHESIS_TIMEOUT_SECONDS")
     assert not any(isinstance(event, ErrorEvent) for event in events)
     message_event = next(event for event in events if isinstance(event, MessageEvent))
     result = ExecutionResult.model_validate_json(message_event.message)

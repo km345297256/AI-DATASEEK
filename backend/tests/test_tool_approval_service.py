@@ -6,6 +6,7 @@ from typing import Any, Mapping
 
 import pytest
 
+import app.domain.services.tool_approval_service as tool_approval_service_module
 from app.domain.models.tool_approval import (
     TOOL_APPROVAL_UNCONSUMED_STATUSES,
     ToolApprovalRecord,
@@ -14,6 +15,7 @@ from app.domain.models.tool_approval import (
 from app.domain.services.tool_approval_service import (
     ToolApprovalConflictError,
     ToolApprovalService,
+    ToolApprovalStateError,
 )
 
 
@@ -366,3 +368,88 @@ async def test_delete_owner_never_deletes_another_owner_or_session():
     await service.delete_owner("user-1", "session-1")
     assert target.approval_id not in repository.records
     assert retained.approval_id in repository.records
+
+
+@pytest.mark.asyncio
+async def test_slow_repository_create_lookup_and_consume_do_not_time_out(monkeypatch):
+    class SlowRepository(InMemoryToolApprovalRepository):
+        async def insert(self, record):
+            await asyncio.sleep(0.02)
+            return await super().insert(record)
+
+        async def find_for_owner(self, *args):
+            await asyncio.sleep(0.02)
+            return await super().find_for_owner(*args)
+
+        async def consume_approved(self, *args, **kwargs):
+            await asyncio.sleep(0.02)
+            return await super().consume_approved(*args, **kwargs)
+
+    # Retired constants cannot bring back the old per-query deadline.
+    monkeypatch.setattr(tool_approval_service_module, "_REPOSITORY_TIMEOUT_SECONDS", 0.001, raising=False)
+    service = ToolApprovalService(SlowRepository(), clock=MutableClock())
+    created = await _create(service)
+    assert await service.get_for_owner("user-1", "session-1", created.approval_id) == created
+    await service.decide("user-1", "session-1", created.approval_id, "approved", 1)
+    consumed = await service.consume(created.approval_id, "a" * 64)
+    assert consumed.status == ToolApprovalStatus.CONSUMED
+    assert consumed.expires_at == created.expires_at
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("operation", ["insert", "find_for_owner", "consume_approved"])
+async def test_repository_wait_can_be_cancelled_without_authorizing_work(monkeypatch, operation):
+    entered = asyncio.Event()
+    repository = InMemoryToolApprovalRepository()
+    service = ToolApprovalService(repository)
+    created = await _create(service)
+    await service.decide("user-1", "session-1", created.approval_id, "approved", 1)
+
+    async def blocked(*args, **kwargs):
+        entered.set()
+        await asyncio.Event().wait()
+
+    monkeypatch.setattr(repository, operation, blocked)
+    if operation == "insert":
+        invoke = _create(service)
+    elif operation == "find_for_owner":
+        invoke = service.get_for_owner("user-1", "session-1", created.approval_id)
+    else:
+        invoke = service.consume(created.approval_id, "a" * 64)
+    pending = asyncio.create_task(invoke)
+    await asyncio.wait_for(entered.wait(), timeout=1)
+    pending.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await pending
+    assert len(repository.records) == 1
+    assert repository.records[created.approval_id].status == ToolApprovalStatus.APPROVED
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("failure", [RuntimeError, TimeoutError])
+async def test_real_approval_repository_failures_remain_private_and_fail_closed(failure):
+    async def broken():
+        raise failure("private-query-value")
+
+    with pytest.raises(ToolApprovalStateError) as captured:
+        await ToolApprovalService._repository_call(broken)
+    assert str(captured.value) == "Tool approval state operation failed"
+    assert "private-query-value" not in str(captured.value)
+
+
+@pytest.mark.asyncio
+async def test_slow_consume_cannot_extend_authorization_lifetime():
+    clock = MutableClock()
+
+    class SlowRepository(InMemoryToolApprovalRepository):
+        async def consume_approved(self, *args, **kwargs):
+            consumed = await super().consume_approved(*args, **kwargs)
+            clock.advance(301)
+            return consumed
+
+    service = ToolApprovalService(SlowRepository(), clock=clock)
+    created = await _create(service)
+    await service.decide("user-1", "session-1", created.approval_id, "approved", 1)
+    with pytest.raises(ToolApprovalConflictError):
+        await service.consume(created.approval_id, "a" * 64)
+    assert created.approval_id not in service._creation_contexts

@@ -240,6 +240,34 @@ async def test_exec_drains_combined_stdout_and_stderr_before_returning():
 
 
 @pytest.mark.asyncio
+@pytest.mark.skipif(os.name != "posix", reason="POSIX child stdout inheritance is required")
+async def test_completed_leader_waits_for_late_inherited_stdout_before_publishing():
+    session_id = f"late-child-output-{uuid.uuid4().hex}"
+    service = ShellService()
+    service.EXEC_COMPLETION_GRACE_SECONDS = 0.01
+    service.OUTPUT_READER_DRAIN_GRACE_SECONDS = 0.01
+    execution = asyncio.create_task(service.exec_command(
+        session_id, "/tmp", "(sleep 0.3; printf late-child-output) & exit 0",
+    ))
+    try:
+        assert await _wait_until(lambda: session_id in service.active_shells)
+        shell = service.active_shells[session_id]
+        assert await _wait_until(lambda: shell["process"].returncode == 0)
+        await asyncio.sleep(0.05)
+        assert not execution.done()
+        assert not shell["output_buffer"].stream_complete
+        result = await execution
+        assert result.status == "completed" and result.returncode == 0
+        assert result.output == "late-child-output"
+        assert result.output_metadata["stream_complete"] is True
+    finally:
+        await service.release_shell(session_id)
+        if not execution.done():
+            execution.cancel()
+        await asyncio.gather(execution, return_exceptions=True)
+
+
+@pytest.mark.asyncio
 async def test_exec_failure_metadata_and_logs_do_not_echo_private_values(
     monkeypatch,
     caplog,
@@ -561,17 +589,18 @@ async def test_completed_leader_does_not_orphan_its_live_grandchild_group(
     command = f"/bin/bash -c {shlex.quote(child_command)}"
     original_process = None
     process_group = None
+    execution = None
 
     try:
-        result = await service.exec_command(session_id, str(tmp_path), command)
-        assert result.status == "completed"
-        assert result.returncode == 0
+        execution = asyncio.create_task(service.exec_command(session_id, str(tmp_path), command))
         assert await _wait_until(pid_path.exists)
 
         shell = ShellService.active_shells[session_id]
         original_process = shell["process"]
         process_group = shell["process_group"]
+        assert await _wait_until(lambda: original_process.returncode is not None)
         assert original_process.returncode == 0
+        assert not execution.done(), "a live child still owns stdout; output is not complete"
         assert process_group["process_group_id"] == original_process.pid
         assert service._process_group_identity_is_current(process_group)
 
@@ -590,6 +619,10 @@ async def test_completed_leader_does_not_orphan_its_live_grandchild_group(
         assert await _wait_until(
             lambda: not service._process_group_identity_is_current(process_group)
         )
+        # Explicit kill/replacement ends the observation without publishing a
+        # misleading completed result for an operation cancelled mid-drain.
+        result = (await asyncio.gather(execution, return_exceptions=True))[0]
+        assert isinstance(result, AppException)
         await asyncio.sleep(0.7)
         assert not survived_path.exists()
     finally:
@@ -617,6 +650,10 @@ async def test_completed_leader_does_not_orphan_its_live_grandchild_group(
             if reader_task and not reader_task.done():
                 reader_task.cancel()
                 await asyncio.gather(reader_task, return_exceptions=True)
+        if execution is not None:
+            if not execution.done():
+                execution.cancel()
+            await asyncio.gather(execution, return_exceptions=True)
 
 
 @pytest.mark.asyncio

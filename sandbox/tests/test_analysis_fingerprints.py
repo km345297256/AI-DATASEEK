@@ -2,7 +2,7 @@ import hashlib
 import json
 import os
 import threading
-import time
+from types import SimpleNamespace
 
 import pytest
 
@@ -64,18 +64,39 @@ def test_snapshot_batch_budget_rejects_not_samples_large_input(tmp_path, monkeyp
     assert result["errors"] == [{"path": str(paths[1]), "code": "snapshot_size_limit"}]
 
 
-@pytest.mark.parametrize("condition", ["cancelled", "expired"])
-def test_snapshot_stops_before_open_when_cancelled(tmp_path, monkeypatch, condition):
+def test_snapshot_stops_before_open_when_cancelled(tmp_path, monkeypatch):
     def unexpected_open(*args):
         raise AssertionError("must not open a cancelled snapshot")
     monkeypatch.setattr(snapshot, "_open_output", unexpected_open)
     cancelled = threading.Event()
-    if condition == "cancelled":
-        cancelled.set()
-    result = snapshot.fingerprint_analysis_files([str(tmp_path / "source")], roots=(tmp_path,), cancelled=cancelled,
-        deadline=time.monotonic() - 1 if condition == "expired" else time.monotonic() + 10)
+    cancelled.set()
+    result = snapshot.fingerprint_analysis_files([str(tmp_path / "source")], roots=(tmp_path,), cancelled=cancelled)
     assert result["files"] == []
-    assert result["errors"][0]["code"] == "snapshot_deadline"
+    assert result["errors"][0]["code"] == "snapshot_cancelled"
+
+
+def test_slow_snapshot_hashes_all_chunks_and_all_files_without_elapsed_limit(tmp_path, monkeypatch):
+    clock = [0.0]
+    monkeypatch.setattr(snapshot, "time", SimpleNamespace(monotonic=lambda: clock[0]), raising=False)
+    monkeypatch.setattr(snapshot, "CHUNK_BYTES", 2)
+    real_sha = hashlib.sha256
+    class SlowHash:
+        def __init__(self):
+            self.digest = real_sha()
+        def update(self, data):
+            clock[0] += 3600
+            self.digest.update(data)
+        def hexdigest(self):
+            return self.digest.hexdigest()
+    monkeypatch.setattr(snapshot.hashlib, "sha256", SlowHash)
+    paths = [tmp_path / name for name in ("source.csv", "output.csv")]
+    for path in paths:
+        path.write_bytes(b"a,b\n1,2\n")
+    result = snapshot.fingerprint_analysis_files([str(path) for path in paths], roots=(tmp_path,))
+    assert result["errors"] == []
+    assert len(result["files"]) == 2
+    assert {item["sha256"] for item in result["files"]} == {real_sha(b"a,b\n1,2\n").hexdigest()}
+    assert clock[0] == 8 * 3600
 
 
 def test_snapshot_detects_source_changed_during_hash(tmp_path, monkeypatch):

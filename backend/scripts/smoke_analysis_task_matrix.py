@@ -324,8 +324,9 @@ def verify_case(client, case, session_id, client_message_id=None):
                 entry["statistics"] = verify_statistics(case, data)
             elif filename.endswith(".png"):
                 entry["image"] = verify_png(data)
-                # Pixels alone cannot establish axis/species semantics; the final
-                # authoritative answer review is required independently above.
+                # This checks image delivery, not the scientific interpretation.
+                # The application publishes conclusions for user assessment;
+                # fixture statistics are checked independently by this test.
             entry["passed"] = True
         except CheckFailure as exc:
             entry.update(passed=False, error=str(exc))

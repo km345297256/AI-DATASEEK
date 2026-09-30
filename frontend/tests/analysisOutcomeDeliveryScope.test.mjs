@@ -111,6 +111,63 @@ test('actual notice renders no file reassurance for pure explanations, and remai
   assert.match(delivered, /部分完成/);
 });
 
+test('completed execution needs no model-review marker and explains completion only on hover', async () => {
+  const value = outcome({ status: 'succeeded', reason_code: 'completed' });
+  const html = await renderNotice(value);
+  assert.match(html, /已完成/);
+  assert.ok(html.includes(`title="${outcomes.ANALYSIS_COMPLETION_DESCRIPTION}"`));
+  // The explanation is a concise tooltip, not another warning in the response.
+  const visibleText = html.replace(/<[^>]+>/g, '');
+  assert.doesNotMatch(visibleText, /由您评估|证据核验|未完成|暂未发布|科学验证/);
+  assert.equal(outcomes.analysisOutcomeIsComplete(value), true);
+});
+
+test('live and history preserve new text and file results without requiring an answer review', () => {
+  for (const attachments of [undefined, [file]]) {
+    const reply = '这里是本次分析结果，方法和结论供您评估。';
+    const events = [
+      { event: 'message', data: { role: 'user', content: 'Analyze or explain the result', timestamp: 1, seq: 1 } },
+      { event: 'message', data: { role: 'assistant', content: reply, attachments, timestamp: 2, seq: 2,
+        metadata: { step_id: 'analysis', analysis_outcome: outcome({ status: 'succeeded', reason_code: 'completed' }) } } },
+      { event: 'done', data: { timestamp: 3, seq: 3 } },
+    ];
+    const session = useAnalysisSession({ api: {} });
+    for (const event of events) session.handleEvent(event);
+    for (const messages of [projectHistoryMessages(events), session.messages.value]) {
+      const result = messages.find(message => message.type === 'assistant');
+      assert.equal(result.content.content, reply);
+      assert.equal(result.content.metadata.answer_review, undefined);
+      assert.equal(outcomes.analysisOutcomeTitle(result.content.metadata.analysis_outcome), '已完成');
+      assert.equal(outcomes.hasDeliveredAnalysisFiles(result), Boolean(attachments));
+    }
+    assert.equal(session.isLoading.value, false);
+    session.dispose();
+  }
+});
+
+test('user assessment does not hide failed execution or unsafe, missing and corrupt files', async () => {
+  for (const [reason_code, expected] of [
+    ['tool_execution_unknown', /执行状态尚未确认/],
+    ['tool_execution_failed', /工具执行失败/],
+    ['dataset_unsafe', /安全读取检查/],
+  ]) {
+    const value = outcome({ reason_code });
+    const html = await renderNotice(value);
+    assert.match(html, /未完成/);
+    assert.match(html, expected);
+    assert.ok(!html.includes(outcomes.ANALYSIS_COMPLETION_DESCRIPTION));
+  }
+  for (const reason_code of ['missing_artifact', 'invalid_content', 'unavailable_or_unsafe_path']) {
+    const value = outcome({ status: 'partial', reason_code: 'artifact_validation_failed', issues: [{
+      artifact_name: 'result.csv', kind: 'table', reason_code, blocking: true,
+    }] });
+    const html = await renderNotice(value);
+    assert.match(html, /部分完成|文件交付问题/);
+    assert.ok(html.includes(outcomes.ARTIFACT_ISSUE_REASON_LABELS[reason_code]));
+    assert.equal(outcomes.analysisOutcomeIsComplete(value), false);
+  }
+});
+
 test('auxiliary file diagnostics remain visible without inventing successful file delivery', async () => {
   const value = outcome({ status: 'succeeded', reason_code: 'completed', issues: [{
     artifact_name: 'optional.png', kind: 'image', reason_code: 'missing_artifact', blocking: false,

@@ -15,6 +15,7 @@ from app.core.exceptions import (
     general_exception_handler
 )
 from app.core.middleware import auto_extend_timeout_middleware
+from app.services.analysis_workspace import analysis_workspace_lifespan
 
 # Configure logging
 def setup_logging():
@@ -46,8 +47,10 @@ def setup_logging():
 setup_logging()
 logger = logging.getLogger(__name__)
 
+
 app = FastAPI(
     version="1.0.0",
+    lifespan=analysis_workspace_lifespan,
 )
 
 # Set up CORS

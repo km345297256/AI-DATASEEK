@@ -7,7 +7,8 @@ from datetime import datetime, UTC
 from pathlib import PurePosixPath
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from app.domain.services.flows.base import BaseFlow
-from app.domain.services.execution_history import ExecutionHistory, reviewed_history_steps
+from app.domain.services.execution_history import ExecutionHistory, analysis_history_steps
+from app.domain.models.result_assessment import has_user_evaluated_result
 from app.domain.models.message import Message
 from typing import Any, AsyncGenerator, Optional
 from enum import Enum
@@ -665,10 +666,7 @@ class PlanActFlow(BaseFlow):
                 "session_id": self._session_id,
                 "user_id": self._user_id,
             },
-            # Preserve the existing sandbox safety ceiling even if a future
-            # manifest advertises a larger host-side budget.
-            default_timeout_seconds=120.0,
-            maximum_timeout_seconds=120.0,
+            # Task execution and spill persistence have no elapsed-time cutoff.
             spill_store=(
                 spill_store
                 if settings.spill_enabled
@@ -685,7 +683,6 @@ class PlanActFlow(BaseFlow):
             spill_max_inline_bytes=settings.spill_max_inline_bytes,
             spill_max_artifact_bytes=settings.spill_max_artifact_bytes,
             spill_preview_bytes=settings.spill_preview_bytes,
-            spill_store_timeout_seconds=settings.spill_store_timeout_seconds,
         )
         next_disposer = getattr(self, "_governed_tool_registry", self._tool_registry).register_interceptors(
             interceptors,
@@ -2286,7 +2283,7 @@ class PlanActFlow(BaseFlow):
         dataset_ids: set[str] | None = None,
         input_file_ids: set[str] | None = None,
     ) -> str:
-        scoped_results = (reviewed_history_steps(events, dataset_ids=dataset_ids,
+        scoped_results = (analysis_history_steps(events, dataset_ids=dataset_ids,
                                                 input_file_ids=input_file_ids)
                           if dataset_ids is not None and input_file_ids is not None else None)
         projection = events if isinstance(events, ExecutionHistory) else None
@@ -2310,6 +2307,7 @@ class PlanActFlow(BaseFlow):
         conversation: list[tuple[str, str]] = []
         vision_results: list[str] = []
         analysis_results: list[tuple[str, tuple[str, ...]]] = []
+        analysis_assessments: dict[tuple[str, tuple[str, ...]], dict[str, str]] = {}
         seen_analysis_results: set[tuple[str, tuple[str, ...]]] = set()
         spill_references: list[dict[str, Any]] = []
         seen_spill_locators: set[str] = set()
@@ -2348,6 +2346,8 @@ class PlanActFlow(BaseFlow):
                     path for path in step.attachments[:8] if isinstance(path, str) and path
                 )
                 key = (result, attachments)
+                if has_user_evaluated_result(step):
+                    analysis_assessments[key] = {"mode": "user_evaluated", "scientific_review": "not_performed"}
                 if key in seen_analysis_results:
                     continue
                 seen_analysis_results.add(key)
@@ -2358,12 +2358,20 @@ class PlanActFlow(BaseFlow):
             vision_results = projection.vision_results
             analysis_results = projection.analysis_results
             spill_references = projection.spill_references
+            for steps in projection.contextual_steps_by_plan.values():
+                for step in steps:
+                    if has_user_evaluated_result(step):
+                        analysis_assessments[(step.result, tuple(step.attachments[:8]))] = {
+                            "mode": "user_evaluated", "scientific_review": "not_performed"}
         if scoped_results is not None:
-            # The executor and final reviewer must see the same authorized
-            # historical results. A failed follow-up or other dataset's recent
-            # work must not hide the result being explained.
+            # Follow-ups can explain prior executed results without model
+            # self-approval. Exact scope and non-certification remain explicit.
             analysis_results = [(step.result, tuple(step.attachments[:8]))
                                 for step in reversed(scoped_results)]
+            for step in scoped_results:
+                if has_user_evaluated_result(step):
+                    analysis_assessments[(step.result, tuple(step.attachments[:8]))] = {
+                        "mode": "user_evaluated", "scientific_review": "not_performed"}
         conversation = conversation[-self.MAX_SESSION_CONTEXT_MESSAGES:]
         rendered_messages_reversed: list[dict[str, str]] = []
         remaining_bytes = self.MAX_SESSION_CONTEXT_BYTES
@@ -2400,6 +2408,7 @@ class PlanActFlow(BaseFlow):
                     self.MAX_SESSION_CONTEXT_MESSAGE_BYTES,
                 ),
                 attachments,
+                analysis_assessments.get((result, attachments)),
             )
             for result, attachments in analysis_results[-3:]
         ]
@@ -2422,8 +2431,9 @@ class PlanActFlow(BaseFlow):
                 {
                     "result": result,
                     "attachments": list(attachments),
+                    **({"assessment": assessment} if assessment is not None else {}),
                 }
-                for result, attachments in rendered_analysis_results
+                for result, attachments, assessment in rendered_analysis_results
             ],
             # Only opaque, session-authorized references are replayed. Raw
             # output and even its bounded preview stay out of future prompts.

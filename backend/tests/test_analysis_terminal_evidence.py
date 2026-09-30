@@ -48,8 +48,9 @@ def public_payload(events):
     return json.dumps([event.model_dump(mode="json") for event in events], ensure_ascii=False)
 
 
-def assert_unverified_notice(text):
-    assert "分析" in text and "核验" in text, "The omitted draft must be explained, not silently erased"
+def assert_failure_notice(text):
+    assert text.startswith(("本次分析未完成。", "本次分析部分完成。"))
+    assert "分析说明尚未通过完整核验" not in text
 
 
 @pytest.mark.asyncio
@@ -81,15 +82,15 @@ async def test_no_substantive_terminal_result_cannot_be_created_by_a_hidden_repa
 
 
 @pytest.mark.asyncio
-async def test_unknown_execution_cannot_publish_success_claims_even_with_a_verified_partial_file():
+async def test_unknown_execution_cannot_claim_success_even_when_prose_and_partial_file_are_published():
     chart = output("partial.png", "image")
     runner, flow, step, message, state = scenario([[chart]], [{"kind": "image"}], unknown=True)
     use_drafts(flow, [UNVERIFIED])
     events = await collect(runner, message)
     assert len(state["prompts"]) == 1
     assert step.success is False and step.outcome.reason_code == "tool_execution_unknown"
-    assert UNVERIFIED not in public_payload(events)
-    assert_unverified_notice(step.result)
+    assert UNVERIFIED in step.result
+    assert_failure_notice(step.result)
     delivered = [item for event in terminal_messages(events) for item in event.attachments or []]
     assert chart[1].file_id in {item.file_id for item in delivered}
     assert any(isinstance(event, DoneEvent) for event in events)
@@ -103,8 +104,8 @@ async def test_saved_script_alone_does_not_prove_its_claimed_chart_or_numerical_
     events = await collect(runner, message)
     assert len(state["prompts"]) == 2  # One local repair, then no actual progress.
     assert step.success is False and step.outcome.missing
-    assert UNVERIFIED not in public_payload(events)
-    assert_unverified_notice(step.result)
+    assert UNVERIFIED in step.result
+    assert_failure_notice(step.result)
     delivered = [item for event in terminal_messages(events) for item in event.attachments or []]
     assert script[1].file_id not in {item.file_id for item in delivered}
     assert step.outcome.status == "failed"
@@ -112,7 +113,7 @@ async def test_saved_script_alone_does_not_prove_its_claimed_chart_or_numerical_
 
 
 @pytest.mark.asyncio
-async def test_failed_required_content_keeps_verified_attachments_but_not_unverified_step_claims():
+async def test_failed_required_content_keeps_verified_attachments_and_prose_with_failed_status():
     chart = output("kept.png", "image")
     bad = output("required.csv", "table", valid=False, reason="inconsistent_table_width")
     runner, flow, step, message, state = scenario([[chart, bad], [chart, bad]], [{"kind": "table"}])
@@ -120,8 +121,8 @@ async def test_failed_required_content_keeps_verified_attachments_but_not_unveri
     events = await collect(runner, message)
     assert len(state["prompts"]) == 2
     assert step.outcome.status == "partial" and step.success is False
-    assert UNVERIFIED not in public_payload(events)
-    assert_unverified_notice(step.result)
+    assert UNVERIFIED in step.result
+    assert_failure_notice(step.result)
     delivered = [item for event in terminal_messages(events) for item in event.attachments or []]
     assert chart[1].file_id in {item.file_id for item in delivered}
     assert bad[1].file_id not in {item.file_id for item in delivered}
@@ -174,7 +175,8 @@ async def test_a_later_failed_step_does_not_erase_an_earlier_successful_step_or_
     assert len(state["prompts"]) == 2
     assert first.status == ExecutionStatus.COMPLETED and first.result == CONFIRMED_DRAFT
     assert later.success is False and later.outcome.status == "partial"
-    assert UNVERIFIED not in public_payload(events)
+    assert UNVERIFIED in later.result
+    assert_failure_notice(later.result)
     assert any(event.message == CONFIRMED_DRAFT for event in terminal_messages(events))
     assert chart[1].file_id in {item.file_id for event in terminal_messages(events) for item in event.attachments or []}
 
@@ -203,12 +205,13 @@ async def test_detached_terminal_event_cannot_republish_its_stale_unverified_pro
     flow.run = detached_run
     events = await collect(runner, message)
     assert step.success is False
-    assert UNVERIFIED not in public_payload(events)
-    assert_unverified_notice(step.result)
+    assert UNVERIFIED in step.result
+    assert_failure_notice(step.result)
+    assert all(event.message != UNVERIFIED for event in terminal_messages(events))
 
 
 @pytest.mark.asyncio
-async def test_checkpoint_serializes_no_unverified_draft_before_final_body_replacement(monkeypatch):
+async def test_checkpoint_serializes_prose_with_truthful_status_and_not_reviewed_marker(monkeypatch):
     step = Step(id="deliver", success=True, result=UNVERIFIED,
                 deliverables=[DeliverableRequirement(kind="image")],
                 outputs={"model_execution_success": True,
@@ -233,11 +236,15 @@ async def test_checkpoint_serializes_no_unverified_draft_before_final_body_repla
         StepEvent(status=StepStatus.COMPLETED, step=step), message, [], source_seq=7)
 
     saved.assert_awaited_once()
-    assert captured[0]["steps"][0]["result"] is None
-    assert UNVERIFIED not in json.dumps(captured)
+    saved_step = captured[0]["steps"][0]
+    assert saved_step["result"] == step.result
+    assert UNVERIFIED in saved_step["result"]
+    assert saved_step["success"] is False
+    assert saved_step["outcome"]["reason_code"] == "delivery_failed"
+    assert saved_step["outputs"]["result_assessment"]["scientific_review"] == "not_performed"
     assert step.outcome.reason_code == "delivery_failed" and step.outcome.can_resume
-    assert UNVERIFIED not in step.result
-    assert_unverified_notice(step.result)
+    assert UNVERIFIED in step.result
+    assert_failure_notice(step.result)
 
 
 @pytest.mark.asyncio

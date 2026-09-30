@@ -112,7 +112,7 @@ class ToolEventData(BaseEventData):
     tool_call_id: str
     name: str
     status: ToolStatus
-    execution_status: Optional[Literal["succeeded", "failed"]] = None
+    execution_status: Optional[Literal["succeeded", "failed", "not_started"]] = None
     function: str
     args: Dict[str, Any]
     content: Optional[ToolContent] = None
@@ -139,6 +139,11 @@ class ToolSSEEvent(BaseSSEEvent):
         execution_status = None
         if event.status == ToolStatus.CALLED and type(success) is bool:
             execution_status = "succeeded" if success else "failed"
+            if (success is False and event.dispatch_status == "not_started"
+                    and event.program_attempt is None):
+                # Only the host-owned event projection can attest no dispatch.
+                # Plugin result strings/flags must not erase a real failure.
+                execution_status = "not_started"
         content = event.tool_content
         if isinstance(content, BrowserToolContent):
             from app.interfaces.dependencies import get_file_service

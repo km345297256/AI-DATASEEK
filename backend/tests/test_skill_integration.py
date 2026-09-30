@@ -1854,7 +1854,8 @@ async def test_sandbox_pool_replenish_creates_one_sandbox_per_run():
     attempts = 0
     scheduled = 0
 
-    async def create_and_warm():
+    async def create_and_warm(*, wait_for_capacity):
+        assert wait_for_capacity is False
         nonlocal attempts
         attempts += 1
         return FakeSandbox()
@@ -1880,7 +1881,8 @@ async def test_sandbox_pool_replenish_schedules_retry_after_failure():
     attempts = 0
     scheduled = 0
 
-    async def create_and_warm():
+    async def create_and_warm(*, wait_for_capacity):
+        assert wait_for_capacity is False
         nonlocal attempts
         attempts += 1
         raise RuntimeError("node temporarily unavailable")

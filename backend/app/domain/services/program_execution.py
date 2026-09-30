@@ -204,18 +204,17 @@ async def trusted_program_prerequisites(tool, call: dict) -> dict | None:
     # This probe grants no execute/write authority and never clears an unknown
     # operation; recovery still requires its private not_started receipt.
     try:
-        async with asyncio.timeout(3):
-            result = await tool.toolkit.sandbox.program_preflight(exec_dir, path)
+        result = await tool.toolkit.sandbox.program_preflight(exec_dir, path)
         if not isinstance(result, ToolResult) or result.success is not True:
             return None
         data = result.data if isinstance(result.data, dict) else {}
         digest = data.get("prerequisite_digest")
-        cwd, source = data.get("cwd"), data.get("source")
+        cwd, source, syntax = data.get("cwd"), data.get("source"), data.get("syntax")
         if (type(data.get("version")) is not int or data["version"] != 1
                 or data.get("status") not in {"ready", "blocked"}
                 or type(data.get("ready")) is not bool
                 or not isinstance(digest, str) or not re.fullmatch(r"[0-9a-f]{64}", digest)
-                or not isinstance(cwd, dict) or not isinstance(source, dict)):
+                or not isinstance(cwd, dict) or not isinstance(source, dict) or not isinstance(syntax, dict)):
             return None
         if (cwd.get("state") not in {"ready", "missing", "not_directory", "not_accessible"}
                 or source.get("state") not in {"ready", "missing", "not_regular", "not_readable", "too_large"}):
@@ -223,10 +222,68 @@ async def trusted_program_prerequisites(tool, call: dict) -> dict | None:
         if source["state"] == "ready" and (not isinstance(source.get("source_digest"), str)
                 or not re.fullmatch(r"[0-9a-f]{64}", source["source_digest"])):
             return None
-        ready = cwd["state"] == "ready" and source["state"] == "ready"
+        if (syntax.get("state") not in {"ready", "not_checked", "invalid"}
+                or (source["state"] == "ready") != (syntax["state"] != "not_checked")
+                or syntax.get("exception_type") not in {None, "SyntaxError", "IndentationError", "TabError"}
+                or any(syntax.get(key) is not None and (type(syntax[key]) is not int or syntax[key] < 1)
+                       for key in ("line", "offset"))):
+            return None
+        ready = cwd["state"] == "ready" and source["state"] == "ready" and syntax["state"] == "ready"
         if data["ready"] != ready or (data["status"] == "ready") != ready:
             return None
-        return {"prerequisite_digest": digest, "ready": ready}
+        return {"prerequisite_digest": digest, "ready": ready,
+                "cwd_state": cwd["state"], "source_state": source["state"],
+                "syntax": {key: syntax.get(key) for key in ("state", "exception_type", "line", "offset")}}
     except Exception:
         # Failure to observe freshness grants no reset. Cancellation propagates.
         return None
+
+
+def program_preparation_failure(tool, call: dict, prerequisites: dict | None) -> dict | None:
+    """A host-owned pre-dispatch result, never a claim about a launched operation.
+
+    The read-only first-party probe is the sole source of prerequisite facts.
+    Do not parse model/tool prose or create source files on the model's behalf.
+    Unknown earlier launches remain exclusively governed by the private ledger.
+    """
+    if not is_trusted_program_tool(tool):
+        return None
+    args = call.get("args") or {}
+    path, cwd = args.get("script_path"), args.get("exec_dir")
+    valid_paths = all(isinstance(value, str) and value.startswith("/")
+        and str(PurePosixPath(value)) == value and ".." not in PurePosixPath(value).parts
+        and "\\" not in value and not any(ord(char) < 32 or ord(char) == 127 for char in value)
+        for value in (path, cwd)) and str(path).endswith(".py")
+    issues: list[dict] = []
+    if not valid_paths:
+        issues.append({"code": "program_invalid_path", "action": "correct_program_paths",
+                       "tool": "program_run", "instruction": "Supply canonical absolute sandbox paths for script_path and exec_dir; do not use ~ or shell expansion."})
+    elif prerequisites is None:
+        issues.append({"code": "program_preflight_unavailable", "action": "inspect_preparation",
+                       "tool": "file_read", "instruction": "Preparation could not be safely inspected. Inspect the saved script and working directory; do not infer that the script ran or blindly retry execution."})
+    elif prerequisites["ready"]:
+        return None
+    else:
+        cwd_state, source_state = prerequisites["cwd_state"], prerequisites["source_state"]
+        if cwd_state != "ready":
+            issues.append({"code": "cwd_" + cwd_state, "action": "prepare_working_directory",
+                           "tool": "shell_run", "instruction": "Create the authorized missing working directory with a separate mkdir operation, or correct exec_dir if it is not an accessible directory. Never modify read-only dataset mounts."})
+        if source_state != "ready":
+            issues.append({"code": "script_" + source_state,
+                           "action": "write_saved_program" if source_state == "missing" else "inspect_saved_program",
+                           "tool": "file_write" if source_state == "missing" else "file_read",
+                           "instruction": "Save the intended complete program at script_path before requesting program_run." if source_state == "missing" else "Inspect or correct the saved source path. The runner requires an accessible regular Python source file, not a link or directory."})
+        if prerequisites["syntax"]["state"] == "invalid":
+            issues.append({"code": "script_syntax_error", "action": "inspect_and_correct_syntax",
+                           "tool": "file_read", "instruction": "Inspect the reported source line and correct the syntax with file_str_replace before running. Source compilation did not execute any program code."})
+    primary = issues[0]
+    public = {"issues": issues}
+    if valid_paths:
+        public.update(script_path=path, exec_dir=cwd)
+    if prerequisites is not None:
+        public.update(cwd_state=prerequisites.get("cwd_state"), source_state=prerequisites.get("source_state"),
+                      syntax=prerequisites.get("syntax"))
+    return {"success": False, "blocked_by_policy": "program_prerequisites_not_ready",
+            "error_code": primary["code"], "side_effect_state": "not_started",
+            "message": "Program NOT started: " + " ".join(issue["instruction"] for issue in issues),
+            "program_preflight": public}

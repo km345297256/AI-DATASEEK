@@ -258,7 +258,7 @@ async def test_cordis_contract_runs_through_plan_act_pipeline_and_shell_adapter(
         ]
         completed = trace_sink.events[-1]
         assert completed.policy_decision == "allow"
-        assert completed.timeout_seconds == 10
+        assert completed.timeout_seconds is None
         assert completed.cancellable is True
         assert completed.effects == ("sandbox_read",)
         assert completed.attributes["catalog_revision"] == snapshot.revision

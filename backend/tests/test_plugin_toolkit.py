@@ -22,7 +22,6 @@ from app.domain.services.tools.pipeline import (
     ToolExecutionPipeline,
 )
 from app.domain.services.tools.interceptors import (
-    ToolExecutionTimeoutError,
     ToolTimeoutInterceptor,
 )
 from app.interfaces.schemas.tool_presentation import (
@@ -287,36 +286,78 @@ async def test_parallel_plugin_calls_use_isolated_sandbox_shell_sessions(tmp_pat
 
 
 @pytest.mark.asyncio
-async def test_hanging_plugin_release_cannot_swallow_outer_timeout(tmp_path):
+async def test_hanging_plugin_release_keeps_waiting_until_user_cancel(tmp_path):
     sandbox = AsyncMock()
     sandbox.exec_command.return_value = ToolResult(
         success=True,
         data={"status": "completed", "returncode": 0, "output": "{}"},
     )
+    releasing = asyncio.Event()
     async def hang_release(_session_id):
+        releasing.set()
         await asyncio.Event().wait()
 
     sandbox.release_shell.side_effect = hang_release
     toolkit = _contract_toolkit(tmp_path, sandbox)
     toolkit.tool_execution_pipeline = ToolExecutionPipeline([
         ToolTimeoutInterceptor(
-            0.01,
-            maximum_timeout_seconds=0.02,
             cancellation_cleanup_timeout_seconds=0.05,
         ),
     ])
 
-    started = asyncio.get_running_loop().time()
-    with pytest.raises(ToolExecutionTimeoutError):
-        await toolkit.get_tool("contract_read").ainvoke({
+    task = asyncio.create_task(toolkit.get_tool("contract_read").ainvoke({
             "id": "release-timeout",
             "name": "contract_read",
             "args": {"value": 1},
-        })
+        }))
+    await releasing.wait()
+    await asyncio.sleep(0.04)
+    assert not task.done()
+    started = asyncio.get_running_loop().time()
+    task.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await task
     elapsed = asyncio.get_running_loop().time() - started
 
     assert elapsed < 0.2
     sandbox.kill_process.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_plugin_keeps_one_launch_across_more_than_120_observation_windows(tmp_path, monkeypatch):
+    monkeypatch.setattr("app.domain.services.tools.plugin._PLUGIN_RETRY_DELAY_SECONDS", 0)
+    sandbox = AsyncMock()
+    sandbox.exec_command.return_value = ToolResult(success=True, data={"status": "running"})
+    sandbox.wait_for_process.side_effect = [
+        *[ToolResult(success=True, data={"status": "running", "returncode": None}) for _ in range(130)],
+        ToolResult(success=True, data={"status": "completed", "returncode": 0}),
+    ]
+    sandbox.view_shell.return_value = ToolResult(success=True, data={"output": "{}"})
+    toolkit = _contract_toolkit(tmp_path, sandbox)
+    result = await toolkit.call_tool("contract_read", {"value": 1})
+    assert result.success
+    sandbox.exec_command.assert_awaited_once()
+    assert sandbox.wait_for_process.await_count == 131
+    sandbox.kill_process.assert_not_awaited()
+    sandbox.release_shell.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_plugin_observation_transport_timeouts_do_not_kill_or_relaunch(tmp_path, monkeypatch):
+    monkeypatch.setattr("app.domain.services.tools.plugin._PLUGIN_RETRY_DELAY_SECONDS", 0)
+    sandbox = AsyncMock()
+    sandbox.exec_command.return_value = ToolResult(success=True, data={"status": "running"})
+    sandbox.wait_for_process.side_effect = [
+        TimeoutError("observation response lost"),
+        ToolResult(success=True, data={"status": "completed", "returncode": 0}),
+    ]
+    sandbox.view_shell.return_value = ToolResult(success=True, data={"output": "{}"})
+    toolkit = _contract_toolkit(tmp_path, sandbox)
+    result = await toolkit.call_tool("contract_read", {"value": 1})
+    assert result.success
+    sandbox.exec_command.assert_awaited_once()
+    assert sandbox.wait_for_process.await_count == 2
+    sandbox.kill_process.assert_not_awaited()
 
 
 @pytest.mark.asyncio

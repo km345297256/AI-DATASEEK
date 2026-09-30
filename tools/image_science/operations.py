@@ -141,7 +141,7 @@ def ocr(a):
         try:
             with Image.open(p) as im: source_info=frame_info(im)
             with tempfile.TemporaryDirectory() as td:
-                base=Path(td)/"ocr"; subprocess.run(["tesseract",str(p),str(base),"-l",a.get("languages","chi_sim+eng"),"tsv"],check=False,capture_output=True,timeout=90)
+                base=Path(td)/"ocr"; subprocess.run(["tesseract",str(p),str(base),"-l",a.get("languages","chi_sim+eng"),"tsv"],check=False,capture_output=True)
                 tsv=base.with_suffix(".tsv"); words=[]
                 if tsv.exists():
                     for line in tsv.read_text(errors="ignore").splitlines()[1:]:

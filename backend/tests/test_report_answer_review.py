@@ -216,7 +216,7 @@ async def test_actual_context_preparation_rejects_without_silently_dropping_repo
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("report_status", ["rejected", "unclear"])
-async def test_real_runner_binds_downloaded_version_preserves_chat_and_cannot_execute_again(report_status):
+async def test_real_runner_delivers_readable_report_without_automatic_prose_review(report_status):
     from test_analysis_repair_flow import scenario, output, collect, terminal_messages
     from test_analysis_answer_review_flow import with_observed_results, real_reviewer
     from types import SimpleNamespace
@@ -234,13 +234,14 @@ async def test_real_runner_binds_downloaded_version_preserves_chat_and_cannot_ex
     ask = AsyncMock(side_effect=lambda messages: answer(messages, status=report_status))
     real_reviewer(agent, ask)
     events = await collect(runner, message)
-    assert len(state["prompts"]) == 1 and ask.await_count == 1
-    assert step.outcome.status == "partial"
-    assert step.outcome.reason_code == ("report_validation_rejected" if report_status == "rejected" else "report_validation_unavailable")
+    assert len(state["prompts"]) == 1 and ask.await_count == 0
+    assert step.outcome.status == "succeeded"
+    assert step.outcome.reason_code == "completed"
     assert not step.outcome.can_resume and not flow._artifact_repair_requests
     assert GOOD in step.result and file.file_id in {item.file_id for item in runner._generated_files}
     assert "# Measured results" not in json.dumps([event.model_dump(mode="json") for event in events])
-    runner._file_storage.download_file_range.assert_awaited_once_with(file.file_id, "fixture-user", offset=0, length=len(data))
+    runner._file_storage.download_file_range.assert_not_awaited()
+    assert step.outputs["result_assessment"]["scientific_review"] == "not_performed"
 
 
 @pytest.mark.asyncio

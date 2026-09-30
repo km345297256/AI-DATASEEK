@@ -597,7 +597,7 @@ async def test_agent_correction_replays_only_proven_new_program_source(monkeypat
             return ToolResult(success=False)
         return ToolResult(success=True, data={"version": 1, "status": "ready", "ready": True,
             "prerequisite_digest": source * 64, "cwd": {"state": "ready"},
-            "source": {"state": "ready", "source_digest": source * 64}})
+            "source": {"state": "ready", "source_digest": source * 64}, "syntax": {"state": "ready"}})
     sandbox.program_preflight = preflight
     toolkit = ShellToolkit(sandbox)
     first = {"name": "program_run", "id": "program-one", "args": {

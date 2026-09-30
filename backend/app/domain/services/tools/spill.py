@@ -73,7 +73,7 @@ class SpillArtifactInterceptor(ToolExecutionInterceptor):
         max_inline_bytes: int = 50_000,
         max_artifact_bytes: int = 32 * 1024 * 1024,
         preview_bytes: int = 12_000,
-        store_timeout_seconds: float = 5.0,
+        store_timeout_seconds: float | None = None,
         excluded_tools: set[str] | frozenset[str] = frozenset({SPILL_READ_TOOL_NAME}),
     ) -> None:
         if max_inline_bytes < 1024:
@@ -82,7 +82,7 @@ class SpillArtifactInterceptor(ToolExecutionInterceptor):
             raise ValueError("spill max artifact bytes must cover the inline limit")
         if preview_bytes < 0:
             raise ValueError("spill preview bytes must not be negative")
-        if store_timeout_seconds <= 0:
+        if store_timeout_seconds is not None and store_timeout_seconds <= 0:
             raise ValueError("spill store timeout must be positive")
         self._store = store
         self._owner = owner
@@ -181,10 +181,7 @@ class SpillArtifactInterceptor(ToolExecutionInterceptor):
                     ),
                 ))
                 self._track_save(save_task)
-                reference = await asyncio.wait_for(
-                    asyncio.shield(save_task),
-                    timeout=self._store_timeout_seconds,
-                )
+                reference = await asyncio.wait_for(asyncio.shield(save_task), self._store_timeout_seconds)
                 status = "stored"
             except asyncio.CancelledError:
                 raise

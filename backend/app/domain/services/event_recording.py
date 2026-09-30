@@ -373,6 +373,8 @@ def _event_payload(event: AgentEvent) -> dict[str, Any]:
         payload.pop("tool_approval", None)
     if payload.get("program_attempt") is None:
         payload.pop("program_attempt", None)
+    if payload.get("dispatch_status") is None:
+        payload.pop("dispatch_status", None)
     return payload
 
 

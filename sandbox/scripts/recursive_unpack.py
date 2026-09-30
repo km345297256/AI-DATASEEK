@@ -43,7 +43,6 @@ class Limits:
     max_files: int = 2_000
     max_total_bytes: int = 2 * 1024 * 1024 * 1024
     max_single_file_bytes: int = 512 * 1024 * 1024
-    timeout_seconds: int = 120
 
 
 @dataclass(slots=True)
@@ -478,10 +477,9 @@ def extract_7z(archive_path: Path, target_root: Path, state: State) -> None:
             text=True,
             errors="replace",
             stdin=subprocess.DEVNULL,
-            timeout=state.limits.timeout_seconds,
             env=_subprocess_environment(),
         )
-    except (OSError, subprocess.TimeoutExpired) as exc:
+    except OSError as exc:
         raise UnpackError(f"unable to list 7z archive: {exc}") from exc
     if listing.returncode != 0:
         raise UnpackError(f"7z listing failed: {listing.stderr[-2_000:]}")
@@ -508,11 +506,10 @@ def extract_7z(archive_path: Path, target_root: Path, state: State) -> None:
                 text=True,
                 errors="replace",
                 stdin=subprocess.DEVNULL,
-                timeout=state.limits.timeout_seconds,
                 env=_subprocess_environment(),
                 preexec_fn=_file_size_limit(state.limits.max_single_file_bytes),
             )
-        except (OSError, subprocess.TimeoutExpired) as exc:
+        except OSError as exc:
             raise UnpackError(f"unable to extract 7z archive: {exc}") from exc
         if extraction.returncode != 0:
             raise UnpackError(f"7z extraction failed: {extraction.stderr[-2_000:]}")
@@ -702,7 +699,6 @@ def parse_arguments(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--max-files", type=int, default=2_000)
     parser.add_argument("--max-total-bytes", type=int, default=2 * 1024 * 1024 * 1024)
     parser.add_argument("--max-single-file-bytes", type=int, default=512 * 1024 * 1024)
-    parser.add_argument("--timeout-seconds", type=int, default=120)
     return parser.parse_args(argv)
 
 
@@ -717,7 +713,6 @@ def main(argv: list[str] | None = None) -> int:
         max_files=max(1, args.max_files),
         max_total_bytes=max(1, args.max_total_bytes),
         max_single_file_bytes=max(1, args.max_single_file_bytes),
-        timeout_seconds=max(1, min(args.timeout_seconds, 600)),
     )
     try:
         manifest = unpack_recursive(

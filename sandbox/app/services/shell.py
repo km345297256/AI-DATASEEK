@@ -25,6 +25,7 @@ from app.models.shell import (
 from app.core.exceptions import AppException, ResourceNotFoundException, BadRequestException
 from app.services.program import (
     BOOTSTRAP, append_program_output, prepare_program, program_command, program_feedback,
+    ProgramPreparationError, validate_program_working_directory,
 )
 from app.services.shell_output import ShellOutputBuffer, utf8_prefix
 from app.services.analysis_workspace import prepare_analysis_workspace
@@ -92,7 +93,6 @@ class ShellService:
     PRE_CANCELLED_EXEC_TTL_SECONDS = 30.0
     MAX_PENDING_EXECUTION_OPERATIONS = 4_096
     MAX_RECEIPT_PROCESS_SCAN_ENTRIES = 16_384
-    RECEIPT_PROCESS_SCAN_SECONDS = 0.1
     # One nonce per server process, shared by all service instances. Restarted
     # servers cannot attest to operations from the previous process.
     SERVER_INSTANCE_ID = uuid.uuid4().hex
@@ -159,12 +159,13 @@ class ShellService:
         # present /proc entry invalidates that proof; never treat it as empty.
         if not os.path.isdir("/proc"):
             return False
-        deadline = self._monotonic() + self.RECEIPT_PROCESS_SCAN_SECONDS
         try:
             with os.scandir("/proc") as entries:
                 for scanned, entry in enumerate(entries):
-                    if (scanned >= self.MAX_RECEIPT_PROCESS_SCAN_ENTRIES
-                        or self._monotonic() >= deadline):
+                    # Scan cardinality is bounded, not its wall-clock duration.
+                    # A slow /proc read cannot turn an exited operation into
+                    # permanently unverifiable execution evidence.
+                    if scanned >= self.MAX_RECEIPT_PROCESS_SCAN_ENTRIES:
                         return False
                     if not entry.name.isdigit():
                         continue
@@ -418,6 +419,7 @@ class ShellService:
     async def _create_program_process(self, exec_dir: str, script_path: str,
                                       args: list[str], *, receipt_record=None) -> asyncio.subprocess.Process:
         prepare_analysis_workspace()
+        validate_program_working_directory(exec_dir)
         snapshot, diagnostics, metadata = prepare_program(script_path, args)
         try:
             if receipt_record is not None:
@@ -937,8 +939,16 @@ class ShellService:
         self,
         session_id: str,
         process: asyncio.subprocess.Process,
+        *,
+        cleanup: bool = False,
     ) -> None:
-        """Give the matching reader bounded time to drain after process exit."""
+        """Collect normal output through EOF; only teardown has a grace period.
+
+        The leader exiting does not mean stdout is fully collected: buffered
+        output or descendants can still hold its pipe open. Normal completion
+        waits without a deadline and remains cancellable. Shield the reader so
+        a cancelled observer does not destroy output owned by this execution.
+        """
         session_ref = _opaque_log_identifier(session_id, namespace="session")
         shell = self.active_shells.get(session_id)
         if not shell or shell.get("process") is not process:
@@ -949,13 +959,16 @@ class ShellService:
             return
 
         try:
-            await asyncio.wait_for(
-                asyncio.shield(reader_task),
-                timeout=self.OUTPUT_READER_DRAIN_GRACE_SECONDS,
-            )
+            if cleanup:
+                await asyncio.wait_for(
+                    asyncio.shield(reader_task),
+                    timeout=self.OUTPUT_READER_DRAIN_GRACE_SECONDS,
+                )
+            else:
+                await asyncio.shield(reader_task)
         except asyncio.TimeoutError:
             logger.warning(
-                "Output reader for session %s did not reach EOF within %ss",
+                "Output reader cleanup for session %s did not reach EOF within %ss",
                 session_ref,
                 self.OUTPUT_READER_DRAIN_GRACE_SECONDS,
             )
@@ -1003,7 +1016,14 @@ class ShellService:
                 receipt_record.state = "not_started"
             raise
         # Ensure directory exists
-        if not os.path.exists(exec_dir):
+        if _program is not None:
+            try:
+                validate_program_working_directory(exec_dir)
+            except ProgramPreparationError:
+                if receipt_record is not None:
+                    receipt_record.state = "not_started"
+                raise
+        elif not os.path.exists(exec_dir):
             if receipt_record is not None:
                 receipt_record.state = "not_started"
             logger.error(
@@ -1040,7 +1060,7 @@ class ShellService:
                     process_group=previous_shell.get("process_group"),
                 )
 
-                await self._wait_for_output_reader(session_id, old_process)
+                await self._wait_for_output_reader(session_id, old_process, cleanup=True)
                 program_feedback(previous_shell)
 
             # A release/kill during replacement can avoid spawning altogether.
@@ -1164,6 +1184,12 @@ class ShellService:
                 program_execution=program_feedback(shell),
                 output_metadata=output_buffer.metadata(),
             )
+        except ProgramPreparationError:
+            # A preparation error contains only fixed diagnostic codes. Keep
+            # it actionable instead of wrapping it into a generic HTTP 500.
+            # The independent launch receipt, not this payload, authorizes any
+            # recovery; creation races still take the unknown-state path below.
+            raise
         except Exception as e:
             logger.error("Command execution failed error_type=%s", type(e).__name__)
             raise AppException(
@@ -1379,7 +1405,7 @@ class ShellService:
             )
             if terminated:
                 logger.debug("Attempting to terminate process tree gracefully")
-                await self._wait_for_output_reader(session_id, process)
+                await self._wait_for_output_reader(session_id, process, cleanup=True)
                 
                 logger.info(f"Process terminated with return code: {process.returncode}")
                 return ShellKillResult(
@@ -1387,7 +1413,7 @@ class ShellService:
                     returncode=process.returncode
                 )
             else:
-                await self._wait_for_output_reader(session_id, process)
+                await self._wait_for_output_reader(session_id, process, cleanup=True)
                 logger.info(f"Process was already terminated with return code: {process.returncode}")
                 return ShellKillResult(
                     status="already_terminated",
@@ -1411,7 +1437,7 @@ class ShellService:
                 timeout_seconds=self.KILL_PROCESS_TERMINATION_GRACE_SECONDS,
                 process_group=shell.get("process_group"),
             )
-            await self._wait_for_output_reader(session_id, process)
+            await self._wait_for_output_reader(session_id, process, cleanup=True)
         except asyncio.CancelledError:
             raise
         except Exception as error:

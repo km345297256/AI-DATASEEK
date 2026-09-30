@@ -5,7 +5,6 @@ import hashlib
 import os
 import stat
 import threading
-import time
 from pathlib import Path
 
 ARTIFACT_ROOT = Path("/home/ubuntu/output")
@@ -19,6 +18,10 @@ def _identity(value: os.stat_result) -> tuple[int, ...]:
 
 class MissingArtifact(FileNotFoundError):
     """Absence proven beneath a stable, no-follow output ancestry."""
+
+
+class _FingerprintCancelled(Exception):
+    """Explicit cancellation is neither invalid content nor a missing file."""
 
 
 class _MissingOutputEntry(FileNotFoundError):
@@ -90,7 +93,7 @@ def _open_output(path: str, root: Path):
             raise FileNotFoundError("output_entry_changed") from None
 
 
-def _fingerprint(path: str, root: Path, cancelled: threading.Event, deadline: float) -> dict:
+def _fingerprint(path: str, root: Path, cancelled: threading.Event) -> dict:
     with _open_output(path, root) as stream:
         before = os.fstat(stream.fileno())
         if not stat.S_ISREG(before.st_mode):
@@ -101,8 +104,8 @@ def _fingerprint(path: str, root: Path, cancelled: threading.Event, deadline: fl
         # extra byte detects growth without reading an unbounded new tail.
         remaining = before.st_size + 1
         while remaining:
-            if cancelled.is_set() or time.monotonic() >= deadline:
-                raise ValueError("cancelled_or_deadline")
+            if cancelled.is_set():
+                raise _FingerprintCancelled()
             chunk = stream.read(min(HASH_CHUNK_BYTES, remaining))
             if not chunk:
                 break
@@ -120,17 +123,18 @@ def _fingerprint(path: str, root: Path, cancelled: threading.Event, deadline: fl
 
 
 def fingerprint_artifacts(paths: list[str], *, root: Path = ARTIFACT_ROOT,
-                          cancelled: threading.Event | None = None, deadline: float | None = None) -> dict:
+                          cancelled: threading.Event | None = None) -> dict:
     if len(paths) > MAX_FINGERPRINT_PATHS:
         raise ValueError("too_many_paths")
     files, errors = [], []
     cancelled = cancelled or threading.Event()
-    deadline = time.monotonic() + 30 if deadline is None else deadline
     for path in dict.fromkeys(paths):
         try:
-            if cancelled.is_set() or time.monotonic() >= deadline:
-                raise ValueError("cancelled_or_deadline")
-            files.append(_fingerprint(path, root, cancelled, deadline))
+            if cancelled.is_set():
+                raise _FingerprintCancelled()
+            files.append(_fingerprint(path, root, cancelled))
+        except _FingerprintCancelled:
+            errors.append({"path": path, "code": "fingerprint_cancelled"})
         except (OSError, ValueError):
             # Internal callers already know these container paths. Never copy
             # OS exception text or resolved targets into the response/logs.

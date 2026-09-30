@@ -113,7 +113,7 @@ def render_slides(a: dict[str, Any]) -> dict[str, Any]:
     import pymupdf as fitz
     source=Path(a["input_path"]); directory=output_path(a["output_dir"],directory=True); artifacts=[]; rendered=[]
     with tempfile.TemporaryDirectory() as temp:
-        completed=subprocess.run(["libreoffice","--headless","--convert-to","pdf","--outdir",temp,str(source)],capture_output=True,text=True,timeout=120)
+        completed=subprocess.run(["libreoffice","--headless","--convert-to","pdf","--outdir",temp,str(source)],capture_output=True,text=True)
         pdf=Path(temp)/(source.stem+".pdf")
         if completed.returncode or not pdf.exists(): raise ValueError("LibreOffice could not render the presentation")
         with fitz.open(pdf) as doc:

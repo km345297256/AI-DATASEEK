@@ -13,6 +13,33 @@ from app.services.shell import ShellService
 from conftest import BASE_URL
 
 
+@pytest.mark.asyncio
+async def test_server_lifespan_prepares_fixed_workspace_before_read_only_preflight(isolated_analysis_workspace):
+    from app.services.analysis_workspace import analysis_workspace_lifespan
+    from app.services.program import probe_program_prerequisites
+    output = isolated_analysis_workspace / "output"
+    assert not output.exists()
+    async with analysis_workspace_lifespan(None):
+        assert output.is_dir()
+        result = probe_program_prerequisites(str(output), str(output / "unsaved.py"))
+        assert result["cwd"]["state"] == "ready"
+        assert result["source"]["state"] == "missing"
+        assert list(output.iterdir()) == []
+
+
+@pytest.mark.asyncio
+async def test_lifespan_storage_error_keeps_api_available_without_following_links(
+    isolated_analysis_workspace, tmp_path, caplog,
+):
+    from app.services.analysis_workspace import analysis_workspace_lifespan
+    output = isolated_analysis_workspace / "output"
+    output.symlink_to(tmp_path.resolve(), target_is_directory=True)
+    async with analysis_workspace_lifespan(None):
+        assert list(tmp_path.iterdir()) == []
+        assert "program launch remains blocked" in caplog.text
+        assert str(tmp_path) not in caplog.text
+
+
 def test_creates_only_output_and_preserves_existing_results(tmp_path):
     root = tmp_path.resolve()
     prepare_analysis_workspace(workspace_root=root)

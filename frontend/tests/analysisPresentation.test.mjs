@@ -101,6 +101,9 @@ new Function('require', 'module', 'exports', compiled)((name) => {
   if (name === 'vue') return vue;
   if (name === 'lucide-vue-next') return { ChevronRight: icon, Image: icon };
   if (name === './ChatMessage.vue') return { default: chatMessage };
+  if (name === './AnalysisResultImage.vue') return { default: vue.defineComponent({
+    props: ['file'], render() { return vue.h('img', { src: `http://localhost:7001${this.file.file_url}`, alt: this.file.filename }); },
+  }) };
   if (name === '../api/client') return { API_CONFIG: { host: 'http://localhost:7001' } };
   if (name === '../api/file') return { prepareShapefilePreview: () => { throw Error('No preview read during rendering'); } };
   if (name === '../types/message') return { isConsecutiveAssistant };

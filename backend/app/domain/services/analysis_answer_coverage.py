@@ -6,7 +6,6 @@ the reviewer. Coverage cannot authorize tools, file repair or analytical replay.
 """
 from __future__ import annotations
 
-import asyncio
 from collections import Counter
 from dataclasses import dataclass
 import hashlib
@@ -130,9 +129,9 @@ def _substantive(quote: str, objective: AnswerObjective, request: str) -> bool:
 
 async def review_coverage(*, ask: Callable[[list], Awaitable[Any]], parse_response: Callable[[Any], dict],
                           request: str, objectives: tuple[AnswerObjective, ...], paragraphs: list[dict],
-                          timeout_seconds: float, request_truncated: bool = False,
+                          request_truncated: bool = False,
                           request_sha256: str | None = None) -> CoverageDecision:
-    """One bounded, tool-disabled semantic check plus host span validation."""
+    """One cancellable, tool-disabled semantic check plus host span validation."""
     request_hash = request_sha256 or hashlib.sha256(request.encode()).hexdigest()
     answer_hash = hashlib.sha256(json.dumps(paragraphs, ensure_ascii=False, sort_keys=True).encode()).hexdigest()
     base = {"objective_count": len(objectives), "request_sha256": request_hash,
@@ -148,8 +147,8 @@ async def review_coverage(*, ask: Callable[[list], Awaitable[Any]], parse_respon
     payload = {"request": request, "objectives": [o.payload() for o in objectives],
                "paragraphs": [{"paragraph_index": index, "text": text} for index, text in eligible.items()]}
     try:
-        response = await asyncio.wait_for(ask([SystemMessage(content=_SYSTEM),
-            HumanMessage(content=json.dumps(payload, ensure_ascii=False))]), timeout=timeout_seconds)
+        response = await ask([SystemMessage(content=_SYSTEM),
+            HumanMessage(content=json.dumps(payload, ensure_ascii=False))])
         result = parse_response(response)
         if set(result) != {"checks"} or not isinstance(result["checks"], list) or len(result["checks"]) != len(objectives):
             raise ValueError("coverage_schema_invalid")

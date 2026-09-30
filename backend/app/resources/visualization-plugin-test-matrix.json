@@ -1,5 +1,24 @@
 [
   {
+    "plugin_id": "viz-svg",
+    "dataset_id": "viz-test-svg",
+    "entry_file": "static-chart.svg",
+    "sample_kind": "project_fixture",
+    "test_steps": [
+      "打开 static-chart.svg，选择 SVG 矢量图（viz-svg）预览。",
+      "核对折线、四个圆点与 A–D 标签；预览通过安全 PNG 显示，长边不超过 2048 像素。",
+      "下载保留原始 SVG；关闭 viz-svg 后不回退到通用图片字节预览。"
+    ],
+    "plugin_name": "SVG 矢量图",
+    "view_kind": "image",
+    "dataset_name": "插件测试 · SVG 静态矢量图",
+    "expected": "四个合成数据点及文字正确渲染为 PNG，原始 SVG 保持可下载；不执行脚本、不加载外部资源。",
+    "expected_file_sha256": "6b4001a37f49b18690956dc2578c0fe71e0ddb884b2547117fb982c428f8df77",
+    "expected_file_bytes": 1142,
+    "source_url": "https://github.com/km345297256/AI-DATASEEK",
+    "license": "MIT"
+  },
+  {
     "plugin_id": "csv",
     "dataset_id": "viz-palmer-penguins",
     "entry_file": "penguins.csv",
