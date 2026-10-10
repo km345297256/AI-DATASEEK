@@ -1,6 +1,8 @@
 from typing import Any, Dict
 
 from app.infrastructure.models.documents import ModelConfigurationDocument
+from app.application.errors.exceptions import BadRequestError
+from app.domain.models.model_configuration import ModelType
 
 
 def legacy_model_settings(source: Any) -> Dict[str, Any]:
@@ -28,8 +30,11 @@ async def resolve_model_settings(model_config_id: str | None, fallback: Any) -> 
         doc = await ModelConfigurationDocument.find_one(
             ModelConfigurationDocument.model_config_id == model_config_id
         )
-        if doc and doc.enabled:
-            return doc.to_domain().runtime_settings()
+        if not doc or not doc.enabled:
+            raise BadRequestError("Selected model configuration is unavailable")
+        if doc.model_type not in {ModelType.CHAT, ModelType.VISION}:
+            raise BadRequestError("Selected model configuration must support chat or vision")
+        return doc.to_domain().runtime_settings()
     return legacy_model_settings(fallback)
 
 

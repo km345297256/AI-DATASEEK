@@ -66,6 +66,7 @@ class VisionAgent(BaseAgent):
         file_storage: Optional[FileStorage] = None,
         user_id: Optional[str] = None,
         dynamic_user_context_provider: Optional[Callable[[], str]] = None,
+        runtime_facts_provider: Optional[Callable[[], str]] = None,
     ):
         self._file_storage = file_storage
         self._user_id = user_id
@@ -78,12 +79,14 @@ class VisionAgent(BaseAgent):
             llm_overrides=self._build_vision_overrides(llm_overrides),
             usage_context=usage_context,
             dynamic_user_context_provider=dynamic_user_context_provider,
+            runtime_facts_provider=runtime_facts_provider,
         )
 
     @staticmethod
     def _build_vision_overrides(base_overrides: Optional[dict] = None) -> dict:
+        from app.domain.services.model_route import merge_model_route_overrides
         settings = get_settings()
-        overrides = dict(base_overrides or {})
+        overrides = {}
         if settings.vision_model_name:
             overrides["model_name"] = settings.vision_model_name
         if settings.vision_model_provider:
@@ -92,13 +95,13 @@ class VisionAgent(BaseAgent):
             overrides["model_provider"] = "openai"
         if settings.vision_model_base:
             overrides["api_base"] = VisionAgent._normalize_openai_base_url(settings.vision_model_base)
-        if settings.vision_model_api_key:
+        if settings.vision_model_api_key is not None:
             overrides["api_key"] = settings.vision_model_api_key
         if settings.vision_temperature is not None:
             overrides["temperature"] = settings.vision_temperature
         if settings.vision_max_tokens is not None:
             overrides["max_tokens"] = settings.vision_max_tokens
-        return overrides
+        return merge_model_route_overrides(settings, base_overrides or {}, overrides)
 
     @staticmethod
     def _normalize_openai_base_url(base_url: str) -> str:

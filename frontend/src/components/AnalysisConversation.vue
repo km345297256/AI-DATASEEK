@@ -56,7 +56,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue';
+import { computed, nextTick, ref, watch } from 'vue';
 import { ChevronRight, Image as ImageIcon } from 'lucide-vue-next';
 import ChatMessage from './ChatMessage.vue';
 import AnalysisResultImage from './AnalysisResultImage.vue';
@@ -75,6 +75,7 @@ const props = withDefaults(defineProps<{
   canResumeAnalysis: (index: number) => boolean;
   messageKey: (message: Message) => number;
   allowProducts?: boolean;
+  beforeSummaryToggle?: (key: number) => (() => void) | undefined;
 }>(), { allowProducts: false });
 defineEmits<{
   (event: 'resumeAnalysis', index: number): void;
@@ -91,9 +92,11 @@ const displayEntries = computed(() => presentation.update(props.messages));
 watch(() => props.sessionId, () => { expanded.value = new Set(); });
 function toggleSummary(message: Message) {
   const key = props.messageKey(message);
+  const settle = props.beforeSummaryToggle?.(key);
   const next = new Set(expanded.value);
   if (next.has(key)) next.delete(key); else next.add(key);
   expanded.value = next;
+  void nextTick(() => settle?.());
 }
 function showMessage(message: Message, _index: number) {
   if (message.type !== 'step') return true;

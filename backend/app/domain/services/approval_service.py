@@ -1,8 +1,9 @@
 from datetime import datetime, UTC
 from typing import Any, Dict, List, Optional, Tuple
 
-from app.application.errors.exceptions import NotFoundError
+from app.application.errors.exceptions import AppException, NotFoundError
 from app.domain.models.approval import ApprovalRequest, ApprovalStatus
+from app.domain.models.mcp_config import MCPConfigurationConflict
 from app.infrastructure.models.documents import ApprovalRequestDocument
 from app.infrastructure.repositories.mongo_mcp_repository import MongoMCPRepository
 
@@ -62,14 +63,18 @@ class ApprovalService:
         doc = await ApprovalRequestDocument.find_one(ApprovalRequestDocument.approval_id == approval_id)
         if not doc:
             raise NotFoundError("Approval request not found")
-        doc.status = status
-        doc.reviewer_user_id = reviewer_user_id
-        doc.reviewed_at = datetime.now(UTC)
-        doc.decision_note = decision_note
-        doc.updated_at = datetime.now(UTC)
-        await doc.save()
-        approval = doc.to_domain()
+        approval = doc.to_domain().model_copy(deep=True)
+        approval.status = status
+        approval.reviewer_user_id = reviewer_user_id
+        approval.reviewed_at = datetime.now(UTC)
+        approval.decision_note = decision_note
+        approval.updated_at = datetime.now(UTC)
+        # A rejected configuration CAS must not persist a successful decision.
+        # This remains two stores, not a transaction or an execution retry.
         await self._apply_decision_effects(approval)
+        for field in ("status", "reviewer_user_id", "reviewed_at", "decision_note", "updated_at"):
+            setattr(doc, field, getattr(approval, field))
+        await doc.save()
         return approval
 
     async def _apply_decision_effects(self, approval: ApprovalRequest) -> None:
@@ -81,6 +86,8 @@ class ApprovalService:
         server = config.mcpServers.get(approval.resource_id)
         if not server:
             return
+        expected = server.model_copy(deep=True)
+        server = server.model_copy(deep=True)
 
         if approval.status == ApprovalStatus.APPROVED:
             server.enabled = True
@@ -89,8 +96,10 @@ class ApprovalService:
         else:
             return
 
-        config.mcpServers[approval.resource_id] = server
-        await repository.save_mcp_config(config)
+        try:
+            await repository.upsert_server(approval.resource_id, server, expected=expected)
+        except MCPConfigurationConflict:
+            raise AppException(code=409, msg="MCP configuration changed; reload before deciding", status_code=409) from None
 
 
 def get_approval_service() -> ApprovalService:

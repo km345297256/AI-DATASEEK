@@ -238,7 +238,7 @@ def test_factory_only_sends_provider_appropriate_constructor_parameters(monkeypa
         return FakeClient(cache=False)
 
     monkeypatch.setattr("app.infrastructure.external.llm.chat_model.init_chat_model", create)
-    model = create_chat_model(Settings(api_key="test-secret", api_base="https://private.example/v1"), {
+    model = create_chat_model(Settings(model_provider=provider, api_key="test-secret", api_base="https://private.example/v1"), {
         "model_provider": provider, "model_name": "test-model", "temperature": 0.2,
         "max_tokens": 300, "client_max_retries": 8,
     })
@@ -264,7 +264,7 @@ def test_deepseek_keeps_thinking_disabled_without_hidden_sdk_retries(monkeypatch
         return FakeClient(cache=False)
 
     monkeypatch.setattr("langchain_deepseek.ChatDeepSeek", create)
-    model = create_chat_model(Settings(api_key="test-secret"), {"model_provider": " DeepSeek "})
+    model = create_chat_model(Settings(model_provider="deepseek", api_key="test-secret"), {"model_provider": " DeepSeek "})
     assert captured["extra_body"] == {"thinking": {"type": "disabled"}}
     assert captured["max_retries"] == 0
     assert model.identity.provider == "deepseek"
@@ -383,7 +383,8 @@ async def test_real_cordis_catalog_reaches_production_execution_agent_and_runtim
         flow.dataset_context = render_dataset_context([mounted])
         all_tools = governed.bind_tools(flow.executor.get_tools()).kwargs["tools"]
         full_messages = [SystemMessage(content=flow.executor.system_prompt),
-                         SystemMessage(content=flow._dynamic_system_prompt()), HumanMessage(content=prompt)]
+                         SystemMessage(content=flow._dynamic_system_prompt()),
+                         SystemMessage(content=flow._runtime_context_prompt()), HumanMessage(content=prompt)]
         full_total, full_tools = estimate_context_tokens(
             full_messages, tool_schemas=all_tools, response_format={"type": "json_object"},
         )

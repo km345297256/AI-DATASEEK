@@ -1,11 +1,11 @@
 import asyncio
 import uuid
 import logging
-from contextlib import suppress
 from typing import Optional, Dict
 
 from app.domain.external.task import Task, TaskRunner
 from app.domain.external.task import TaskInputClosedError
+from app.domain.utils.shutdown import join_cleanup, raise_cleanup_errors
 from app.infrastructure.external.message_queue.redis_stream_queue import RedisStreamQueue, MessageQueue
 
 logger = logging.getLogger(__name__)
@@ -15,6 +15,8 @@ class RedisStreamTask(Task):
     """Redis Stream-based task implementation following the Task protocol."""
     
     _task_registry: Dict[str, 'RedisStreamTask'] = {}
+    _destroy_task: Optional[asyncio.Task] = None
+    _shutting_down = False
     
     def __init__(self, runner: TaskRunner):
         """Initialize Redis Stream task with a task runner.
@@ -22,11 +24,15 @@ class RedisStreamTask(Task):
         Args:
             runner: The TaskRunner instance that will execute this task
         """
+        if type(self)._shutting_down:
+            raise TaskInputClosedError("Task registry is shutting down")
         self._runner = runner
         self._id = str(uuid.uuid4())
         self._execution_task: Optional[asyncio.Task] = None
         self._input_lifecycle_lock = asyncio.Lock()
         self._closing = False
+        self._cancel_requested = False
+        self._finalizing = False
         self._closed = asyncio.Event()
         
         # Create input/output streams based on task ID
@@ -115,7 +121,10 @@ class RedisStreamTask(Task):
             self._closed.set()
             return False
         if not self.done:
-            self._execution_task.cancel()
+            if (not getattr(self, "_cancel_requested", False)
+                    and not getattr(self, "_finalizing", False)):
+                self._cancel_requested = True
+                self._execution_task.cancel()
             logger.info(f"Task {self._id} cancelled")
             return True
         
@@ -134,6 +143,10 @@ class RedisStreamTask(Task):
     
     async def _on_task_done(self) -> None:
         """Called when the task is done."""
+        # A natural return can enter cleanup before any cancel was requested.
+        # Keep task-affine MCP/AnyIO exits in this execution task and do not
+        # interrupt them with the first late user/shutdown cancellation.
+        self._finalizing = True
         self._closing = True
         try:
             if self._runner:
@@ -182,17 +195,42 @@ class RedisStreamTask(Task):
 
     @classmethod
     async def destroy(cls) -> None:
-        """Destroy all task instances."""
+        """Join one shared teardown; a failed owner cannot skip its siblings."""
+        if cls._destroy_task is None or cls._destroy_task.done():
+            cls._shutting_down = True
+            cls._destroy_task = asyncio.create_task(cls._destroy_registered())
+        await join_cleanup(cls._destroy_task)
+
+    @classmethod
+    async def _destroy_registered(cls) -> None:
         tasks = list(cls._task_registry.values())
-        for task in tasks:
-            task.cancel()
-        for task in tasks:
-            if task._execution_task is not None:
-                with suppress(asyncio.CancelledError):
-                    await task._execution_task
-            if task._runner:
-                await task._runner.destroy()
-        cls._task_registry.clear()
+        errors: list[BaseException] = []
+        try:
+            for task in tasks:
+                try:
+                    task.cancel()
+                except BaseException as error:
+                    errors.append(error)
+            for task in tasks:
+                try:
+                    if task._execution_task is not None:
+                        try:
+                            await task._execution_task
+                        except asyncio.CancelledError:
+                            pass  # Expected result of the cancellation above.
+                        except BaseException as error:
+                            errors.append(error)
+                    if task._runner:
+                        try:
+                            await task._runner.destroy()
+                        except BaseException as error:
+                            errors.append(error)
+                finally:
+                    task._cleanup_registry()
+                    task._closed.set()
+        finally:
+            cls._shutting_down = False
+        raise_cleanup_errors(errors)
     
     def __repr__(self) -> str:
         """String representation of the task."""

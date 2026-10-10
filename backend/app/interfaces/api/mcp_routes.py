@@ -6,9 +6,12 @@ from app.domain.models.mcp_config import (
     MCPRiskLevel,
     MCPScope,
     MCPServerConfig,
+    MCPConfigurationConflict,
     can_access_mcp,
+    can_manage_mcp,
     is_mcp_owned_by,
     mcp_catalog_source,
+    mcp_owner_id,
 )
 from app.domain.models.user import User
 from app.domain.services.approval_service import ApprovalService, get_approval_service
@@ -50,9 +53,12 @@ def _server_response(name: str, config: MCPServerConfig, user: User | None = Non
         transport=config.transport,
         enabled=config.enabled,
         description=config.description,
-        command=config.command,
-        args=config.args,
-        url=config.url,
+        # URLs (userinfo, query, path), arguments and commands can all contain
+        # credentials. Project private connection fields as a unit; regex
+        # redaction of a few known token names cannot make them public-safe.
+        command=config.command if can_view_secrets else None,
+        args=config.args if can_view_secrets else None,
+        url=config.url if can_view_secrets else None,
         headers=config.headers if can_view_secrets else None,
         env=config.env if can_view_secrets else None,
         scope=getattr(config, "scope", MCPScope.GLOBAL),
@@ -74,6 +80,10 @@ async def _stored_user(current_user: User, user_repository: UserRepository) -> U
 
 def _is_accessible(config: MCPServerConfig, user: User) -> bool:
     return can_access_mcp(config, user.id, is_admin=user.role == "admin")
+
+
+def _can_manage(config: MCPServerConfig, user: User) -> bool:
+    return can_manage_mcp(config, user.id, is_admin=user.role == "admin")
 
 
 @router.get("/servers", response_model=APIResponse[MCPServerListResponse])
@@ -152,13 +162,21 @@ async def upsert_mcp_server(
     if request.is_global and current_user.role != "admin":
         raise HTTPException(status_code=403, detail="Only admins can create global MCP servers")
 
-    existing = (await _repository().get_mcp_config()).mcpServers.get(name)
-    if existing and not _is_accessible(existing, current_user):
+    repository = _repository()
+    existing = (await repository.get_mcp_config()).mcpServers.get(name)
+    if existing and not _can_manage(existing, current_user):
         raise HTTPException(status_code=403, detail="Not authorized to modify this MCP server")
 
+    # Editing the connection must not silently change its owner, scope or risk.
+    scope = (MCPScope.GLOBAL if request.is_global else MCPScope.USER)
+    if existing and "is_global" not in request.model_fields_set:
+        scope = existing.scope
+    risk_level = request.risk_level
+    if existing and "risk_level" not in request.model_fields_set:
+        risk_level = existing.risk_level
     requires_approval = (
         current_user.role != "admin"
-        and request.risk_level in {MCPRiskLevel.SENSITIVE, MCPRiskLevel.RESTRICTED}
+        and risk_level in {MCPRiskLevel.SENSITIVE, MCPRiskLevel.RESTRICTED}
     )
     server_config = MCPServerConfig(
         transport=request.transport,
@@ -169,23 +187,26 @@ async def upsert_mcp_server(
         url=request.url,
         headers=request.headers,
         env=request.env,
-        scope=MCPScope.GLOBAL if request.is_global else MCPScope.USER,
-        owner_user_id=current_user.id,
-        user_id=None if request.is_global else current_user.id,
-        workspace_id=None,
-        risk_level=request.risk_level,
+        scope=scope,
+        owner_user_id=mcp_owner_id(existing) if existing else current_user.id,
+        user_id=None if scope == MCPScope.GLOBAL else (existing.user_id if existing else current_user.id),
+        workspace_id=existing.workspace_id if existing else None,
+        risk_level=risk_level,
     )
-    config = await _repository().upsert_server(name, server_config)
+    try:
+        config = await repository.upsert_server(name, server_config, expected=existing)
+    except MCPConfigurationConflict:
+        raise HTTPException(status_code=409, detail="MCP configuration changed; reload before saving") from None
     if requires_approval:
         await approval_service.create_request(
             requester_user_id=current_user.id,
             resource_type="mcp_server",
             resource_id=name,
             requested_permissions=["mcp.use"],
-            reason=f"Request access to {request.risk_level} MCP server {name}",
+            reason=f"Request access to {risk_level} MCP server {name}",
             metadata={
                 "server_name": name,
-                "risk_level": request.risk_level,
+                "risk_level": risk_level,
                 "transport": request.transport,
                 "auto_disabled_until_approved": True,
             },
@@ -195,12 +216,12 @@ async def upsert_mcp_server(
         action="mcp.upsert",
         resource_type="mcp_server",
         resource_id=name,
-        risk_level=AuditRiskLevel.HIGH if request.risk_level in {MCPRiskLevel.SENSITIVE, MCPRiskLevel.RESTRICTED} else AuditRiskLevel.MEDIUM,
+        risk_level=AuditRiskLevel.HIGH if risk_level in {MCPRiskLevel.SENSITIVE, MCPRiskLevel.RESTRICTED} else AuditRiskLevel.MEDIUM,
         metadata={
             "transport": request.transport,
             "scope": server_config.scope,
-            "risk_level": request.risk_level,
-            "is_global": request.is_global,
+            "risk_level": risk_level,
+            "is_global": scope == MCPScope.GLOBAL,
             "requires_approval": requires_approval,
         },
     )
@@ -215,11 +236,15 @@ async def delete_mcp_server(
     current_user: User = Depends(get_current_user),
     audit_service: AuditService = Depends(get_audit_service),
 ) -> APIResponse[MCPServerListResponse]:
-    existing_config = await _repository().get_mcp_config()
+    repository = _repository()
+    existing_config = await repository.get_mcp_config()
     existing = existing_config.mcpServers.get(name)
-    if existing and not _is_accessible(existing, current_user):
+    if existing and not _can_manage(existing, current_user):
         raise HTTPException(status_code=403, detail="Not authorized to delete this MCP server")
-    config = await _repository().delete_server(name)
+    try:
+        config = await repository.delete_server(name, expected=existing)
+    except MCPConfigurationConflict:
+        raise HTTPException(status_code=409, detail="MCP configuration changed; reload before deleting") from None
     await audit_service.record(
         actor_user_id=current_user.id,
         action="mcp.delete",

@@ -47,25 +47,35 @@ import {createI18n} from 'vue-i18n';
 import ChatBox from ${JSON.stringify(resolve(frontend, 'src/components/ChatBox.vue'))};
 import AnalysisConversation from ${JSON.stringify(resolve(frontend, 'src/components/AnalysisConversation.vue'))};
 import {ConversationViewport} from ${JSON.stringify(resolve(frontend, 'src/utils/conversationViewport.ts'))};
+import {useAnalysisSession} from ${JSON.stringify(resolve(frontend, 'src/composables/useAnalysisSession.ts'))};
+import * as agentApi from ${JSON.stringify(resolve(frontend, 'src/api/agent.ts'))};
 import en from ${JSON.stringify(resolve(frontend, 'src/locales/en.ts'))};
 const messages=${JSON.stringify(messages)};
 const state=reactive({modelValue:'',rows:1,isRunning:false,attachments:[],selectedSkills:[],selectedMcpServers:[],
   disabled:false,showFileActions:true,showMcpActions:true,submitOnEnter:true,compactComposer:true,placeholder:'输入分析问题…'});
 const events={submissions:[],stops:0,resumes:[],tools:[],resumeChecks:[]};
+const session=useAnalysisSession({api:agentApi,getViewport:()=>document.querySelector('#conversation')});
+session.messages.value=messages;
+session.sessionId.value='synthetic-chat-session';
 const app=createApp({render:()=>h('main',[
   h('section',{id:'composer'},[h(ChatBox,{...state,
     'onUpdate:modelValue':value=>state.modelValue=value,
     'onUpdate:selectedSkills':value=>state.selectedSkills=value,
     'onUpdate:selectedMcpServers':value=>state.selectedMcpServers=value,
     onSubmit:()=>events.submissions.push(state.modelValue),onStop:()=>events.stops++})]),
-  h('section',{id:'conversation'},[h(AnalysisConversation,{messages,sessionId:'synthetic-chat-session',isLoading:false,
+  h('section',{id:'conversation',onScroll:()=>{const view=document.querySelector('#conversation');
+    if(session.isViewportReaderScroll())session.follow.value=view.scrollHeight-view.scrollTop-view.clientHeight<=1;
+  }},[h(AnalysisConversation,{messages:session.messages.value,sessionId:session.sessionId.value,isLoading:false,
     messageKey:message=>message.content.timestamp,
+    beforeSummaryToggle:session.beforeSummaryToggle,
     canResumeAnalysis:index=>{events.resumeChecks.push(index);return index===4;},
     onResumeAnalysis:index=>events.resumes.push(index),onToolClick:tool=>events.tools.push(tool)})]),
 ])});
 app.use(createI18n({legacy:false,locale:'en',messages:{en},missingWarn:false,fallbackWarn:false}));
 app.mount('#app');
-window.harness={state,events,messages,set:async patch=>{Object.assign(state,patch);await nextTick();},unmount:()=>app.unmount()};
+window.harness={state,events,messages,session,set:async patch=>{Object.assign(state,patch);await nextTick();},
+  switchSession:async()=>{session.reset();session.messages.value=structuredClone(messages);session.sessionId.value='synthetic-next-session';await nextTick();session.followTail();},
+  unmount:()=>{session.dispose();app.unmount();}};
 window.ConversationViewport=ConversationViewport;
 window.harnessReady=true;`;
 const bundle = await build({
@@ -269,6 +279,98 @@ try {
   assert.deepEqual(await visibleTypes(), ['attachments', 'user', 'task-summary', 'assistant']);
   assert.deepEqual(await page.evaluate(() => window.harness.messages), messages, 'Presentation and clicks must not mutate source history');
   report.checks.push({ conversation: { collapsedOrder: await visibleTypes(), expandedOrder: ['attachments', 'user', 'task-summary', 'step', 'assistant'], resumeSourceIndex: 4, sourceHistoryUnchanged: true } });
+  // Real summary event -> production composable -> production viewport. Only
+  // message card internals are stubbed above; neither toggle nor geometry is.
+  await page.addStyleTag({ content: '#conversation{height:400px;overflow:auto;overflow-anchor:auto} #conversation article[data-type="user"]{padding-top:1000px} #conversation article[data-type="step"]{min-height:700px} #conversation article[data-type="assistant"]{min-height:100px} #conversation article[data-type="task-summary"]{min-height:40px}' });
+  const settleFrames = () => page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(() => requestAnimationFrame(resolve)))));
+  const foldGeometry = () => page.evaluate(() => {
+    const viewport = document.querySelector('#conversation');
+    const summary = viewport.querySelector('[data-testid="summary-toggle"]');
+    return { top: summary.getBoundingClientRect().top - viewport.getBoundingClientRect().top,
+      scrollTop: viewport.scrollTop, floor: viewport.scrollHeight - viewport.clientHeight,
+      reserved: Number.parseFloat(viewport.querySelector('.analysis-conversation').style.paddingBottom) || 0,
+      following: window.harness.session.follow.value };
+  });
+  await page.evaluate(() => window.harness.session.followTail());
+  await settleFrames();
+  const beforeExpand = await foldGeometry();
+  await summary.click(); await settleFrames();
+  const afterExpand = await foldGeometry();
+  assert.ok(Math.abs(afterExpand.top - beforeExpand.top) <= 1, 'Expanding long steps must retain the clicked heading, not follow the new tail');
+  assert.equal(afterExpand.following, false);
+  assert.equal(afterExpand.reserved, 0, 'Expansion must not retain unnecessary room');
+  await page.evaluate(async () => {
+    const image = document.createElement('img'); image.style.cssText = 'display:block;width:200px;height:auto';
+    const loaded = new Promise((resolve, reject) => { image.onload = resolve; image.onerror = reject; });
+    document.querySelector('#conversation article[data-type="user"]').append(image);
+    image.src = 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="200" height="120"><rect width="200" height="120" fill="#dff3e8"/></svg>');
+    await loaded;
+  });
+  await settleFrames();
+  const afterFoldImage = await foldGeometry();
+  assert.ok(Math.abs(afterFoldImage.top - beforeExpand.top) <= 1, 'A late image above the expanded heading must retain its anchor');
+  await page.evaluate(() => {
+    const viewport = document.querySelector('#conversation'), summary = viewport.querySelector('[data-testid="summary-toggle"]');
+    viewport.scrollTop += summary.getBoundingClientRect().top - viewport.getBoundingClientRect().top - 100;
+  });
+  await settleFrames();
+  const beforeCollapse = await foldGeometry();
+  await summary.click(); await settleFrames();
+  const afterCollapse = await foldGeometry();
+  assert.ok(Math.abs(afterCollapse.top - beforeCollapse.top) <= 1, 'Collapse must reserve enough room to avoid a native scroll clamp');
+  assert.ok(afterCollapse.reserved > 0 && afterCollapse.reserved < 400, 'Only the missing bottom room may remain');
+  assert.equal(afterCollapse.following, false, 'Programmatic fold compensation at the floor must not reacquire follow');
+  await summary.click(); await settleFrames();
+  const reopened = await foldGeometry();
+  assert.ok(Math.abs(reopened.top - beforeCollapse.top) <= 1, 'Repeated pointer toggles must not release room before the click');
+  assert.equal(reopened.reserved, 0);
+  await summary.click(); await settleFrames();
+  await page.locator('#conversation').hover(); await page.mouse.wheel(0, -250); await settleFrames(); await settleFrames();
+  const afterReader = await foldGeometry();
+  assert.equal(afterReader.reserved, 0, 'Actual upward reader movement must reclaim the now-unneeded space');
+  const readerTop = afterReader.scrollTop;
+  await page.evaluate(() => document.querySelector('#conversation article[data-type="user"]').style.paddingTop = '1080px');
+  await settleFrames();
+  // Native browser anchoring is permitted after release; the old clicked heading
+  // must no longer be owned by our controller (its inline override is restored).
+  assert.equal(await page.locator('#conversation').evaluate(element => element.style.overflowAnchor), '');
+  await page.evaluate(() => window.harness.session.handleEvent({ event: 'message', data: { role: 'user', content: 'Synthetic new input', timestamp: 600 } }));
+  await settleFrames();
+  const afterInput = await foldGeometry();
+  assert.equal(afterInput.following, true, 'A real new-turn event must restore follow ownership');
+  assert.ok(Math.abs(afterInput.scrollTop - afterInput.floor) <= 1);
+  assert.equal(afterInput.reserved, 0);
+  await page.evaluate(() => window.harness.switchSession()); await settleFrames();
+  const afterSession = await foldGeometry();
+  assert.equal(afterSession.reserved, 0);
+  assert.equal(await summary.getAttribute('aria-expanded'), 'false');
+  assert.equal(afterSession.following, true);
+  report.checks.push({ foldOwnership: { beforeExpand, afterExpand, afterFoldImage, beforeCollapse, afterCollapse, reopened, afterReader, readerTop, afterInput, afterSession } });
+
+  await page.evaluate(() => {
+    const { session } = window.harness;
+    session.reset(); session.messages.value = window.harness.messages.filter(message => message.content.timestamp < 600);
+    session.sessionId.value = 'synthetic-short-session';
+  });
+  await settleFrames();
+  await page.evaluate(() => {
+    const user = document.querySelector('#conversation article[data-type="user"]');
+    user.style.paddingTop = '100px'; user.querySelector('img')?.remove();
+  });
+  await summary.click(); await settleFrames();
+  await page.evaluate(() => document.querySelector('#conversation').scrollTop = 120);
+  await settleFrames();
+  const beforeShortCollapse = await foldGeometry();
+  await summary.click(); await settleFrames();
+  const afterShortCollapse = await foldGeometry();
+  assert.ok(afterShortCollapse.floor - afterShortCollapse.reserved < 0, 'The short fixture must have less natural content than its viewport');
+  assert.ok(Math.abs(afterShortCollapse.top - beforeShortCollapse.top) <= 1, 'A short conversation must retain the clicked heading without native clamp');
+  assert.equal(afterShortCollapse.following, false);
+  await page.evaluate(() => window.harness.session.followTail()); await settleFrames();
+  assert.equal((await foldGeometry()).reserved, 0);
+  assert.equal((await foldGeometry()).scrollTop, 0);
+  report.checks.push({ shortFold: { beforeShortCollapse, afterShortCollapse } });
+
   const nativeAnchor = await page.evaluate(async () => {
     const frames = () => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
     const viewport = document.createElement('section');

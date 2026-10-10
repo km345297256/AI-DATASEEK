@@ -13,6 +13,7 @@ from app.domain.external.sandbox import Sandbox
 from app.domain.external.search import SearchEngine
 from app.domain.models.event import BaseEvent, ErrorEvent, DoneEvent, MessageEvent, WaitEvent, AgentEvent
 from app.domain.utils.public_error import public_error_message
+from app.domain.utils.shutdown import cancel_and_join, cleanup_steps, join_cleanup
 from pydantic import TypeAdapter
 from app.domain.repositories.agent_repository import AgentRepository
 from app.domain.repositories.session_repository import SessionRepository
@@ -110,23 +111,28 @@ class AgentDomainService:
             
     async def shutdown(self) -> None:
         """Clean up all Agent's resources"""
-        logger.info("Starting to close all Agents")
-        input_monitor = getattr(self, "_input_monitor", None)
-        if input_monitor is not None:
-            input_monitor.cancel()
-            await asyncio.gather(input_monitor, return_exceptions=True)
-            self._input_monitor = None
-        bootstrap_tasks = list(self._chat_bootstrap_tasks)
-        for task in bootstrap_tasks:
-            task.cancel()
-        await asyncio.gather(*bootstrap_tasks, return_exceptions=True)
+        if getattr(self, "_shutdown_task", None) is None:
+            self._shutdown_task = asyncio.create_task(self._shutdown_resources())
+        await join_cleanup(self._shutdown_task)
 
-        # No bootstrap can create a new Task after this registry teardown.
-        await self._task_cls.destroy()
-        prewarm_tasks = list(self._jupyter_prewarm_tasks)
-        for task in prewarm_tasks:
-            task.cancel()
-        await asyncio.gather(*prewarm_tasks, return_exceptions=True)
+    async def _shutdown_resources(self) -> None:
+        logger.info("Starting to close all Agents")
+
+        async def stop_monitor():
+            monitor = getattr(self, "_input_monitor", None)
+            try:
+                await cancel_and_join([monitor] if monitor is not None else [])
+            finally:
+                self._input_monitor = None
+
+        # Bootstrap must settle before the task snapshot, even if its cleanup
+        # failed. Prewarm cleanup must run even if a runner fails to close.
+        await cleanup_steps(
+            stop_monitor,
+            lambda: cancel_and_join(self._chat_bootstrap_tasks),
+            self._task_cls.destroy,
+            lambda: cancel_and_join(self._jupyter_prewarm_tasks),
+        )
         logger.info("All agents closed successfully")
 
     def _prewarm_jupyter(self, session: Session, *, dataset_ids: list[str]) -> None:

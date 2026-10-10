@@ -229,6 +229,7 @@
       <div
         ref="timelineRef"
         class="timeline-scrollbar-hidden relative min-h-0 min-w-0 max-w-full flex-1 overscroll-contain overflow-x-hidden overflow-y-auto"
+        @scroll="handleTimelineScroll"
         @wheel.passive="handleTimelineWheel"
         @pointerdown="handleTimelinePointerDown"
         @pointerup="handleTimelinePointerUp"
@@ -365,6 +366,7 @@
               :is-loading="isLoading"
               :completion-advice="completionAdvice"
               :can-resume-analysis="canResumeAnalysis"
+              :before-summary-toggle="analysisSession.beforeSummaryToggle"
               allow-products
               @resumeAnalysis="resumeAnalysis"
               @toolClick="handleToolClick"
@@ -732,6 +734,10 @@ function updateTimelineFollowState() {
   if (!timeline) return;
   const distanceToBottom = timeline.scrollHeight - timeline.scrollTop - timeline.clientHeight;
   shouldFollowTimeline.value = distanceToBottom <= TIMELINE_BOTTOM_THRESHOLD;
+}
+
+function handleTimelineScroll() {
+  if (analysisSession.isViewportReaderScroll()) updateTimelineFollowState();
 }
 
 function handleTimelineWheel(event: WheelEvent) {

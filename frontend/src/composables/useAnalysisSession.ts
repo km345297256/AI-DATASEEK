@@ -101,6 +101,16 @@ export function useAnalysisSession(options: AnalysisSessionOptions) {
     viewportState.layout();
   }
   const isViewportReaderScroll = () => viewportState.readerMoved(options.getViewport?.());
+  function beforeSummaryToggle(key: number) {
+    const settle = viewportState.beginFold(options.getViewport?.(), key);
+    if (settle) follow.value = false;
+    return settle;
+  }
+  function followTail() {
+    follow.value = true;
+    viewportState.bind(options.getViewport?.());
+    viewportState.followTail();
+  }
 
   function scheduleViewport() {
     if (viewportScheduled) return;
@@ -149,7 +159,7 @@ export function useAnalysisSession(options: AnalysisSessionOptions) {
     lastTool.value = undefined;
     lastNoMessageTool.value = undefined;
     completionAdvice.value = undefined;
-    follow.value = true;
+    followTail();
     options.onNewTurn?.();
   }
 
@@ -634,7 +644,7 @@ export function useAnalysisSession(options: AnalysisSessionOptions) {
     clearAnalysisProgress();
   }
 
-  return { sessionId, sessionCreatedAt, messages, isLoading, connectionNotice, canRetryInput, retryPendingInput, syncViewport, isViewportReaderScroll, loadingStatus, hasMoreHistory,
+  return { sessionId, sessionCreatedAt, messages, isLoading, connectionNotice, canRetryInput, retryPendingInput, syncViewport, isViewportReaderScroll, beforeSummaryToggle, followTail, loadingStatus, hasMoreHistory,
     isLoadingHistory, isRestoringHistory, historyBeforeSeq, timelineRevision, follow, plan, lastTool, lastNoMessageTool,
     completionAdvice, selectedSkills, selectedMcpServers, lastEventId, lastEventSeq, taskStartedAtMs, analysisProgress,
     messageKey, send, restore, loadEarlierHistory, stop, reset, dispose, canResumeAnalysis, resumeAnalysis, handleEvent };

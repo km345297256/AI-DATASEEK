@@ -173,6 +173,7 @@ class BaseAgent(ABC):
         usage_context: Optional[dict] = None,
         token_usage_service: Optional[TokenUsageService] = None,
         dynamic_user_context_provider: Optional[Callable[[], str]] = None,
+        runtime_facts_provider: Optional[Callable[[], str]] = None,
     ):
         settings = get_settings()
         # Provenance records hash only this repository-owned prompt. A custom
@@ -207,6 +208,10 @@ class BaseAgent(ABC):
         # loop here so four configured attempts really mean four HTTP calls.
         llm_kwargs["client_max_retries"] = 0
         self._model = create_chat_model(settings, overrides=llm_kwargs)
+        if runtime_facts_provider is not None:
+            from app.infrastructure.external.llm.chat_model import LangChainModelDriver
+            if isinstance(self._model, LangChainModelDriver):
+                self._model.set_runtime_facts_provider(runtime_facts_provider)
         self._model_provider = llm_kwargs.get("model_provider") or self._model_provider
         self._model_name = llm_kwargs.get("model_name") or self._model_name
         self._execution_builtin_system_prompt = builtin_system_prompt
@@ -1543,6 +1548,9 @@ class BaseAgent(ABC):
             # durable evidence. In particular dynamic prompts below must never
             # share the persisted memory list (or its nested messages).
             logger.info("agent_request_history_projection_repaired agent=%s", self.name)
+        # Accepted tool/skill/dataset context is frozen for this logical call.
+        # Volatile runtime facts are supplied separately by the model driver at
+        # every physical admission, including parser repair requests.
         dynamic_context_insert_index = 1
         if self.dynamic_system_prompt_provider:
             dynamic_system_prompt = self.dynamic_system_prompt_provider()

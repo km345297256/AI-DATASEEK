@@ -12,6 +12,9 @@ from app.domain.services.input_delivery import InputDeliveryService, InputLeaseL
 from app.domain.services.agent_domain_service import AgentDomainService
 from app.infrastructure.repositories.mongo_session_repository import MongoSessionRepository
 from app.infrastructure.models.documents import SessionDocument, SessionEventDocument
+from app.infrastructure.external.task import redis_task
+from app.domain.services.agent_task_runner import AgentTaskRunner
+from app.domain.services.tools.mcp import MCPToolkit
 
 
 class MemoryInputs:
@@ -125,6 +128,104 @@ class FakeTask:
     def cancel(self):
         self.cancelled = True
         self.done = True
+
+
+@pytest.fixture
+def owned_task_registry(monkeypatch):
+    cls = redis_task.RedisStreamTask
+    monkeypatch.setattr(cls, "_task_registry", {})
+    monkeypatch.setattr(cls, "_destroy_task", None)
+    monkeypatch.setattr(cls, "_shutting_down", False)
+    monkeypatch.setattr(redis_task, "RedisStreamQueue", lambda _: object())
+    return cls
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("trigger", ["stop", "lost-owner"])
+@pytest.mark.parametrize("natural_completion", [False, True], ids=["active", "finalizing"])
+async def test_delivery_cancellation_respects_task_owner_without_letting_live_work_continue(
+    owned_task_registry, trigger, natural_completion,
+):
+    repository = MemoryInputs()
+    service = InputDeliveryService(repository, repository)
+    record = await service.claim(await pending(repository))
+    running, cleaning, release = asyncio.Event(), asyncio.Event(), asyncio.Event()
+    state = SimpleNamespace(cancelled=False, closed=False, owner=None)
+
+    async def cleanup_manager():
+        state.owner = asyncio.current_task()
+        cleaning.set()
+        await release.wait()
+        state.closed = True
+
+    toolkit = MCPToolkit()
+    toolkit.manager = SimpleNamespace(cleanup=cleanup_manager)
+    runner = object.__new__(AgentTaskRunner)
+    runner._agent_id = "synthetic"
+    runner._browser = runner._sandbox = runner._flow = None
+    runner._mcp_tool = toolkit
+
+    async def run(task):
+        await service.start("session", record.event, task)
+        running.set()
+        if not natural_completion:
+            try:
+                await asyncio.Event().wait()
+            except asyncio.CancelledError:
+                state.cancelled = True
+                raise
+
+    runner.run = run
+    task = owned_task_registry(runner)
+    await service.bind(record, task)
+    await task.run()
+    await running.wait()
+    if natural_completion:
+        await cleaning.wait()
+    try:
+        assert service._local[("session", record.key)].worker_owned_by_task
+        if trigger == "stop":
+            await service.cancel_session("session")
+        else:
+            current = await repository.get("session", record.key)
+            await repository.transition(current, {"runtime_id": "replacement-runtime"})
+            await service.maintain(AsyncMock())
+        await cleaning.wait()
+        for _ in range(2):
+            await asyncio.sleep(0)
+        assert state.cancelled is (not natural_completion)
+        assert not task._closed.is_set()
+        assert toolkit.manager is not None
+        assert state.owner is task._execution_task
+    finally:
+        release.set()
+        await task.wait_closed()
+        await owned_task_registry.destroy()
+    assert state.closed and toolkit.manager is None
+    assert not service._local
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("bound", [False, True])
+async def test_unstarted_bootstrap_worker_still_receives_direct_cancellation(bound):
+    repository = MemoryInputs()
+    service = InputDeliveryService(repository, repository)
+    ready = asyncio.Event()
+    task = FakeTask()
+
+    async def bootstrap():
+        record = await service.claim(await pending(repository))
+        if bound:
+            await service.bind(record, task)
+        ready.set()
+        await asyncio.Event().wait()
+
+    worker = asyncio.create_task(bootstrap())
+    await ready.wait()
+    await service.cancel_session("session")
+    with pytest.raises(asyncio.CancelledError):
+        await worker
+    assert task.cancelled is bound
 
 
 async def pending(repository):

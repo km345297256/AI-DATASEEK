@@ -128,6 +128,7 @@
             :is-loading="isLoading"
             :completion-advice="completionAdvice"
             :can-resume-analysis="canResumeAnalysis"
+            :before-summary-toggle="analysisSession.beforeSummaryToggle"
             @resumeAnalysis="resumeAnalysis"
             @toolClick="handleToolClick"
             @jupyterOpened="handleJupyterOpened"
@@ -387,8 +388,7 @@ const jumpToRealTime = () => {
 }
 
 const handleFollow = () => {
-  follow.value = true;
-  simpleBarRef.value?.scrollToBottom();
+  analysisSession.followTail();
 }
 
 const handleScroll = (_: Event) => {

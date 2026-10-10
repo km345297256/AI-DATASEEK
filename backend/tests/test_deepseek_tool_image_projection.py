@@ -148,7 +148,9 @@ def test_driver_preparation_applies_only_to_deepseek_before_budgeting():
     model = create_chat_model(settings())
     prepared, *_ = model._prepare_provider_request(original, {})
     assert prepared[-1].type == "human" and len(images(prepared)) == 1
-    other = create_chat_model(settings(), {"model_provider": "openai"})
+    # A different provider owns its credentials; the projection assertion must
+    # not rely on inheriting the default DeepSeek key across provider routes.
+    other = create_chat_model(settings(), {"model_provider": "openai", "api_key": "synthetic-openai-key"})
     unchanged, *_ = other._prepare_provider_request(original, {})
     assert dumps(unchanged) == dumps(original)
 

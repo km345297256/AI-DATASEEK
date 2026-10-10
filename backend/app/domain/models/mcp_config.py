@@ -89,6 +89,15 @@ def is_mcp_owned_by(config: MCPServerConfig, user_id: str) -> bool:
     return mcp_owner_id(config) == user_id
 
 
+def can_manage_mcp(config: MCPServerConfig, user_id: str, *, is_admin: bool = False) -> bool:
+    """Visibility/installation never grants permission to mutate a server."""
+    return is_admin or is_mcp_owned_by(config, user_id)
+
+
+class MCPConfigurationConflict(RuntimeError):
+    """The server changed after the caller authorized its previous state."""
+
+
 def can_access_mcp(config: MCPServerConfig, user_id: str, *, is_admin: bool = False) -> bool:
     if is_admin:
         return True

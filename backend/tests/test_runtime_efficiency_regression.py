@@ -132,6 +132,7 @@ def _profile_metrics(flow) -> dict[str, Any]:
     messages = [
         SystemMessage(content=flow.executor.system_prompt),
         SystemMessage(content=flow._dynamic_system_prompt()),
+        SystemMessage(content=flow._runtime_context_prompt()),
         HumanMessage(content="Inspect the mounted dataset and report evidence."),
     ]
     total_tokens, tool_tokens = estimate_context_tokens(

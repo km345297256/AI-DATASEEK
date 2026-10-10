@@ -180,6 +180,7 @@ def test_history_requires_per_root_explanation_test_and_real_writer_bump(tmp_pat
     transition = {"file": "new.json"}
     if acknowledged:
         transition["changes"] = {"InputAdmission": {"reason": "synthetic change", "compatibility": "test migration",
+                                                    "readers": {"new_reads_old": "migration exercised", "old_reads_new": "version refused"},
                                                     "test": "backend/tests/test_migration.py"}}
     (directory / "history.json").write_text(json.dumps({"format_version": 1,
         "snapshots": [{"file": "old.json"}, transition]}))

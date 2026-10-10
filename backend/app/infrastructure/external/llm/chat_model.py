@@ -10,7 +10,7 @@ from typing import Any, Optional
 from langchain.chat_models import init_chat_model
 from langchain_core.callbacks import AsyncCallbackManagerForLLMRun, CallbackManagerForLLMRun
 from langchain_core.language_models import BaseChatModel
-from langchain_core.messages import AIMessage, BaseMessage, ToolMessage
+from langchain_core.messages import AIMessage, BaseMessage, ToolMessage, SystemMessage
 from langchain_core.outputs import ChatGeneration, ChatResult
 from langchain_core.runnables import RunnableBinding
 from langchain_core.tools import BaseTool
@@ -20,6 +20,7 @@ from app.core.config import Settings
 from app.domain.external.model_driver import ModelCapabilities, ModelIdentity, ModelRequestMiddleware
 from app.domain.models.execution_environment import safe_public_identifier
 from app.domain.models.model_request import ToolImageObservationMessage
+from app.domain.services.model_route import resolve_model_route
 
 
 def _safe_identity(value: str, fallback: str, limit: int) -> str:
@@ -153,6 +154,7 @@ class LangChainModelDriver(BaseChatModel):
     max_output_tokens: int = Field(gt=0)
     _client: BaseChatModel = PrivateAttr()
     _middleware: ModelRequestMiddleware | None = PrivateAttr(default=None)
+    _runtime_facts_provider: Callable[[], str] | None = PrivateAttr(default=None)
 
     def __init__(
         self, *, client: BaseChatModel, identity: ModelIdentity,
@@ -179,6 +181,29 @@ class LangChainModelDriver(BaseChatModel):
 
     def bind(self, **kwargs: Any) -> RunnableBinding:
         return _DriverBinding(bound=self, kwargs=kwargs, config={})
+
+    def set_runtime_facts_provider(self, provider: Callable[[], str]) -> None:
+        """Attach trusted, side-effect-free facts to this Agent-owned driver.
+
+        Bindings and parser repairs retain the same driver. Only this provider
+        runs per physical request; tool/skill/dataset selection stays frozen.
+        """
+        self._runtime_facts_provider = provider
+
+    def _with_runtime_facts(self, messages: list[BaseMessage]) -> list[BaseMessage]:
+        if self._runtime_facts_provider is None:
+            return list(messages)
+        facts = self._runtime_facts_provider()
+        if not isinstance(facts, str):
+            raise ValueError("Runtime context provider must return text")
+        if not facts:
+            return list(messages)
+        # Keep system facts before the first conversational message for routes
+        # requiring a leading system prompt, without replacing any system text.
+        index = 0
+        while index < len(messages) and isinstance(messages[index], SystemMessage):
+            index += 1
+        return [*messages[:index], SystemMessage(content=facts), *messages[index:]]
 
     def bind_tools(
         self, tools: Sequence[dict[str, Any] | type | Callable | BaseTool],
@@ -247,7 +272,12 @@ class LangChainModelDriver(BaseChatModel):
         self, messages: list[BaseMessage], stop: list[str] | None = None,
         run_manager: AsyncCallbackManagerForLLMRun | None = None, **kwargs: Any,
     ) -> ChatResult:
-        prepared, request, response_format, output = self._prepare_provider_request(messages, kwargs)
+        # Fresh facts enter before sizing, HMAC/audit and provider projection.
+        # Never mutate caller history or persist this temporary system message.
+        try:
+            prepared, request, response_format, output = self._prepare_provider_request(self._with_runtime_facts(messages), kwargs)
+        except asyncio.CancelledError as exc:
+            raise _PreservedModelCancellation(exc) from None
 
         async def invoke(prepared_messages: list[BaseMessage], effective_output: int) -> AIMessage:
             call_kwargs = dict(request)
@@ -324,7 +354,8 @@ def create_chat_model(
 ) -> BaseChatModel:
     """Create a governed adapter, preserving the established factory API."""
     ov = overrides or {}
-    provider = (ov.get("model_provider") or settings.model_provider or "openai").lower().strip()
+    route = resolve_model_route(settings, ov)
+    provider = route.provider
     model_name = ov.get("model_name") or settings.model_name
     output = _positive_output(ov.get("max_tokens") if ov.get("max_tokens") is not None else settings.max_tokens)
     kwargs: dict[str, Any] = {
@@ -339,17 +370,17 @@ def create_chat_model(
         # Legacy client_max_retries overrides must not hide SDK requests.
         # Agent retries and parser repairs each cross this driver instead.
         kwargs["max_retries"] = 0
-    api_base = ov.get("api_base") or settings.api_base
+    api_base = route.api_base
     if api_base:
         kwargs["base_url"] = api_base
-    api_key = ov.get("api_key") or settings.api_key
-    if api_key and provider in {"openai", "azure_openai", "xai", "perplexity", "deepseek", "anthropic"}:
+    api_key = route.api_key
+    if api_key is not None and provider in {"openai", "azure_openai", "xai", "perplexity", "deepseek", "anthropic"}:
         kwargs["api_key"] = api_key
-    if settings.extra_headers:
+    if route.extra_headers:
         if provider == "ollama":
-            kwargs["client_kwargs"] = {"headers": dict(settings.extra_headers)}
+            kwargs["client_kwargs"] = {"headers": dict(route.extra_headers)}
         else:
-            kwargs["default_headers"] = settings.extra_headers
+            kwargs["default_headers"] = route.extra_headers
     # SDK defaults (often ten minutes) are still task cutoffs. Explicitly
     # disable them for every analysis/review route, including cloned clients.
     # Legacy timeout overrides must not silently restore an elapsed-time cap.

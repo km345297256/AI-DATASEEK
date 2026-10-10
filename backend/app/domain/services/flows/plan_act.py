@@ -320,6 +320,7 @@ class PlanActFlow(BaseFlow):
             tools=agent_tools,
             dynamic_system_prompt_provider=self._dynamic_system_prompt,
             dynamic_user_context_provider=self._dynamic_user_context,
+            runtime_facts_provider=self._runtime_context_prompt,
             llm_overrides=self._agent_llm_overrides(base_llm_overrides, "planner"),
             usage_context=usage_context,
         )
@@ -334,6 +335,7 @@ class PlanActFlow(BaseFlow):
             tools=agent_tools,
             dynamic_system_prompt_provider=self._dynamic_system_prompt,
             dynamic_user_context_provider=self._dynamic_user_context,
+            runtime_facts_provider=self._runtime_context_prompt,
             llm_overrides=self._agent_llm_overrides(base_llm_overrides, "execution"),
             usage_context=usage_context,
         )
@@ -348,6 +350,7 @@ class PlanActFlow(BaseFlow):
             tools=agent_tools,
             dynamic_system_prompt_provider=self._dynamic_system_prompt,
             dynamic_user_context_provider=self._dynamic_user_context,
+            runtime_facts_provider=self._runtime_context_prompt,
             llm_overrides=self._agent_llm_overrides(base_llm_overrides, "vision"),
             usage_context=usage_context,
             file_storage=self._file_storage,
@@ -412,6 +415,7 @@ class PlanActFlow(BaseFlow):
                 tools=[view, discovery, *core],
                 dynamic_system_prompt_provider=lambda view=view: self._domain_system_prompt(view),
                 dynamic_user_context_provider=self._dynamic_user_context,
+                runtime_facts_provider=self._runtime_context_prompt,
                 llm_overrides=overrides, usage_context=dict(usage_context),
             )
             # Persisted memory and model-trace roles must be isolated even for
@@ -423,7 +427,7 @@ class PlanActFlow(BaseFlow):
 
     def _domain_system_prompt(self, view: PluginToolView) -> str:
         return "\n\n".join(filter(None, (
-            self._runtime_context_prompt(), self.dataset_context,
+            self.dataset_context,
             view.preset.instructions, self._tool_selection_prompt(view),
             "You are a bounded domain step executor in the existing plan. Do not delegate, invent tools, "
             "run shell commands or propose a new Agent loop. Use only supplied tool schemas. "
@@ -1139,7 +1143,6 @@ class PlanActFlow(BaseFlow):
             return "\n\n".join(
                 part
                 for part in [
-                    self._runtime_context_prompt(),
                     self.dataset_context,
                     self._tool_selection_prompt(),
                 ]
@@ -1148,7 +1151,6 @@ class PlanActFlow(BaseFlow):
         parts = [
             part
             for part in [
-                self._runtime_context_prompt(),
                 self._subagent_capabilities_prompt(),
                 self.active_skill_context,
                 getattr(self, "dataset_context", ""),
@@ -2191,17 +2193,18 @@ class PlanActFlow(BaseFlow):
         return subagents or default_subagents()
 
     def _agent_llm_overrides(self, base_overrides: dict, agent_key: str) -> dict:
+        from app.domain.services.model_route import merge_model_route_overrides
         overrides = dict(base_overrides or {})
         if agent_key == "planner":
             planner_config = self.agent_profile_config.get("planner_config") if isinstance(self.agent_profile_config, dict) else None
             if isinstance(planner_config, dict):
-                overrides.update({key: value for key, value in planner_config.items() if value is not None})
+                overrides = merge_model_route_overrides(get_settings(), overrides, planner_config)
             return overrides
 
         subagent = self.enabled_subagents.get(agent_key)
         if not subagent:
             return overrides
-        overrides.update({key: value for key, value in subagent.model_settings.items() if value is not None})
+        overrides = merge_model_route_overrides(get_settings(), overrides, subagent.model_settings)
         if subagent.system_prompt:
             overrides["system_prompt"] = subagent.system_prompt
         return overrides

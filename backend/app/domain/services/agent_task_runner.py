@@ -55,6 +55,7 @@ from app.domain.models.execution_environment import ExecutionEnvironmentSnapshot
 from app.domain.services.execution_environment import create_agent_execution_snapshot
 from app.domain.services.model_runtime import ModelBudgetStopped, model_execution_scope, model_stop_reason, analysis_budget_scope
 from app.domain.services.tool_settlement import tool_settlement_scope
+from app.domain.utils.shutdown import cleanup_steps, join_cleanup
 from app.infrastructure.repositories.mongo_model_trace_repository import get_model_trace_repository
 from app.domain.services.tools.mcp import MCPToolkit
 from app.domain.services.tools.interceptors import (
@@ -3411,22 +3412,18 @@ class AgentTaskRunner(TaskRunner):
 
     async def destroy(self) -> None:
         """Destroy the task and release resources"""
+        if getattr(self, "_destroy_task", None) is None:
+            self._destroy_task = asyncio.create_task(self._destroy_resources())
+        await join_cleanup(self._destroy_task)
+
+    async def _destroy_resources(self) -> None:
         logger.info("Starting to destroy agent task")
-        
-        # Destroy sandbox environment
+        steps = []
         if self._sandbox:
-            logger.debug(
-                "Destroying sandbox environment agent=%s",
-                opaque_log_identifier(self._agent_id, namespace="agent"),
-            )
-            await self._sandbox.destroy()
-        
+            steps.append(self._sandbox.destroy)
         if self._mcp_tool:
-            logger.debug(
-                "Destroying MCP tool agent=%s",
-                opaque_log_identifier(self._agent_id, namespace="agent"),
-            )
-            await self._mcp_tool.cleanup()
+            steps.append(self._mcp_tool.cleanup)
+        await cleanup_steps(*steps)
         
         logger.debug(
             "Agent fully closed and resources cleared agent=%s",

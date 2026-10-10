@@ -401,10 +401,11 @@ def test_dynamic_system_prompt_excludes_untrusted_session_context():
 
     prompt = flow._dynamic_system_prompt()
 
-    assert "<runtime_context>" in prompt
-    assert "Current session ID: session-123" in prompt
-    assert "Current local time:" in prompt
-    assert "Current UTC time:" in prompt
+    assert "<runtime_context>" not in prompt
+    runtime_facts = flow._runtime_context_prompt()
+    assert "Current session ID: session-123" in runtime_facts
+    assert "Current local time:" in runtime_facts
+    assert "Current UTC time:" in runtime_facts
     assert "skill-context" in prompt
     assert "session-context" not in prompt
     assert flow._dynamic_user_context() == "session-context"

@@ -148,6 +148,8 @@ test('both page shells delegate timeline, gallery and recommendations to the com
   for (const page of ['ChatPage', 'DatasetSeekPage']) {
     const text = readFileSync(new URL(`../src/pages/${page}.vue`, import.meta.url), 'utf8');
     assert.match(text, /<AnalysisConversation/);
+    assert.match(text, /:before-summary-toggle="analysisSession\.beforeSummaryToggle"/);
+    assert.match(text, /analysisSession\.isViewportReaderScroll\(\)/);
     assert.doesNotMatch(text.split('<script')[0], /<ChatMessage|v-for="\(message, index\) in messages"/);
   }
 });

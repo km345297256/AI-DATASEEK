@@ -51,7 +51,8 @@ class ModelConfiguration(BaseModel):
         }
         if self.api_base:
             settings["api_base"] = self.api_base
-        if self.api_key:
+        # An explicit empty key means local no-auth, not default-key inheritance.
+        if self.api_key is not None:
             settings["api_key"] = self.api_key
         settings.update({
             key: value

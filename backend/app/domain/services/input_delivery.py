@@ -28,6 +28,7 @@ class _LocalInput:
     record: AcceptedInput
     worker: asyncio.Task
     task: Any = None
+    worker_owned_by_task: bool = False
 
     def live(self) -> bool:
         return not self.worker.done() or (self.task is not None and not self.task.done)
@@ -35,7 +36,11 @@ class _LocalInput:
     def cancel(self) -> None:
         if self.task is not None:
             self.task.cancel()
-        if not self.worker.done() and self.worker is not asyncio.current_task():
+        # start() transfers cancellation ownership to Task. Bypassing it with
+        # worker.cancel() could interrupt its task-affine natural finalizer.
+        # A claimed/bound bootstrap worker remains independently cancellable.
+        if (not (self.task is not None and self.worker_owned_by_task)
+                and not self.worker.done() and self.worker is not asyncio.current_task()):
             self.worker.cancel()
 
 
@@ -81,7 +86,7 @@ class InputDeliveryService:
             "preparation_failure_code": None}, require_live=True)
         if updated is None:
             raise InputLeaseLost()
-        self._local[(session_id, key)] = _LocalInput(updated, asyncio.current_task(), task)
+        self._local[(session_id, key)] = _LocalInput(updated, asyncio.current_task(), task, worker_owned_by_task=True)
         return True
 
     async def mark_analysis_started(self, session_id: str, key: str) -> None:

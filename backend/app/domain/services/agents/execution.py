@@ -185,6 +185,7 @@ class ExecutionAgent(BaseAgent):
         llm_overrides: Optional[dict] = None,
         usage_context: Optional[dict] = None,
         dynamic_user_context_provider: Optional[Callable[[], str]] = None,
+        runtime_facts_provider: Optional[Callable[[], str]] = None,
     ):
         runtime_overrides = dict(llm_overrides or {})
         settings = get_settings()
@@ -203,6 +204,7 @@ class ExecutionAgent(BaseAgent):
             llm_overrides=runtime_overrides,
             usage_context=usage_context,
             dynamic_user_context_provider=dynamic_user_context_provider,
+            runtime_facts_provider=runtime_facts_provider,
         )
 
         self._current_plan: Optional[Plan] = None

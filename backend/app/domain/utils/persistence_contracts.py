@@ -26,6 +26,16 @@ from app.domain.services.execution_history import ExecutionHistory
 from app.domain.services.tools.mcp_images import MCPImageRef, MCP_IMAGE_REFS_KEY, MCP_IMAGE_REFS_VERSION
 
 
+# Only these exact accepted acknowledgements predate the two-reader policy.
+# A new record cannot opt out by omitting a policy version or backdating a name.
+_LEGACY_READER_REVIEWS = {
+    "2026-09-24-program-attempt.json": "ee482c6171a45ec3069b8e65733e17e9bec9fd6e2104fefceb4cc63256428ab9",
+    "2026-09-29-independent-subprotocols.json": "92d03686aeac90594473d7ec8c270c7d49f795dd6ace5b3ae336c84998233a13",
+    "2026-09-30-user-evaluated-results.json": "815ed569f7e7fdbc9e3212066b85c94d7beb0fb030668785059e5e8f841a1556",
+    "2026-09-30-program-preparation.json": "0670488f2dfc84722deb9804e4a9d69d650dd511f90a307ad63e3f47f44f0098",
+}
+
+
 def canonical(value) -> str:
     return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
 
@@ -183,6 +193,23 @@ def validate_catalog(catalog: dict) -> None:
             raise ValueError("Persistence snapshot digest mismatch")
 
 
+def review_catalogs(before: dict, after: dict) -> dict:
+    """Independent structural evidence, never hidden by acknowledgements.
+
+    Reversing the classifier flags old-reader hazards such as new enum values.
+    Neither direction proves semantic preservation, safe refusal or authority.
+    The normal writer-version gate remains unchanged.
+    """
+    validate_catalog(before)
+    validate_catalog(after)
+    forward = compare_catalogs(before, after)
+    reverse = {change["root"]: change for change in compare_catalogs(after, before)}
+    return {"changes": [{**change,
+        "old_reader_structural_classification": reverse[change["root"]]["classification"],
+        "reader_evidence_required": ["new_reads_old", "old_reads_new"],
+    } for change in forward], "semantic_compatibility_verified": False}
+
+
 def check_history(repo: Path, current: dict) -> list[dict]:
     """Verify frozen snapshots, acknowledged transitions, and exact freshness."""
     directory = repo / "docs/persistence"
@@ -201,6 +228,7 @@ def check_history(repo: Path, current: dict) -> list[dict]:
         validate_catalog(snapshot)
         if previous is not None:
             changes = compare_catalogs(previous, snapshot)
+            legacy_reader_review = _LEGACY_READER_REVIEWS.get(filename) == hashlib.sha256(canonical(entry).encode()).hexdigest()
             explanations = entry.get("changes", {})
             if set(explanations) != {item["root"] for item in changes}:
                 raise ValueError("Every changed root requires an explicit compatibility record")
@@ -209,6 +237,13 @@ def check_history(repo: Path, current: dict) -> list[dict]:
                 if not all(isinstance(acknowledgement.get(key), str) and acknowledgement[key].strip()
                            for key in ("reason", "compatibility", "test")):
                     raise ValueError("Incomplete persistence compatibility explanation")
+                if not legacy_reader_review:
+                    readers = acknowledgement.get("readers", {})
+                    if not isinstance(readers, dict) or not all(
+                        isinstance(readers.get(key), str) and readers[key].strip()
+                        for key in ("new_reads_old", "old_reads_new")
+                    ):
+                        raise ValueError("New persistence records require both reader directions")
                 test = Path(acknowledgement["test"])
                 if test.is_absolute() or ".." in test.parts or not str(test).startswith("backend/tests/test_") or not (repo / test).is_file():
                     raise ValueError("Compatibility record must name a committed behavior/migration test")

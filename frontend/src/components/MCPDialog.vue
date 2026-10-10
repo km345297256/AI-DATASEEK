@@ -128,7 +128,7 @@
                 {{ server.description || server.url || server.command || t('No description') }}
               </div>
             </div>
-            <div class="flex shrink-0 gap-1">
+            <div v-if="isOwned(server)" class="flex shrink-0 gap-1">
               <button class="rounded-md p-1 hover:bg-[var(--fill-tsp-white-dark)]" type="button" @click.prevent="startEdit(server)">
                 <Pencil :size="14" />
               </button>
@@ -159,6 +159,7 @@ import { useI18n } from 'vue-i18n';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { deleteMCPServer, listMCPServers, saveMCPServer, type MCPServerInfo, type MCPTransport } from '@/api/mcp';
 import { showErrorToast, showSuccessToast } from '@/utils/toast';
+import { useAuth } from '@/composables/useAuth';
 
 const props = defineProps<{
   open: boolean;
@@ -171,6 +172,11 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useI18n();
+const { currentUser } = useAuth();
+const isOwned = (server: MCPServerInfo) => {
+  const owner = server.owner_user_id || server.user_id;
+  return Boolean(owner && owner === currentUser.value?.id);
+};
 const servers = ref<MCPServerInfo[]>([]);
 const loading = ref(false);
 const saving = ref(false);

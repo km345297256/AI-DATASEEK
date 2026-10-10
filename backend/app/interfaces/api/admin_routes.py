@@ -12,14 +12,14 @@ import shutil
 from typing import Optional
 import uuid
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 
 from app.application.errors.exceptions import BadRequestError, NotFoundError, UnauthorizedError
 from app.application.services.agent_service import AgentService
 from app.application.services.resource_configuration_service import ResourceConfigurationService
 from app.core.config import get_settings
 from app.domain.models.audit import AuditRiskLevel
-from app.domain.models.mcp_config import MCPScope
+from app.domain.models.mcp_config import MCPConfigurationConflict, MCPScope
 from app.domain.models.session import SessionStatus
 from app.domain.models.skill import SkillScope
 from app.domain.models.user import User, UserRole
@@ -86,9 +86,10 @@ def _mcp_response(name: str, server, owner_names: dict[str, str]) -> AdminMCPSer
         transport=server.transport,
         enabled=server.enabled,
         description=server.description,
-        command=server.command,
-        args=server.args,
-        url=server.url,
+        # Administrative metadata is not a credential/configuration export.
+        command=None,
+        args=None,
+        url=None,
         scope=server.scope,
         user_id=server.user_id,
         owner_user_id=server.owner_user_id,
@@ -465,6 +466,8 @@ async def update_mcp_server(
     server = config.mcpServers.get(name)
     if not server:
         raise NotFoundError("MCP server not found")
+    expected = server.model_copy(deep=True)
+    server = server.model_copy(deep=True)
     if request.enabled is not None:
         server.enabled = request.enabled
     if request.scope is not None:
@@ -481,8 +484,10 @@ async def update_mcp_server(
         server.owner_user_id = request.owner_user_id or None
     if request.workspace_id is not None:
         server.workspace_id = request.workspace_id or None
-    config.mcpServers[name] = server
-    await repository.save_mcp_config(config)
+    try:
+        await repository.upsert_server(name, server, expected=expected)
+    except MCPConfigurationConflict:
+        raise HTTPException(status_code=409, detail="MCP configuration changed; reload before saving") from None
     await audit_service.record(
         actor_user_id=current_user.id,
         action="admin.mcp.update",
@@ -514,8 +519,10 @@ async def delete_mcp_server(
     server = config.mcpServers.get(name)
     if not server:
         raise NotFoundError("MCP server not found")
-    config.mcpServers.pop(name, None)
-    await repository.save_mcp_config(config)
+    try:
+        await repository.delete_server(name, expected=server.model_copy(deep=True))
+    except MCPConfigurationConflict:
+        raise HTTPException(status_code=409, detail="MCP configuration changed; reload before deleting") from None
     await audit_service.record(
         actor_user_id=current_user.id,
         action="admin.mcp.delete",

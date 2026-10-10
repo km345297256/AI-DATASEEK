@@ -2673,8 +2673,10 @@ async def test_approval_decision_enables_and_disables_mcp_server(monkeypatch):
                 }
             )
 
-        async def save_mcp_config(self, config):
-            saved_configs.append(config)
+        async def upsert_server(self, name, server, *, expected):
+            assert name == "sensitive-db"
+            assert expected.enabled is False
+            saved_configs.append(MCPConfig(mcpServers={name: server}))
 
     monkeypatch.setattr(
         "app.domain.services.approval_service.MongoMCPRepository",
