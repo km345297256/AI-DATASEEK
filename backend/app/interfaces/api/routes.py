@@ -9,6 +9,7 @@ from . import (
     agent_profile_routes,
     config_routes,
     dataset_routes,
+    data_candidate_routes,
     file_routes,
     mcp_routes,
     plugin_runtime_routes,
@@ -41,6 +42,7 @@ def create_api_router() -> APIRouter:
     api_router.include_router(visualization_routes.router)
     api_router.include_router(admin_routes.router)
     api_router.include_router(dataset_routes.router)
+    api_router.include_router(data_candidate_routes.router)
 
     return api_router
 

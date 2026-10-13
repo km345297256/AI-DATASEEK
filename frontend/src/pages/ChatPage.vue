@@ -109,6 +109,7 @@
       </div>
       <div class="mx-auto w-full max-w-full sm:max-w-[768px] sm:min-w-[390px] flex flex-col flex-1">
         <div class="flex flex-col w-full gap-[12px] pb-[80px] pt-[12px] flex-1 overflow-y-auto">
+          <DataSourceCandidates v-if="sessionId" :session-id="sessionId" :files="provenanceFiles" />
           <DataRunHistory v-if="sessionId" :session-id="sessionId" :revision="lastEventSeq" />
           <button v-if="hasMoreHistory" type="button" :disabled="isLoadingHistory" class="mx-auto rounded-lg px-4 py-2 text-sm text-[var(--text-secondary)] disabled:opacity-50" @click="loadEarlierHistory">
             {{ isLoadingHistory ? '正在加载历史记录…' : '加载更早的对话' }}
@@ -174,6 +175,7 @@ import { useRouter, onBeforeRouteUpdate } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import ChatBox from '../components/ChatBox.vue';
 import DataRunHistory from '../components/DataRunHistory.vue';
+import DataSourceCandidates from '../components/DataSourceCandidates.vue';
 import ChatMessage from '../components/ChatMessage.vue';
 import * as agentApi from '../api/agent';
 import { Message, MessageContent, ToolContent, StepContent, AttachmentsContent, isConsecutiveAssistant } from '../types/message';
@@ -308,6 +310,12 @@ const {
   taskStartedAtMs,
 } = toRefs(state);
 const { updateAnalysisProgress, beginAnalysisProgress, clearAnalysisProgress } = useAnalysisProgress(analysisProgress);
+const provenanceFiles = computed(() => {
+  const files = messages.value.filter(message => message.type === 'attachments')
+    .flatMap(message => (message.content as AttachmentsContent).attachments)
+    .filter(file => file.file_id && !file.file_id.startsWith('temp-'));
+  return [...new Map(files.map(file => [file.file_id, file])).values()];
+});
 const hasRunningStep = computed(() => Boolean(findCurrentTurnRunningStep(messages.value)));
 
 // Non-state refs that don't need reset
