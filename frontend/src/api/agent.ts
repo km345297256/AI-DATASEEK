@@ -371,3 +371,11 @@ export async function updateSessionCollaborators(sessionId: string, userIds: str
   );
   return response.data.data.collaborators;
 }
+
+
+export async function getDataRuns(sessionId: string, beforeSeq?: number, signal?: AbortSignal): Promise<import('../types/dataRun').DataRunPage> {
+  const response = await apiClient.get<ApiResponse<import('../types/dataRun').DataRunPage>>(
+    `/sessions/${encodeURIComponent(sessionId)}/runs`, { params: { before_seq: beforeSeq }, signal },
+  );
+  return response.data.data;
+}

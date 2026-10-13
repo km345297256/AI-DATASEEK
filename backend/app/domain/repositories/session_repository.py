@@ -92,6 +92,14 @@ class SessionRepository(Protocol):
         """Release a claim when a message failed before it reached the task queue."""
         ...
 
+    async def get_run_starts(self, session_id: str, *, before_seq: int | None = None, limit: int = 11):
+        """Bounded, newest-first explicit run registrations."""
+        ...
+
+    async def get_run_events(self, session_id: str, run_id: str, *, limit: int = 2001):
+        """Bounded run evidence, excluding private tool payloads."""
+        ...
+
     async def get_events(self, session_id: str) -> List[AgentEvent]:
         """Get all events for a session"""
         ...

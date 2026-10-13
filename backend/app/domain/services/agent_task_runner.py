@@ -13,6 +13,7 @@ from pydantic import TypeAdapter
 from app.domain.models.message import Message
 from app.domain.models.event import (
     BaseEvent,
+    RunEvent,
     ErrorEvent,
     TitleEvent,
     MessageEvent,
@@ -336,6 +337,8 @@ class AgentTaskRunner(TaskRunner):
         return None
 
     async def _put_and_add_event(self, task: Task, event: AgentEvent) -> None:
+        if event.run_id is None and getattr(self, "_active_run_id", None):
+            event.run_id = self._active_run_id
         if isinstance(event, ToolEvent):
             approvals = getattr(self, "_tool_approval_views", {})
             if event.tool_approval is None and event.tool_call_id in approvals:
@@ -391,6 +394,7 @@ class AgentTaskRunner(TaskRunner):
         self._tool_approval_views[call_id] = view
         template = self._analysis_job_tools.get(call_id)
         await self._put_and_add_event(task, ToolEvent(
+            run_id=template.run_id if template is not None else None,
             tool_call_id=call_id,
             tool_name=template.tool_name if template is not None else "plugin",
             function_name=template.function_name if template is not None else context.tool_name,
@@ -410,6 +414,7 @@ class AgentTaskRunner(TaskRunner):
         # Only display arguments already emitted by the Agent are repeated.
         # Compiled analysis intentionally emits a short label, never its code.
         await self._put_and_add_event(task, ToolEvent(
+            run_id=template.run_id if template is not None else None,
             tool_call_id=call_id,
             tool_name=template.tool_name if template is not None else "plugin",
             function_name=template.function_name if template is not None else context.tool_name,
@@ -508,7 +513,7 @@ class AgentTaskRunner(TaskRunner):
             "Event remained oversized after bounding; replacing it agent=%s",
             opaque_log_identifier(self._agent_id, namespace="agent"),
         )
-        return ErrorEvent(error="Task event was too large to persist; inline output was omitted.")
+        return ErrorEvent(run_id=event.run_id, error="Task event was too large to persist; inline output was omitted.")
 
     @staticmethod
     def _event_payload_size(event: AgentEvent) -> int:
@@ -1586,6 +1591,15 @@ class AgentTaskRunner(TaskRunner):
                     if delivery is not None and await delivery.start(self._session_id, event, task):
                         from app.domain.models.input_admission import input_key
                         self._accepted_input_key = input_key(event)
+                    self._active_run_id = None
+                    if type(event.seq) is int and event.seq > 0:
+                        from app.domain.services.data_runs import data_run_id
+                        self._active_run_id = data_run_id(self._session_id, event.seq)
+                        await self._put_and_add_event(task, RunEvent(
+                            id="run-start:" + self._active_run_id,
+                            run_id=self._active_run_id, phase="started",
+                            source_event_seq=event.seq, timestamp=event.timestamp,
+                        ))
                     message = event.message or ""
                     metadata = event.metadata or {}
                     await self._sync_message_attachments_to_sandbox(event)
@@ -2350,6 +2364,19 @@ class AgentTaskRunner(TaskRunner):
                 task_id=task_id,
                 message=message,
                 trigger_event_seq=trigger_event_seq,
+            )
+
+        if getattr(self, "_active_run_id", None) and trigger_event_seq:
+            from app.domain.models.data_run import RunSkillRelease
+            active_skills = getattr(self._flow, "_prepared_active_skills", None) or []
+            snapshot = getattr(self, "_execution_snapshot", None)
+            yield RunEvent(
+                run_id=self._active_run_id, phase="environment", source_event_seq=trigger_event_seq,
+                skills=[RunSkillRelease.from_skill(skill) for skill in active_skills
+                        if skill.manifest and skill.package_sha256],
+                legacy_skill_count=sum(not skill.manifest for skill in active_skills),
+                environment_fingerprint=snapshot.fingerprint if snapshot else None,
+                catalog_revision=snapshot.catalog.revision if snapshot and snapshot.catalog else None,
             )
 
         artifact_discovery_dirty = bool(getattr(self, "_generated_files", []))

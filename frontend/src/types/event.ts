@@ -23,11 +23,14 @@ export interface SpillArtifactNotice {
 }
 
 export type AgentSSEEvent = {
-  event: 'tool' | 'step' | 'message' | 'error' | 'done' | 'title' | 'wait' | 'plan' | 'attachments';
-  data: ToolEventData | StepEventData | MessageEventData | ErrorEventData | DoneEventData | TitleEventData | WaitEventData | PlanEventData;
+  event: 'run' | 'tool' | 'step' | 'message' | 'error' | 'done' | 'title' | 'wait' | 'plan' | 'attachments';
+  data: RunEventData | ToolEventData | StepEventData | MessageEventData | ErrorEventData | DoneEventData | TitleEventData | WaitEventData | PlanEventData;
 }
 
+export interface RunEventData extends BaseEventData { phase: 'started' | 'environment'; source_event_seq: number }
+
 export interface BaseEventData {
+  run_id?: string;
   /** Existing Redis stream cursor; kept for transport-level resume. */
   event_id?: string | null;
   /** Monotonic within one session. Missing on pre-versioning history. */

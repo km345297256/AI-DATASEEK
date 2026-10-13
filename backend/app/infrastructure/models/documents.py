@@ -687,6 +687,8 @@ class SessionEventDocument(Document):
                 [("session_id", ASCENDING), ("event.type", ASCENDING), ("event.role", ASCENDING), ("seq", ASCENDING)],
                 name="session_history_turn_lookup",
             ),
+            IndexModel([("session_id", ASCENDING), ("event.run_id", ASCENDING), ("seq", ASCENDING)], name="session_run_events"),
+            IndexModel([("session_id", ASCENDING), ("event.type", ASCENDING), ("event.phase", ASCENDING), ("seq", ASCENDING)], name="session_run_starts"),
             IndexModel([("input_active_session", ASCENDING)], unique=True,
                        partialFilterExpression={"input_active_session": {"$type": "string"}},
                        name="session_input_active_unique"),

@@ -5,6 +5,7 @@ import time
 import uuid
 from enum import Enum
 from app.domain.models.plan import Plan, Step
+from app.domain.models.data_run import RunSkillRelease
 from app.domain.models.file import FileInfo
 import json
 from app.domain.models.search import SearchResultItem
@@ -47,6 +48,7 @@ class BaseEvent(BaseModel):
         ge=1,
         le=MAX_EVENT_SEQUENCE,
     )
+    run_id: str | None = Field(default=None, pattern=r"^[a-f0-9]{32}$", exclude_if=lambda value: value is None)
     # Missing versions in legacy documents are interpreted as version 1.
     # Future incompatible envelopes must introduce a new explicit version.
     version: Literal[1] = 1
@@ -161,7 +163,20 @@ class WaitEvent(BaseEvent):
     """Wait event"""
     type: Literal["wait"] = "wait"
 
+class RunEvent(BaseEvent):
+    """Durable registration/environment receipt, never a model-authored answer."""
+    type: Literal["run"] = "run"
+    run_id: str = Field(pattern=r"^[a-f0-9]{32}$")
+    phase: Literal["started", "environment"]
+    source_event_seq: int = Field(strict=True, ge=1, le=MAX_EVENT_SEQUENCE)
+    skills: list[RunSkillRelease] = Field(default_factory=list, max_length=100)
+    legacy_skill_count: int = Field(default=0, ge=0)
+    environment_fingerprint: str | None = Field(default=None, pattern=r"^[a-f0-9]{64}$")
+    catalog_revision: str | None = Field(default=None, pattern=r"^[a-f0-9]{64}$")
+
+
 AgentEvent = Union[
+    RunEvent,
     ErrorEvent,
     PlanEvent, 
     ToolEvent,

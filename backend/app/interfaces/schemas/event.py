@@ -7,6 +7,7 @@ from app.interfaces.schemas.file import FileInfoResponse
 from app.domain.models.event import ToolStatus, ToolContent, BrowserToolContent
 from app.domain.models.event import (
     AgentEvent,
+    RunEvent,
     ErrorEvent,
     PlanEvent,
     MessageEvent,
@@ -40,6 +41,7 @@ class BaseEventData(BaseModel):
         ge=1,
         le=MAX_EVENT_SEQUENCE,
     )
+    run_id: str | None = Field(default=None, pattern=r"^[a-f0-9]{32}$", exclude_if=lambda value: value is None)
     version: Literal[1] = 1
     timestamp: datetime = Field(default_factory=lambda: datetime.now())
 
@@ -51,6 +53,7 @@ class BaseEventData(BaseModel):
     @classmethod
     def base_event_data(cls, event: AgentEvent) -> dict:
         return {
+            **({"run_id": event.run_id} if event.run_id else {}),
             "event_id": event.id,
             "seq": event.seq,
             "version": event.version,
@@ -61,7 +64,7 @@ class BaseEventData(BaseModel):
     def from_event(cls, event: AgentEvent) -> Self:
         return cls(
             **cls.base_event_data(event),
-            **event.model_dump(exclude={"type", "id", "seq", "version", "timestamp"})
+            **event.model_dump(exclude={"type", "id", "seq", "version", "timestamp", "run_id"})
         )
 
 class CommonEventData(BaseEventData):
@@ -243,7 +246,13 @@ class CommonSSEEvent(BaseSSEEvent):
     event: str
     data: CommonEventData
 
+class RunSSEEvent(BaseSSEEvent):
+    event: Literal["run"] = "run"
+    data: CommonEventData
+
+
 AgentSSEEvent = Union[
+    RunSSEEvent,
     CommonEventData,
     PlanSSEEvent,
     MessageSSEEvent,

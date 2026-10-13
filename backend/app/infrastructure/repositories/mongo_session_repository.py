@@ -795,6 +795,34 @@ class MongoSessionRepository(SessionRepository):
         if not result.matched_count:
             raise ValueError(f"Session {session_id} not found")
 
+    async def get_run_starts(self, session_id: str, *, before_seq: int | None = None, limit: int = 11):
+        query = {"session_id": session_id, "event.type": "run", "event.phase": "started"}
+        if before_seq is not None:
+            query["seq"] = {"$lt": before_seq}
+        docs = await SessionEventDocument.get_pymongo_collection().find(query, {"event": 1}).sort("seq", -1).limit(min(limit, 21)).to_list(length=min(limit, 21))
+        adapter = TypeAdapter(AgentEvent)
+        return [adapter.validate_python(doc["event"]) for doc in docs]
+
+    async def get_run_events(self, session_id: str, run_id: str, *, limit: int = 2001):
+        query = {"session_id": session_id, "event.run_id": run_id,
+                 "event.type": {"$in": ["run", "plan", "step", "tool", "done", "wait", "error"]}}
+        # Raw tool arguments/results and step prose are unnecessary to compute
+        # status. They must not be copied into the public run read model.
+        projection = {"event.function_args": 0, "event.function_result": 0,
+                      "event.tool_content": 0, "event.presentation": 0,
+                      **{f"event.{prefix}.{field}": 0 for prefix in ("step", "plan.steps")
+                         for field in ("description", "inputs", "outputs", "result", "error", "attachments")},
+                      **{f"event.plan.{field}": 0 for field in ("title", "goal", "message", "result", "error")}}
+        docs = await SessionEventDocument.get_pymongo_collection().find(query, projection).sort("seq", 1).limit(min(limit, 2001)).to_list(length=min(limit, 2001))
+        adapter = TypeAdapter(AgentEvent)
+        result = []
+        for doc in docs:
+            payload = doc["event"]
+            if payload["type"] == "tool":
+                payload["function_args"] = {}
+            result.append(adapter.validate_python(payload))
+        return result
+
     async def get_events(self, session_id: str) -> List[AgentEvent]:
         """Get events in sequence order, synthesizing legacy sequence values."""
         docs = await SessionEventDocument.find(

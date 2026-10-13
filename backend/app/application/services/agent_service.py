@@ -175,6 +175,22 @@ class AgentService:
                 raise RuntimeError("Session not found")
         return await self._session_repository.get_events(session_id)
     
+    async def get_data_runs(self, session_id: str, user_id: str, *, before_seq: int | None = None):
+        from app.domain.models.data_run import DataRunPage
+        from app.domain.services.data_runs import project_data_run
+        session = await self.get_session(session_id, user_id)
+        if session is None:
+            raise RuntimeError("Session not found")
+        starts = await self._session_repository.get_run_starts(session_id, before_seq=before_seq, limit=11)
+        latest = (await self._session_repository.get_run_starts(session_id, limit=1)) if before_seq is not None else starts[:1]
+        active_run_id = latest[0].run_id if latest else None
+        runs = []
+        for start in starts[:10]:
+            events = await self._session_repository.get_run_events(session_id, start.run_id, limit=2001)
+            runs.append(project_data_run(start, events[:2000], history_complete=len(events) <= 2000,
+                                         session_active=session.status.value == "running" and start.run_id == active_run_id))
+        return DataRunPage(runs=runs, next_before_seq=starts[9].seq if len(starts) > 10 else None)
+
     async def get_session_history(self, session_id: str, user_id: str, *, turns: int = 5,
                                   before_seq: int | None = None) -> SessionHistoryPage:
         session = await self.get_session(session_id, user_id)

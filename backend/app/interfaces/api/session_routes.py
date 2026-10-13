@@ -1,3 +1,4 @@
+from app.domain.models.data_run import DataRunPage
 from fastapi import APIRouter, Depends, Request, WebSocket, WebSocketDisconnect, Query
 from fastapi.responses import StreamingResponse
 from sse_starlette.sse import EventSourceResponse
@@ -184,6 +185,18 @@ async def get_session(
         is_owner=True,
         collaborators=[],
     ))
+
+@router.get("/{session_id}/runs", response_model=APIResponse[DataRunPage])
+async def get_data_runs(
+    session_id: str,
+    before_seq: int | None = Query(default=None, ge=1, le=9_007_199_254_740_991),
+    current_user: User = Depends(get_current_user),
+    agent_service: AgentService = Depends(get_agent_service),
+):
+    if not await agent_service.get_session(session_id, current_user.id):
+        raise NotFoundError("Session not found")
+    return APIResponse.success(await agent_service.get_data_runs(session_id, current_user.id, before_seq=before_seq))
+
 
 @router.get("/{session_id}/history", response_model=APIResponse[GetSessionHistoryResponse])
 async def get_session_history(
