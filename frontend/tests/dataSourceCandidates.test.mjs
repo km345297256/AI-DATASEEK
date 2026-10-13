@@ -13,7 +13,7 @@ function harness() {
   const module = { exports: {} }, scope = vue.effectScope();
   new Function('require', 'module', 'exports', code)((name) => {
     if (name === 'vue') return { ...vue, onUnmounted: callback => { unmount = callback; } };
-    if (name === '../api/dataCandidate') return Object.fromEntries(['listCandidates', 'createCandidate', 'listVersions', 'registerVersion'].map(method =>
+    if (name === '../api/dataCandidate') return Object.fromEntries(['listCandidates', 'createCandidate', 'listVersions', 'registerVersion', 'getAcquisitionPlan'].map(method =>
       [method, (...args) => new Promise((resolve, reject) => requests.push({ method, args, resolve, reject }))]));
     assert.fail(name);
   }, module, module.exports);
@@ -74,4 +74,22 @@ test('unmount aborts an in-flight read and suppresses late updates', async () =>
   assert.equal(h.requests[0].args.at(-1).aborted, true);
   h.requests[0].resolve({ candidates: [candidate], next_cursor: null }); await pending;
   assert.deepEqual(h.state.candidates.value, []);
+});
+
+
+test('acquisition plans stay not-started and stale results never cross sessions', async () => {
+  const h = harness();
+  try {
+    const pending = h.state.inspectPlan(candidate);
+    assert.equal(h.requests[0].method, 'getAcquisitionPlan');
+    h.props.sessionId = 'second'; await flush();
+    h.requests[0].resolve({ accession: 'GCF_000009045.1', status: 'not_started', execution_available: false });
+    await pending;
+    assert.equal(h.state.acquisitionPlan.value, null);
+    const latest = h.state.inspectPlan(candidate);
+    h.requests[1].resolve({ accession: 'GCF_000009045.1', status: 'not_started', execution_available: false });
+    await latest;
+    assert.equal(h.state.acquisitionPlan.value.status, 'not_started');
+    assert.equal(h.state.acquisitionPlan.value.execution_available, false);
+  } finally { h.close(); }
 });

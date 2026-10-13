@@ -126,7 +126,7 @@ async def test_pagination_does_not_lose_candidates():
 @pytest.mark.asyncio
 async def test_every_route_requires_owned_session():
     from app.interfaces.api.data_candidate_routes import router
-    assert len(router.routes) == 4
+    assert len(router.routes) == 7
     for route in router.routes:
         assert any(dependency.call is owned_session for dependency in route.dependant.dependencies)
     agent = SimpleNamespace(get_session=AsyncMock(return_value=None))

@@ -2,7 +2,7 @@
   <section class="sources">
     <button class="heading" type="button" :aria-expanded="open" @click="open = !open">{{ open ? '▾' : '▸' }} 数据线索与版本</button>
     <div v-if="open" class="body">
-      <p class="hint">保存数据来源，将会话文件登记为可追溯版本。来源由你提供，尚未联网检索或核验。</p>
+      <p class="hint">保存数据来源，将会话文件登记为可追溯版本。也可在对话中要求检索 NCBI 基因组，官方元数据会出现在这里；文件下载尚未接入。</p>
       <form class="form" @submit.prevent="save">
         <label>数据名称<input v-model="draft.title" required maxlength="200" :disabled="busy" placeholder="例如：某项研究的测序数据" /></label>
         <label>公开来源链接<input v-model="draft.source_url" type="url" required maxlength="2048" :disabled="busy" placeholder="https://…" /></label>
@@ -15,12 +15,24 @@
       <button type="button" :disabled="busy" @click="load(false)">刷新线索</button>
       <p v-if="!busy && loaded && !candidates.length" class="hint">还没有数据线索，可以先登记已知来源。</p>
       <article v-for="candidate in candidates" :key="candidate.candidate_id" class="candidate">
-        <strong>{{ candidate.title }}</strong><span class="tag">用户提供来源 · 未核验</span>
+        <strong>{{ candidate.title }}</strong>
+        <span class="tag">{{ candidate.provenance === 'ncbi_datasets' ? 'NCBI 官方元数据 · 未下载序列' : '用户提供来源 · 未核验' }}</span>
+        <p v-if="candidate.discovery" class="hint">
+          {{ candidate.discovery.assembly.source_database === 'refseq' ? 'RefSeq' : 'GenBank' }} · {{ candidate.discovery.assembly.assembly_level }} ·
+          {{ candidate.discovery.assembly.reference_genome === null ? '参考标记未知' : candidate.discovery.assembly.reference_genome ? '参考基因组' : '未标为参考基因组' }}<br />
+          官方报告长度：{{ candidate.discovery.assembly.total_sequence_length ?? '未知' }} bp；GC：{{ candidate.discovery.assembly.gc_percent ?? '未知' }}%（未独立计算）
+        </p>
         <p>{{ candidate.external_id }}</p>
         <a :href="candidate.source_url" target="_blank" rel="noopener noreferrer">{{ candidate.source_url }}</a>
         <button type="button" :disabled="busy" @click="choose(candidate)">查看版本 / 登记文件</button>
+        <button v-if="candidate.provenance === 'ncbi_datasets'" type="button" :disabled="busy" @click="inspectPlan(candidate)">查看获取计划</button>
       </article>
       <button v-if="nextCursor" type="button" :disabled="busy" @click="load(true)">加载更多线索</button>
+      <div v-if="acquisitionPlan" class="candidate" role="status">
+        <strong>{{ acquisitionPlan.accession }} · 获取尚未开始</strong>
+        <p>计划格式：genomic FASTA；传输上限：100 MiB。</p>
+        <p class="hint">官方序列长度 {{ acquisitionPlan.reported_sequence_bases ?? '未知' }} bp 不等于下载字节数。持久下载任务尚未接入，此计划不会启动下载。</p>
+      </div>
       <div v-if="selected" class="versions">
         <strong>{{ selected.title }} · 文件版本</strong>
         <p class="hint">选择本会话中的文件。每个文件最多 64 MiB，一次最多 16 个、合计 128 MiB。</p>
@@ -49,8 +61,10 @@
 <script setup lang="ts">
 import { ref, watch, onUnmounted } from 'vue';
 import type { FileInfo } from '../api/file';
-import { listCandidates, createCandidate, listVersions, registerVersion, type DataCandidate, type DataVersion } from '../api/dataCandidate';
-const props = defineProps<{ sessionId: string; files: FileInfo[] }>();
+import { listCandidates, createCandidate, listVersions, registerVersion, getAcquisitionPlan, type AcquisitionPlan, type DataCandidate, type DataVersion } from '../api/dataCandidate';
+const props = defineProps<{ sessionId: string; files: FileInfo[]; revision?: number }>();
+const acquisitionPlan = ref<AcquisitionPlan | null>(null);
+let refreshTimer: ReturnType<typeof setTimeout> | null = null;
 const open = ref(false), busy = ref(false), loaded = ref(false), versionsLoaded = ref(false);
 const error = ref(''), notice = ref('');
 const candidates = ref<DataCandidate[]>([]), versions = ref<DataVersion[]>([]);
@@ -102,6 +116,13 @@ async function loadVersions(more = false) {
     versionCursor.value = page.next_cursor; versionsLoaded.value = true;
   });
 }
+async function inspectPlan(candidate: DataCandidate) {
+  acquisitionPlan.value = null;
+  await perform(async (signal, current) => {
+    const plan = await getAcquisitionPlan(props.sessionId, candidate.candidate_id, signal);
+    if (current()) acquisitionPlan.value = plan;
+  });
+}
 async function register() {
   const candidate = selected.value;
   if (!candidate || !fileIds.value.length) return;
@@ -113,16 +134,22 @@ async function register() {
     notice.value = '文件内容摘要已登记，来源关联尚未核验。';
   });
 }
+watch(() => props.revision, () => {
+  if (refreshTimer) clearTimeout(refreshTimer);
+  if (open.value) refreshTimer = setTimeout(() => { refreshTimer = null; void load(); }, 1500);
+});
 watch(open, value => { if (value && !loaded.value) void load(); });
 watch(() => props.sessionId, () => {
   generation++; controller?.abort(); controller = null;
+  if (refreshTimer) clearTimeout(refreshTimer);
+  refreshTimer = null; acquisitionPlan.value = null;
   busy.value = false; loaded.value = false; versionsLoaded.value = false;
   candidates.value = []; versions.value = []; selected.value = null; fileIds.value = [];
   nextCursor.value = null; versionCursor.value = null; error.value = ''; notice.value = '';
   draft.value = { title: '', source_url: '', external_id: '' };
   if (open.value) void load();
 });
-onUnmounted(() => { generation++; controller?.abort(); });
+onUnmounted(() => { generation++; controller?.abort(); if (refreshTimer) clearTimeout(refreshTimer); });
 </script>
 
 <style scoped>

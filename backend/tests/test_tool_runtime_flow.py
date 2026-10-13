@@ -144,6 +144,8 @@ async def test_default_flow_is_small_but_legacy_profile_retains_full_catalog(flo
     _, complete_tokens = estimate_context_tokens([], tool_schemas=complete)
     assert initial_tokens < complete_tokens / 3
     assert {"dataset_quicklook", "dataset_unpack", "shell_exec"} <= set(ToolRegistry(small.executor.toolkits).tool_names())
+    assert {"ncbi_search_genomes", "ncbi_describe_genome", "ncbi_plan_acquisition"} <= set(ToolRegistry(small.executor.toolkits).tool_names())
+    assert "Scientific data discovery" in small._dynamic_system_prompt()
     assert small._tool_registry.get_tool("space_ground_track") is not None
     assert small.executor.get_tool("space_ground_track") is None
 
@@ -154,6 +156,8 @@ async def test_load_in_dataset_fast_path_adds_next_model_schema_without_bypassin
     flow.configure_tool_execution()
     agent = flow.executor
     agent._dataset_fast_path_mode = True
+    assert agent.get_tool("ncbi_search_genomes") is not None
+    assert {"ncbi_search_genomes", "ncbi_describe_genome", "ncbi_plan_acquisition"} <= {schema["function"]["name"] for schema in _schemas(agent)}
     assert agent.get_tool("tool_catalog_search") is not None
     assert agent.get_tool("tool_catalog_load") is not None
     assert agent.get_tool("table_profile") is None

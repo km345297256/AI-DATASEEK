@@ -5,7 +5,8 @@ import json
 from typing import Annotated, Literal
 from urllib.parse import urlsplit, urlunsplit
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from app.domain.models.source_connector import NcbiObservation
 
 OpaqueId = Annotated[str, Field(pattern=r"^(?:(?:minio|gridfs):)?[A-Za-z0-9_-]{1,128}$")]
 Digest = Annotated[str, Field(pattern=r"^[a-f0-9]{64}$")]
@@ -54,7 +55,19 @@ class DataCandidate(CandidateInput):
     candidate_id: Digest
     asset_id: Digest
     created_at: int
-    provenance: Literal["user_reference"] = "user_reference"
+    provenance: Literal["user_reference", "ncbi_datasets"] = "user_reference"
+    discovery: NcbiObservation | None = None
+
+    @model_validator(mode="after")
+    def validate_evidence(self):
+        if self.provenance == "user_reference" and self.discovery is not None:
+            raise ValueError("Manual references cannot claim connector evidence")
+        if self.provenance == "ncbi_datasets":
+            if self.discovery is None or self.external_id != self.discovery.assembly.accession:
+                raise ValueError("NCBI references require exact assembly evidence")
+            if self.source_url != f"https://www.ncbi.nlm.nih.gov/datasets/genome/{self.external_id}/":
+                raise ValueError("NCBI source URL mismatch")
+        return self
 
 
 class VersionInput(StrictRecord):
@@ -97,3 +110,11 @@ class CandidatePage(StrictRecord):
 class VersionPage(StrictRecord):
     versions: list[DataVersion]
     next_cursor: Digest | None = None
+
+
+class DiscoveryPage(StrictRecord):
+    candidates: list[DataCandidate]
+    total_count: int | None
+    next_page_token: str
+    scope: Literal["one_provider_page"] = "one_provider_page"
+    files_downloaded: Literal[False] = False

@@ -132,7 +132,7 @@ class FrontControllerResolution:
 LightweightResolution = FrontControllerResolution
 
 
-FRONT_CONTROLLER_PROMPT_VERSION = "2026-09-08.1"
+FRONT_CONTROLLER_PROMPT_VERSION = "2026-10-13.1"
 MAX_TARGET_FILES = 48
 MAX_CONTROLLER_RESPONSE_CHARS = 16000
 
@@ -235,6 +235,9 @@ Rules:
 - Use direct only when the answer follows completely from the user's own text,
   recent conversation, or ordinary language knowledge. Do not verify extra facts
   that the user did not ask to verify.
+- Internet dataset discovery, NCBI accession verification, or obtaining current
+  scientific source metadata requires sandbox mode (the tool-enabled agent).
+  Such requests cannot be answered from the local catalog or direct memory.
 - Use catalog when the answer needs only registered dataset names, descriptions,
   tags, file paths, filenames, extensions, sizes, counts, or format groups.
 - `recent_archive_inventory` contains virtual paths recovered from successful

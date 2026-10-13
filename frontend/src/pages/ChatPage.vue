@@ -109,7 +109,7 @@
       </div>
       <div class="mx-auto w-full max-w-full sm:max-w-[768px] sm:min-w-[390px] flex flex-col flex-1">
         <div class="flex flex-col w-full gap-[12px] pb-[80px] pt-[12px] flex-1 overflow-y-auto">
-          <DataSourceCandidates v-if="sessionId" :session-id="sessionId" :files="provenanceFiles" />
+          <DataSourceCandidates v-if="sessionId" :session-id="sessionId" :files="provenanceFiles" :revision="lastEventSeq" />
           <DataRunHistory v-if="sessionId" :session-id="sessionId" :revision="lastEventSeq" />
           <button v-if="hasMoreHistory" type="button" :disabled="isLoadingHistory" class="mx-auto rounded-lg px-4 py-2 text-sm text-[var(--text-secondary)] disabled:opacity-50" @click="loadEarlierHistory">
             {{ isLoadingHistory ? '正在加载历史记录…' : '加载更早的对话' }}

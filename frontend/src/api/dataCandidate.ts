@@ -1,7 +1,11 @@
 import { apiClient, type ApiResponse } from './client';
 export interface CandidateInput { title: string; source_url: string; external_id: string }
 export interface DataCandidate extends CandidateInput {
-  candidate_id: string; asset_id: string; created_at: number; provenance: 'user_reference';
+  candidate_id: string; asset_id: string; created_at: number; provenance: 'user_reference' | 'ncbi_datasets';
+  discovery?: {
+    connector: 'ncbi-datasets-v2'; retrieved_at: number; report_sha256: string;
+    assembly: { accession: string; organism_name: string; tax_id: number; source_database: 'refseq' | 'genbank'; assembly_level: string; reference_genome: boolean | null; total_sequence_length: number | null; gc_percent: number | null };
+  } | null;
 }
 export interface DataVersion {
   version_id: string; candidate_id: string; asset_id: string;
@@ -23,4 +27,12 @@ export async function listVersions(session: string, candidate: string, cursor?: 
 }
 export async function registerVersion(session: string, candidate: string, fileIds: string[], signal?: AbortSignal) {
   return (await apiClient.post<ApiResponse<DataVersion>>(`${base(session)}/${encodeURIComponent(candidate)}/versions`, { file_ids: fileIds }, { signal, timeout: 120000 })).data.data;
+}
+
+export interface AcquisitionPlan {
+  accession: string; reported_sequence_bases: number | null; download_size_bytes: null;
+  transfer_limit_bytes: number; status: 'not_started'; execution_available: false;
+}
+export async function getAcquisitionPlan(session: string, candidate: string, signal?: AbortSignal) {
+  return (await apiClient.get<ApiResponse<AcquisitionPlan>>(`${base(session)}/${encodeURIComponent(candidate)}/acquisition-plan`, { signal })).data.data;
 }

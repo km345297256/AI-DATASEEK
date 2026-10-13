@@ -42,6 +42,7 @@ from app.domain.services.tools.message import MessageToolkit
 from app.domain.services.tools.search import SearchToolkit
 from app.domain.services.tools.skill import SkillToolkit
 from app.domain.services.tools.dataset_catalog import DatasetCatalogToolkit
+from app.domain.services.tools.data_discovery import DataDiscoveryToolkit, DISCOVERY_GUIDANCE
 from app.domain.services.tools.plugin import PluginToolkit
 from app.domain.services.tools.registry import ToolRegistry
 from app.domain.services.tools.tool_selection import PluginToolView, ToolDiscoveryToolkit
@@ -265,6 +266,7 @@ class PlanActFlow(BaseFlow):
             MessageToolkit(),
             self.skill_toolkit,
             self.dataset_catalog_toolkit,
+            DataDiscoveryToolkit(user_id=self._user_id, session_id=self._session_id),
             mcp_tool,
         ]
 
@@ -1109,6 +1111,7 @@ class PlanActFlow(BaseFlow):
                 for part in [
                     self._runtime_context_prompt(),
                     self.dataset_context,
+                    DISCOVERY_GUIDANCE,
                     self._tool_selection_prompt(),
                 ]
                 if part
@@ -1119,6 +1122,7 @@ class PlanActFlow(BaseFlow):
                 self._runtime_context_prompt(),
                 self._subagent_capabilities_prompt(),
                 self.active_skill_context,
+                DISCOVERY_GUIDANCE,
                 getattr(self, "dataset_context", ""),
                 self._tool_selection_prompt(),
             ]
