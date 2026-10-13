@@ -6,6 +6,7 @@ import { ref } from 'vue';
 import { useAnalysisProgress } from '../src/composables/useAnalysisProgress.ts';
 import { isAnalysisProgressEvent, isAnalysisProgressMessage } from '../src/utils/analysisProgress.ts';
 import { acceptAgentEvent, createAgentEventCursor } from '../src/utils/agentEventCursor.ts';
+import { closeUnconfirmedSteps } from '../src/utils/chatTimeline.ts';
 import { projectHistoryMessages, prependHistoricalMessages } from '../src/utils/sessionHistory.ts';
 
 const progress = (seq = 1, stage = 'verifying_execution', extra = {}) => ({
@@ -37,7 +38,7 @@ function harness(page) {
     lastEventId: ref(), lastEventSeq: ref(), isLoading: ref(true), taskStartedAtMs: ref(),
     completionAdvice: ref(), currentPlan: ref(),
     isPlaceholderAssistantMessage: () => false, isLegacyPlanProgressMessage: () => false,
-    completeRunningSteps() {}, failRunningSteps() {}, insertTaskExecutionSummary() {},
+    closeUnconfirmedSteps() {}, failRunningSteps() {}, insertTaskExecutionSummary() {},
     eventBus: { emit() {} }, EVENT_REFRESH_SESSION_LIST: 'refresh', refreshHistory() {},
     handleToolEvent() {}, handleTool() {}, handleStepEvent() {}, handleStep() {},
     handlePlanEvent() {}, handleTitleEvent() {}, handleErrorEvent() {},
@@ -62,12 +63,12 @@ for (const page of ['ChatPage', 'DatasetSeekPage', 'SharePage']) {
     assert.equal(scope.analysisProgress.value, '正在补全分析结果…');
   });
 
-  test(`${page}: final outcome remains a genuine answer and closes late progress`, () => {
+  test(`${page}: step outcome remains an answer while later stages can report progress`, () => {
     const { scope, receive } = harness(page);
     receive(progress(1));
     receive(final(2));
     receive(progress(3));
-    assert.equal(scope.analysisProgress.value, '');
+    assert.equal(scope.analysisProgress.value, '正在核验执行状态…');
     assert.equal(scope.messages.value.length, 1);
     assert.equal(scope.messages.value[0].content.content, '已完成的真实结论');
     assert.deepEqual(scope.messages.value[0].content.metadata.analysis_outcome, outcome);
@@ -195,3 +196,21 @@ test('shared timed replay cannot append or clear a new view after its timer resu
   assert.equal(scope.analysisProgress.value, 'new view');
   assert.equal(scope.replayCompleted.value, false);
 });
+
+
+for (const page of ['ChatPage', 'DatasetSeekPage', 'SharePage']) {
+  test(`${page}: stream end preserves confirmed steps and marks an unfinished step unknown`, () => {
+    const { scope, receive } = harness(page);
+    scope.closeUnconfirmedSteps = closeUnconfirmedSteps;
+    scope.messages.value = [
+      { type: 'user', content: { content: '分析', timestamp: 1 } },
+      ...['completed', 'failed', 'running'].map((status, index) => ({ type: 'step', content: {
+        id: String(index), status, description: status, tools: [], timestamp: 2,
+      } })),
+    ];
+    receive({ event: 'done', data: { seq: 10, timestamp: 10 } });
+    assert.deepEqual(scope.messages.value.filter((message) => message.type === 'step').map((message) => message.content.status),
+      ['completed', 'failed', 'unknown']);
+    assert.equal(scope.isLoading.value, false);
+  });
+}

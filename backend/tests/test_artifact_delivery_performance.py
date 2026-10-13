@@ -280,6 +280,7 @@ async def test_completed_step_delivers_artifact_once_before_duplicate_messages()
     assert delivery.metadata["artifact_delivery"] is True
     assert delivery.metadata["step_id"] == step.id
     assert delivery.metadata["analysis_outcome"]["status"] == "succeeded"
+    assert delivery.metadata["analysis_outcome"]["scope"] == "step"
     assert discovery_skip_paths == [{artifact_path}]
     assert events[-1].advice is not None
 

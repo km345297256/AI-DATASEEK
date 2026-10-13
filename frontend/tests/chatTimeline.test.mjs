@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import {
-  completeRunningSteps,
+  closeUnconfirmedSteps,
   failRunningSteps,
   findCurrentTurnRunningStep,
   findCurrentTurnStep,
@@ -68,7 +68,7 @@ test('an error only fails running steps in the current turn', () => {
   assert.equal(messages[3].content.status, 'failed');
 });
 
-test('a done event completes a running step in the current turn', () => {
+test('a done event closes a running step as unconfirmed, never successful', () => {
   const oldStep = { id: '1', description: 'old', status: 'running', tools: [], timestamp: 1 };
   const currentStep = { id: '2', description: 'export', status: 'running', tools: [], timestamp: 2 };
   const messages = [
@@ -79,11 +79,11 @@ test('a done event completes a running step in the current turn', () => {
     message('assistant', { content: 'done' }),
   ];
 
-  const completed = completeRunningSteps(messages, 10);
+  const completed = closeUnconfirmedSteps(messages, 10);
 
   assert.equal(completed.length, 1);
   assert.equal(messages[1].content.status, 'running');
-  assert.equal(messages[3].content.status, 'completed');
+  assert.equal(messages[3].content.status, 'unknown');
   assert.equal(messages[3].content.ended_at, 10);
 });
 

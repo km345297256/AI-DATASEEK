@@ -57,23 +57,24 @@ export const failRunningSteps = (
   return failedSteps;
 };
 
-export const completeRunningSteps = (
+/** End of a message stream is not evidence that an unfinished step succeeded. */
+export const closeUnconfirmedSteps = (
   messages: Message[],
   endedAt: number,
   currentTurnOnly = true,
 ): StepContent[] => {
   const turnStart = currentTurnOnly ? getCurrentTurnStartIndex(messages) : 0;
-  const completedSteps: StepContent[] = [];
+  const unconfirmedSteps: StepContent[] = [];
   for (let index = turnStart; index < messages.length; index += 1) {
     const message = messages[index];
     if (message.type !== 'step') continue;
     const step = message.content as StepContent;
     if (step.status !== 'running') continue;
-    step.status = 'completed';
+    step.status = 'unknown';
     step.ended_at = endedAt;
-    completedSteps.push(step);
+    unconfirmedSteps.push(step);
   }
-  return completedSteps;
+  return unconfirmedSteps;
 };
 
 export const insertTaskExecutionSummary = (

@@ -28,7 +28,7 @@ test('whole-turn paged replay matches eager history including tools, attachments
   const merged = prependHistoricalMessages(projectHistoryMessages([...first, ...second]), latest);
   assert.deepEqual(merged, eager);
   assert.equal(merged.findLast((message) => message.type === 'step'), latestObject);
-  assert.deepEqual(merged.filter((message) => message.type === 'step').map((message) => message.content.status), ['completed', 'completed', 'completed']);
+  assert.deepEqual(merged.filter((message) => message.type === 'step').map((message) => message.content.status), ['unknown', 'unknown', 'unknown']);
 });
 
 test('late history completion preserves live events, tools, polling updates and the SSE cursor', async () => {
@@ -110,4 +110,18 @@ test('page integrations use abortable five-turn history while shared views keep 
   const shared = await readFile(new URL('../src/pages/SharePage.vue', import.meta.url), 'utf8');
   assert.match(shared, /getSharedSession\(/);
   assert.doesNotMatch(shared, /getSessionHistory\(/);
+});
+
+
+test('replay resolves an unconfirmed step only when its explicit terminal event arrives', () => {
+  const events = [
+    event(1, 'message', { role: 'user', content: '分析' }),
+    event(2, 'step', { id: 'step', status: 'running', description: '分析' }),
+    event(3, 'done', {}),
+  ];
+  assert.equal(projectHistoryMessages(events).find((message) => message.type === 'step').content.status, 'unknown');
+  for (const status of ['completed', 'failed']) {
+    const replayed = projectHistoryMessages([...events, event(4, 'step', { id: 'step', status, description: '分析' })]);
+    assert.equal(replayed.find((message) => message.type === 'step').content.status, status);
+  }
 });

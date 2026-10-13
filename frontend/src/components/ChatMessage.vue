@@ -136,6 +136,7 @@
       <span class="size-3.5 animate-spin rounded-full border-2 border-[var(--border-dark)] border-t-transparent" aria-hidden="true" />
       <span>思考中...</span>
     </div>
+    <p v-if="stepContent.status === 'unknown'" class="mb-2 text-xs text-[var(--text-secondary)]" role="status">本轮响应已结束，此阶段的执行结果尚未确认。</p>
     <div class="flex">
       <div class="w-[24px] relative">
         <div class="border-l border-dashed border-[var(--border-dark)] absolute start-[8px] top-0 bottom-0"

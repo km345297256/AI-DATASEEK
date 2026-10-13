@@ -19,6 +19,8 @@ export interface ArtifactIssue {
 }
 
 export interface AnalysisOutcome {
+  /** Older events omit scope; neither case certifies overall task completion. */
+  scope?: 'step';
   status: 'succeeded' | 'partial' | 'failed';
   reason_code: string;
   missing: Array<{ kind: string; min_count: number; label: string }>;

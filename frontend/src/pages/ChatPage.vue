@@ -142,7 +142,7 @@
           </div>
 
           <!-- Loading indicator -->
-          <LoadingIndicator v-if="isLoading || isRestoringHistory" role="status" aria-live="polite" :text="isRestoringHistory ? '正在加载最近对话…' : connectionNotice || analysisProgress || $t('Thinking')" />
+          <LoadingIndicator v-if="(isLoading || isRestoringHistory) && !hasRunningStep" role="status" aria-live="polite" :text="isRestoringHistory ? '正在加载最近对话…' : connectionNotice || analysisProgress || $t('Thinking')" />
           <p v-else-if="connectionNotice" role="status" class="mt-3 text-sm text-[var(--text-tertiary)]">{{ connectionNotice }}</p>
         </div>
 
@@ -168,7 +168,7 @@
 <script setup lang="ts">
 import { findAnalysisTool, mergeAnalysisToolEvent } from '@/utils/analysisJob';
 import SimpleBar from '../components/SimpleBar.vue';
-import { ref, onMounted, watch, nextTick, onUnmounted, reactive, toRefs } from 'vue';
+import { ref, computed, onMounted, watch, nextTick, onUnmounted, reactive, toRefs } from 'vue';
 import { useRouter, onBeforeRouteUpdate } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import ChatBox from '../components/ChatBox.vue';
@@ -201,7 +201,7 @@ import { consumePendingChat } from '../composables/usePendingChat'
 import { useAgentProfile } from '../composables/useAgentProfile'
 import { copyToClipboard } from '../utils/dom'
 import {
-  completeRunningSteps,
+  closeUnconfirmedSteps,
   failRunningSteps,
   findCurrentTurnRunningStep,
   findCurrentTurnStep,
@@ -306,6 +306,7 @@ const {
   taskStartedAtMs,
 } = toRefs(state);
 const { updateAnalysisProgress, beginAnalysisProgress, clearAnalysisProgress } = useAnalysisProgress(analysisProgress);
+const hasRunningStep = computed(() => Boolean(findCurrentTurnRunningStep(messages.value)));
 
 // Non-state refs that don't need reset
 const toolPanel = ref<InstanceType<typeof ToolPanel>>()
@@ -535,7 +536,7 @@ const handleEvent = (event: AgentSSEEvent) => {
     handleStepEvent(event.data as StepEventData);
   } else if (event.event === 'done') {
     isLoading.value = false;
-    completeRunningSteps(messages.value, event.data.timestamp);
+    closeUnconfirmedSteps(messages.value, event.data.timestamp);
     eventBus.emit(EVENT_REFRESH_SESSION_LIST);
     const elapsedMs = taskStartedAtMs.value === undefined
       ? undefined

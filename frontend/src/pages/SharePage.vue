@@ -139,6 +139,7 @@ import {
   findCurrentTurnStep,
   insertTaskExecutionSummary,
   isLatestAssistantMessage,
+  closeUnconfirmedSteps,
 } from '../utils/chatTimeline';
 import { isPlaceholderAssistantMessage } from '../utils/datasetResultPresentation';
 import { isAnalysisProgressMessage } from '../utils/analysisProgress';
@@ -401,6 +402,7 @@ const handleEvent = (event: AgentSSEEvent) => {
     handleStepEvent(event.data as StepEventData);
   } else if (event.event === 'done') {
     isLoading.value = false;
+    closeUnconfirmedSteps(messages.value, event.data.timestamp);
     insertTaskExecutionSummary(messages.value, event.data.timestamp);
     completionAdvice.value = (event.data as any)?.advice;
   } else if (event.event === 'wait') {

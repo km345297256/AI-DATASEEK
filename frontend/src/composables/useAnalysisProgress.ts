@@ -19,7 +19,7 @@ export function useAnalysisProgress(analysisProgress: Ref<string> = ref('')) {
       beginAnalysisProgress();
       return;
     }
-    if (['done', 'wait', 'error'].includes(event.event) || message?.metadata?.analysis_outcome) {
+    if (['done', 'wait', 'error'].includes(event.event)) {
       clearAnalysisProgress();
       return;
     }

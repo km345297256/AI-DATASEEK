@@ -91,7 +91,7 @@ const planProgress = computed((): string => {
 });
 
 const isCompleted = computed((): boolean => {
-  return props.plan?.steps.every(step => step.status === 'completed') ?? false;
+  return Boolean(props.plan?.steps.length) && props.plan.steps.every(step => step.status === 'completed');
 });
 
 const hasFailedStep = computed((): boolean => {
@@ -104,7 +104,8 @@ const currentStep = computed((): string => {
       return step.description;
     }
   }
-  return t('Task Completed');
+  if (hasFailedStep.value) return '部分步骤未完成';
+  return isCompleted.value ? t('Task Completed') : '任务状态待确认';
 });
 
 const isTerminalStep = (status: string): boolean => {

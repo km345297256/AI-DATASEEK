@@ -246,7 +246,7 @@ def test_partial_summary_reports_the_actual_chart_and_code_without_a_generic_scr
 def test_success_summary_does_not_say_failed_or_hide_verified_delivery_types():
     _, chart = artifact()
     text = outcome_message(AnalysisOutcome(status="succeeded", reason_code="completed"), delivered_files=[chart])
-    assert text.startswith("本次分析已完成。")
+    assert text.startswith("本阶段分析已完成。")
     assert "图表 × 1" in text
     assert "未完成" not in text and "待完成" not in text
 

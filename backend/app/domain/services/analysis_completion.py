@@ -307,7 +307,7 @@ def outcome_message(outcome: AnalysisOutcome, *, delivered_count: int = 0,
                     delivered_files: list[Any] | None = None) -> str:
     """A truthful status summary; do not replace verified analysis content with it."""
     complete = outcome.status == "succeeded" and not outcome.missing
-    prefix = ("本次分析已完成。" if complete else
+    prefix = ("本阶段分析已完成。" if complete else
               "本次分析部分完成。" if outcome.status in {"partial", "succeeded"} else "本次分析未完成。")
     lines = [prefix]
     if not complete:

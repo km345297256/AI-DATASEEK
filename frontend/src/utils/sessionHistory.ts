@@ -2,7 +2,7 @@ import type { AgentSSEEvent, MessageEventData, StepEventData, ToolEventData, Err
 import type { Message, MessageContent, AttachmentsContent, StepContent, ToolContent } from '../types/message';
 import { acceptAgentEvent, createAgentEventCursor } from './agentEventCursor.ts';
 import { findAnalysisTool, mergeAnalysisToolEvent } from './analysisJob.ts';
-import { completeRunningSteps, failRunningSteps, findCurrentTurnRunningStep, findCurrentTurnStep, insertTaskExecutionSummary } from './chatTimeline.ts';
+import { closeUnconfirmedSteps, failRunningSteps, findCurrentTurnRunningStep, findCurrentTurnStep, insertTaskExecutionSummary } from './chatTimeline.ts';
 import { isPlaceholderAssistantMessage } from './datasetResultPresentation.ts';
 import { isAnalysisProgressMessage } from './analysisProgress.ts';
 
@@ -48,7 +48,7 @@ export function projectHistoryMessages(events: AgentSSEEvent[], datasetMode = fa
       failRunningSteps(messages);
       messages.push({ type: 'assistant', content: { content: data.error, timestamp: data.timestamp } as MessageContent });
     } else if (event.event === 'done') {
-      completeRunningSteps(messages, event.data.timestamp);
+      closeUnconfirmedSteps(messages, event.data.timestamp);
       insertTaskExecutionSummary(messages, event.data.timestamp);
     }
   }

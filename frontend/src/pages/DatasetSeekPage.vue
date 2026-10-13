@@ -564,7 +564,7 @@ import { isPlaceholderAssistantMessage } from '@/utils/datasetResultPresentation
 import { copyToClipboard } from '@/utils/dom';
 import { eventBus } from '@/utils/eventBus';
 import { showErrorToast, showSuccessToast } from '@/utils/toast';
-import { completeRunningSteps, failRunningSteps, findCurrentTurnRunningStep, findCurrentTurnStep, insertTaskExecutionSummary, isLatestAssistantMessage } from '@/utils/chatTimeline';
+import { closeUnconfirmedSteps, failRunningSteps, findCurrentTurnRunningStep, findCurrentTurnStep, insertTaskExecutionSummary, isLatestAssistantMessage } from '@/utils/chatTimeline';
 import { acceptAgentEvent, createAgentEventCursor, resetAgentEventCursor } from '@/utils/agentEventCursor';
 import { isConsecutiveAssistant, type AttachmentsContent, type Message, type MessageContent, type StepContent, type ToolContent } from '@/types/message';
 import type { AgentSSEEvent, CompletionAdviceData, DoneEventData, ErrorEventData, MessageEventData, PlanEventData, StepEventData, TitleEventData, ToolEventData } from '@/types/event';
@@ -1059,7 +1059,7 @@ function handleEvent(event: AgentSSEEvent) {
     taskStartedAtMs.value = undefined;
   } else if (event.event === 'done') {
     isLoading.value = false;
-    completeRunningSteps(messages.value, event.data.timestamp);
+    closeUnconfirmedSteps(messages.value, event.data.timestamp);
     const elapsedMs = taskStartedAtMs.value === undefined
       ? undefined
       : performance.now() - taskStartedAtMs.value;

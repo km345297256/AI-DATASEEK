@@ -170,6 +170,16 @@ Run 成功条件：当前计划的必要步骤成功、必要产物已登记且�
 
 ## 8. 官方来源与尚待验证的事实
 
+### 执行状态修正记录（2026-10-13）
+
+LAB-02/06 的首批修正明确了已有成果检查契约的作用范围：AnalysisOutcome 固定为 step，单个阶段成功不能证明整个任务完成。前端实时消息与历史回放统一显示“阶段已完成”；旧消息没有范围字段时仅显示“成果检查通过”，不追认整体任务成功。服务端兜底成功文案也改为“本阶段分析已完成”。
+
+响应结束事件不再把仍在运行的步骤补写为成功，而是停止该步骤的加载指示并显示“执行结果尚未确认”；之后收到明确的步骤终态时才更新结果。阶段成果不会关闭后续阶段的进度提示。失败计划和空计划不显示“任务已完成”，聊天页已有步骤加载指示时不重复显示底部“思考中”。这些修正覆盖聊天、数据集分析和分享页的响应结束处理，以及历史回放。
+
+验证：后端 5,308 通过、32 跳过、190 子测试通过；继续排除含导入时数据库操作的原有 test_admin_skill_delete.py。前端 2,662 项测试、类型检查和生产构建通过，Compose 配置检查通过。沙箱仍因本机缺少 PyMuPDF、python-pptx 及受控 Linux GRIB 环境在收集阶段失败，本批没有修改沙箱。
+
+边界：本批未建立独立的持久化 Run/Attempt 模型，也未实现跨运行事件归属和恢复调度；LAB-02/06 尚未全部完成。unknown 是前端对缺失步骤终态的保守展示，不是新建的后端任务终态。
+
 - [NCBI 获取基因组元数据](https://www.ncbi.nlm.nih.gov/datasets/docs/v2/how-tos/genomes/get-genome-metadata/)：支持按物种、accession 和组装属性检索；用于场景 A 的入口选择。
 - [NCBI 获取基因组数据包](https://www.ncbi.nlm.nih.gov/datasets/docs/v2/how-tos/genomes/download-genome/)：用于场景 A 的获取适配设计。
 - [NCBI Datasets FAQ](https://www.ncbi.nlm.nih.gov/datasets/docs/v2/troubleshooting/faq/)：Datasets 不提供 SRA 获取，SRA 需要单独工具链。

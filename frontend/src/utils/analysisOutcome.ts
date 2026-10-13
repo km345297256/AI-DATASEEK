@@ -89,6 +89,7 @@ export function readAnalysisOutcome(value: unknown): AnalysisOutcome | undefined
   const resumeFrom = typeof outcome.resume_from === 'string' && CHECKPOINT_ID.test(outcome.resume_from)
     ? outcome.resume_from : undefined;
   return {
+    ...(outcome.scope === 'step' ? { scope: 'step' as const } : {}),
     status: outcome.status as AnalysisOutcome['status'],
     reason_code: outcome.reason_code,
     missing: outcome.missing as AnalysisOutcome['missing'],
@@ -128,15 +129,18 @@ const REASON_LABELS: Record<string, string> = {
 
 /** Do not render arbitrary diagnostic text, paths or provider output. */
 export function analysisOutcomeReason(outcome: AnalysisOutcome): string {
-  if (analysisOutcomeIsComplete(outcome)) return '本次分析已完成。';
+  if (analysisOutcomeIsComplete(outcome)) return outcome.scope === 'step'
+    ? '本阶段的执行与成果检查已完成，整体任务状态请以任务进度为准。'
+    : '该条结果的成果检查已通过，整体任务完成情况尚未确认。';
   if (['completed', 'requirements_satisfied'].includes(outcome.reason_code)) return '本次分析仍有待完成项。';
   return (Object.prototype.hasOwnProperty.call(REASON_LABELS, outcome.reason_code) ? REASON_LABELS[outcome.reason_code] : undefined)
     ?? '本次分析尚未完成，具体原因暂未确认。';
 }
 
 export function analysisOutcomeTitle(outcome: AnalysisOutcome): string {
-  return analysisOutcomeIsComplete(outcome) ? '已完成'
-    : outcome.status === 'failed' ? '未完成' : '部分完成';
+  if (analysisOutcomeIsComplete(outcome)) return outcome.scope === 'step' ? '阶段已完成' : '成果检查通过';
+  const title = outcome.status === 'failed' ? '未完成' : '部分完成';
+  return outcome.scope === 'step' ? `阶段${title}` : title;
 }
 
 export function analysisOutcomeMissing(outcome: AnalysisOutcome): string[] {

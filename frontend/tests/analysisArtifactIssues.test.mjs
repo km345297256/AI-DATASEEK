@@ -34,7 +34,7 @@ test('history without issue metadata remains compatible and is never rewritten',
   const snapshot = JSON.stringify(value);
   const parsed = presentation.readAnalysisOutcome(value);
   assert.deepEqual(parsed.issues, []);
-  assert.equal(presentation.analysisOutcomeTitle(parsed), '已完成');
+  assert.equal(presentation.analysisOutcomeTitle(parsed), '成果检查通过');
   assert.equal(JSON.stringify(value), snapshot);
   for (const issues of [null, false, 'legacy data', {}]) {
     assert.deepEqual(read({ issues }).issues, []);
@@ -98,8 +98,8 @@ test('diagnostics are bounded, copied, and exact duplicates are removed', () => 
 test('successful required delivery stays completed while auxiliary failures render separately', async () => {
   const value = read({ issues: [issue(), issue({ artifact_name: 'optional.py', kind: 'code', reason_code: 'invalid_code_syntax' })] });
   assert.equal(presentation.analysisOutcomeIsComplete(value), true);
-  assert.equal(presentation.analysisOutcomeTitle(value), '已完成');
-  assert.equal(presentation.analysisOutcomeReason(value), '本次分析已完成。');
+  assert.equal(presentation.analysisOutcomeTitle(value), '成果检查通过');
+  assert.equal(presentation.analysisOutcomeReason(value), '该条结果的成果检查已通过，整体任务完成情况尚未确认。');
   const html = await renderNotice(value, true);
   assert.match(html, /已完成/);
   assert.match(html, /附加文件问题/);
@@ -158,13 +158,28 @@ test('real analysis text is not replaced by status notices, in history or in the
   assert.match(source, /const visibleAssistantContent = computed\(\(\) => stripHiddenDatasetResultNotices\(messageContent.value.content\)\)/);
 });
 
-test('file issues do not turn terminal outcomes into transient progress or reopen finished status', () => {
+test('step diagnostics preserve answers without closing progress for subsequent steps', () => {
   const state = useAnalysisProgress();
   const progress = { event: 'message', data: { role: 'assistant', timestamp: 1, content: 'working', metadata: { analysis_progress: { stage: 'verifying_execution' } } } };
   state.updateAnalysisProgress(progress);
   const final = { event: 'message', data: { role: 'assistant', timestamp: 2, content: '真实结果', metadata: { analysis_outcome: outcome({ issues: [issue()] }) } } };
   state.updateAnalysisProgress(final);
+  assert.equal(state.analysisProgress.value, '');
+  state.updateAnalysisProgress(progress);
+  assert.equal(state.analysisProgress.value, '正在核验执行状态…');
+  state.updateAnalysisProgress({ event: 'done', data: { timestamp: 3 } });
   state.updateAnalysisProgress(progress);
   assert.equal(state.analysisProgress.value, '');
   assert.equal(projectHistoryMessages([progress, final]).length, 1);
+});
+
+
+test('real Vue notice keeps the step scope and does not hide partial failure', async () => {
+  const completeHtml = await renderNotice(read({ scope: 'step' }));
+  assert.match(completeHtml, /阶段已完成/);
+  assert.doesNotMatch(completeHtml, /本次分析已完成/);
+  const failedHtml = await renderNotice(read({ scope: 'step', status: 'failed', reason_code: 'delivery_failed' }));
+  assert.match(failedHtml, /阶段未完成/);
+  assert.match(failedHtml, /尚未成功交付/);
+  assert.doesNotMatch(failedHtml, /阶段成果已生成|分析仍在继续/);
 });

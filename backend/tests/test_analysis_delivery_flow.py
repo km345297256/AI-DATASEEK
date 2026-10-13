@@ -5,7 +5,7 @@ from unittest.mock import AsyncMock
 import pytest
 
 from app.application.services.dataset_request_resolver import ExecutionDecision, FrontControllerResolution, RequestDecision
-from app.domain.models.analysis_outcome import DeliverableRequirement
+from app.domain.models.analysis_outcome import AnalysisOutcome, DeliverableRequirement
 from app.domain.models.event import DoneEvent, MessageEvent, StepEvent, StepStatus, PlanEvent
 from app.domain.models.file import FileInfo
 from app.domain.models.message import Message
@@ -202,3 +202,48 @@ async def test_unlimited_accounting_does_not_disable_safe_delivery_checkpoint(mo
     assert step.outcome.resume_from == "a" * 32
     save.assert_awaited_once()
     handle.snapshot.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_successful_step_delivery_does_not_certify_the_following_running_step():
+    first = Step(id="inspect", success=True, status=ExecutionStatus.COMPLETED,
+                 result="结构检查结果。", deliverables=[DeliverableRequirement(kind="report")])
+    second = Step(id="analyze", status=ExecutionStatus.RUNNING)
+    pair = artifact("structure.md", "report")
+    runner = runner_for(first, [pair])
+
+    class Flow:
+        status = AgentStatus.EXECUTING
+        plan = Plan(steps=[first, second])
+
+        async def run(self, message):
+            yield StepEvent(status=StepStatus.COMPLETED, step=first)
+            yield StepEvent(status=StepStatus.STARTED, step=second)
+            yield DoneEvent()
+
+    runner._flow = Flow()
+    runner._front_controller_resolution = FrontControllerResolution(
+        decision=RequestDecision(safety=SafetyReview(decision="allow", risk_level="low"),
+                                 execution=ExecutionDecision(mode="sandbox", required_evidence="file_content")), answer="", controller_metadata={})
+    runner._record_safety_audit = AsyncMock()
+    runner._initialize_mcp_tool = AsyncMock()
+    runner._sync_step_attachments_to_storage = AsyncMock(return_value=[pair[1]])
+    runner._sync_discovered_artifacts_to_storage = AsyncMock(return_value=[])
+    runner._sync_message_attachments_to_storage = AsyncMock()
+    events = [event async for event in runner._run_flow(Message(message="检查并分析"))]
+    delivery = next(event for event in events if isinstance(event, MessageEvent)
+                    and event.metadata.get("analysis_outcome"))
+    assert delivery.metadata["step_id"] == first.id
+    assert delivery.metadata["analysis_outcome"]["scope"] == "step"
+    assert delivery.metadata["analysis_outcome"]["status"] == "succeeded"
+    assert second.status == ExecutionStatus.RUNNING
+    assert events.index(delivery) < next(index for index, event in enumerate(events)
+                                        if isinstance(event, StepEvent) and event.step.id == second.id)
+
+
+def test_step_outcome_contract_cannot_claim_run_completion():
+    from pydantic import ValidationError
+    with pytest.raises(ValidationError):
+        AnalysisOutcome(scope="run", status="succeeded", reason_code="completed")
+    legacy = AnalysisOutcome.model_validate({"status": "succeeded", "reason_code": "completed"})
+    assert legacy.model_dump()["scope"] == "step"

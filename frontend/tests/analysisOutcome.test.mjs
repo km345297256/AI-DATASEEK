@@ -177,8 +177,8 @@ test('unknown failure notice does not invent preserved files or promise automati
 
 test('only confirmed successful outcomes display completed and contradictory missing items remain visible', () => {
   const complete = readAnalysisOutcome(outcome({ status: 'succeeded', reason_code: 'completed', missing: [], can_resume: false }));
-  assert.equal(analysisOutcomeTitle(complete), '已完成');
-  assert.equal(analysisOutcomeReason(complete), '本次分析已完成。');
+  assert.equal(analysisOutcomeTitle(complete), '成果检查通过');
+  assert.equal(analysisOutcomeReason(complete), '该条结果的成果检查已通过，整体任务完成情况尚未确认。');
   const contradictory = readAnalysisOutcome(outcome({ status: 'succeeded', reason_code: 'completed' }));
   assert.equal(analysisOutcomeTitle(contradictory), '部分完成');
   assert.equal(analysisOutcomeReason(contradictory), '本次分析仍有待完成项。');
@@ -197,4 +197,43 @@ test('in-progress assistant messages stay nonterminal and never display successf
   assert.equal(resumableAnalysisOutcome([assistant(), progress], 1), undefined);
   const projected = projectHistoryMessages([{ event: 'message', data: { role: 'assistant', ...progress.content } }]);
   assert.deepEqual(projected, []);
+});
+
+
+test('step success stays scoped before, during and after subsequent steps in history', () => {
+  const result = outcome({ scope: 'step', status: 'succeeded', reason_code: 'completed', missing: [], can_resume: false });
+  const resultEvent = { event: 'message', data: { seq: 2, timestamp: 2, role: 'assistant', content: '结构摘要', metadata: { analysis_outcome: result, step_id: 'inspect' } } };
+  const events = [
+    { event: 'message', data: { seq: 1, timestamp: 1, role: 'user', content: '检查并分析' } },
+    resultEvent,
+    { event: 'step', data: { seq: 3, timestamp: 3, id: 'analyze', description: '分析', status: 'running' } },
+    { event: 'step', data: { seq: 4, timestamp: 4, id: 'analyze', description: '分析', status: 'failed' } },
+    { event: 'done', data: { seq: 5, timestamp: 5 } },
+  ];
+  for (const end of [2, 3, 4, 5]) {
+    const messages = projectHistoryMessages(events.slice(0, end));
+    const answer = messages.find((message) => message.type === 'assistant');
+    const parsed = readAnalysisOutcome(answer.content.metadata.analysis_outcome);
+    assert.equal(analysisOutcomeTitle(parsed), '阶段已完成');
+    assert.equal(analysisOutcomeReason(parsed), '本阶段的执行与成果检查已完成，整体任务状态请以任务进度为准。');
+    assert.doesNotMatch(analysisOutcomeReason(parsed), /本次分析已完成/);
+  }
+});
+
+test('step failures and incomplete deliverables are never relabeled as generated success', () => {
+  for (const status of ['partial', 'failed']) {
+    const parsed = readAnalysisOutcome(outcome({ scope: 'step', status, reason_code: 'delivery_failed' }));
+    assert.equal(analysisOutcomeTitle(parsed), status === 'failed' ? '阶段未完成' : '阶段部分完成');
+    assert.equal(analysisOutcomeReason(parsed), '部分成果文件尚未成功交付。');
+    assert.deepEqual(analysisOutcomeMissing(parsed), ['图表 × 1']);
+  }
+});
+
+test('unknown or absent scope cannot certify an entire task', () => {
+  for (const scope of [undefined, null, 'run', 'task', '../private']) {
+    const parsed = readAnalysisOutcome(outcome({ scope, status: 'succeeded', missing: [], can_resume: false }));
+    assert.equal(parsed.scope, undefined);
+    assert.equal(analysisOutcomeTitle(parsed), '成果检查通过');
+    assert.match(analysisOutcomeReason(parsed), /整体任务完成情况尚未确认/);
+  }
 });

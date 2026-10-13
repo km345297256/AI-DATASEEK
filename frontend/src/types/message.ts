@@ -43,7 +43,7 @@ export interface ToolContent extends BaseContent {
 export interface StepContent extends BaseContent {
   id: string;
   description: string;
-  status: 'pending' | 'running' | 'completed' | 'failed';
+  status: 'pending' | 'running' | 'completed' | 'failed' | 'unknown';
   tools: ToolContent[];
   started_at?: number;
   ended_at?: number;

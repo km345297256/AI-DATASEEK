@@ -99,6 +99,9 @@ class DeliverableRequirement(BaseModel):
 
 class AnalysisOutcome(BaseModel):
     model_config = ConfigDict(extra="forbid")
+    # This contract is evaluated at a step boundary. It cannot certify a plan
+    # or run, even when that step happens to be the last one in the plan.
+    scope: Literal["step"] = "step"
     status: Literal["succeeded", "partial", "failed"]
     reason_code: str = Field(pattern=r"^[a-z][a-z0-9_]{0,63}$")
     missing: list[DeliverableRequirement] = Field(default_factory=list, max_length=16)
