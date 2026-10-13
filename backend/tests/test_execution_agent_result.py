@@ -1381,6 +1381,12 @@ async def test_successful_step_emits_updated_plan_before_advancing():
             self.session.status = status
 
     class FakeSkillRegistry:
+        def unpin(self):
+            return None
+
+        def pin(self, **_kwargs):
+            return None
+
         def clear_restriction(self):
             return None
 

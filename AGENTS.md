@@ -12,6 +12,12 @@ branch for commits and pushes in this repository. Do not commit directly to
 `main` by default. This branch preference does not authorize automatic commits
 or pushes; perform those actions only when the user requests them.
 
+For the user-authorized Data Skills laboratory upgrade, use branch `datalab`.
+After each completed change batch, validate, commit the relevant changes, push
+to the configured remotes, and deploy to the local environment using `./run.sh`.
+Preserve unrelated working-tree edits; do not include credentials in commits or
+container build contexts. This workflow does not request a remote deployment.
+
 ## Services
 
 | Service | Stack | Purpose |

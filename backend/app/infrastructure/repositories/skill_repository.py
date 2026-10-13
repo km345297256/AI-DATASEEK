@@ -12,6 +12,11 @@ class MongoSkillRepository(SkillRepository):
         if not existing:
             existing = await SkillDocument.find_one(SkillDocument.path == skill.path)
         if existing:
+            if existing.manifest is not None and (
+                existing.package_sha256 != skill.package_sha256
+                or existing.manifest != skill.manifest
+            ):
+                raise ValueError("Published skill packages are immutable; install a new version")
             existing.update_from_domain(skill)
             await existing.save()
             return existing.to_domain()

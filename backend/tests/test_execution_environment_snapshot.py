@@ -585,6 +585,12 @@ def test_agent_snapshot_records_actual_filtered_skill_state():
         def clear_restriction(self):
             return None
 
+        def unpin(self):
+            return None
+
+        def pin(self, **_kwargs):
+            return None
+
         def reload(self):
             return None
 

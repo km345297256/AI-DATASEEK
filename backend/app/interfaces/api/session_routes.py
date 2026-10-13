@@ -76,14 +76,16 @@ async def _installed_skill_names(user: User, requested: List[str]) -> List[str]:
     )
     await registry.load()
     installed = {
-        skill.name.strip().lower()
+        skill.name.strip().lower(): (
+            f"{skill.name}#sha256={skill.package_sha256}" if skill.manifest else skill.name
+        )
         for skill in registry.list_skills()
         if (
             (skill.owner_user_id or skill.user_id) == user.id
             or skill.id in user.installed_skill_ids
         )
     }
-    return [name for name in requested if name.strip().lower() in installed]
+    return [installed[name.strip().lower()] for name in requested if name.strip().lower() in installed]
 
 
 async def _installed_mcp_names(user: User, requested: List[str]) -> List[str]:

@@ -12,6 +12,14 @@ export interface SkillInfo {
   created_from_session_id?: string | null;
   installed: boolean;
   source: 'official' | 'personal';
+  package_id?: string | null;
+  version?: string | null;
+  title?: string | null;
+  category?: string | null;
+  domains?: string[];
+  package_sha256?: string | null;
+  format?: 'legacy' | 'data-skill-v1';
+  verification_status?: 'unverified';
 }
 
 export interface SkillListResponse {

@@ -14,6 +14,7 @@ from app.domain.models.agent_profile import AgentPlannerConfig, AgentProfile, Ag
 from app.domain.models.model_configuration import ModelConfiguration, ModelType
 from app.domain.models.sandbox_record import SandboxRecord
 from app.domain.models.skill import Skill, SkillScope
+from app.domain.models.skill_manifest import SkillManifest
 from app.domain.models.renderer import Renderer, RendererKind, RendererScope
 from app.domain.models.workspace import Workspace, WorkspaceMember, WorkspaceRole
 from app.domain.models.audit import AuditLog, AuditRiskLevel, AuditStatus
@@ -941,6 +942,8 @@ class SkillDocument(BaseDocument[Skill], id_field="skill_id", domain_model_class
     max_context_chars: int = 6000
     content: str
     path: str
+    manifest: Optional[SkillManifest] = None
+    package_sha256: Optional[str] = None
     scripts: List[str] = Field(default_factory=list)
     references: List[str] = Field(default_factory=list)
     templates: List[str] = Field(default_factory=list)

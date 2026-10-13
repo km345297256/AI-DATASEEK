@@ -31,6 +31,8 @@ class SkillToolkit(BaseToolkit):
                 "name": skill.name,
                 "description": skill.description,
                 "triggers": skill.triggers,
+                "package_id": skill.manifest.package_id if skill.manifest else None,
+                "version": skill.manifest.version if skill.manifest else None,
                 "resources": {
                     "scripts": skill.scripts,
                     "references": skill.references,
@@ -54,6 +56,7 @@ class SkillToolkit(BaseToolkit):
                 "name": skill.name,
                 "description": skill.description,
                 "content": content or skill.content,
+                "contract": skill.manifest.model_dump(mode="json") if skill.manifest else None,
                 "resources": {
                     "scripts": skill.scripts,
                     "references": skill.references,

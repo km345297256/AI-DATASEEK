@@ -69,6 +69,13 @@ def _skill_response(skill: Skill, user: User | None = None) -> SkillResponse:
         created_from_session_id=skill.created_from_session_id,
         installed=_is_installed_skill(skill, user) if user else False,
         source="official" if not (skill.owner_user_id or skill.user_id) else "personal",
+        package_id=skill.manifest.package_id if skill.manifest else None,
+        version=skill.manifest.version if skill.manifest else None,
+        title=skill.manifest.title if skill.manifest else None,
+        category=skill.manifest.category if skill.manifest else None,
+        domains=skill.manifest.domains if skill.manifest else [],
+        package_sha256=skill.package_sha256 if skill.manifest else None,
+        format="data-skill-v1" if skill.manifest else "legacy",
     )
 
 
@@ -295,6 +302,9 @@ async def update_skill_file(
     if not skill:
         raise HTTPException(status_code=404, detail="Skill not found")
     await permission_service.require(current_user, "write", skill)
+
+    if skill.manifest:
+        raise HTTPException(status_code=409, detail="Versioned skill packages are immutable; upload a new version")
 
     root = _safe_skill_root(skill)
     if not root.exists() or not root.is_dir():

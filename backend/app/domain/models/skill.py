@@ -3,6 +3,7 @@ from enum import Enum
 from pydantic import BaseModel, Field
 from typing import List, Optional
 import uuid
+from app.domain.models.skill_manifest import SkillManifest
 
 
 class SkillScope(str, Enum):
@@ -22,6 +23,8 @@ class Skill(BaseModel):
     max_context_chars: int = 6000
     content: str
     path: str
+    manifest: Optional[SkillManifest] = None
+    package_sha256: Optional[str] = Field(default=None, pattern=r"^[0-9a-f]{64}$")
     scripts: List[str] = Field(default_factory=list)
     references: List[str] = Field(default_factory=list)
     templates: List[str] = Field(default_factory=list)

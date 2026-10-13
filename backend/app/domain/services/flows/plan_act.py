@@ -517,6 +517,7 @@ class PlanActFlow(BaseFlow):
                 "description": str(getattr(skill, "description", "") or ""),
                 "triggers": [str(value) for value in (getattr(skill, "triggers", ()) or ())],
                 "content": str(getattr(skill, "content", "") or ""),
+                "package_sha256": getattr(skill, "package_sha256", None),
                 "scope": scope,
                 "priority": getattr(skill, "priority", 0),
                 "max_context_chars": getattr(skill, "max_context_chars", None),
@@ -2044,6 +2045,7 @@ class PlanActFlow(BaseFlow):
     def _activate_skills(self, requested_names: list[str]):
         # Reload before every user turn because a long-lived task runner may be
         # reused after the user changes their personal Skill library.
+        self.skill_registry.unpin()
         self.skill_registry.clear_restriction()
         self.skill_registry.reload()
         active_skills = []
@@ -2051,6 +2053,8 @@ class PlanActFlow(BaseFlow):
         for requested_name in requested_names:
             skill = self.skill_registry.get_skill(requested_name)
             if not skill:
+                if "#sha256=" in requested_name:
+                    raise ValueError("Selected skill release is missing or changed; select it again")
                 continue
             normalized = skill.name.strip().lower()
             if normalized in seen:
@@ -2059,6 +2063,8 @@ class PlanActFlow(BaseFlow):
             active_skills.append(skill)
 
         self.skill_registry.restrict_to([skill.name for skill in active_skills])
+        catalog = getattr(getattr(self, "plugin_toolkit", None), "catalog_snapshot", None)
+        self.skill_registry.pin(tool_versions={tool.name: tool.version for tool in catalog.tools} if catalog else {})
         self.active_skill_context = SkillRenderer.render(active_skills)
         return active_skills
 

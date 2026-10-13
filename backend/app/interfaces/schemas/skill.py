@@ -15,6 +15,14 @@ class SkillResponse(BaseModel):
     created_from_session_id: Optional[str] = None
     installed: bool = False
     source: str = "personal"
+    package_id: Optional[str] = None
+    version: Optional[str] = None
+    title: Optional[str] = None
+    category: Optional[str] = None
+    domains: List[str] = Field(default_factory=list)
+    package_sha256: Optional[str] = None
+    format: str = "legacy"
+    verification_status: str = "unverified"
 
 
 class SkillListResponse(BaseModel):

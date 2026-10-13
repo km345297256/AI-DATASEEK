@@ -3,12 +3,18 @@ import logging
 import re
 import shutil
 import zipfile
+import hashlib
+import tempfile
+import stat
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import BinaryIO, List, Optional
 
 from app.domain.models.skill import Skill, SkillScope
 from app.domain.repositories.skill_repository import SkillRepository
+from app.domain.services.skills.package import (
+    parse_manifest, read_package, package_digest, MAX_PACKAGE_BYTES, MAX_PACKAGE_FILES,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -29,9 +35,13 @@ class SkillRegistry:
         self.repository = repository
         self._skills: List[Skill] = []
         self._allowed_names: Optional[set[str]] = None
+        self._pinned = False
+        self._resource_snapshots: dict[str, dict[str, bytes]] = {}
         self.reload()
 
     async def load(self) -> None:
+        if self._pinned:
+            return
         self.reload()
         if self.repository and self.user_id:
             db_skills = await self.repository.list_accessible(self.user_id)
@@ -40,12 +50,31 @@ class SkillRegistry:
             # database records override file-scan records for that same package.
             by_key = {str(Path(skill.path).resolve()): skill for skill in self._skills}
             for skill in db_skills:
-                by_key[str(Path(skill.path).resolve())] = skill
+                key = str(Path(skill.path).resolve())
+                fresh = by_key.get(key)
+                if skill.manifest or (fresh and fresh.manifest):
+                    fresh = fresh or self._load_skill(Path(skill.path), skill.scope, skill.user_id)
+                    # A missing/changed release must never be restored from an
+                    # old Mongo body while its resources come from new files.
+                    if not fresh or not fresh.manifest or (
+                        skill.manifest and skill.package_sha256 != fresh.package_sha256
+                    ):
+                        by_key.pop(key, None)
+                        continue
+                    fresh.id = skill.id
+                    for field in ("scope", "user_id", "owner_user_id", "workspace_id", "created_from_session_id"):
+                        setattr(fresh, field, getattr(skill, field))
+                    by_key[key] = fresh
+                else:
+                    by_key[key] = skill
             self._skills = list(by_key.values())
             self._apply_restriction()
 
     def reload(self) -> None:
+        if self._pinned:
+            return
         self._skills = []
+        self._resource_snapshots = {}
         if not self.enabled:
             logger.info("Skill registry disabled")
             return
@@ -59,8 +88,7 @@ class SkillRegistry:
     async def sync_files_to_repository(self) -> None:
         if not self.repository:
             return
-        for skill in self._skills:
-            await self.repository.save(skill)
+        self._skills = [await self.repository.save(skill) for skill in self._skills]
 
     def _global_dir(self) -> Path:
         legacy_has_skills = any(self.skills_dir.glob("*/SKILL.md")) if self.skills_dir.exists() else False
@@ -86,7 +114,19 @@ class SkillRegistry:
             raw_content = skill_file.read_text(encoding="utf-8").strip()
             frontmatter, content = self._split_frontmatter(raw_content)
             metadata = {**frontmatter, **self._load_metadata(skill_file.parent)}
+            manifest = None
+            digest = None
+            if (skill_file.parent / "skill.yaml").exists():
+                files = read_package(skill_file.parent)
+                manifest = parse_manifest(files["skill.yaml"])
+                digest = package_digest(files)
+                # Manifest metadata is authoritative over legacy frontmatter
+                # and local ownership metadata, neither can forge verification.
+                metadata.update(name=manifest.selection_name, description=manifest.description, triggers=manifest.triggers)
+                metadata["priority"] = 0
+                metadata["max_context_chars"] = 6000
             return Skill(
+                **({"id": hashlib.sha256(f"{skill_file.resolve()}:{digest}".encode()).hexdigest()[:32]} if digest else {}),
                 name=metadata.get("name") or skill_file.parent.name,
                 description=metadata.get("description", ""),
                 triggers=metadata.get("triggers", []),
@@ -94,6 +134,8 @@ class SkillRegistry:
                 max_context_chars=metadata.get("max_context_chars", 6000),
                 content=content,
                 path=str(skill_file),
+                manifest=manifest,
+                package_sha256=digest,
                 scripts=self._scan_resource_files(skill_file.parent / "scripts"),
                 references=self._scan_resource_files(skill_file.parent / "references"),
                 templates=self._scan_resource_files(skill_file.parent / "templates"),
@@ -103,8 +145,8 @@ class SkillRegistry:
                 workspace_id=metadata.get("workspace_id"),
                 created_from_session_id=metadata.get("created_from_session_id"),
             )
-        except Exception as exc:
-            logger.warning("Failed to load skill from %s: %s", skill_file, exc)
+        except Exception:
+            logger.warning("Failed to load skill package: %s", skill_file.parent.name)
             return None
 
     def _load_metadata(self, skill_dir: Path) -> dict:
@@ -138,10 +180,42 @@ class SkillRegistry:
 
     def get_skill(self, name: str) -> Optional[Skill]:
         normalized = name.strip().lower()
+        normalized, separator, digest = normalized.partition("#sha256=")
+        matches = [skill for skill in self._skills if skill.name.lower() == normalized]
+        # Do not silently select between two installations of one release.
+        if len(matches) != 1:
+            return None
+        return matches[0] if not separator or matches[0].package_sha256 == digest else None
+
+    def unpin(self) -> None:
+        self._pinned = False
+        self._resource_snapshots = {}
+
+    def pin(self, *, tool_versions: dict[str, str] | None = None) -> None:
+        """Freeze bytes exposed by Skill tools for this Agent turn."""
+        if self._pinned:
+            return
+        snapshots = {}
+        digests = {}
         for skill in self._skills:
-            if skill.name.lower() == normalized:
-                return skill
-        return None
+            if skill.manifest:
+                unavailable = [dependency.name for dependency in skill.manifest.tools
+                               if (tool_versions or {}).get(dependency.name) != dependency.version]
+                if unavailable:
+                    raise ValueError("Skill tool dependencies are unavailable or incompatible: " + ", ".join(unavailable))
+            files = read_package(Path(skill.path).parent)
+            digest = package_digest(files)
+            if skill.manifest and digest != skill.package_sha256:
+                raise ValueError("Skill package changed before task activation")
+            _, body = self._split_frontmatter(files["SKILL.md"].decode("utf-8").strip())
+            if body != skill.content:
+                raise ValueError("Skill instructions changed before task activation")
+            snapshots[skill.name] = files
+            digests[skill.name] = digest
+        self._resource_snapshots = snapshots
+        for skill in self._skills:
+            skill.package_sha256 = digests[skill.name]
+        self._pinned = True
 
     def get_skill_by_id(self, skill_id: str) -> Optional[Skill]:
         return next((skill for skill in self._skills if skill.id == skill_id), None)
@@ -199,6 +273,14 @@ class SkillRegistry:
         path = Path(filename)
         if path.is_absolute() or ".." in path.parts:
             return False, f"Unsafe resource path: {filename}"
+        if self._pinned:
+            content = self._resource_snapshots.get(skill.name, {}).get(f"{directory_name}/{path.as_posix()}")
+            if content is None:
+                return False, f"Resource file not found: {filename}"
+            try:
+                return True, content.decode("utf-8")
+            except UnicodeDecodeError:
+                return False, f"Resource is not a UTF-8 text file: {filename}"
         skill_dir = Path(skill.path).parent
         resource_path = skill_dir / directory_name / path
         try:
@@ -256,6 +338,7 @@ class SkillRegistry:
     ) -> List[Skill]:
         owner_id = user_id or self.user_id
         saved_skills: list[Skill] = []
+        await self.load()
         with zipfile.ZipFile(fileobj) as archive:
             self._validate_zip(archive)
             skill_roots = self._find_zip_skill_roots(archive)
@@ -264,20 +347,49 @@ class SkillRegistry:
 
             target_root = self._target_root(scope, owner_id)
             target_root.mkdir(parents=True, exist_ok=True)
-            for root in skill_roots:
-                source_name = root.rstrip("/").split("/")[-1] or "skill"
-                target_dir = self._unique_skill_dir(target_root, source_name)
-                target_dir.mkdir(parents=True, exist_ok=False)
-                self._extract_skill_root(archive, root, target_dir)
-                skill = self._load_skill(target_dir / "SKILL.md", scope, owner_id)
-                if skill:
+            # Validate every package before making any uploaded directory
+            # visible to the registry. Rejected packages never become legacy.
+            with tempfile.TemporaryDirectory(prefix=".skill-upload-", dir=target_root) as staging:
+                pending = []
+                releases = {(s.manifest.package_id, s.manifest.version): s.package_sha256
+                            for s in self._skills if s.manifest}
+                if self.repository and owner_id:
+                    for stored in await self.repository.list_accessible(owner_id):
+                        if stored.manifest:
+                            releases[(stored.manifest.package_id, stored.manifest.version)] = stored.package_sha256
+                for index, root in enumerate(skill_roots):
+                    source_name = root.rstrip("/").split("/")[-1] or "skill"
+                    staged = Path(staging) / str(index)
+                    staged.mkdir()
+                    self._extract_skill_root(archive, root, staged)
+                    # Ownership is installation metadata, not supplied by the
+                    # uploader's package or another user's archived metadata.
+                    self._write_metadata(staged, owner_user_id=owner_id, workspace_id=workspace_id,
+                                         created_from_session_id=None)
+                    skill = self._load_skill(staged / "SKILL.md", scope, owner_id)
+                    if not skill:
+                        raise ValueError("No valid skills were loaded: invalid skill package")
+                    if skill.manifest:
+                        key = (skill.manifest.package_id, skill.manifest.version)
+                        if key in releases:
+                            raise ValueError("Skill release already exists; use a new version")
+                        releases[key] = skill.package_sha256
+                    pending.append((source_name, staged))
+                for source_name, staged in pending:
+                    target_dir = self._unique_skill_dir(target_root, source_name)
+                    staged.rename(target_dir)
+                    skill = self._load_skill(target_dir / "SKILL.md", scope, owner_id)
+                    if skill is None:
+                        raise ValueError("No valid skills were loaded: invalid skill package")
                     skill.owner_user_id = owner_id
                     skill.workspace_id = workspace_id
-                    if self.repository:
-                        skill = await self.repository.save(skill)
+                    try:
+                        if self.repository:
+                            skill = await self.repository.save(skill)
+                    except Exception:
+                        shutil.rmtree(target_dir)
+                        raise
                     saved_skills.append(skill)
-            if not saved_skills:
-                raise ValueError("No valid skills were loaded from the zip file")
 
         await self.load()
         return saved_skills
@@ -504,10 +616,20 @@ class SkillRegistry:
         return value
 
     def _validate_zip(self, archive: zipfile.ZipFile) -> None:
+        seen = set()
+        total = 0
+        if len(archive.infolist()) > MAX_PACKAGE_FILES:
+            raise ValueError("Skill archive contains too many entries")
         for info in archive.infolist():
-            path = Path(info.filename)
-            if path.is_absolute() or ".." in path.parts:
-                raise ValueError(f"Unsafe zip path: {info.filename}")
+            normalized = info.filename.replace("\\", "/")
+            path = Path(normalized)
+            total += info.file_size
+            if (path.is_absolute() or ".." in path.parts or ":" in normalized
+                    or stat.S_ISLNK(info.external_attr >> 16) or normalized in seen):
+                raise ValueError("Unsafe zip path or duplicate archive entry")
+            if total > MAX_PACKAGE_BYTES:
+                raise ValueError("Skill archive exceeds size limit")
+            seen.add(normalized)
 
     def _find_zip_skill_roots(self, archive: zipfile.ZipFile) -> list[str]:
         roots = []
@@ -529,12 +651,10 @@ class SkillRegistry:
                     continue
                 relative = name[len(root):]
             else:
-                if "/" in name:
-                    continue
                 relative = name
             if relative.startswith("__MACOSX/") or Path(relative).name.startswith("._"):
                 continue
-            target_path = target_dir / relative
+            target_path = self._safe_child_path(target_dir, relative)
             target_path.parent.mkdir(parents=True, exist_ok=True)
             with archive.open(info) as src, target_path.open("wb") as dst:
                 shutil.copyfileobj(src, dst)
