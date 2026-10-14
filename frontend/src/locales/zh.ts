@@ -1,4 +1,5 @@
 export default {
+  'Skill selection scope': '仅选择已添加的技能；选择保留精确版本。适用性仍需核对输入与执行条件，不代表已经执行或验证通过。',
   "Data skills catalog introduction": "按数据流程和领域查找技能，查看固定版本后添加到我的技能。",
   "Workflow category": "流程分类",
   "All categories": "全部分类",

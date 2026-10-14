@@ -1,5 +1,5 @@
 from app.domain.models.data_run import DataRunPage
-from fastapi import APIRouter, Depends, Request, WebSocket, WebSocketDisconnect, Query
+from fastapi import HTTPException, APIRouter, Depends, Request, WebSocket, WebSocketDisconnect, Query
 from fastapi.responses import StreamingResponse
 from sse_starlette.sse import EventSourceResponse
 from typing import AsyncGenerator, List, Optional
@@ -66,7 +66,9 @@ def merge_skill_names(*groups: List[str]) -> List[str]:
     return merged
 
 
-async def _installed_skill_names(user: User, requested: List[str]) -> List[str]:
+async def _installed_skill_names(
+    user: User, requested: List[str], *, required: List[str] | None = None,
+) -> List[str]:
     settings = get_settings()
     registry = SkillRegistry(
         settings.skills_dir,
@@ -76,16 +78,29 @@ async def _installed_skill_names(user: User, requested: List[str]) -> List[str]:
         user_skills_dir=settings.user_skills_dir,
     )
     await registry.load()
+    accessible = registry.list_skills()
+    counts: dict[str, int] = {}
+    for skill in accessible:
+        key = skill.name.strip().lower()
+        counts[key] = counts.get(key, 0) + 1
     installed = {
         skill.name.strip().lower(): (
             f"{skill.name}#sha256={skill.package_sha256}" if skill.manifest else skill.name
         )
-        for skill in registry.list_skills()
-        if (
+        for skill in accessible
+        if counts[skill.name.strip().lower()] == 1
+        and (not skill.manifest or skill.package_sha256)
+        and (
             (skill.owner_user_id or skill.user_id) == user.id
             or skill.id in user.installed_skill_ids
         )
     }
+    if any(name.strip().lower() not in installed for name in (required or [])):
+        raise HTTPException(
+            status_code=409,
+            detail="所选技能已不可用、尚未添加或版本身份不唯一，请重新选择后发送。",
+            headers={"X-DataSeek-Error": "skill-selection-unavailable"},
+        )
     return [installed[name.strip().lower()] for name in requested if name.strip().lower() in installed]
 
 
@@ -538,7 +553,7 @@ async def chat(
     effective_skills = [] if request.resume_from else await _installed_skill_names(user, merge_skill_names(
         user.auto_enabled_skills or [],
         request.skills or [],
-    ))
+    ), required=request.skills or [])
     effective_mcp_servers = [] if request.resume_from else await _installed_mcp_names(user, request.mcp_servers or [])
 
     async def event_generator() -> AsyncGenerator[ServerSentEvent, None]:

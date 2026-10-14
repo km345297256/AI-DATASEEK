@@ -1,4 +1,5 @@
 export default {
+  'Skill selection scope': 'Choose from added skills with exact release identities. Check input and execution requirements; selection does not mean execution or verification has succeeded.',
   "Data skills catalog introduction": "Find skills by workflow and domain, inspect exact releases, and add them to your skills.",
   "Workflow category": "Workflow category",
   "All categories": "All categories",

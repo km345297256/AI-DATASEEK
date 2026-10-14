@@ -15,6 +15,19 @@ function emit(options, event) {
 
 const response = () => new Response(null, { headers: { 'content-type': 'text/event-stream; charset=utf-8' } });
 
+test('unavailable skill rejection has a safe actionable message and never retries', async () => {
+  for (const code of ['skill-selection-unavailable', 'untrusted-error']) {
+    const session = run([async options => options.onopen(new Response('private server detail', {
+      status: 409, headers: { 'x-dataseek-error': code },
+    }))]);
+    await session.finished;
+    assert.equal(session.requests.length, 1);
+    assert.equal(session.retries.length, 0);
+    assert.doesNotMatch(session.errors[0].message, /private server detail|untrusted-error/);
+    assert.match(session.errors[0].message, code === 'skill-selection-unavailable' ? /重新选择后发送/ : /HTTP 409/);
+  }
+});
+
 function run(attempts, initial = {}, overrides = {}) {
   const recovery = createAgentStreamRecovery({ message: 'Analyze', client_message_id: 'stable-input', ...initial });
   const requests = [];

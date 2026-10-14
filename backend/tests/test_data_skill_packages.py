@@ -226,6 +226,6 @@ async def test_installed_release_is_bound_to_content_before_scheduling(tmp_path,
     skill = registry.list_skills()[0]
     monkeypatch.setattr(session_routes, "SkillRegistry", lambda *a, **kw: registry)
     user = User(id="u", fullname="Test User", email="test@example.org", installed_skill_ids=[skill.id])
-    assert await session_routes._installed_skill_names(user, [skill.name]) == [
+    assert await session_routes._installed_skill_names(user, [skill.name], required=[skill.name]) == [
         f"{skill.name}#sha256={skill.package_sha256}"
     ]

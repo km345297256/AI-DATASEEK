@@ -124,8 +124,12 @@
                                         <Puzzle :size="14" class="mt-0.5 shrink-0 text-[var(--icon-secondary)]" />
                                         <span class="min-w-0 flex-1">
                                             <span class="flex items-center gap-1.5 text-[13px] font-medium leading-4 text-[var(--text-primary)]">
-                                                <span class="truncate">{{ skill.name }}</span>
+                                                <span class="truncate">{{ skill.title || skill.name }}</span>
                                                 <Check v-if="selectedSkills.includes(skill.name)" :size="13" class="shrink-0" />
+                                            </span>
+                                            <span class="mt-1 block text-[11px] text-[var(--text-tertiary)]">
+                                                {{ t(skillCategories[skillCategory(skill)]) }} · {{ skill.version || t('Legacy skill') }}
+                                                <span v-if="skill.format === 'data-skill-v1'"> · {{ t('Skill not verified') }}</span>
                                             </span>
                                             <span v-if="skill.description" class="mt-0.5 block truncate text-[11px] leading-4 text-[var(--text-tertiary)]">{{ skill.description }}</span>
                                         </span>
@@ -187,6 +191,7 @@ import SendIcon from './icons/SendIcon.vue';
 import { useI18n } from 'vue-i18n';
 import ChatBoxFiles from './ChatBoxFiles.vue';
 import SkillDialog from './SkillDialog.vue';
+import { filterSkillCatalog, skillCategory, skillCategories } from '@/utils/skillCatalog';
 import MCPDialog from './MCPDialog.vue';
 import { Check, ChevronRight, CirclePlus, Paperclip, PlugZap, Plus, Puzzle, Search, Settings2, UploadCloud, X } from 'lucide-vue-next';
 import type { FileInfo } from '../api/file';
@@ -275,11 +280,7 @@ const actionFilteredSkills = computed(() => {
     const manuallySelectable = availableSkills.value.filter(
         (skill) => !autoEnabledSkillNames.value.has(skill.name.trim().toLowerCase()),
     );
-    if (!query) return manuallySelectable;
-    return manuallySelectable.filter((skill) =>
-        [skill.name, skill.description, ...skill.triggers]
-            .some((value) => value?.toLocaleLowerCase().includes(query)),
-    );
+    return filterSkillCatalog(manuallySelectable, { query, category: '', domain: '', source: 'all', installed: false });
 });
 
 const setAutoEnabledSkills = (names: string[]) => {

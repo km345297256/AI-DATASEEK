@@ -88,6 +88,9 @@ export function startSSEConnection<T>(
             if (controller.signal.aborted) return;
             if (!response.ok) {
               // HTTP/application failures need an explicit decision, not a POST replay.
+              if (response.status === 409 && response.headers.get('x-dataseek-error') === 'skill-selection-unavailable') {
+                throw new SSEConnectionError('http', '所选技能已不可用、尚未添加或版本身份不唯一，请重新选择后发送。');
+              }
               throw new SSEConnectionError('http', `连接请求失败（HTTP ${response.status}）`);
             }
             if (!response.headers.get('content-type')?.toLowerCase().startsWith('text/event-stream')) {

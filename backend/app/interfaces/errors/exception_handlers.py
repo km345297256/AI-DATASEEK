@@ -59,6 +59,9 @@ def register_exception_handlers(app: FastAPI) -> None:
         logger.warning("HTTP exception status_code=%d", exc.status_code)
         return JSONResponse(
             status_code=exc.status_code,
+            headers={"X-DataSeek-Error": "skill-selection-unavailable"}
+            if exc.status_code == 409 and (exc.headers or {}).get("X-DataSeek-Error") == "skill-selection-unavailable"
+            else None,
             content=APIResponse(
                 code=exc.status_code,
                 msg=exc.detail,

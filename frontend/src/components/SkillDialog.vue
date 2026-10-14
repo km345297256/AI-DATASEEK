@@ -1,6 +1,6 @@
 <template>
   <Dialog v-model:open="open">
-    <DialogContent class="w-[520px]">
+    <DialogContent class="w-[min(520px,calc(100vw-24px))]">
       <DialogHeader>
         <DialogTitle>{{ t('Skills') }}</DialogTitle>
       </DialogHeader>
@@ -22,11 +22,19 @@
           <input ref="fileInput" class="hidden" type="file" accept=".md,.zip" @change="handleUpload" />
         </div>
 
+        <div class="mb-3 flex flex-wrap gap-2">
+          <input v-model="query" :aria-label="t('Search skills')" :placeholder="t('Search skills')" class="min-w-0 flex-1 rounded-lg border border-[var(--border-main)] bg-transparent px-3 py-2 text-sm" />
+          <select v-model="category" :aria-label="t('Workflow category')" class="rounded-lg border border-[var(--border-main)] bg-[var(--background-menu-white)] px-2 text-sm">
+            <option value="">{{ t('All categories') }}</option>
+            <option v-for="(label, key) in skillCategories" :key="key" :value="key">{{ t(label) }}</option>
+          </select>
+        </div>
+        <p class="mb-3 text-xs text-[var(--text-tertiary)]">{{ t('Skill selection scope') }}</p>
         <div v-if="loading" class="py-8 text-center text-sm text-[var(--text-tertiary)]">
           {{ t('Loading') }}...
         </div>
         <div v-else-if="visibleSkills.length === 0" class="rounded-lg border border-dashed border-[var(--border-main)] py-8 text-center text-sm text-[var(--text-tertiary)]">
-          {{ t('No skills yet') }}
+          {{ t('No matching skills') }}
         </div>
         <div v-else class="max-h-[360px] overflow-y-auto rounded-lg border border-[var(--border-main)]">
           <label
@@ -41,10 +49,11 @@
               @change="toggleSkill(skill.name)"
             />
             <div class="min-w-0 flex-1">
-              <div class="truncate text-sm font-medium text-[var(--text-primary)]">{{ skill.name }}</div>
+              <div class="truncate text-sm font-medium text-[var(--text-primary)]">{{ skill.title || skill.name }}</div>
               <div class="mt-1 text-xs leading-5 text-[var(--text-tertiary)]">
                 {{ skill.description || t('No description') }}
               </div>
+              <SkillMetadata :skill="skill" />
               <div v-if="skill.triggers.length" class="mt-2 flex flex-wrap gap-1">
                 <span
                   v-for="trigger in skill.triggers.slice(0, 6)"
@@ -73,6 +82,8 @@
 
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
+import SkillMetadata from './SkillMetadata.vue';
+import { filterSkillCatalog, skillCategories } from '@/utils/skillCatalog';
 import { Upload } from 'lucide-vue-next';
 import { useI18n } from 'vue-i18n';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -93,6 +104,8 @@ const emit = defineEmits<{
 
 const { t } = useI18n();
 const skills = ref<SkillInfo[]>([]);
+const query = ref('');
+const category = ref('');
 const autoEnabledSkillNames = ref(new Set<string>());
 const loading = ref(false);
 const uploading = ref(false);
@@ -104,9 +117,9 @@ const open = computed({
 });
 
 const selectedSkills = computed(() => props.selectedSkills ?? []);
-const visibleSkills = computed(() => skills.value.filter(
+const visibleSkills = computed(() => filterSkillCatalog(skills.value.filter(
   (skill) => !autoEnabledSkillNames.value.has(skill.name.trim().toLowerCase()),
-));
+), { query: query.value, category: category.value, source: 'all', domain: '', installed: false }));
 
 const loadSkills = async () => {
   loading.value = true;

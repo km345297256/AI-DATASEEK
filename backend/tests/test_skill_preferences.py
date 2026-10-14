@@ -123,6 +123,69 @@ async def test_installed_auto_enabled_skill_is_authorized(monkeypatch):
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("available,installed", [([], []), (["pdf-maker"], []), (["pdf-maker", "pdf-maker"], ["skill-pdf-maker"])])
+async def test_explicit_missing_uninstalled_or_ambiguous_selection_is_rejected(monkeypatch, available, installed):
+    monkeypatch.setattr(session_routes, "SkillRegistry", lambda *args, **kwargs: FakeRegistry(available))
+    with pytest.raises(HTTPException) as error:
+        await session_routes._installed_skill_names(make_user(installed_skill_ids=installed), ["pdf-maker"], required=["pdf-maker"])
+    assert error.value.status_code == 409
+
+
+@pytest.mark.asyncio
+async def test_stale_preference_does_not_block_valid_explicit_selection(monkeypatch):
+    monkeypatch.setattr(session_routes, "SkillRegistry", lambda *args, **kwargs: FakeRegistry(["pdf-maker"]))
+    result = await session_routes._installed_skill_names(
+        make_user(installed_skill_ids=["skill-pdf-maker"]), ["old-auto", " PDF-MAKER "], required=["PDF-MAKER"],
+    )
+    assert result == ["pdf-maker"]
+
+
+@pytest.mark.asyncio
+async def test_chat_rejects_explicit_selection_before_starting_agent(monkeypatch):
+    from types import SimpleNamespace
+    from unittest.mock import AsyncMock
+    from starlette.requests import Request
+    from app.interfaces.schemas.session import ChatRequest
+    monkeypatch.setattr(session_routes, "SkillRegistry", lambda *args, **kwargs: FakeRegistry([]))
+    monkeypatch.setattr(session_routes, "_agent_profile_overrides", AsyncMock(return_value=None))
+    agent = SimpleNamespace(chat=AsyncMock())
+    user = make_user()
+    with pytest.raises(HTTPException) as error:
+        await session_routes.chat(
+            "session", ChatRequest(message="检查数据", skills=["missing@1.0.0"]),
+            Request({"type": "http", "headers": []}), current_user=user,
+            agent_service=agent, profile_service=object(),
+            user_repository=FakeUserRepository(user),
+        )
+    assert error.value.status_code == 409
+    agent.chat.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_http_handler_preserves_only_known_skill_error_marker(monkeypatch):
+    from fastapi import FastAPI
+    from httpx import ASGITransport, AsyncClient
+    from app.interfaces.errors.exception_handlers import register_exception_handlers
+    app = FastAPI()
+    register_exception_handlers(app)
+    monkeypatch.setattr(session_routes, "SkillRegistry", lambda *args, **kwargs: FakeRegistry([]))
+
+    @app.get("/selection")
+    async def selection():
+        return await session_routes._installed_skill_names(make_user(), ["missing"], required=["missing"])
+
+    @app.get("/other")
+    async def other():
+        raise HTTPException(409, "Conflict", headers={"X-DataSeek-Error": "arbitrary-body"})
+
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        response = await client.get("/selection")
+        assert response.status_code == 409
+        assert response.headers["x-dataseek-error"] == "skill-selection-unavailable"
+        assert "x-dataseek-error" not in (await client.get("/other")).headers
+
+
+@pytest.mark.asyncio
 async def test_get_preferences_removes_stale_uninstalled_skills(monkeypatch):
     user = make_user(auto_enabled_skills=["pdf-maker"], installed_skill_ids=[])
     repository = FakeUserRepository(user)
