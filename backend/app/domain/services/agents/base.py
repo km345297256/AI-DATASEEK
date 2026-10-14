@@ -756,6 +756,7 @@ class BaseAgent(ABC):
                 if blocked:
                     code = ("tool_execution_unknown" if evidence["pending_execution"] else
                             "invalid_execution_result" if problem == "invalid_execution_result" else
+                            "invalid_summary_result" if problem == "invalid_summary_result" else
                             "tool_protocol_error")
                     self._set_execution_outcome(code)
                     detail = ("已有操作的执行状态尚未确认，未重新执行。" if evidence["pending_execution"] else

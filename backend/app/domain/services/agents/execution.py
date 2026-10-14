@@ -3329,11 +3329,16 @@ class ExecutionAgent(BaseAgent):
             return problem
         try:
             parsed = parse_json_lenient(self._message_content_to_text(message.content))
+            if getattr(self, "_summarizing", False):
+                summary = Message.model_validate(parsed)
+                if not summary.message.strip() or is_non_substantive_message_text(summary.message):
+                    return "invalid_summary_result"
+                return None
             result = ExecutionResult.model_validate(parsed)
             if not result.result or is_non_substantive_message_text(result.result):
                 return "invalid_execution_result"
         except Exception:
-            return "invalid_execution_result"
+            return "invalid_summary_result" if getattr(self, "_summarizing", False) else "invalid_execution_result"
         return None
 
     async def _decode_execution_result(self, raw_message: Any) -> Optional[ExecutionResult]:
@@ -3881,15 +3886,21 @@ class ExecutionAgent(BaseAgent):
         )
         await self.reset_context()
         message = f"{plan_context}\n\n{SUMMARIZE_PROMPT}" if plan_context else SUMMARIZE_PROMPT
-        async for event in self.execute(message):
-            if isinstance(event, MessageEvent):
-                logger.debug(
-                    "Execution agent summary received chars=%d",
-                    len(event.message or ""),
-                )
-                parsed_response = await self._parse_json(event.message)
-                message = Message.model_validate(parsed_response)
-                attachments = [FileInfo(file_path=file_path) for file_path in message.attachments]
-                yield MessageEvent(message=message.message, attachments=attachments)
-                continue
-            yield event
+        self._summarizing = True
+        try:
+            async for event in self.execute(message):
+                if isinstance(event, MessageEvent):
+                    logger.debug(
+                        "Execution agent summary received chars=%d",
+                        len(event.message or ""),
+                    )
+                    # The live protocol gate already validated this shape. Do
+                    # not ask a repair model to invent a summary after execution.
+                    parsed_response = parse_json_lenient(event.message)
+                    summary = Message.model_validate(parsed_response)
+                    attachments = [FileInfo(file_path=file_path) for file_path in summary.attachments]
+                    yield MessageEvent(message=summary.message, attachments=attachments)
+                    continue
+                yield event
+        finally:
+            self._summarizing = False

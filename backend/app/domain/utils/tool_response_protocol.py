@@ -44,7 +44,13 @@ def textual_tool_envelope_reason(content: Any) -> str | None:
 
 def terminal_response_correction(reason: str) -> str:
     """Host-authored recovery instructions contain no model-supplied payload."""
-    if reason == "invalid_execution_result":
+    if reason == "invalid_summary_result":
+        detail = (
+            "The final summary must be a JSON object with a substantive message string and "
+            "an attachments array of existing artifact paths. Summarize only observed work. "
+            "Do not repeat analysis, regenerate files, or turn failures into success. "
+        )
+    elif reason == "invalid_execution_result":
         detail = (
             "The last response is not a valid completed analysis result. If work remains, "
             "continue it with the actual bound tools. If the work is complete, return the "
