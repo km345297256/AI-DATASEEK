@@ -123,6 +123,7 @@ class ToolEventData(BaseEventData):
     spill: Optional[SpillArtifactNotice] = None
     analysis_job: Optional[AnalysisJobView] = None
     tool_approval: Optional[ToolApprovalView] = None
+    connector_status: Optional[str] = None
 
 class ToolSSEEvent(BaseSSEEvent):
     event: Literal["tool"] = "tool"
@@ -168,6 +169,7 @@ class ToolSSEEvent(BaseSSEEvent):
                 spill=spill,
                 analysis_job=event.analysis_job,
                 tool_approval=event.tool_approval,
+                connector_status=connector_status_text(event),
             )
         )
 
@@ -339,3 +341,24 @@ class EventMapper:
         return list(filter(lambda x: x is not None, [
             await EventMapper.event_to_sse_event(event) for event in events if event
         ]))
+
+
+def connector_status_text(event):
+    """Expose a bounded explanation, never upstream bodies, paths or credentials."""
+    if event.function_name == 'ncbi_plan_acquisition':
+        return '这一步仅查看下载计划，尚未开始下载。下载需要调用数据连接器的 acquire 操作。'
+    if event.function_name != 'data_connector_call' or (event.function_args or {}).get('operation') != 'acquire':
+        return None
+    if event.tool_approval and event.tool_approval.status in {'rejected', 'expired', 'cancelled'}:
+        return '本次下载未执行：批准已拒绝、过期或任务已取消。可重新发起下载。'
+    if event.status != ToolStatus.CALLED:
+        if event.tool_approval and event.tool_approval.status == 'pending':
+            return '下载等待你的单次批准；批准后将下载并校验数据包。'
+        return '正在下载并校验数据包（最多 32 MiB）；完成后将交付 ZIP 文件，当前请勿重复发送。'
+    result = event.function_result
+    result = result if isinstance(result, dict) else result.model_dump() if result else {}
+    data = result.get('data') or {}
+    if result.get('success') is True and data.get('files_downloaded') is True and data.get('files'):
+        return '数据包已下载、校验并保存到任务文件。可点击文件卡片下载；这不代表已完成数据分析。'
+    from app.domain.services.tools.data_discovery import connector_error_message
+    return connector_error_message(data.get('reason', 'unknown'))

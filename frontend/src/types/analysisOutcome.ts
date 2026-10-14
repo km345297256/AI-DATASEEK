@@ -1,4 +1,4 @@
-export type ArtifactIssueKind = 'image' | 'table' | 'report' | 'code' | 'any';
+export type ArtifactIssueKind = 'image' | 'table' | 'report' | 'code' | 'data' | 'any';
 
 export type ArtifactIssueReasonCode =
   | 'missing_artifact'

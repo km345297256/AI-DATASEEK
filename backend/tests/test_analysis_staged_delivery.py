@@ -164,7 +164,7 @@ async def test_staged_duplicate_path_or_object_cannot_smuggle_mismatched_upload(
 @pytest.mark.parametrize("path", ["/Users/person/private.csv", "/home/ubuntu/output/../private.csv",
                                  "/home/ubuntu/output//data.csv", "/home/ubuntu/output/private\\data.csv",
                                  "/home/ubuntu/output/private\n.csv", "/home/ubuntu/datasets/source.csv",
-                                 "/home/ubuntu/output/unsupported.zip"])
+                                 "/home/ubuntu/output/unsupported.rar"])
 async def test_staged_verifier_does_not_request_unsafe_or_unsupported_paths(path):
     record, info = artifact()
     info.file_path = path

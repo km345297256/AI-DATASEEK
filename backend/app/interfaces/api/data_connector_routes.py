@@ -20,5 +20,6 @@ async def catalog(user=Depends(get_current_user), service=Depends(get_data_conne
 async def call(connector_id: str, request: ConnectorCall, scope=Depends(owned_session), service=Depends(get_data_connector_service)):
     try:
         return APIResponse.success(await service.call(*scope, connector_id, request.operation, request.arguments))
-    except SourceConnectorError:
-        raise UpstreamServiceError('数据源请求未完成，请稍后重试或在对话中确认检索条件') from None
+    except SourceConnectorError as error:
+        from app.domain.services.tools.data_discovery import connector_error_message
+        raise UpstreamServiceError(connector_error_message(error.reason)) from None

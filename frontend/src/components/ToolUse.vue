@@ -1,4 +1,5 @@
 <template>
+  <p v-if="tool.connector_status" role="status" class="my-2 rounded-lg border border-[var(--border-main)] px-3 py-2 text-sm text-[var(--text-secondary)]">{{ tool.connector_status }}</p>
   <p v-if="tool.name === 'message' && tool.args?.text" class="text-[var(--text-secondary)] text-[14px] overflow-hidden text-ellipsis whitespace-pre-line">
     {{ tool.args.text }}
   </p>

@@ -51,6 +51,7 @@ export interface ToolEventData extends BaseEventData {
   spill?: SpillArtifactNotice | null;
   analysis_job?: AnalysisJobView | null;
   tool_approval?: ToolApprovalView | null;
+  connector_status?: string | null;
 }
 
 export interface StepEventData extends BaseEventData {

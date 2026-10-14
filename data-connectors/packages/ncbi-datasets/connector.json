@@ -1,9 +1,9 @@
 {
   "schema_version": "data-connector-v1",
   "id": "ncbi-datasets-v2",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "title": "NCBI Datasets",
-  "description": "检索与读取 NCBI 基因组组装的官方元数据。",
+  "description": "检索官方元数据，下载指定版本的基因组 FASTA 数据包。",
   "transport": "native",
   "auth": "none",
   "domains": [
@@ -74,6 +74,58 @@
       },
       "output_schema": {
         "$defs": {
+          "ConnectorFile": {
+            "additionalProperties": false,
+            "properties": {
+              "title": {
+                "default": "",
+                "maxLength": 400,
+                "title": "Title",
+                "type": "string"
+              },
+              "checksum_origin": {
+                "const": "computed_locally",
+                "default": "computed_locally",
+                "title": "Checksum Origin",
+                "type": "string"
+              },
+              "file_id": {
+                "maxLength": 200,
+                "minLength": 1,
+                "title": "File Id",
+                "type": "string"
+              },
+              "filename": {
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,199}$",
+                "title": "Filename",
+                "type": "string"
+              },
+              "size": {
+                "exclusiveMinimum": 0,
+                "maximum": 33554432,
+                "title": "Size",
+                "type": "integer"
+              },
+              "sha256": {
+                "pattern": "^[a-f0-9]{64}$",
+                "title": "Sha256",
+                "type": "string"
+              },
+              "source_url": {
+                "title": "Source Url",
+                "type": "string"
+              }
+            },
+            "required": [
+              "file_id",
+              "filename",
+              "size",
+              "sha256",
+              "source_url"
+            ],
+            "title": "ConnectorFile",
+            "type": "object"
+          },
           "ConnectorResource": {
             "additionalProperties": false,
             "description": "A metadata result, not a downloaded artifact. URLs are public references only.",
@@ -152,8 +204,11 @@
             "type": "string"
           },
           "kind": {
-            "const": "metadata",
             "default": "metadata",
+            "enum": [
+              "metadata",
+              "files"
+            ],
             "title": "Kind",
             "type": "string"
           },
@@ -185,10 +240,17 @@
             "title": "Total Count"
           },
           "files_downloaded": {
-            "const": false,
             "default": false,
             "title": "Files Downloaded",
             "type": "boolean"
+          },
+          "files": {
+            "items": {
+              "$ref": "#/$defs/ConnectorFile"
+            },
+            "maxItems": 16,
+            "title": "Files",
+            "type": "array"
           }
         },
         "required": [
@@ -203,6 +265,223 @@
       "effects": [
         "network",
         "session_metadata"
+      ],
+      "timeout_seconds": 60
+    },
+    {
+      "name": "acquire",
+      "title": "下载数据",
+      "description": "下载指定版本的 genomic FASTA ZIP 数据包；最多 32 MiB，超时或校验失败不会标记成功。",
+      "input_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "accession": {
+            "maxLength": 32,
+            "pattern": "^GC[AF]_[0-9]{9}\\.[1-9][0-9]*$",
+            "title": "Accession",
+            "type": "string"
+          }
+        },
+        "required": [
+          "accession"
+        ],
+        "title": "DescribeInput",
+        "type": "object"
+      },
+      "output_schema": {
+        "$defs": {
+          "ConnectorFile": {
+            "additionalProperties": false,
+            "properties": {
+              "title": {
+                "default": "",
+                "maxLength": 400,
+                "title": "Title",
+                "type": "string"
+              },
+              "checksum_origin": {
+                "const": "computed_locally",
+                "default": "computed_locally",
+                "title": "Checksum Origin",
+                "type": "string"
+              },
+              "file_id": {
+                "maxLength": 200,
+                "minLength": 1,
+                "title": "File Id",
+                "type": "string"
+              },
+              "filename": {
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,199}$",
+                "title": "Filename",
+                "type": "string"
+              },
+              "size": {
+                "exclusiveMinimum": 0,
+                "maximum": 33554432,
+                "title": "Size",
+                "type": "integer"
+              },
+              "sha256": {
+                "pattern": "^[a-f0-9]{64}$",
+                "title": "Sha256",
+                "type": "string"
+              },
+              "source_url": {
+                "title": "Source Url",
+                "type": "string"
+              }
+            },
+            "required": [
+              "file_id",
+              "filename",
+              "size",
+              "sha256",
+              "source_url"
+            ],
+            "title": "ConnectorFile",
+            "type": "object"
+          },
+          "ConnectorResource": {
+            "additionalProperties": false,
+            "description": "A metadata result, not a downloaded artifact. URLs are public references only.",
+            "properties": {
+              "title": {
+                "maxLength": 200,
+                "minLength": 1,
+                "title": "Title",
+                "type": "string"
+              },
+              "source_url": {
+                "maxLength": 2048,
+                "minLength": 1,
+                "title": "Source Url",
+                "type": "string"
+              },
+              "external_id": {
+                "maxLength": 200,
+                "minLength": 1,
+                "title": "External Id",
+                "type": "string"
+              },
+              "id": {
+                "maxLength": 200,
+                "minLength": 1,
+                "title": "Id",
+                "type": "string"
+              },
+              "candidate_id": {
+                "anyOf": [
+                  {
+                    "pattern": "^[a-f0-9]{64}$",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Candidate Id"
+              },
+              "retrieved_at": {
+                "minimum": 0,
+                "title": "Retrieved At",
+                "type": "integer"
+              },
+              "metadata": {
+                "additionalProperties": true,
+                "title": "Metadata",
+                "type": "object"
+              }
+            },
+            "required": [
+              "title",
+              "source_url",
+              "external_id",
+              "id",
+              "retrieved_at"
+            ],
+            "title": "ConnectorResource",
+            "type": "object"
+          }
+        },
+        "additionalProperties": false,
+        "properties": {
+          "connector_id": {
+            "title": "Connector Id",
+            "type": "string"
+          },
+          "connector_version": {
+            "title": "Connector Version",
+            "type": "string"
+          },
+          "operation": {
+            "title": "Operation",
+            "type": "string"
+          },
+          "kind": {
+            "default": "metadata",
+            "enum": [
+              "metadata",
+              "files"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "resources": {
+            "items": {
+              "$ref": "#/$defs/ConnectorResource"
+            },
+            "maxItems": 20,
+            "title": "Resources",
+            "type": "array"
+          },
+          "next_cursor": {
+            "default": "",
+            "maxLength": 4096,
+            "title": "Next Cursor",
+            "type": "string"
+          },
+          "total_count": {
+            "anyOf": [
+              {
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Total Count"
+          },
+          "files_downloaded": {
+            "default": false,
+            "title": "Files Downloaded",
+            "type": "boolean"
+          },
+          "files": {
+            "items": {
+              "$ref": "#/$defs/ConnectorFile"
+            },
+            "maxItems": 16,
+            "title": "Files",
+            "type": "array"
+          }
+        },
+        "required": [
+          "connector_id",
+          "connector_version",
+          "operation",
+          "resources"
+        ],
+        "title": "ConnectorResult",
+        "type": "object"
+      },
+      "effects": [
+        "network",
+        "session_metadata",
+        "file_write"
       ],
       "timeout_seconds": 60
     },
@@ -228,6 +507,58 @@
       },
       "output_schema": {
         "$defs": {
+          "ConnectorFile": {
+            "additionalProperties": false,
+            "properties": {
+              "title": {
+                "default": "",
+                "maxLength": 400,
+                "title": "Title",
+                "type": "string"
+              },
+              "checksum_origin": {
+                "const": "computed_locally",
+                "default": "computed_locally",
+                "title": "Checksum Origin",
+                "type": "string"
+              },
+              "file_id": {
+                "maxLength": 200,
+                "minLength": 1,
+                "title": "File Id",
+                "type": "string"
+              },
+              "filename": {
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,199}$",
+                "title": "Filename",
+                "type": "string"
+              },
+              "size": {
+                "exclusiveMinimum": 0,
+                "maximum": 33554432,
+                "title": "Size",
+                "type": "integer"
+              },
+              "sha256": {
+                "pattern": "^[a-f0-9]{64}$",
+                "title": "Sha256",
+                "type": "string"
+              },
+              "source_url": {
+                "title": "Source Url",
+                "type": "string"
+              }
+            },
+            "required": [
+              "file_id",
+              "filename",
+              "size",
+              "sha256",
+              "source_url"
+            ],
+            "title": "ConnectorFile",
+            "type": "object"
+          },
           "ConnectorResource": {
             "additionalProperties": false,
             "description": "A metadata result, not a downloaded artifact. URLs are public references only.",
@@ -306,8 +637,11 @@
             "type": "string"
           },
           "kind": {
-            "const": "metadata",
             "default": "metadata",
+            "enum": [
+              "metadata",
+              "files"
+            ],
             "title": "Kind",
             "type": "string"
           },
@@ -339,10 +673,17 @@
             "title": "Total Count"
           },
           "files_downloaded": {
-            "const": false,
             "default": false,
             "title": "Files Downloaded",
             "type": "boolean"
+          },
+          "files": {
+            "items": {
+              "$ref": "#/$defs/ConnectorFile"
+            },
+            "maxItems": 16,
+            "title": "Files",
+            "type": "array"
           }
         },
         "required": [
@@ -362,7 +703,7 @@
     }
   ],
   "limitations": [
-    "仅返回元数据，尚不提供序列下载。",
+    "支持单个组装的 genomic FASTA ZIP 下载，压缩包最多 32 MiB、解压总量最多 64 MiB；暂不支持大文件断点续传。",
     "公开数据源，无需账户授权；来源记录保存于当前任务。"
   ]
 }

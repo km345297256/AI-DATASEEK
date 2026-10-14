@@ -11,6 +11,7 @@ from app.domain.models.analysis_outcome import (
 )
 
 KINDS = {
+    "data": {"zip"},
     "image": {"png", "jpg", "jpeg", "webp", "gif", "bmp", "tif", "tiff", "svg", "avif"},
     "table": {"csv", "tsv", "xlsx", "xls", "parquet"},
     "report": {"md", "markdown", "txt", "json", "html", "htm", "pdf", "docx"},

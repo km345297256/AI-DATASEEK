@@ -51,7 +51,7 @@ class ArtifactFingerprintsRequest(BaseModel):
 class ArtifactValidationItem(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
     path: str = Field(min_length=1, max_length=4096)
-    kind: Literal["image", "table", "report", "code"]
+    kind: Literal["image", "table", "report", "code", "data"]
 
 
 class ArtifactValidationRequest(BaseModel):

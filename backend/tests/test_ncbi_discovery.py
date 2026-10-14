@@ -138,7 +138,7 @@ async def test_discovery_saves_authoritative_observation_and_separate_plan():
     assert first == repeat and first.provenance == 'ncbi_datasets'
     assert 'unselected' not in first.model_dump_json()
     plan = await service.plan_acquisition('owner', 's', first.candidate_id)
-    assert plan.status == 'not_started' and not plan.execution_available
+    assert plan.status == 'not_started' and plan.execution_available
     assert plan.download_size_bytes is None and plan.reported_sequence_bases == 4215606
     assert len(service.repository.rows) == 1  # No file/version/download was fabricated.
     with pytest.raises(NotFoundError): await service.plan_acquisition('other', 's', first.candidate_id)

@@ -85,7 +85,7 @@ def _receipt(value: Any) -> dict[str, Any]:
             or size is not None and (type(size) is not int or not 0 <= size <= 2**63 - 1)):
         raise ValueError("invalid_receipt")
     if valid and (digest is None or size is None or size <= 0
-                  or value.get("kind") not in {"image", "table", "report", "code"}):
+                  or value.get("kind") not in {"image", "table", "report", "code", "data"}):
         raise ValueError("invalid_receipt")
     reason = "validated" if valid else value.get("reason")
     if not valid and reason not in REPAIRABLE_REASONS | NON_REPAIRABLE_REASONS:

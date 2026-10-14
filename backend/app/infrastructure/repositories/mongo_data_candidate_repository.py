@@ -41,3 +41,11 @@ class MongoDataCandidateRepository:
         rows = await self.collection.find({"_id": {**lower, "$lt": prefix[:-1] + ";"},
                                             "owner_id": owner, "session_id": session}).sort("_id", 1).limit(21).to_list(length=21)
         return [row["payload"] for row in rows]
+
+
+    async def save_acquisition(self, owner, session, accession, payload):
+        # A replaceable pointer to a verified owned file, separate from immutable provenance.
+        key = self.prefix(owner, session, "acquired_package") + accession
+        await self.collection.replace_one(
+            {"_id": key, "owner_id": owner, "session_id": session},
+            {"_id": key, "owner_id": owner, "session_id": session, "payload": payload}, upsert=True)

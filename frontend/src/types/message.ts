@@ -37,6 +37,7 @@ export interface ToolContent extends BaseContent {
   spill?: SpillArtifactNotice | null;
   analysis_job?: AnalysisJobView | null;
   tool_approval?: ToolApprovalView | null;
+  connector_status?: string | null;
   status: "calling" | "called";
 }
 

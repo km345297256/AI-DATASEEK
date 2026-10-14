@@ -988,6 +988,18 @@ class MongoSessionRepository(SessionRepository):
         ).sort("+captured_at").to_list()
         return [document.to_domain() for document in docs]
     
+    async def upsert_connector_file(self, session_id: str, user_id: str, file_info: FileInfo) -> None:
+        """Keep one owned source-file reference as it gains a sandbox working path."""
+        result = await SessionDocument.get_pymongo_collection().update_one(
+            {"session_id": session_id, "user_id": user_id},
+            [{"$set": {"files": {"$concatArrays": [
+                {"$filter": {"input": {"$ifNull": ["$files", []]}, "as": "file",
+                             "cond": {"$ne": ["$$file.file_id", {"$literal": file_info.file_id}]}}},
+                {"$literal": [file_info.model_dump()]}]},
+                "updated_at": datetime.now(UTC)}}])
+        if not result.matched_count:
+            raise ValueError("Owned session not found")
+
     async def add_file(self, session_id: str, file_info: FileInfo) -> None:
         """Add a file to a session"""
         result = await SessionDocument.find_one(

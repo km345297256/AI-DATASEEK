@@ -6,7 +6,7 @@ import unicodedata
 
 from pydantic import BaseModel, ConfigDict, Field, field_serializer, field_validator, model_validator
 
-DELIVERABLE_LABELS = {"image": "图表", "table": "数据表", "report": "报告", "code": "代码", "any": "结果文件"}
+DELIVERABLE_LABELS = {"image": "图表", "table": "数据表", "report": "报告", "code": "代码", "data": "数据文件", "any": "结果文件"}
 
 ArtifactReasonCode = Literal[
     "missing_artifact",
@@ -35,7 +35,7 @@ def safe_artifact_name(value: object) -> str:
 class ArtifactIssue(BaseModel):
     model_config = ConfigDict(extra="forbid", revalidate_instances="always", frozen=True)
     artifact_name: str = Field(min_length=1, max_length=160)
-    kind: Literal["image", "table", "report", "code", "any"]
+    kind: Literal["image", "table", "report", "code", "data", "any"]
     reason_code: ArtifactReasonCode
     blocking: bool = Field(strict=True)
 
@@ -65,7 +65,7 @@ class ArtifactIssue(BaseModel):
 
 class DeliverableRequirement(BaseModel):
     model_config = ConfigDict(extra="forbid", revalidate_instances="always")
-    kind: Literal["image", "table", "report", "code", "any"]
+    kind: Literal["image", "table", "report", "code", "data", "any"]
     min_count: int = Field(default=1, strict=True, ge=1, le=16)
     formats: list[str] = Field(default_factory=list, max_length=8)
     label: str = Field(default="", max_length=200)

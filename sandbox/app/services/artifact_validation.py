@@ -33,7 +33,7 @@ MAX_ARCHIVE_BYTES = 64 * 1024 * 1024
 MAX_ARCHIVE_ENTRIES = 1_000
 READ_CHUNK_BYTES = 1024 * 1024
 BATCH_TIMEOUT_SECONDS = 30
-KINDS = frozenset({"image", "table", "report", "code"})
+KINDS = frozenset({"image", "table", "report", "code", "data"})
 IMAGE_FORMATS = {
     ".png": "PNG", ".jpg": "JPEG", ".jpeg": "JPEG", ".webp": "WEBP",
     ".gif": "GIF", ".bmp": "BMP", ".tif": "TIFF", ".tiff": "TIFF", ".avif": "AVIF",
@@ -68,6 +68,8 @@ def _check_cancelled(cancelled: threading.Event, deadline: float) -> None:
 
 def _classify(path: str, expected_kind: str) -> str | None:
     suffix = Path(path).suffix.casefold()
+    if suffix == ".zip":
+        return "data"
     if suffix in IMAGE_FORMATS:
         return "image"
     if suffix in CODE_SUFFIXES:
@@ -275,6 +277,26 @@ def _json_metadata(text: str, expected_kind: str) -> dict[str, Any]:
 def _validate_content(content: bytes, suffix: str, kind: str, cancelled: threading.Event,
                       deadline: float) -> dict[str, Any]:
     _check_cancelled(cancelled, deadline)
+    if kind == "data" and suffix == ".zip":
+        with zipfile.ZipFile(io.BytesIO(content)) as archive:
+            entries = archive.infolist()
+            if not entries or len(entries) > MAX_ARCHIVE_ENTRIES or sum(x.file_size for x in entries) > MAX_ARCHIVE_BYTES:
+                raise _InvalidArtifact("archive_size_limit")
+            names = [x.filename for x in entries]
+            if len(names) != len(set(names)):
+                raise _InvalidArtifact("invalid_content")
+            total = 0
+            for entry in entries:
+                path = Path(entry.filename)
+                if path.is_absolute() or ".." in path.parts or "\\" in entry.filename or entry.flag_bits & 1 or stat.S_ISLNK(entry.external_attr >> 16):
+                    raise _InvalidArtifact("invalid_content")
+                with archive.open(entry) as stream:
+                    while block := stream.read(READ_CHUNK_BYTES):
+                        _check_cancelled(cancelled, deadline)
+                        total += len(block)
+                        if total > MAX_ARCHIVE_BYTES:
+                            raise _InvalidArtifact("archive_size_limit")
+            return {"format": "ZIP", "archive_entries": len(entries), "archive_bytes": total}
     if kind == "image":
         return _image_metadata(content, suffix, cancelled, deadline)
     if suffix == ".xlsx":

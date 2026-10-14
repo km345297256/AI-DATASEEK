@@ -70,7 +70,7 @@ services:
     image: ${SANDBOX_IMAGE:-ai-dataseek-sandbox:${IMAGE_TAG:-latest}}
     build:
       context: .
-      dockerfile: sandbox/Dockerfile
+      dockerfile: ${SANDBOX_DOCKERFILE:-sandbox/Dockerfile}
     command: ["/bin/true"]
     restart: "no"
     networks:

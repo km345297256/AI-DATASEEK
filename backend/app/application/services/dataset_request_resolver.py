@@ -187,7 +187,8 @@ Preserve every requested downloadable file output in execution.deliverables befo
 An inline metadata answer is not a file deliverable. For connector metadata
 lookup without requested files, use requires_artifacts=false, deliverables=[]
 and sandbox mode for actual tool execution; never invent a report requirement.
-Each item has kind (image, table, report, code, or any), min_count (1..16),
+For NCBI sequence downloads use kind=data, formats=["zip"], requires_artifacts=true, and sandbox mode. A metadata report is not a sequence download.
+Each item has kind (image, table, report, code, data, or any), min_count (1..16),
 formats (lowercase extensions without dots, or [] when unspecified), and label.
 Use [] for no requested files. Visualization requires kind=image; a script is
 not a chart. For an open-ended visualization request require one useful image;

@@ -72,7 +72,7 @@ class DataConnectorService:
 
 
 def ncbi_registration(service) -> RegisteredConnector:
-    connector_id, version = 'ncbi-datasets-v2', '1.0.0'
+    connector_id, version = 'ncbi-datasets-v2', '1.1.0'
 
     def resource(candidate):
         return ConnectorResource(id=candidate.external_id, title=candidate.title,
@@ -91,20 +91,26 @@ def ncbi_registration(service) -> RegisteredConnector:
         return ConnectorResult(connector_id=connector_id, connector_version=version, operation='describe',
             resources=[resource(candidate)])
 
+    async def acquire(owner, session, args):
+        receipt = await service.acquire(owner, session, args.accession)
+        return ConnectorResult(connector_id=connector_id, connector_version=version, operation='acquire',
+            kind='files', resources=[], files=[receipt], files_downloaded=True)
+
     operations = {}
     for name, title, description, model, invoke in [
         ('search', '检索数据', '按分类与筛选条件检索基因组组装元数据，每页最多 20 条；翻页保持筛选条件。', NcbiSearch, search),
+        ('acquire', '下载数据', '下载指定版本的 genomic FASTA ZIP 数据包；最多 32 MiB，超时或校验失败不会标记成功。', DescribeInput, acquire),
         ('describe', '读取元数据', '读取完整 accession.version 指定的组装元数据，不替换为最新版。', DescribeInput, describe),
     ]:
         descriptor = ConnectorOperation(name=name, title=title, description=description,
             input_schema=model.model_json_schema(), output_schema=ConnectorResult.model_json_schema(),
-            effects=['network', 'session_metadata'], timeout_seconds=60)
+            effects=['network', 'session_metadata'] + (['file_write'] if name == 'acquire' else []), timeout_seconds=60)
         operations[name] = RegisteredOperation(descriptor, model, invoke)
     return RegisteredConnector(ConnectorManifest(id=connector_id, version=version, title='NCBI Datasets',
-        description='检索与读取 NCBI 基因组组装的官方元数据。', transport='native', auth='none',
+        description='检索官方元数据，下载指定版本的基因组 FASTA 数据包。', transport='native', auth='none',
         domains=['www.ncbi.nlm.nih.gov', 'api.ncbi.nlm.nih.gov'],
         operations=[op.descriptor for op in operations.values()],
-        limitations=['仅返回元数据，尚不提供序列下载。', '公开数据源，无需账户授权；来源记录保存于当前任务。']), operations)
+        limitations=['支持单个组装的 genomic FASTA ZIP 下载，压缩包最多 32 MiB、解压总量最多 64 MiB；暂不支持大文件断点续传。', '公开数据源，无需账户授权；来源记录保存于当前任务。']), operations)
 
 
 def build_data_connector_service(ncbi_service):

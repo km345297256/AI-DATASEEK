@@ -30,7 +30,8 @@
           "items": {
             "enum": [
               "network",
-              "session_metadata"
+              "session_metadata",
+              "file_write"
             ],
             "type": "string"
           },

@@ -83,7 +83,7 @@ class AcquisitionPlan(SourceRecord):
     format: Literal['genomic_fasta'] = 'genomic_fasta'
     reported_sequence_bases: int | None
     download_size_bytes: None = None
-    transfer_limit_bytes: int = 100 * 1024 * 1024
+    transfer_limit_bytes: int = 32 * 1024 * 1024
     status: Literal['not_started'] = 'not_started'
-    execution_available: Literal[False] = False
-    reason: Literal['durable_acquisition_worker_pending'] = 'durable_acquisition_worker_pending'
+    execution_available: Literal[True] = True
+    reason: Literal['call_connector_acquire'] = 'call_connector_acquire'

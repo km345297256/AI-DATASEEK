@@ -247,7 +247,7 @@ class PlanActFlow(BaseFlow):
             session_repository=self._session_repository,
         )
         self.dataset_catalog_toolkit = DatasetCatalogToolkit()
-        self.data_discovery_toolkit = DataDiscoveryToolkit(user_id=self._user_id, session_id=self._session_id)
+        self.data_discovery_toolkit = DataDiscoveryToolkit(user_id=self._user_id, session_id=self._session_id, sandbox=sandbox)
         self.mcp_toolkit = mcp_tool
         self.plugin_toolkit = PluginToolkit(
             sandbox,

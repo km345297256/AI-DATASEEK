@@ -70,7 +70,7 @@ async def test_agent_uses_standard_dispatch_without_caller_supplied_session():
     result = await tool._arun(connector_id='ncbi-datasets-v2', operation='search', arguments={'taxon': '1386'})
     assert result.success and result.data['files_downloaded'] is False
     assert upstream.search.call_args.args[:2] == ('owner', 'session')
-    assert tool.execution_contract['effects'] == ['network']
+    assert tool.execution_contract['effects'] == ['network', 'sandbox_write']
     failed = await tool._arun(connector_id='ncbi-datasets-v2', operation='acquire', arguments={})
     assert not failed.success
 

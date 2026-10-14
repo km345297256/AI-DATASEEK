@@ -31,7 +31,7 @@ export async function registerVersion(session: string, candidate: string, fileId
 
 export interface AcquisitionPlan {
   accession: string; reported_sequence_bases: number | null; download_size_bytes: null;
-  transfer_limit_bytes: number; status: 'not_started'; execution_available: false;
+  transfer_limit_bytes: number; status: 'not_started'; execution_available: boolean;
 }
 export async function getAcquisitionPlan(session: string, candidate: string, signal?: AbortSignal) {
   return (await apiClient.get<ApiResponse<AcquisitionPlan>>(`${base(session)}/${encodeURIComponent(candidate)}/acquisition-plan`, { signal })).data.data;
