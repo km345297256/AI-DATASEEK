@@ -105,44 +105,6 @@ def _rewind_or_buffer_stream(file_data):
 # caches and other sandbox working files.  Explicit step/message attachments
 # remain supported outside this directory.
 ARTIFACT_SEARCH_ROOTS = ("/home/ubuntu/output",)
-ARTIFACT_EXTENSIONS = (
-    ".avif",
-    ".csv",
-    ".geojson",
-    ".gif",
-    ".html",
-    ".jpeg",
-    ".jpg",
-    ".json",
-    ".jsonl",
-    ".log",
-    ".md",
-    ".npy",
-    ".npz",
-    ".obj",
-    ".parquet",
-    ".pkl",
-    ".pdf",
-    ".png",
-    ".prj",
-    ".py",
-    ".rar",
-    ".shp",
-    ".shx",
-    ".dbf",
-    ".cpg",
-    ".svg",
-    ".tif",
-    ".tiff",
-    ".txt",
-    ".webp",
-    ".xls",
-    ".xlsx",
-    ".xml",
-    ".yaml",
-    ".yml",
-    ".zip",
-)
 ARTIFACT_EXCLUDED_PARTS = {
     ".cache",
     ".config",
@@ -808,7 +770,7 @@ class AgentTaskRunner(TaskRunner):
             return False
         if self._is_private_artifact_path(file_path):
             return False
-        return path.suffix.lower() in ARTIFACT_EXTENSIONS
+        return bool(path.name) and not path.name.startswith(".")
 
     def _is_private_artifact_path(self, file_path: str) -> bool:
         if not file_path:

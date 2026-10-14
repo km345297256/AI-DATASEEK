@@ -11,7 +11,7 @@ from app.domain.models.analysis_outcome import (
 )
 
 KINDS = {
-    "data": {"zip"},
+    "data": {"zip", "fasta", "fa", "fna", "faa", "fastq", "fq"},
     "image": {"png", "jpg", "jpeg", "webp", "gif", "bmp", "tif", "tiff", "svg", "avif"},
     "table": {"csv", "tsv", "xlsx", "xls", "parquet"},
     "report": {"md", "markdown", "txt", "json", "html", "htm", "pdf", "docx"},
@@ -41,7 +41,7 @@ REASONS = {
 
 def artifact_kind(path: str) -> str | None:
     extension = PurePosixPath(path).suffix.lower().lstrip(".")
-    return next((kind for kind, formats in KINDS.items() if extension in formats), None)
+    return next((kind for kind, formats in KINDS.items() if extension in formats), "data")
 
 
 def requirements_for_step(step, message) -> list[DeliverableRequirement]:
@@ -121,8 +121,14 @@ def _inspect_records(records, delivered, validation_available, *, _selected_deli
         digest, size, kind = item.get("sha256"), item.get("size"), item.get("kind")
         suffix = PurePosixPath(path).suffix.lower().lstrip(".") if isinstance(path, str) else ""
         if (not _safe_output_path(path) or not isinstance(digest, str) or not re.fullmatch(r"[0-9a-f]{64}", digest)
-                or type(size) is not int or size <= 0 or not isinstance(kind, str) or kind not in KINDS
-                or (suffix not in KINDS[kind] and not (kind == "table" and suffix == "json"))):
+                or type(size) is not int or size < 0
+                or (size == 0 and not (isinstance(item.get("metadata"), dict)
+                    and item["metadata"].get("validation_scope") == "file_integrity"))
+                or not isinstance(kind, str) or kind not in KINDS
+                or (suffix not in KINDS[kind] and not (kind == "table" and suffix == "json")
+                    and not (isinstance(item.get("metadata"), dict)
+                             and item["metadata"].get("validation_scope") == "file_integrity"
+                             and item["metadata"].get("content_validation") == "unsupported"))):
             failed(item, "validation_receipt_invalid")
             continue
         valid[path] = item
@@ -160,7 +166,17 @@ def verified_deliveries(records: list[dict], delivered, *, validation_available:
     implementation, including non-final event publication paths.
     """
     selected = []
-    _inspect_records(records, list(delivered), validation_available, _selected_deliveries=selected)
+    accepted, _ = _inspect_records(records, list(delivered), validation_available, _selected_deliveries=selected)
+    by_path = {item["path"]: item for item in accepted}
+    for info in selected:
+        record = by_path[_value(info, "file_path")]
+        scope = (record.get("metadata") or {}).get("validation_scope")
+        metadata = dict(_value(info, "metadata") or {})
+        metadata["artifact_validation_scope"] = "file_integrity" if scope == "file_integrity" else "content"
+        if isinstance(info, dict):
+            info["metadata"] = metadata
+        else:
+            info.metadata = metadata
     return selected
 
 
@@ -290,7 +306,8 @@ def verified_delivery_counts(delivered_files: list[Any]) -> dict[str, int]:
                 or not isinstance(path, str) or not path.startswith("/home/ubuntu/output/") or path in seen_paths
                 or str(PurePosixPath(path)) != path or ".." in PurePosixPath(path).parts
                 or "\\" in path or any(ord(char) < 32 for char in path)
-                or type(size) is not int or size <= 0
+                or type(size) is not int or size < 0
+                or (size == 0 and metadata.get("artifact_validation_scope") != "file_integrity")
                 or not isinstance(digest, str) or not re.fullmatch(r"[a-f0-9]{64}", digest)):
             continue
         seen_ids.add(file_id)

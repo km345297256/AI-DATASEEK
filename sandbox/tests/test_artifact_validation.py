@@ -203,7 +203,7 @@ def test_text_report_must_be_nonempty_and_unimplemented_format_is_explicit(tmp_p
     assert _receipt(path, "report", tmp_path)["valid"] is True
     path.write_bytes(b"\x00binary")
     assert _receipt(path, "report", tmp_path)["valid"] is False
-    assert _receipt(tmp_path / "report.pdf", "report", tmp_path)["reason"] == "unsupported_format"
+    assert _receipt(tmp_path / "report.pdf", "report", tmp_path)["reason"] == "missing_artifact"
 
 
 @pytest.mark.parametrize("suffix", [".txt", ".md", ".markdown", ".html", ".htm"])

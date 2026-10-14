@@ -460,3 +460,16 @@ def test_public_issue_collection_is_bounded_and_keeps_required_faults_first():
     records.append(failed_artifact("required.png", kind="image", reason="invalid_content"))
     issues = issues_from_records([DeliverableRequirement(kind="image")], records)
     assert len(issues) == 64 and issues[0].blocking and issues[0].artifact_name == "required.png"
+
+
+@pytest.mark.parametrize('size', [0, 17])
+def test_custom_format_delivered_without_claiming_content_validation(size):
+    pair = artifact('result.xxcc1', 'data', size=size)
+    pair[0]['metadata'] = {'validation_scope': 'file_integrity', 'content_validation': 'unsupported'}
+    result = assess([{'kind': 'data', 'formats': ['xxcc1']}], [pair])
+    assert result.status == 'succeeded'
+    selected = verified_deliveries([pair[0]], [pair[1]])
+    assert selected == [pair[1]]
+    assert selected[0].metadata['artifact_validation_scope'] == 'file_integrity'
+    pair[1].metadata['artifact_sha256'] = 'b' * 64
+    assert verified_deliveries([pair[0]], [pair[1]]) == []

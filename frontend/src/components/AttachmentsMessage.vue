@@ -17,6 +17,8 @@
           </div>
           <div class="text-xs text-[var(--text-tertiary)]">{{ getFileTypeText(attachment.filename) }} · {{
             formatFileSize(attachment.size) }}</div>
+          <div v-if="attachment.metadata?.artifact_validation_scope === 'file_integrity'"
+            class="text-xs text-[var(--text-tertiary)]">已交付 · 未进行格式内容校验</div>
         </div>
         <div
           class="items-center justify-center cursor-pointer hover:bg-[var(--fill-tsp-gray-main)] rounded-md w-6 h-6 border border-[var(--border-main)] flex opacity-0 group-hover/attach:opacity-100">
@@ -44,6 +46,8 @@
           </div>
           <div class="text-xs text-[var(--text-tertiary)]">{{ getFileTypeText(attachment.filename) }} · {{
             formatFileSize(attachment.size) }}</div>
+          <div v-if="attachment.metadata?.artifact_validation_scope === 'file_integrity'"
+            class="text-xs text-[var(--text-tertiary)]">已交付 · 未进行格式内容校验</div>
         </div>
         <div
           class="items-center justify-center cursor-pointer hover:bg-[var(--fill-tsp-gray-main)] rounded-md w-6 h-6 border border-[var(--border-main)] flex opacity-0 group-hover/attach:opacity-100">

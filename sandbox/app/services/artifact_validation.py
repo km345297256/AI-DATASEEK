@@ -33,6 +33,7 @@ MAX_ARCHIVE_BYTES = 64 * 1024 * 1024
 MAX_ARCHIVE_ENTRIES = 1_000
 READ_CHUNK_BYTES = 1024 * 1024
 BATCH_TIMEOUT_SECONDS = 30
+SEQUENCE_SUFFIXES = frozenset({".fasta", ".fa", ".fna", ".faa", ".fastq", ".fq"})
 KINDS = frozenset({"image", "table", "report", "code", "data"})
 IMAGE_FORMATS = {
     ".png": "PNG", ".jpg": "JPEG", ".jpeg": "JPEG", ".webp": "WEBP",
@@ -68,7 +69,7 @@ def _check_cancelled(cancelled: threading.Event, deadline: float) -> None:
 
 def _classify(path: str, expected_kind: str) -> str | None:
     suffix = Path(path).suffix.casefold()
-    if suffix == ".zip":
+    if suffix == ".zip" or suffix in SEQUENCE_SUFFIXES:
         return "data"
     if suffix in IMAGE_FORMATS:
         return "image"
@@ -84,7 +85,7 @@ def _classify(path: str, expected_kind: str) -> str | None:
 
 
 def _read_stable_output(path: str, root: Path, cancelled: threading.Event,
-                        deadline: float, byte_budget: list[int]) -> bytes:
+                        deadline: float, byte_budget: list[int], *, allow_empty: bool = False) -> bytes:
     _check_cancelled(cancelled, deadline)
     with _open_output(path, root) as stream:
         before = os.fstat(stream.fileno())
@@ -94,7 +95,7 @@ def _read_stable_output(path: str, root: Path, cancelled: threading.Event,
             raise _InvalidArtifact("file_size_limit", {"size_bytes": before.st_size, "limit_bytes": MAX_FILE_BYTES})
         if before.st_size > byte_budget[0]:
             raise _InvalidArtifact("batch_size_limit", {"size_bytes": before.st_size, "limit_bytes": byte_budget[0]})
-        if before.st_size == 0:
+        if before.st_size == 0 and not allow_empty:
             raise _InvalidArtifact("empty_file")
         chunks: list[bytes] = []
         remaining = before.st_size + 1
@@ -274,9 +275,59 @@ def _json_metadata(text: str, expected_kind: str) -> dict[str, Any]:
     return {"format": "JSON", "row_count": len(payload), "column_count": width}
 
 
+def _sequence_metadata(content: bytes, suffix: str, cancelled: threading.Event,
+                       deadline: float) -> dict[str, Any]:
+    """Validate sequence syntax, not biological claims or measured quality."""
+    try:
+        text = content.decode("ascii")
+    except UnicodeDecodeError:
+        raise _InvalidArtifact("invalid_content") from None
+    allowed = frozenset("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz*.-")
+    records = bases = current_length = 0
+    stream = io.StringIO(text)
+    if suffix in {".fastq", ".fq"}:
+        while header := stream.readline():
+            _check_cancelled(cancelled, deadline)
+            sequence, separator, quality = (stream.readline().rstrip("\r\n") for _ in range(3))
+            header = header.rstrip("\r\n")
+            if (not header.startswith("@") or not header[1:].strip()
+                    or not sequence or not set(sequence) <= allowed
+                    or not separator.startswith("+")
+                    or (separator[1:] and separator[1:] != header[1:])
+                    or len(sequence) != len(quality)
+                    or any(not 33 <= ord(char) <= 126 for char in quality)):
+                raise _InvalidArtifact("invalid_content")
+            records += 1
+            bases += len(sequence)
+        file_format = "FASTQ"
+    else:
+        for line in stream:
+            _check_cancelled(cancelled, deadline)
+            line = line.rstrip("\r\n")
+            if line.startswith(">"):
+                if not line[1:].strip() or (records and not current_length):
+                    raise _InvalidArtifact("invalid_content")
+                records += 1
+                current_length = 0
+            else:
+                if not records or not line or not set(line) <= allowed:
+                    raise _InvalidArtifact("invalid_content")
+                current_length += len(line)
+                bases += len(line)
+        if not current_length:
+            raise _InvalidArtifact("invalid_content")
+        file_format = "FASTA"
+    if not records:
+        raise _InvalidArtifact("invalid_content")
+    return {"format": file_format, "record_count": records, "base_count": bases,
+            "validation_scope": "format_only"}
+
+
 def _validate_content(content: bytes, suffix: str, kind: str, cancelled: threading.Event,
                       deadline: float) -> dict[str, Any]:
     _check_cancelled(cancelled, deadline)
+    if kind == "data" and suffix in SEQUENCE_SUFFIXES:
+        return _sequence_metadata(content, suffix, cancelled, deadline)
     if kind == "data" and suffix == ".zip":
         with zipfile.ZipFile(io.BytesIO(content)) as archive:
             entries = archive.infolist()
@@ -333,6 +384,9 @@ def validate_artifacts(items: list[dict[str, str]], *, root: Path = ARTIFACT_ROO
     for item in items:
         path, expected_kind = item["path"], item["kind"]
         kind = _classify(path, expected_kind)
+        integrity_only = kind is None
+        if integrity_only:
+            kind = expected_kind
         receipt = {"path": path, "expected_kind": expected_kind, "kind": kind, "valid": False,
                    "reason": "invalid_content", "sha256": None, "size": None, "metadata": {}, "diagnostics": {}}
         try:
@@ -344,7 +398,7 @@ def validate_artifacts(items: list[dict[str, str]], *, root: Path = ARTIFACT_ROO
             if kind != expected_kind:
                 raise _InvalidArtifact("kind_mismatch")
             try:
-                content = _read_stable_output(path, root, cancelled, deadline, byte_budget)
+                content = _read_stable_output(path, root, cancelled, deadline, byte_budget, allow_empty=integrity_only)
             except MissingArtifact:
                 raise _InvalidArtifact("missing_artifact") from None
             except (OSError, ValueError):
@@ -355,7 +409,9 @@ def validate_artifacts(items: list[dict[str, str]], *, root: Path = ARTIFACT_ROO
                 raise _InvalidArtifact("unavailable_or_unsafe_path") from None
             receipt["size"] = len(content)
             receipt["sha256"] = hashlib.sha256(content).hexdigest()
-            metadata = _validate_content(content, Path(path).suffix.casefold(), kind, cancelled, deadline)
+            metadata = ({"validation_scope": "file_integrity", "content_validation": "unsupported"}
+                        if integrity_only else
+                        _validate_content(content, Path(path).suffix.casefold(), kind, cancelled, deadline))
             _check_cancelled(cancelled, deadline)
             receipt.update(valid=True, reason="validated", metadata=metadata)
         except _InvalidArtifact as exc:
