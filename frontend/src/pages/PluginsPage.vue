@@ -334,7 +334,7 @@
           <div class="mb-4 flex flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <h2 class="text-lg font-semibold text-[var(--text-primary)]">{{ t('Skills') }}</h2>
-              <p class="mt-1 text-sm text-[var(--text-tertiary)]">{{ t('Upload Markdown or ZIP skill packages') }}</p>
+              <p class="mt-1 text-sm text-[var(--text-tertiary)]">{{ t('Data skills catalog introduction') }}</p>
             </div>
             <button class="inline-flex h-11 w-full items-center justify-center gap-1.5 rounded-lg border border-[var(--border-btn-main)] px-3 text-sm text-[var(--text-primary)] hover:bg-[var(--fill-tsp-white-light)] sm:h-9 sm:w-auto" :disabled="skillUploading" @click="skillFileInput?.click()">
               <Upload :size="15" />
@@ -343,13 +343,33 @@
             <input ref="skillFileInput" class="hidden" type="file" accept=".md,.zip" @change="uploadSkillPackage" />
           </div>
 
+          <div class="mb-4 flex flex-wrap items-center gap-3">
+            <label class="flex items-center gap-2 text-sm text-[var(--text-secondary)]">
+              {{ t('Workflow category') }}
+              <select v-model="skillCategoryFilter" class="rounded-lg border border-[var(--border-main)] bg-[var(--background-menu-white)] p-2">
+                <option value="">{{ t('All categories') }}</option>
+                <option v-for="(label, key) in skillCategories" :key="key" :value="key">{{ t(label) }}</option>
+              </select>
+            </label>
+            <label class="flex items-center gap-2 text-sm text-[var(--text-secondary)]">
+              {{ t('Data domain') }}
+              <select v-model="skillDomainFilter" class="max-w-[220px] rounded-lg border border-[var(--border-main)] bg-[var(--background-menu-white)] p-2">
+                <option value="">{{ t('All domains') }}</option>
+                <option v-for="domain in skillDomains" :key="domain" :value="domain">{{ domain }}</option>
+              </select>
+            </label>
+            <label class="flex items-center gap-2 text-sm text-[var(--text-secondary)]">
+              <input v-model="skillInstalledOnly" type="checkbox" />{{ t('Installed skills only') }}
+            </label>
+            <button v-if="skillCategoryFilter || skillDomainFilter || skillInstalledOnly || skillSearchQuery" class="text-sm underline" @click="resetSkillFilters">{{ t('Reset skill filters') }}</button>
+          </div>
           <div v-if="skillLoading" class="py-8 text-center text-sm text-[var(--text-tertiary)]">{{ t('Loading') }}...</div>
-          <div v-else-if="filteredSkills.length === 0" class="rounded-xl border border-dashed border-[var(--border-main)] py-8 text-center text-sm text-[var(--text-tertiary)]">{{ t('No skills yet') }}</div>
+          <div v-else-if="filteredSkills.length === 0" class="rounded-xl border border-dashed border-[var(--border-main)] py-8 text-center text-sm text-[var(--text-tertiary)]">{{ skills.length ? t('No matching skills') : t('No skills yet') }}</div>
           <div v-else class="grid gap-3 md:grid-cols-2">
             <article v-for="skill in pagedSkills" :key="skill.id" class="min-h-[124px] cursor-pointer rounded-lg border border-[var(--border-main)] bg-[var(--background-gray-main)] p-4 hover:bg-[var(--fill-tsp-white-light)]" @click="openSkill(skill.name)">
               <div class="flex items-start justify-between gap-3">
                 <div class="min-w-0">
-                  <div class="truncate text-sm font-semibold text-[var(--text-primary)]">{{ skill.name }}</div>
+                  <div class="truncate text-sm font-semibold text-[var(--text-primary)]">{{ skill.title || skill.name }}</div>
                   <div class="description-clamp mt-2 text-xs leading-5 text-[var(--text-tertiary)]">{{ skill.description || t('No description') }}</div>
                 </div>
                 <div class="flex shrink-0 items-center gap-1.5">
@@ -374,6 +394,7 @@
                   ><Check v-if="skill.installed" :size="15" /><Plus v-else :size="15" /></button>
                 </div>
               </div>
+              <SkillMetadata :skill="skill" />
               <div v-if="skill.triggers.length" class="mt-3 flex flex-wrap gap-1">
                 <span v-for="trigger in skill.triggers.slice(0, 8)" :key="trigger" class="rounded border border-[var(--border-main)] px-1.5 py-0.5 text-[11px] text-[var(--text-tertiary)]">{{ trigger }}</span>
               </div>
@@ -496,9 +517,14 @@
     <Dialog v-model:open="skillDetailOpen">
       <DialogContent class="w-[min(1100px,calc(100vw-32px))]">
         <DialogHeader>
-          <DialogTitle>{{ selectedSkillDetail?.skill.name || t('Skill Detail') }}</DialogTitle>
+          <DialogTitle>{{ selectedSkillDetail?.skill.title || selectedSkillDetail?.skill.name || t('Skill Detail') }}</DialogTitle>
           <p v-if="selectedSkillDetail?.skill.description" class="mt-2 whitespace-pre-wrap text-sm leading-5 text-[var(--text-tertiary)]">
             {{ selectedSkillDetail.skill.description }}
+          </p>
+          <SkillMetadata v-if="selectedSkillDetail" :skill="selectedSkillDetail.skill" />
+          <p v-if="selectedSkillDetail?.skill.format === 'data-skill-v1'" class="mt-2 break-all text-xs text-[var(--text-tertiary)]">
+            {{ selectedSkillDetail.skill.package_id }} · {{ t('Skill release immutable') }}
+            <br />SHA-256: {{ selectedSkillDetail.skill.package_sha256 }}
           </p>
         </DialogHeader>
         <div class="grid h-[70vh] grid-cols-[280px_1fr] overflow-hidden px-6 pb-5 pt-2">
@@ -513,14 +539,14 @@
                 <div class="min-w-0 truncate text-xs text-[var(--text-tertiary)]">{{ selectedSkillFile.path }}</div>
                 <div class="flex shrink-0 items-center gap-2">
                   <button
-                    v-if="!editingSkillFile"
+                    v-if="!editingSkillFile && selectedSkillDetail?.skill.format !== 'data-skill-v1'"
                     class="rounded-lg border border-[var(--border-main)] px-2 py-1 text-xs text-[var(--text-secondary)] hover:bg-[var(--fill-tsp-white-light)]"
                     :disabled="selectedSkillFile.binary"
                     @click="startEditSkillFile"
                   >
                     {{ t('Edit') }}
                   </button>
-                  <template v-else>
+                  <template v-else-if="editingSkillFile && selectedSkillDetail?.skill.format !== 'data-skill-v1'">
                     <button class="rounded-lg border border-[var(--border-main)] px-2 py-1 text-xs text-[var(--text-secondary)] hover:bg-[var(--fill-tsp-white-light)]" @click="cancelEditSkillFile">{{ t('Cancel') }}</button>
                     <button class="rounded-lg bg-[var(--Button-primary-black)] px-2 py-1 text-xs text-[var(--text-onblack)] disabled:opacity-50" :disabled="savingSkillFile" @click="saveSkillFile">{{ savingSkillFile ? t('Saving...') : t('Save') }}</button>
                   </template>
@@ -549,6 +575,8 @@
 </template>
 
 <script setup lang="ts">
+import SkillMetadata from '@/components/SkillMetadata.vue';
+import { skillCategories, filterSkillCatalog } from '@/utils/skillCatalog';
 import { computed, defineComponent, h, nextTick, onMounted, reactive, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useRoute, useRouter } from 'vue-router';
@@ -669,6 +697,17 @@ const skillDetailOpen = ref(false);
 const selectedSkillDetail = ref<SkillDetailResponse | null>(null);
 const selectedSkillFilePath = ref('');
 const skillPage = ref(1);
+const skillCategoryFilter = ref('');
+const skillDomainFilter = ref('');
+const skillInstalledOnly = ref(false);
+const skillDomains = computed(() => [...new Set(skills.value.flatMap(skill => skill.domains || []))].sort());
+const resetSkillFilters = () => {
+  skillCategoryFilter.value = '';
+  skillDomainFilter.value = '';
+  skillInstalledOnly.value = false;
+  skillSearchQuery.value = '';
+  pluginSource.value = 'all';
+};
 const editingSkillFile = ref(false);
 const savingSkillFile = ref(false);
 const skillFileDraft = ref('');
@@ -719,15 +758,11 @@ const filteredMcpServers = computed(() => {
   ].some((value) => String(value || '').toLowerCase().includes(query))));
 });
 
-const filteredSkills = computed(() => {
-  const query = normalizedSkillSearch.value;
-  return skills.value.filter((skill) => (pluginSource.value === 'all' || skill.source === pluginSource.value) && (!query || [
-    skill.name,
-    skill.description,
-    skill.scope,
-    ...(skill.triggers || []),
-  ].some((value) => String(value || '').toLowerCase().includes(query))));
-});
+const filteredSkills = computed(() => filterSkillCatalog(skills.value, {
+  query: normalizedSkillSearch.value, source: pluginSource.value,
+  category: skillCategoryFilter.value, domain: skillDomainFilter.value,
+  installed: skillInstalledOnly.value,
+}));
 
 const filteredRenderers = computed(() => {
   const query = normalizedRendererSearch.value;
@@ -1270,7 +1305,7 @@ watch(mcpSearchQuery, () => {
   mcpPage.value = 1;
 });
 
-watch(skillSearchQuery, () => {
+watch([skillSearchQuery, skillCategoryFilter, skillDomainFilter, skillInstalledOnly], () => {
   skillPage.value = 1;
 });
 
