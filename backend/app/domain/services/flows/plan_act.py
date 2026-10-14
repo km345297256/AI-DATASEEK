@@ -800,7 +800,7 @@ class PlanActFlow(BaseFlow):
         if discovery is not None:
             discovery.selected_connectors = list(message.data_connectors)
         if message.data_connectors:
-            self.session_context += "\n本次用户已选择数据连接器：" + ", ".join(message.data_connectors) + "。需要外部数据时先读取 data_connector_list，再用 data_connector_call 调用所选来源的能力；不要把元数据结果当成已下载文件。"
+            self.session_context += "\n本次用户已选择数据连接器：" + ", ".join(message.data_connectors) + "。需要新的外部证据时先读取 data_connector_list，再用 data_connector_call 调用所选来源的能力；复用已成功返回的结果，不为格式整理重复读取；纯元数据问答不要求文件交付，不要把元数据结果当成已下载文件。"
         self.dataset_context = render_dataset_context(message.datasets)
         catalog_toolkit = getattr(self, "dataset_catalog_toolkit", None)
         if catalog_toolkit is not None:
