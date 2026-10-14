@@ -1,0 +1,368 @@
+{
+  "schema_version": "data-connector-v1",
+  "id": "ncbi-datasets-v2",
+  "version": "1.0.0",
+  "title": "NCBI Datasets",
+  "description": "检索与读取 NCBI 基因组组装的官方元数据。",
+  "transport": "native",
+  "auth": "none",
+  "domains": [
+    "www.ncbi.nlm.nih.gov",
+    "api.ncbi.nlm.nih.gov"
+  ],
+  "operations": [
+    {
+      "name": "search",
+      "title": "检索数据",
+      "description": "按分类与筛选条件检索基因组组装元数据，每页最多 20 条；翻页保持筛选条件。",
+      "input_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "taxon": {
+            "maxLength": 120,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9 ._'()-]*$",
+            "title": "Taxon",
+            "type": "string"
+          },
+          "assembly_source": {
+            "default": "refseq",
+            "enum": [
+              "refseq",
+              "genbank",
+              "all"
+            ],
+            "title": "Assembly Source",
+            "type": "string"
+          },
+          "assembly_level": {
+            "default": "complete_genome",
+            "enum": [
+              "complete_genome",
+              "chromosome",
+              "scaffold",
+              "contig",
+              "all"
+            ],
+            "title": "Assembly Level",
+            "type": "string"
+          },
+          "reference_only": {
+            "default": false,
+            "title": "Reference Only",
+            "type": "boolean"
+          },
+          "page_size": {
+            "default": 5,
+            "maximum": 20,
+            "minimum": 1,
+            "title": "Page Size",
+            "type": "integer"
+          },
+          "page_token": {
+            "default": "",
+            "maxLength": 4096,
+            "title": "Page Token",
+            "type": "string"
+          }
+        },
+        "required": [
+          "taxon"
+        ],
+        "title": "NcbiSearch",
+        "type": "object"
+      },
+      "output_schema": {
+        "$defs": {
+          "ConnectorResource": {
+            "additionalProperties": false,
+            "description": "A metadata result, not a downloaded artifact. URLs are public references only.",
+            "properties": {
+              "title": {
+                "maxLength": 200,
+                "minLength": 1,
+                "title": "Title",
+                "type": "string"
+              },
+              "source_url": {
+                "maxLength": 2048,
+                "minLength": 1,
+                "title": "Source Url",
+                "type": "string"
+              },
+              "external_id": {
+                "maxLength": 200,
+                "minLength": 1,
+                "title": "External Id",
+                "type": "string"
+              },
+              "id": {
+                "maxLength": 200,
+                "minLength": 1,
+                "title": "Id",
+                "type": "string"
+              },
+              "candidate_id": {
+                "anyOf": [
+                  {
+                    "pattern": "^[a-f0-9]{64}$",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Candidate Id"
+              },
+              "retrieved_at": {
+                "minimum": 0,
+                "title": "Retrieved At",
+                "type": "integer"
+              },
+              "metadata": {
+                "additionalProperties": true,
+                "title": "Metadata",
+                "type": "object"
+              }
+            },
+            "required": [
+              "title",
+              "source_url",
+              "external_id",
+              "id",
+              "retrieved_at"
+            ],
+            "title": "ConnectorResource",
+            "type": "object"
+          }
+        },
+        "additionalProperties": false,
+        "properties": {
+          "connector_id": {
+            "title": "Connector Id",
+            "type": "string"
+          },
+          "connector_version": {
+            "title": "Connector Version",
+            "type": "string"
+          },
+          "operation": {
+            "title": "Operation",
+            "type": "string"
+          },
+          "kind": {
+            "const": "metadata",
+            "default": "metadata",
+            "title": "Kind",
+            "type": "string"
+          },
+          "resources": {
+            "items": {
+              "$ref": "#/$defs/ConnectorResource"
+            },
+            "maxItems": 20,
+            "title": "Resources",
+            "type": "array"
+          },
+          "next_cursor": {
+            "default": "",
+            "maxLength": 4096,
+            "title": "Next Cursor",
+            "type": "string"
+          },
+          "total_count": {
+            "anyOf": [
+              {
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Total Count"
+          },
+          "files_downloaded": {
+            "const": false,
+            "default": false,
+            "title": "Files Downloaded",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "connector_id",
+          "connector_version",
+          "operation",
+          "resources"
+        ],
+        "title": "ConnectorResult",
+        "type": "object"
+      },
+      "effects": [
+        "network",
+        "session_metadata"
+      ],
+      "timeout_seconds": 60
+    },
+    {
+      "name": "describe",
+      "title": "读取元数据",
+      "description": "读取完整 accession.version 指定的组装元数据，不替换为最新版。",
+      "input_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "accession": {
+            "maxLength": 32,
+            "pattern": "^GC[AF]_[0-9]{9}\\.[1-9][0-9]*$",
+            "title": "Accession",
+            "type": "string"
+          }
+        },
+        "required": [
+          "accession"
+        ],
+        "title": "DescribeInput",
+        "type": "object"
+      },
+      "output_schema": {
+        "$defs": {
+          "ConnectorResource": {
+            "additionalProperties": false,
+            "description": "A metadata result, not a downloaded artifact. URLs are public references only.",
+            "properties": {
+              "title": {
+                "maxLength": 200,
+                "minLength": 1,
+                "title": "Title",
+                "type": "string"
+              },
+              "source_url": {
+                "maxLength": 2048,
+                "minLength": 1,
+                "title": "Source Url",
+                "type": "string"
+              },
+              "external_id": {
+                "maxLength": 200,
+                "minLength": 1,
+                "title": "External Id",
+                "type": "string"
+              },
+              "id": {
+                "maxLength": 200,
+                "minLength": 1,
+                "title": "Id",
+                "type": "string"
+              },
+              "candidate_id": {
+                "anyOf": [
+                  {
+                    "pattern": "^[a-f0-9]{64}$",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Candidate Id"
+              },
+              "retrieved_at": {
+                "minimum": 0,
+                "title": "Retrieved At",
+                "type": "integer"
+              },
+              "metadata": {
+                "additionalProperties": true,
+                "title": "Metadata",
+                "type": "object"
+              }
+            },
+            "required": [
+              "title",
+              "source_url",
+              "external_id",
+              "id",
+              "retrieved_at"
+            ],
+            "title": "ConnectorResource",
+            "type": "object"
+          }
+        },
+        "additionalProperties": false,
+        "properties": {
+          "connector_id": {
+            "title": "Connector Id",
+            "type": "string"
+          },
+          "connector_version": {
+            "title": "Connector Version",
+            "type": "string"
+          },
+          "operation": {
+            "title": "Operation",
+            "type": "string"
+          },
+          "kind": {
+            "const": "metadata",
+            "default": "metadata",
+            "title": "Kind",
+            "type": "string"
+          },
+          "resources": {
+            "items": {
+              "$ref": "#/$defs/ConnectorResource"
+            },
+            "maxItems": 20,
+            "title": "Resources",
+            "type": "array"
+          },
+          "next_cursor": {
+            "default": "",
+            "maxLength": 4096,
+            "title": "Next Cursor",
+            "type": "string"
+          },
+          "total_count": {
+            "anyOf": [
+              {
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Total Count"
+          },
+          "files_downloaded": {
+            "const": false,
+            "default": false,
+            "title": "Files Downloaded",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "connector_id",
+          "connector_version",
+          "operation",
+          "resources"
+        ],
+        "title": "ConnectorResult",
+        "type": "object"
+      },
+      "effects": [
+        "network",
+        "session_metadata"
+      ],
+      "timeout_seconds": 60
+    }
+  ],
+  "limitations": [
+    "仅返回元数据，尚不提供序列下载。",
+    "公开数据源，无需账户授权；来源记录保存于当前任务。"
+  ]
+}

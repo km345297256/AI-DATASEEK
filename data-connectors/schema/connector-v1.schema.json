@@ -1,0 +1,139 @@
+{
+  "$defs": {
+    "ConnectorOperation": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "pattern": "^[a-z][a-z_]{0,63}$",
+          "title": "Name",
+          "type": "string"
+        },
+        "title": {
+          "title": "Title",
+          "type": "string"
+        },
+        "description": {
+          "title": "Description",
+          "type": "string"
+        },
+        "input_schema": {
+          "additionalProperties": true,
+          "title": "Input Schema",
+          "type": "object"
+        },
+        "output_schema": {
+          "additionalProperties": true,
+          "title": "Output Schema",
+          "type": "object"
+        },
+        "effects": {
+          "items": {
+            "enum": [
+              "network",
+              "session_metadata"
+            ],
+            "type": "string"
+          },
+          "title": "Effects",
+          "type": "array"
+        },
+        "timeout_seconds": {
+          "maximum": 60,
+          "minimum": 1,
+          "title": "Timeout Seconds",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "name",
+        "title",
+        "description",
+        "input_schema",
+        "output_schema",
+        "effects",
+        "timeout_seconds"
+      ],
+      "title": "ConnectorOperation",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": "data-connector-v1",
+      "default": "data-connector-v1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "id": {
+      "pattern": "^[a-z][a-z0-9-]{0,63}$",
+      "title": "Id",
+      "type": "string"
+    },
+    "version": {
+      "pattern": "^\\d+\\.\\d+\\.\\d+$",
+      "title": "Version",
+      "type": "string"
+    },
+    "title": {
+      "title": "Title",
+      "type": "string"
+    },
+    "description": {
+      "title": "Description",
+      "type": "string"
+    },
+    "transport": {
+      "enum": [
+        "native",
+        "mcp",
+        "http"
+      ],
+      "title": "Transport",
+      "type": "string"
+    },
+    "auth": {
+      "enum": [
+        "none",
+        "oauth2",
+        "api_key"
+      ],
+      "title": "Auth",
+      "type": "string"
+    },
+    "domains": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Domains",
+      "type": "array"
+    },
+    "operations": {
+      "items": {
+        "$ref": "#/$defs/ConnectorOperation"
+      },
+      "title": "Operations",
+      "type": "array"
+    },
+    "limitations": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Limitations",
+      "type": "array"
+    }
+  },
+  "required": [
+    "id",
+    "version",
+    "title",
+    "description",
+    "transport",
+    "auth",
+    "domains",
+    "operations",
+    "limitations"
+  ],
+  "title": "ConnectorManifest",
+  "type": "object"
+}

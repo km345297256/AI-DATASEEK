@@ -35,6 +35,9 @@
                     </select>
                 </div>
             </div>
+            <div v-if="!shared && activeSessionId()" class="max-h-[45vh] overflow-y-auto px-6">
+                <DataSourceCandidates :key="activeSessionId()" :session-id="activeSessionId()" :files="files" />
+            </div>
             <div class="flex-1 min-h-0 flex flex-col">
                 <div v-if="files.length > 0" class="flex-1 min-h-0 overflow-auto px-3 mt-4 pb-4">
                     <div class="flex flex-col gap-1 first:pt-0 pt-2">
@@ -80,6 +83,7 @@
 </template>
 
 <script setup lang="ts">
+import DataSourceCandidates from './DataSourceCandidates.vue';
 import { X, Download, File } from 'lucide-vue-next';
 import { ref, watch } from 'vue';
 import { useRoute } from 'vue-router';

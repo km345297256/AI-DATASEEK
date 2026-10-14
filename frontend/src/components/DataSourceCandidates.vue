@@ -1,10 +1,10 @@
 <template>
   <section class="sources">
-    <button class="heading" type="button" :aria-expanded="open" @click="open = !open">{{ open ? '▾' : '▸' }} 数据线索与版本</button>
+    <button class="heading" type="button" :aria-expanded="open" @click="open = !open">{{ open ? '▾' : '▸' }} 来源与文件版本</button>
     <div v-if="open" class="body">
       <p class="hint">保存数据来源，将会话文件登记为可追溯版本。也可在对话中要求检索 NCBI 基因组，官方元数据会出现在这里；文件下载尚未接入。</p>
       <form class="form" @submit.prevent="save">
-        <label>数据名称<input v-model="draft.title" required maxlength="200" :disabled="busy" placeholder="例如：某项研究的测序数据" /></label>
+        <label>数据名称<input v-model="draft.title" required maxlength="200" :disabled="busy" placeholder="例如：某地区逐日气温数据" /></label>
         <label>公开来源链接<input v-model="draft.source_url" type="url" required maxlength="2048" :disabled="busy" placeholder="https://…" /></label>
         <label>外部标识<input v-model="draft.external_id" required maxlength="200" :disabled="busy" placeholder="例如：accession、DOI 或数据集编号" /></label>
         <p class="hint">只接受公开 HTTPS 链接；查询参数和片段不会保存。请勿填写凭据或本地路径。</p>

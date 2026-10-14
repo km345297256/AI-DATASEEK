@@ -12,11 +12,11 @@
                     :key="skillName"
                     class="inline-flex h-8 max-w-full items-center gap-1.5 rounded-md border border-[var(--border-main)] bg-[var(--background-menu-white)] px-2 text-xs text-[var(--text-primary)] shadow-sm">
                     <Puzzle :size="14" class="shrink-0 text-[var(--icon-secondary)]" />
-                    <span class="truncate font-medium">{{ skillName }}</span>
+                    <span class="truncate font-medium" :title="skillName">{{ skillLabel(skillName, labelSkills) }}</span>
                     <button
                         type="button"
                         class="ml-0.5 flex size-5 shrink-0 items-center justify-center rounded hover:bg-[var(--fill-tsp-white-dark)]"
-                        :aria-label="t('Remove skill', { name: skillName })"
+                        :aria-label="t('Remove skill', { name: skillLabel(skillName, labelSkills) })"
                         :title="t('Remove selected skill')"
                         @click="removeSkill(skillName)">
                         <X :size="13" />
@@ -191,11 +191,12 @@ import SendIcon from './icons/SendIcon.vue';
 import { useI18n } from 'vue-i18n';
 import ChatBoxFiles from './ChatBoxFiles.vue';
 import SkillDialog from './SkillDialog.vue';
+import { skillLabel } from '@/utils/skillLabel';
 import { filterSkillCatalog, skillCategory, skillCategories } from '@/utils/skillCatalog';
 import MCPDialog from './MCPDialog.vue';
 import { Check, ChevronRight, CirclePlus, Paperclip, PlugZap, Plus, Puzzle, Search, Settings2, UploadCloud, X } from 'lucide-vue-next';
 import type { FileInfo } from '../api/file';
-import { getSkillPreferences, listSkills, type SkillInfo } from '../api/skill';
+import { getSkillPreferences, listSkills, listSkillCatalog, type SkillInfo } from '../api/skill';
 import { showErrorToast } from '../utils/toast';
 import { useSettingsDialog } from '../composables/useSettingsDialog';
 import { eventBus } from '../utils/eventBus';
@@ -212,6 +213,7 @@ const textareaRef = ref<HTMLTextAreaElement>();
 const actionMenuRef = ref<HTMLElement>();
 const actionSkillSearchInputRef = ref<HTMLInputElement>();
 const availableSkills = ref<SkillInfo[]>([]);
+const labelSkills = ref<SkillInfo[]>([]);
 const skillsLoading = ref(false);
 const skillsLoaded = ref(false);
 const autoEnabledSkillNames = ref(new Set<string>());
@@ -293,7 +295,12 @@ const handleSkillPreferencesUpdated = (payload: unknown) => {
     }
 };
 
+const loadSkillLabels = async () => {
+    try { labelSkills.value = await listSkillCatalog(); } catch { labelSkills.value = []; }
+};
+
 const handleSkillCatalogUpdated = () => {
+    void loadSkillLabels();
     skillsLoaded.value = false;
     if (actionSkillMenuOpen.value) void loadAvailableSkills();
 };
@@ -464,6 +471,7 @@ onMounted(() => {
     eventBus.on(EVENT_SKILL_CATALOG_UPDATED, handleSkillCatalogUpdated);
     eventBus.on(EVENT_SKILL_PREFERENCES_UPDATED, handleSkillPreferencesUpdated);
     loadAutoEnabledSkills();
+    void loadSkillLabels();
 });
 onUnmounted(() => {
     document.removeEventListener('pointerdown', handleDocumentPointerDown);

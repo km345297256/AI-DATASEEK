@@ -41,7 +41,7 @@
 
     <div class="flex-1 overflow-y-auto px-4 py-4 sm:px-6 sm:py-5">
       <div class="mx-auto flex max-w-[1080px] flex-col gap-4 sm:gap-6">
-        <div v-if="activeTab !== 'credentials'" class="rounded-xl border border-[var(--border-main)] bg-[var(--background-menu-white)] p-3 sm:p-4">
+        <div v-if="!['credentials', 'connectors'].includes(activeTab)" class="rounded-xl border border-[var(--border-main)] bg-[var(--background-menu-white)] p-3 sm:p-4">
           <label class="flex items-center gap-3 rounded-xl border border-[var(--border-main)] bg-[var(--background-gray-main)] px-3 py-2">
             <Search :size="18" class="shrink-0 text-[var(--icon-secondary)]" />
             <input
@@ -64,6 +64,7 @@
           </div>
         </div>
 
+        <DataConnectorsPanel v-if="activeTab === 'connectors'" />
         <ToolCredentialsPanel v-if="activeTab === 'credentials'" />
 
         <section v-if="activeTab === 'presets'" class="rounded-xl border border-[var(--border-main)] bg-[var(--background-menu-white)] p-4 sm:p-5">
@@ -575,6 +576,7 @@
 </template>
 
 <script setup lang="ts">
+import DataConnectorsPanel from '@/components/DataConnectorsPanel.vue';
 import SkillMetadata from '@/components/SkillMetadata.vue';
 import { skillCategories, filterSkillCatalog } from '@/utils/skillCatalog';
 import { computed, defineComponent, h, nextTick, onMounted, reactive, ref, watch } from 'vue';
@@ -605,16 +607,17 @@ const { isLeftPanelShow, toggleLeftPanel } = useLeftPanel();
 const { currentUser } = useAuth();
 const PAGE_SIZE = 6;
 
-type PluginTab = 'skills' | 'mcp' | 'renderers' | 'runtime' | 'presets' | 'credentials';
+type PluginTab = 'connectors' | 'skills' | 'mcp' | 'renderers' | 'runtime' | 'presets' | 'credentials';
 const tabs = computed<Array<{ key: PluginTab; label: string }>>(() => [
   { key: 'skills', label: t('Skills') },
+  { key: 'connectors', label: '数据连接器' },
   { key: 'mcp', label: t('MCP') },
   { key: 'renderers', label: '可视化插件' },
   { key: 'runtime', label: t('Analysis Tools') },
   { key: 'presets', label: t('Domain Presets') },
   { key: 'credentials', label: t('Credentials') },
 ]);
-const tabKeys = new Set<PluginTab>(['skills', 'mcp', 'renderers', 'runtime', 'presets', 'credentials']);
+const tabKeys = new Set<PluginTab>(['connectors', 'skills', 'mcp', 'renderers', 'runtime', 'presets', 'credentials']);
 const routeTab = typeof route.query.tab === 'string' && tabKeys.has(route.query.tab as PluginTab)
   ? route.query.tab as PluginTab
   : 'skills';
@@ -647,6 +650,7 @@ const activeSearchQuery = computed({
     runtime: runtimeSearchQuery.value,
     presets: presetSearchQuery.value,
     credentials: '',
+    connectors: '',
   })[activeTab.value],
   set: (value: string) => {
     if (activeTab.value === 'skills') skillSearchQuery.value = value;
@@ -663,6 +667,7 @@ const activeSearchPlaceholder = computed(() => ({
   runtime: t('Search analysis tools'),
   presets: t('Search domain presets'),
   credentials: '',
+  connectors: '',
 })[activeTab.value]);
 
 const setActiveTab = (tab: PluginTab) => {

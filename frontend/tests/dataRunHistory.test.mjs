@@ -2,12 +2,10 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import * as vue from 'vue';
-import { parse, compileScript } from '@vue/compiler-sfc';
 import ts from 'typescript';
 
-const source = readFileSync(new URL('../src/components/DataRunHistory.vue', import.meta.url), 'utf8');
-const script = compileScript(parse(source).descriptor, { id: 'run-history-test' });
-const code = ts.transpileModule(script.content, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS } }).outputText;
+const source = readFileSync(new URL('../src/composables/useDataRuns.ts', import.meta.url), 'utf8');
+const code = ts.transpileModule(source, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS } }).outputText;
 function harness() {
   const requests = [];
   let unmount;
@@ -15,21 +13,20 @@ function harness() {
   const scope = vue.effectScope();
   new Function('require', 'module', 'exports', code)((name) => {
     if (name === 'vue') return { ...vue, onUnmounted: (callback) => { unmount = callback; } };
-    if (name === '../api/agent') return { getDataRuns: (sessionId, before, signal) => new Promise((resolve, reject) => requests.push({ sessionId, before, signal, resolve, reject })) };
+    if (name === '@/api/agent') return { getDataRuns: (sessionId, before, signal) => new Promise((resolve, reject) => requests.push({ sessionId, before, signal, resolve, reject })) };
     assert.fail(name);
   }, module, module.exports);
   const props = vue.reactive({ sessionId: 'first', revision: 1 });
-  const state = scope.run(() => module.exports.default.setup(props, { expose() {} }));
+  const state = scope.run(() => module.exports.useDataRuns(vue.toRef(props, 'sessionId'), vue.toRef(props, 'revision')));
   return { state, props, requests, close: () => { unmount(); scope.stop(); } };
 }
 const flush = async () => { await Promise.resolve(); await vue.nextTick(); };
 const page = (id, next = null) => ({ runs: [{ run_id: id, status: 'unknown', steps: [], skills: [] }], next_before_seq: next });
 
-test('run history is lazy and stale responses cannot cross session boundaries', async () => {
+test('task status loads immediately and stale responses cannot cross session boundaries', async () => {
   const h = harness();
   try {
-    assert.equal(h.requests.length, 0);
-    h.state.open.value = true;
+    assert.equal(h.requests.length, 1);
     await flush();
     assert.equal(h.requests[0].sessionId, 'first');
     h.props.sessionId = 'second';
@@ -46,7 +43,6 @@ test('run history is lazy and stale responses cannot cross session boundaries', 
 test('pagination deduplicates run identities and loading failures do not become empty success', async () => {
   const h = harness();
   try {
-    h.state.open.value = true;
     await flush();
     h.requests[0].resolve(page('one', 10));
     await flush();
@@ -66,7 +62,6 @@ test('pagination deduplicates run identities and loading failures do not become 
 
 test('unmount aborts requests and prevents a late update', async () => {
   const h = harness();
-  h.state.open.value = true;
   await flush();
   h.close();
   assert.equal(h.requests[0].signal.aborted, true);

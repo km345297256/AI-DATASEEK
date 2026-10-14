@@ -12,30 +12,38 @@ const compiled = ts.transpileModule(script.content, {
   compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS },
 }).outputText;
 const module = { exports: {} };
+let currentRun;
+const taskProgress = {};
+new Function('exports', ts.transpileModule(readFileSync(new URL('../src/utils/taskProgress.ts', import.meta.url), 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText)(taskProgress);
 const icon = vue.defineComponent({ render: () => vue.h('span') });
 new Function('require', 'module', 'exports', compiled)((name) => {
   if (name === 'vue') return vue;
   if (name === 'vue-i18n') return { useI18n: () => ({ t: (key) => key }) };
   if (name === 'lucide-vue-next') return { ChevronUp: icon, ChevronDown: icon, Clock: icon, CircleX: icon };
   if (name === './icons/StepSuccessIcon.vue') return { default: icon };
+  if (name === './DataRunHistory.vue') return { default: icon };
+  if (name === '@/utils/taskProgress') return taskProgress;
+  if (name === '@/composables/useDataRuns') return { useDataRuns: () => ({ runs: vue.ref(currentRun ? [currentRun] : []), loading: vue.ref(false), error: vue.ref(''), nextBefore: vue.ref(null), load() {} }) };
   assert.fail(`Unexpected dependency: ${name}`);
 }, module, module.exports);
 
-const render = (statuses) => renderToString(vue.createSSRApp(module.exports.default, {
-  plan: { steps: statuses.map((status, index) => ({ id: String(index), description: `步骤 ${index}`, status })) },
-}));
+const render = (statuses, run, isRunning = false) => {
+  currentRun = run;
+  return renderToString(vue.createSSRApp(module.exports.default, {
+    sessionId: 'session', isRunning,
+    plan: { steps: statuses.map((status, index) => ({ id: String(index), description: `步骤 ${index}`, status })) },
+  }));
+};
 
-test('failed or empty plans never display task completed', async () => {
-  for (const statuses of [[], ['failed'], ['completed', 'failed']]) {
-    const html = await render(statuses);
-    assert.doesNotMatch(html, /Task Completed/);
-    assert.match(html, statuses.length ? /部分步骤未完成/ : /任务状态待确认/);
-  }
+test('completed stages cannot override failed, incomplete or absent run records', async () => {
+  assert.match(await render(['completed'], { status: 'failed', history_complete: true }), /任务失败/);
+  assert.match(await render(['completed'], { status: 'succeeded', history_complete: false }), /任务记录不完整/);
+  assert.doesNotMatch(await render(['completed'], undefined), /任务已完成/);
 });
 
-test('pending work stays visible after an earlier step succeeds', async () => {
-  const html = await render(['completed', 'running']);
-  assert.match(html, /步骤 1/);
-  assert.doesNotMatch(html, /Task Completed/);
-  assert.match(await render(['completed', 'completed']), /Task Completed/);
+test('only a terminal successful run displays overall completion', async () => {
+  const succeeded = { status: 'succeeded', history_complete: true };
+  assert.match(await render(['completed'], succeeded), /任务已完成/);
+  assert.match(await render(['completed'], succeeded, true), /任务进行中/);
+  assert.doesNotMatch(await render(['completed'], succeeded, true), /任务已完成/);
 });
