@@ -1702,6 +1702,12 @@ class AgentTaskRunner(TaskRunner):
                         elif isinstance(event, WaitEvent):
                             await self._session_repository.update_status(self._session_id, SessionStatus.WAITING)
                             return
+                        elif isinstance(event, ErrorEvent):
+                            # Error already closes the durable input lease and
+                            # SSE. Do not resume the flow with an expired lease,
+                            # leaving the session falsely marked as running.
+                            await self._session_repository.update_status(self._session_id, SessionStatus.COMPLETED)
+                            return
 
             await self._session_repository.update_status(self._session_id, SessionStatus.COMPLETED)
         except asyncio.CancelledError as error:

@@ -54,7 +54,7 @@ def terminal_response_correction(reason: str) -> str:
         detail = (
             "The last response is not a valid completed analysis result. If work remains, "
             "continue it with the actual bound tools. If the work is complete, return the "
-            "required JSON object with success, a substantive result, and attachments. "
+            "required JSON object with success, a substantive result, and attachments. Return ONLY that JSON object, without narration or Markdown fences. "
             "Use only observed execution evidence and actual generated files; do not invent "
             "results, paths, attachments, or upgrade a failed task to success. "
         )

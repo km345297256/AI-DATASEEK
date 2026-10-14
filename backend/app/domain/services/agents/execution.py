@@ -41,7 +41,7 @@ from app.domain.models.tool_result import ToolResult
 from app.core.config import get_settings
 from app.domain.utils.public_error import public_error_message
 from app.domain.services.analysis_completion import requirements_for_step
-from app.domain.utils.robust_json_parser import parse_json_lenient
+from app.domain.utils.execution_result_parser import parse_execution_response
 
 logger = logging.getLogger(__name__)
 
@@ -3328,7 +3328,8 @@ class ExecutionAgent(BaseAgent):
         if problem or message.tool_calls:
             return problem
         try:
-            parsed = parse_json_lenient(self._message_content_to_text(message.content))
+            parsed = parse_execution_response(self._message_content_to_text(message.content),
+                                              summary=getattr(self, "_summarizing", False))
             if getattr(self, "_summarizing", False):
                 summary = Message.model_validate(parsed)
                 if not summary.message.strip() or is_non_substantive_message_text(summary.message):
@@ -3349,7 +3350,7 @@ class ExecutionAgent(BaseAgent):
         a plausible success report after tools have already been closed.
         """
         try:
-            parsed_response = parse_json_lenient(
+            parsed_response = parse_execution_response(
                 self._message_content_to_text(raw_message)
             )
         except Exception as exc:
@@ -3898,7 +3899,7 @@ class ExecutionAgent(BaseAgent):
                     )
                     # The live protocol gate already validated this shape. Do
                     # not ask a repair model to invent a summary after execution.
-                    parsed_response = parse_json_lenient(event.message)
+                    parsed_response = parse_execution_response(event.message, summary=True)
                     summary = Message.model_validate(parsed_response)
                     attachments = [FileInfo(file_path=file_path) for file_path in summary.attachments]
                     yield MessageEvent(message=summary.message, attachments=attachments)

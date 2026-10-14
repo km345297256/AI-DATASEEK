@@ -55,3 +55,31 @@ def test_summary_correction_does_not_request_execution_result_or_new_work():
     assert "message string" in correction
     assert "Do not repeat analysis" in correction
     assert "with success" not in correction
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize('summary', [False, True])
+async def test_narrated_complete_receipt_is_decoded_without_model_repair(summary):
+    agent = object.__new__(ExecutionAgent)
+    agent._summarizing = summary
+    payload = ({'message': 'Checked four rows.', 'attachments': []} if summary else
+               {'success': True, 'result': 'Checked four rows.', 'attachments': ['/home/ubuntu/output/report.md']})
+    raw = 'The report exists and has been verified. Let me return the JSON object.\n\n' + json.dumps(payload)
+    assert agent._terminal_response_problem(AIMessage(content=raw)) is None
+    if not summary:
+        decoded = await agent._decode_execution_result(raw)
+        assert decoded.result == payload['result']
+        assert decoded.attachments == payload['attachments']
+
+
+@pytest.mark.parametrize('raw', [
+    'Ready. {"success":true,"result":"done","attachments":[]',
+    'Ready. {"success":true,"result":"done","attachments":[]} trailing instructions',
+    'Example {} {"success":true,"result":"done","attachments":[]}',
+    'Invoke {"tool_calls":[{"name":"shell_run"}]}',
+    '<tool_call>{"success":true,"result":"done","attachments":[]}',
+    'Ready. {"success":true,"result":"done","attachments":[],"tool_calls":[]}',
+])
+def test_ambiguous_or_tool_shaped_narration_is_not_a_result(raw):
+    agent = object.__new__(ExecutionAgent)
+    assert agent._terminal_response_problem(AIMessage(content=raw)) is not None
