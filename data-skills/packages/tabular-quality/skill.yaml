@@ -1,0 +1,36 @@
+schema_version: 1
+package_id: dataseek/tabular-quality
+version: 1.0.0
+title: 表格基础质检
+description: 对小型 UTF-8 CSV 检查行列结构、空白缺失值和精确重复行，保留输入摘要和方法说明。
+authors: [DataSeek contributors]
+license: MIT
+category: quality
+domains: [tabular]
+triggers: [CSV质检, 表格缺失值, 重复行]
+inputs:
+  type: object
+  additionalProperties: false
+  required: [input_file_id]
+  properties:
+    input_file_id: {type: string, minLength: 1}
+outputs:
+  type: object
+  additionalProperties: false
+  required: [report_file_id, input_sha256]
+  properties:
+    report_file_id: {type: string, minLength: 1}
+    input_sha256: {type: string, pattern: '^[a-f0-9]{64}$'}
+prerequisites:
+  - 用户已选择并授权输入文件，执行环境中可只读访问
+  - 有可用且获准的沙箱 Python 3 执行工具；安装包不自动授予执行权限
+semantic_constraints:
+  - 只处理 UTF-8（可含 BOM）逗号 CSV，首行为非空且不重复的列名
+  - 空字符串和纯空白算缺失；NA/null 等文本不自动算缺失
+  - 数据最多 4 MiB、10000 行、256 列，原文件不得修改
+  - 不推断科学含义、单位或异常阈值
+resources: {network: false, memory_mb: 128, timeout_seconds: 30}
+tools: []
+validation:
+  - 合成样例为4行3列，重复1行，value缺失2个、label缺失1个，NA不计缺失
+  - 拒绝重复表头、不齐整记录、非法UTF-8和超预算输入

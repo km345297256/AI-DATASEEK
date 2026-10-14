@@ -48,6 +48,7 @@ RUN uv sync --frozen --no-dev --no-install-project
 
 # Copy project files
 COPY backend/. .
+COPY data-skills/packages/tabular-quality /app/skills/dataseek-tabular-quality-1.0.0
 COPY tools /opt/ai-dataseek/tools
 COPY sandbox/app /opt/ai-dataseek/sandbox-contract/app
 COPY sandbox/scripts /opt/ai-dataseek/sandbox-contract/scripts
