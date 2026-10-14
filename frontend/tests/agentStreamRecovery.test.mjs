@@ -300,3 +300,16 @@ test('real SSE parser reconnects after a broken byte stream and drains offline t
     globalThis.document = previousDocument;
   }
 });
+
+test('run lifecycle events advance the durable cursor and do not cause protocol failures', async () => {
+  const session = run([async options => {
+    await options.onopen(response());
+    emit(options, frame(1, 'run', { phase: 'started', source_event_seq: 1 }));
+    emit(options, frame(2, 'run', { phase: 'environment', source_event_seq: 1 }));
+    emit(options, frame(3, 'done'));
+  }]);
+  await session.finished;
+  assert.equal(session.errors.length, 0);
+  assert.equal(session.retries.length, 0);
+  assert.equal(session.events.length, 3);
+});

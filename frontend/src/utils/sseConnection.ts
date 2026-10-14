@@ -131,7 +131,7 @@ export function startSSEConnection<T>(
           || (cause instanceof DOMException && ['NetworkError', 'AbortError'].includes(cause.name));
         if (!isTransport || !retryAllowed || retries >= maxAttempts) {
           callbacks.onError?.(isTransport
-            ? new SSEConnectionError('transport', '连接暂时中断，请刷新页面恢复；后台任务可能仍在运行。')
+            ? new SSEConnectionError('transport', '自动重连已停止。尚无法确认后台任务状态，请重新获取状态。')
             : cause instanceof Error ? cause : new SSEConnectionError('protocol', '事件流连接失败，请刷新页面。'));
           return;
         }

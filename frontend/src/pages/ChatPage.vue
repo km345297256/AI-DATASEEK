@@ -142,8 +142,11 @@
           </div>
 
           <!-- Loading indicator -->
-          <LoadingIndicator v-if="(isLoading || isRestoringHistory) && !hasRunningStep" role="status" aria-live="polite" :text="isRestoringHistory ? '正在加载最近对话…' : connectionNotice || analysisProgress || $t('Thinking')" />
-          <p v-else-if="connectionNotice" role="status" class="mt-3 text-sm text-[var(--text-tertiary)]">{{ connectionNotice }}</p>
+          <LoadingIndicator v-if="isLoading && !isRestoringHistory && !connectionNotice && !hasRunningStep" role="status" aria-live="polite" :text="analysisProgress || $t('Thinking')" />
+          <div v-if="!messages.length && !isLoading && !isRestoringHistory && !connectionNotice" class="flex flex-1 flex-col items-center justify-center px-6 py-12 text-center">
+            <h2 class="text-lg font-medium text-[var(--text-primary)]">尚未开始对话</h2>
+            <p class="mt-2 max-w-md text-sm leading-6 text-[var(--text-secondary)]">描述你需要查找或分析的数据。已有文件和来源可从右上角的文件入口查看。</p>
+          </div>
         </div>
 
         <div class="mobile-safe-bottom flex flex-col bg-[var(--background-gray-main)] sticky bottom-0">
@@ -151,7 +154,14 @@
             class="flex items-center justify-center w-[36px] h-[36px] rounded-full bg-[var(--background-white-main)] hover:bg-[var(--background-gray-main)] clickable border border-[var(--border-main)] shadow-[0px_5px_16px_0px_var(--shadow-S),0px_0px_1.25px_0px_var(--shadow-S)] absolute -top-20 left-1/2 -translate-x-1/2">
             <ArrowDown class="text-[var(--icon-primary)]" :size="20" />
           </button>
-          <PlanPanel v-if="sessionId" :key="sessionId" :plan="plan || undefined" :session-id="sessionId" :revision="lastEventSeq" :is-running="isLoading" />
+          <div v-if="connectionNotice" role="status" aria-live="polite" class="mb-2 rounded-xl border border-[var(--border-main)] bg-[var(--background-menu-white)] px-4 py-3 text-sm">
+            <p class="font-medium text-[var(--text-primary)]">{{ isLoading ? '正在恢复连接' : '连接状态' }}</p>
+            <p class="mt-1 leading-5 text-[var(--text-secondary)]">{{ connectionNotice }}</p>
+            <button v-if="isLoading" type="button" class="mt-2 underline" @click="stopReconnecting">停止重连</button>
+            <button v-else type="button" class="mt-2 underline disabled:opacity-50" :disabled="isRestoringHistory" @click="refreshConnectionState">重新获取状态</button>
+          </div>
+          <p v-if="isRestoringHistory" role="status" class="mb-2 px-4 text-sm text-[var(--text-secondary)]">正在读取会话状态…</p>
+          <PlanPanel v-if="sessionId && (messages.length || isLoading) && !connectionNotice" :key="sessionId" :plan="plan || undefined" :session-id="sessionId" :revision="lastEventSeq" :is-running="isLoading" />
           <ChatBox v-model="inputMessage" v-model:selected-skills="selectedSkills" v-model:selected-mcp-servers="selectedMcpServers" :rows="1" @submit="handleSubmit" :isRunning="isLoading" @stop="handleStop"
             :disabled="isRestoringHistory" :attachments="attachments" />
           <p class="pb-1.5 text-center text-[10px] text-[var(--text-tertiary)]">DataSeek 也可能会犯错。请核查重要信息。</p>
@@ -166,6 +176,7 @@
 </template>
 
 <script setup lang="ts">
+import { shouldRecoverSession } from '../utils/sessionRecovery';
 import { findAnalysisTool, mergeAnalysisToolEvent } from '@/utils/analysisJob';
 import SimpleBar from '../components/SimpleBar.vue';
 import { ref, computed, onMounted, watch, nextTick, onUnmounted, reactive, toRefs } from 'vue';
@@ -208,7 +219,6 @@ import {
   insertTaskExecutionSummary,
   isLatestAssistantMessage,
 } from '../utils/chatTimeline';
-import { SessionStatus } from '../types/response';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import LoadingIndicator from '@/components/ui/LoadingIndicator.vue';
 import { eventBus } from '../utils/eventBus';
@@ -669,15 +679,16 @@ const chat = async (
           if (!isCurrentChat()) return;
           console.log('Chat opened');
           isLoading.value = true;
-          connectionNotice.value = '';
+          // Clear the recovery notice only once task events resume.
         },
         onRetry: ({ attempt, maxAttempts }) => {
           if (!isCurrentChat()) return;
           isLoading.value = true;
-          connectionNotice.value = `连接中断，正在恢复（${attempt}/${maxAttempts}）…`;
+          connectionNotice.value = `与服务器的连接中断，正在尝试重连（${attempt}/${maxAttempts}）。暂时无法确认任务进度。`;
         },
         onMessage: ({ event, data }) => {
           if (!isCurrentChat()) return;
+          connectionNotice.value = '';
           handleEvent({
             event: event as AgentSSEEvent['event'],
             data: data as AgentSSEEvent['data']
@@ -728,6 +739,25 @@ const chat = async (
   }
 }
 
+const stopReconnecting = () => {
+  // Stop only this viewer's retries; cancellation of the backend is a separate action.
+  ++chatGeneration;
+  cancelCurrentChat.value?.();
+  cancelCurrentChat.value = null;
+  isLoading.value = false;
+  clearAnalysisProgress();
+  taskStartedAtMs.value = undefined;
+  connectionNotice.value = '已停止自动重连。后台任务状态尚未确认，可重新获取状态。';
+};
+
+const refreshConnectionState = async () => {
+  try {
+    await restoreSession();
+  } catch {
+    connectionNotice.value = '无法读取会话状态，请稍后重试。';
+  }
+};
+
 const restoreSession = async () => {
   if (!sessionId.value) {
     showErrorToast(t('Session not found'));
@@ -739,8 +769,11 @@ const restoreSession = async () => {
   const request = new AbortController();
   historyRequest = request;
   isRestoringHistory.value = true;
-  const session = await agentApi.getSessionHistory(activeSessionId, undefined, request.signal).catch((error) => {
-    if (!request.signal.aborted) throw error;
+  const session = await agentApi.getSessionHistory(activeSessionId, undefined, request.signal).catch(() => {
+    if (!request.signal.aborted && generation === chatGeneration) {
+      isLoading.value = false;
+      connectionNotice.value = '无法读取会话状态，请稍后重试。';
+    }
     return null;
   }).finally(() => {
     if (generation === chatGeneration) isRestoringHistory.value = false;
@@ -769,10 +802,11 @@ const restoreSession = async () => {
   selectedSkills.value = restoredSkills;
   selectedMcpServers.value = restoredMcpServers;
   realTime.value = true;
-  if (session.status === SessionStatus.RUNNING || session.status === SessionStatus.PENDING) {
+  if (shouldRecoverSession(session.status, session.events)) {
     await chat();
   } else {
     isLoading.value = false;
+    connectionNotice.value = '';
     clearAnalysisProgress();
   }
   agentApi.clearUnreadMessageCount(activeSessionId);

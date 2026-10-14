@@ -11,7 +11,7 @@ interface ChatRequestBody {
   [key: string]: unknown;
 }
 
-const EVENT_NAMES = new Set(['tool', 'step', 'message', 'error', 'done', 'title', 'wait', 'plan', 'attachments']);
+const EVENT_NAMES = new Set(['run', 'tool', 'step', 'message', 'error', 'done', 'title', 'wait', 'plan', 'attachments']);
 
 /** Keep acceptance, the durable cursor and terminal state outside any one HTTP attempt. */
 export function createAgentStreamRecovery(request: ChatRequestBody) {
