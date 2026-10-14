@@ -203,7 +203,7 @@ async def test_every_non_step_boundary_withholds_bad_files_but_preserves_verifie
         terminal = DoneEvent()
     else:
         terminal = MessageEvent(message="Measured findings and limitations remain intact.", attachments=[good[1], bad[1]])
-    runner = runner_for([good, bad], [terminal], summary=boundary == "summary")
+    runner = runner_for([good, bad], [terminal, DoneEvent()] if boundary == "summary" else [terminal], summary=boundary == "summary")
     events = await run(runner)
     assert terminal in events
     messages = [event for event in events if isinstance(event, MessageEvent)]
@@ -265,4 +265,59 @@ async def test_summary_discovery_after_verified_step_cannot_reintroduce_invalid_
     events = await run(runner)
     files = [info for event in events if isinstance(event, MessageEvent) for info in event.attachments or []]
     assert files == [original[1]]
-    runner._sandbox.validate_artifacts.assert_awaited_once_with([{"path": invalid[1].file_path, "kind": "table"}])
+    assert any({"path": invalid[1].file_path, "kind": "table"} in call.args[0]
+               for call in runner._sandbox.validate_artifacts.await_args_list)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("terminal", [WaitEvent, lambda: ErrorEvent(error="interrupted"), DoneEvent])
+async def test_buffered_step_files_survive_terminal_boundaries_without_early_delivery(terminal):
+    good = artifact()
+    step = Step(success=True, result="Checked data.")
+    runner = runner_for([good])
+
+    async def finalize(event, *_args, **_kwargs):
+        event.step.outcome = AnalysisOutcome(status="succeeded", reason_code="completed")
+        return [good[1]]
+
+    async def flow(_message):
+        yield StepEvent(step=step, status=StepStatus.COMPLETED)
+        yield MessageEvent(message=step.result)
+        yield terminal()
+
+    runner._flow.run = flow
+    runner._finalize_analysis_step = finalize
+    runner._sync_step_attachments_to_storage = AsyncMock(return_value=[good[1]])
+    events = await run(runner)
+    assert isinstance(events[0], StepEvent)
+    assert isinstance(events[1], MessageEvent)
+    assert events[1].attachments == [good[1]]
+    assert len(events) == 3
+    assert "analysis_outcome" not in (events[1].metadata or {})
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("terminal", [DoneEvent, lambda: ErrorEvent(error="interrupted")])
+async def test_final_delivery_withholds_artifact_modified_after_step_validation(terminal):
+    good = artifact()
+    step = Step(success=True, result="All done.")
+    runner = runner_for([good])
+
+    async def finalize(event, *_args, **_kwargs):
+        event.step.outcome = AnalysisOutcome(status="succeeded", reason_code="completed")
+        return [good[1]]
+
+    async def flow(_message):
+        yield StepEvent(step=step, status=StepStatus.COMPLETED)
+        good[0]["sha256"] = "b" * 64
+        yield terminal()
+
+    runner._flow.run = flow
+    runner._finalize_analysis_step = finalize
+    runner._sync_step_attachments_to_storage = AsyncMock(return_value=[good[1]])
+    events = await run(runner)
+    delivery = events[-2]
+    assert delivery.attachments == []
+    assert delivery.metadata["partial"] is True
+    assert "未完整交付" in delivery.message or "未能完整完成" in delivery.message
+    assert "All done" not in delivery.message

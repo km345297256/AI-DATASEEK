@@ -359,6 +359,6 @@ def connector_status_text(event):
     result = result if isinstance(result, dict) else result.model_dump() if result else {}
     data = result.get('data') or {}
     if result.get('success') is True and data.get('files_downloaded') is True and data.get('files'):
-        return '数据包已下载、校验并保存到任务文件。可点击文件卡片下载；这不代表已完成数据分析。'
+        return '数据包已下载并通过校验。任务结束后将统一提供结果和下载文件。'
     from app.domain.services.tools.data_discovery import connector_error_message
     return connector_error_message(data.get('reason', 'unknown'))

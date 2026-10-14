@@ -3887,6 +3887,8 @@ class ExecutionAgent(BaseAgent):
         await self.reset_context()
         message = f"{plan_context}\n\n{SUMMARIZE_PROMPT}" if plan_context else SUMMARIZE_PROMPT
         self._summarizing = True
+        previous_tool_choice = self.tool_choice
+        self.tool_choice = "none"
         try:
             async for event in self.execute(message):
                 if isinstance(event, MessageEvent):
@@ -3904,3 +3906,4 @@ class ExecutionAgent(BaseAgent):
                 yield event
         finally:
             self._summarizing = False
+            self.tool_choice = previous_tool_choice

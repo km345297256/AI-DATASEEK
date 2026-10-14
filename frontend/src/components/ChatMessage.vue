@@ -101,7 +101,7 @@
       </div>
     </template>
     <AnalysisOutcomeNotice
-      v-if="analysisOutcome"
+      v-if="analysisOutcome && analysisOutcome.status !== 'succeeded'"
       :outcome="analysisOutcome"
       :allow-resume="allowAnalysisResume && !isShare && !safetyReview"
       @resume="$emit('resumeAnalysis')"

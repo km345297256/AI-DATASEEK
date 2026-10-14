@@ -30,6 +30,7 @@ async def test_summarize_uses_summary_contract_and_restores_step_mode(fail):
 
     async def execute(request):
         assert agent._summarizing is True
+        assert agent.tool_choice == "none"
         if fail:
             raise RuntimeError("Transport failure")
         response = '{"message":"Checked four rows.","attachments":["/home/ubuntu/output/report.json"]}'
@@ -45,6 +46,7 @@ async def test_summarize_uses_summary_contract_and_restores_step_mode(fail):
         assert events[0].message == "Checked four rows."
         assert events[0].attachments[0].file_path == "/home/ubuntu/output/report.json"
     assert agent._summarizing is False
+    assert agent.tool_choice is None
     agent._parse_json.assert_not_awaited()
 
 

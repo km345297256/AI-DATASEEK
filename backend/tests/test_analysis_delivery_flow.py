@@ -231,13 +231,13 @@ async def test_successful_step_delivery_does_not_certify_the_following_running_s
     runner._sync_discovered_artifacts_to_storage = AsyncMock(return_value=[])
     runner._sync_message_attachments_to_storage = AsyncMock()
     events = [event async for event in runner._run_flow(Message(message="检查并分析"))]
-    delivery = next(event for event in events if isinstance(event, MessageEvent)
-                    and event.metadata.get("analysis_outcome"))
-    assert delivery.metadata["step_id"] == first.id
-    assert delivery.metadata["analysis_outcome"]["scope"] == "step"
-    assert delivery.metadata["analysis_outcome"]["status"] == "succeeded"
+    delivery = next(event for event in events if isinstance(event, MessageEvent))
+    assert "analysis_outcome" not in delivery.metadata
+    assert delivery.metadata["partial"] is True
+    assert delivery.message.startswith("任务尚未完整完成")
     assert second.status == ExecutionStatus.RUNNING
-    assert events.index(delivery) < next(index for index, event in enumerate(events)
+    assert events[-2] is delivery
+    assert events.index(delivery) > next(index for index, event in enumerate(events)
                                         if isinstance(event, StepEvent) and event.step.id == second.id)
 
 

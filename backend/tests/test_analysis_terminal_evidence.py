@@ -134,7 +134,8 @@ async def test_successful_delivered_step_keeps_its_substantive_answer_unchanged(
     events = await collect(runner, message)
     assert step.success is True and step.outcome.status == "succeeded"
     assert step.result == CONFIRMED_DRAFT
-    assert any(event.message == CONFIRMED_DRAFT for event in terminal_messages(events))
+    assert len(terminal_messages(events)) == 1
+    assert any(isinstance(event, StepEvent) and event.step.result == CONFIRMED_DRAFT for event in events)
 
 
 @pytest.mark.asyncio
@@ -149,7 +150,8 @@ async def test_repair_pending_draft_stays_private_including_the_next_started_ste
     public = public_payload(events)
     assert UNVERIFIED not in public
     assert "previous_analysis" not in public
-    assert any(event.message == CONFIRMED_DRAFT for event in terminal_messages(events))
+    assert len(terminal_messages(events)) == 1
+    assert any(isinstance(event, StepEvent) and event.step.result == CONFIRMED_DRAFT for event in events)
     assert len([event for event in events if isinstance(event, StepEvent)
                 and event.status in {StepStatus.COMPLETED, StepStatus.FAILED}]) == 1
 
@@ -174,7 +176,8 @@ async def test_a_later_failed_step_does_not_erase_an_earlier_successful_step_or_
     assert first.status == ExecutionStatus.COMPLETED and first.result == CONFIRMED_DRAFT
     assert later.success is False and later.outcome.status == "partial"
     assert UNVERIFIED not in public_payload(events)
-    assert any(event.message == CONFIRMED_DRAFT for event in terminal_messages(events))
+    assert len(terminal_messages(events)) == 1
+    assert any(isinstance(event, StepEvent) and event.step.result == CONFIRMED_DRAFT for event in events)
     assert chart[1].file_id in {item.file_id for event in terminal_messages(events) for item in event.attachments or []}
 
 

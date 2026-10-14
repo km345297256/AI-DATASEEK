@@ -2401,8 +2401,7 @@ class AgentTaskRunner(TaskRunner):
         last_analysis_outcome = None
         artifact_discovery_ran = False
         delivered_file_keys: set[str] = set()
-        completed_step_count = 0
-        early_artifact_delivery_count = 0
+        pending_delivery: MessageEvent | None = None
         skip_next_step_results: set[str] = set()
         withheld_step_outcomes = {}
         # Completion advice only needs the current turn.  Keeping this compact
@@ -2494,7 +2493,6 @@ class AgentTaskRunner(TaskRunner):
                         # The matching terminal/prose pair is internal until
                         # required outputs are repaired or further work stalls.
                         continue
-                    completed_step_count += 1
                     last_analysis_outcome = event.step.outcome
                     if last_analysis_outcome and last_analysis_outcome.status != "succeeded":
                         withheld_step_outcomes[event.step.id] = last_analysis_outcome
@@ -2505,7 +2503,7 @@ class AgentTaskRunner(TaskRunner):
                         for file_info in terminal_files
                         if self._file_delivery_key(file_info) not in delivered_file_keys
                     ]
-                    if new_files or last_analysis_outcome:
+                    if new_files or last_analysis_outcome or event.step.result:
                         result_message = (event.step.result or "").strip()
                         delivery_message = result_message or f"已生成 {len(new_files)} 个结果文件。"
                         delivery_event = MessageEvent(
@@ -2518,16 +2516,14 @@ class AgentTaskRunner(TaskRunner):
                                 **({"analysis_outcome": last_analysis_outcome.model_dump(exclude_none=True)} if last_analysis_outcome else {}),
                             },
                         )
-                        delivered_file_keys.update(
-                            self._file_delivery_key(file_info) for file_info in new_files
-                        )
-                        early_artifact_delivery_count += 1
-                        post_events.append(delivery_event)
+                        # Step evidence stays in StepEvent; deliver only at Done.
+                        if pending_delivery:
+                            delivery_event.attachments = self._unique_files(
+                                pending_delivery.attachments + new_files)
+                        pending_delivery = delivery_event
                         if result_message:
-                            # ExecutionAgent emits step.result immediately after
-                            # StepEvent.  The delivery event above is that same
-                            # answer with its files attached, so discard the
-                            # following attachment-free duplicate.
+                            # ExecutionAgent repeats step.result after StepEvent.
+                            # Keep that prose internal until terminal delivery.
                             skip_next_step_results = {original_step_result, result_message} - {""}
             elif isinstance(event, MessageEvent):
                 if (event.metadata or {}).get("analysis_progress"):
@@ -2547,7 +2543,11 @@ class AgentTaskRunner(TaskRunner):
                     # A later summarizer has no new execution evidence and must
                     # not resurrect a withheld draft, including when a later
                     # step succeeded after an earlier one failed.
-                    event.message = "部分步骤尚未完成核验；已确认的分析与文件请以上方各步骤的交付结果为准。"
+                    event.message = (pending_delivery.message if pending_delivery and
+                                     (pending_delivery.metadata or {}).get("analysis_outcome", {}).get("status") in {"failed", "partial"}
+                                     else "部分步骤尚未完成核验，任务未完整完成。以下附件仅包含已通过检查的文件。")
+                    event.metadata = {**(event.metadata or {}), "analysis_outcome":
+                                      next(iter(withheld_step_outcomes.values())).model_dump(exclude_none=True)}
                 if (
                     skip_next_step_results
                     and not is_summary
@@ -2568,6 +2568,8 @@ class AgentTaskRunner(TaskRunner):
                         # The step boundary is authoritative. A later model
                         # summary cannot introduce an unvalidated attachment.
                         requested_paths = {item.file_path for item in event.attachments or []}
+                        if is_summary:
+                            requested_paths.update(item.file_path for item in self._generated_files)
                         event.attachments = [item for item in self._generated_files if item.file_path in requested_paths]
                     else:
                         await self._sync_message_attachments_to_storage(event)
@@ -2579,21 +2581,16 @@ class AgentTaskRunner(TaskRunner):
                         if self._file_delivery_key(file_info) not in delivered_file_keys
                     ]
                     event.attachments = await self._validate_staged_artifact_files(staged_files)
-                    if event.attachments:
-                        delivered_file_keys.update(
-                            self._file_delivery_key(file_info)
-                            for file_info in event.attachments
-                        )
-                    # A one-step result with artifacts was already delivered at
-                    # the completed-step boundary.  Do not show a second LLM
-                    # rendition of the same answer merely to carry those files.
-                    if (
-                        is_summary
-                        and completed_step_count == 1
-                        and early_artifact_delivery_count == 1
-                        and not event.attachments
-                    ):
+                    if is_summary:
+                        if pending_delivery:
+                            event.attachments = await self._validate_staged_artifact_files(self._unique_files(
+                                pending_delivery.attachments + event.attachments))
+                        event.metadata = {**(event.metadata or {}), "artifact_delivery": True}
+                        pending_delivery = event
                         suppress_event = True
+                    elif not suppress_event:
+                        delivered_file_keys.update(
+                            self._file_delivery_key(item) for item in event.attachments)
             elif isinstance(event, ErrorEvent):
                 if self._flow._artifact_repair_requests:
                     # execute_step has already yielded its terminal StepEvent;
@@ -2604,8 +2601,11 @@ class AgentTaskRunner(TaskRunner):
                 # any durable partial outputs first; otherwise they are uploaded
                 # later at Done time and exist in history, but the connected user
                 # never receives them before the stream closes.
-                if artifact_discovery_dirty:
-                    partial_files = await self._sync_discovered_artifacts_to_storage()
+                if artifact_discovery_dirty or pending_delivery:
+                    partial_files = (await self._sync_discovered_artifacts_to_storage()
+                                     if artifact_discovery_dirty else [])
+                    if pending_delivery:
+                        partial_files = self._unique_files(pending_delivery.attachments + partial_files)
                     artifact_discovery_dirty = False
                     artifact_discovery_ran = True
                     partial_files = [
@@ -2629,12 +2629,28 @@ class AgentTaskRunner(TaskRunner):
                                 metadata={
                                     "artifact_delivery": True,
                                     "partial": True,
+                                    **({"analysis_outcome": last_analysis_outcome.model_dump(exclude_none=True)}
+                                       if last_analysis_outcome and last_analysis_outcome.status != "succeeded" else {}),
                                 },
                             )
                         )
+                if pending_delivery and not pre_events:
+                    # No files survived the terminal check; do not restore the
+                    # buffered pre-check attachments when retaining diagnostics.
+                    pending_delivery.attachments = []
+                    pending_delivery.message = "任务未能完整完成。" + (
+                        pending_delivery.message if last_analysis_outcome and last_analysis_outcome.status != "succeeded" else "")
+                    pending_delivery.metadata = {"partial": True, **(
+                        {"analysis_outcome": last_analysis_outcome.model_dump(exclude_none=True)}
+                        if last_analysis_outcome and last_analysis_outcome.status != "succeeded" else {})}
+                    pre_events.append(pending_delivery)
+                pending_delivery = None
             elif isinstance(event, WaitEvent):
-                if artifact_discovery_dirty:
-                    late_files = await self._sync_discovered_artifacts_to_storage()
+                if artifact_discovery_dirty or pending_delivery:
+                    late_files = (await self._sync_discovered_artifacts_to_storage()
+                                  if artifact_discovery_dirty else [])
+                    if pending_delivery:
+                        late_files = self._unique_files(pending_delivery.attachments + late_files)
                     artifact_discovery_dirty = False
                     artifact_discovery_ran = True
                     late_files = [
@@ -2655,6 +2671,7 @@ class AgentTaskRunner(TaskRunner):
                                 metadata={"artifact_delivery": True},
                             )
                         )
+                pending_delivery = None
             elif isinstance(event, DoneEvent):
                 if artifact_discovery_dirty:
                     late_files = await self._sync_discovered_artifacts_to_storage()
@@ -2678,6 +2695,28 @@ class AgentTaskRunner(TaskRunner):
                                 metadata={"artifact_delivery": True},
                             )
                         )
+                if pending_delivery:
+                    pending_delivery.attachments = self._unique_files(
+                        pending_delivery.attachments + [
+                            item for delivery_event in pre_events
+                            if isinstance(delivery_event, MessageEvent)
+                            for item in delivery_event.attachments])
+                    expected_files = len(pending_delivery.attachments)
+                    pending_delivery.attachments = await self._validate_staged_artifact_files(pending_delivery.attachments)
+                    metadata = pending_delivery.metadata or {}
+                    if len(pending_delivery.attachments) < expected_files:
+                        pending_delivery.message = "部分结果文件未通过最终检查，任务未完整交付。以下仅提供检查通过的文件。"
+                        metadata["partial"] = True
+                    plan = getattr(self._flow, "plan", None)
+                    if any(not step.success for step in getattr(plan, "steps", [])) and not withheld_step_outcomes:
+                        pending_delivery.message = "任务尚未完整完成。以下为已完成步骤的结果：\n\n" + pending_delivery.message
+                        metadata["partial"] = True
+                    if (metadata.get("analysis_outcome") or {}).get("status") == "succeeded":
+                        metadata.pop("analysis_outcome", None)
+                    metadata.pop("step_id", None)
+                    pending_delivery.metadata = metadata
+                    pre_events = [pending_delivery]
+                    pending_delivery = None
                 completion_advice_service = getattr(
                     self,
                     "_completion_advice_service",

@@ -188,7 +188,9 @@ def test_dataset_unpack_working_root_is_excluded_from_artifact_delivery():
 
 
 @pytest.mark.asyncio
-async def test_completed_step_delivers_artifact_once_before_duplicate_messages():
+@pytest.mark.parametrize("with_summary", [False, True])
+@pytest.mark.parametrize("second_step", [False, True])
+async def test_completed_steps_deliver_once_only_at_task_end(with_summary, second_step):
     artifact_path = "/home/ubuntu/output/chart.png"
     artifact = FileInfo(
         file_id="chart-file",
@@ -219,9 +221,16 @@ async def test_completed_step_delivers_artifact_once_before_duplicate_messages()
             yield StepEvent(status=StepStatus.COMPLETED, step=step)
             # ExecutionAgent normally repeats step.result here.
             yield MessageEvent(message="图表已生成。")
-            self.status = AgentStatus.SUMMARIZING
-            # A one-step summary is another rendition of the same answer.
-            yield MessageEvent(message="图表已经生成，请查看附件。")
+            if second_step:
+                yield ToolEvent(tool_call_id="verify", tool_name="file", function_name="file_read",
+                                function_args={}, status=ToolStatus.CALLED)
+                second = step.model_copy(deep=True)
+                second.id = "second"
+                yield StepEvent(status=StepStatus.COMPLETED, step=second)
+                yield MessageEvent(message="图表已生成。")
+            if with_summary:
+                self.status = AgentStatus.SUMMARIZING
+                yield MessageEvent(message="图表已经生成，请查看附件。")
             yield DoneEvent()
 
     class _Advice:
@@ -268,20 +277,16 @@ async def test_completed_step_delivers_artifact_once_before_duplicate_messages()
 
     events = [event async for event in runner._run_flow(_message())]
 
-    assert [type(event) for event in events] == [
-        ToolEvent,
-        StepEvent,
-        MessageEvent,
-        DoneEvent,
-    ]
-    delivery = events[2]
-    assert delivery.message == "图表已生成。"
+    assert [type(event) for event in events] == (
+        [ToolEvent, StepEvent] + ([ToolEvent, StepEvent] if second_step else [])
+        + [MessageEvent, DoneEvent])
+    delivery = events[-2]
+    assert delivery.message == ("图表已经生成，请查看附件。" if with_summary else "图表已生成。")
     assert delivery.attachments == [artifact]
     assert delivery.metadata["artifact_delivery"] is True
-    assert delivery.metadata["step_id"] == step.id
-    assert delivery.metadata["analysis_outcome"]["status"] == "succeeded"
-    assert delivery.metadata["analysis_outcome"]["scope"] == "step"
-    assert discovery_skip_paths == [{artifact_path}]
+    assert "step_id" not in delivery.metadata
+    assert "analysis_outcome" not in delivery.metadata
+    assert discovery_skip_paths == [{artifact_path}] * (2 if second_step else 1)
     assert events[-1].advice is not None
 
 
@@ -586,7 +591,7 @@ async def test_successful_compiled_analysis_reconciles_undeclared_artifacts():
 
     assert any(isinstance(event, MessageEvent) and event.attachments == [artifact] for event in events)
     assert discovery_calls == 1
-    assert validation_calls == [[{"path": artifact.file_path, "kind": "image"}]]
+    assert validation_calls == [[{"path": artifact.file_path, "kind": "image"}]] * 2
     assert completed_step.outcome.status == "succeeded"
 
 
