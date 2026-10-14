@@ -12,6 +12,7 @@ DISCOVERY_GUIDANCE = """Data connectors: use data_connector_list to discover reg
 
 class DataDiscoveryToolkit(BaseToolkit):
     name: str = 'data_discovery'
+    selected_connectors: list[str] = []
 
     def __init__(self, *, user_id: str, session_id: str, service=None):
         super().__init__()
@@ -89,7 +90,7 @@ class DataDiscoveryToolkit(BaseToolkit):
         """List trusted data connectors and their supported operations and JSON input schemas. Does not connect to a provider or grant credentials."""
         from app.application.services.data_connector_service import build_data_connector_service
         service = build_data_connector_service(self._service)
-        return ToolResult(success=True, message='可调用的数据连接器', data={'connectors': [entry.model_dump(mode='json') for entry in service.catalog()]})
+        return ToolResult(success=True, message='可调用的数据连接器', data={'connectors': [entry.model_dump(mode='json') for entry in service.catalog() if not self.selected_connectors or entry.id in self.selected_connectors]})
 
     @tool_execution_contract(timeout_seconds=65, cancellable=True, concurrency='exclusive', effects=('network',))
     @tool(parse_docstring=True)
@@ -103,6 +104,8 @@ class DataDiscoveryToolkit(BaseToolkit):
         """
         from app.application.services.data_connector_service import build_data_connector_service
         service = build_data_connector_service(self._service)
+        if self.selected_connectors and connector_id not in self.selected_connectors:
+            return ToolResult(success=False, message='请使用本次所选连接器', data={'reason': 'connector_not_selected'})
         try:
             result = await service.call(self._user_id, self._session_id, connector_id, operation, arguments)
             return ToolResult(success=True, message='数据连接器调用完成；返回元数据，未下载文件', data=result.model_dump(mode='json'))

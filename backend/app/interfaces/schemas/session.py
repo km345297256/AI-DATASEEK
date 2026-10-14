@@ -31,6 +31,7 @@ class ChatRequest(BaseModel):
     attachments: Optional[List[dict]] = None
     skills: Optional[List[str]] = None
     mcp_servers: Optional[List[str]] = None
+    data_connectors: List[str] = Field(default_factory=list, max_length=16)
     dataset_ids: Optional[List[str]] = None
     event_id: Optional[str] = None
     event_seq: Optional[int] = Field(
@@ -46,7 +47,7 @@ class ChatRequest(BaseModel):
             if not self.client_message_id or not self.client_message_id.strip():
                 raise ValueError("A continuation requires a new client_message_id")
             if ((self.message or "").strip() or self.agent_profile_id or self.attachments
-                    or self.skills or self.mcp_servers or self.dataset_ids):
+                    or self.skills or self.mcp_servers or self.data_connectors or self.dataset_ids):
                 raise ValueError("A continuation cannot change the original task or execution scope")
         return self
 

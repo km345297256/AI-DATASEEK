@@ -41,7 +41,7 @@
               :rows="2"
               v-model="message"
               v-model:selected-skills="selectedSkills"
-              v-model:selected-mcp-servers="selectedMcpServers"
+              v-model:selected-mcp-servers="selectedMcpServers" v-model:selected-connectors="selectedConnectors" show-connector-actions
               skill-menu-placement="down"
               @submit="handleSubmit"
               :isRunning="false"
@@ -80,6 +80,7 @@ const isSubmitting = ref(false);
 const attachments = ref<FileInfo[]>([]);
 const selectedSkills = ref<string[]>([]);
 const selectedMcpServers = ref<string[]>([]);
+const selectedConnectors = ref<string[]>([]);
 const { toggleLeftPanel, isLeftPanelShow } = useLeftPanel();
 const { hideFilePanel } = useFilePanel();
 const { currentUser } = useAuth();
@@ -102,6 +103,7 @@ const handleSubmit = async () => {
         message: message.value,
         skills: selectedSkills.value,
         mcpServers: selectedMcpServers.value,
+        dataConnectors: selectedConnectors.value,
         agentProfileId: selectedProfile.value?.id ?? null,
         files: attachments.value.map((file: FileInfo) => ({
           file_id: file.file_id,

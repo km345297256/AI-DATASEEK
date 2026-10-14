@@ -91,3 +91,29 @@ def test_published_schema_and_example_match_executable_contract():
     root = Path(__file__).resolve().parents[2] / 'data-connectors'
     assert json.loads((root / 'schema/connector-v1.schema.json').read_text()) == ConnectorManifest.model_json_schema()
     assert json.loads((root / 'packages/ncbi-datasets/connector.json').read_text()) == ncbi_registration(None).manifest.model_dump(mode='json')
+
+
+@pytest.mark.asyncio
+async def test_explicit_selection_filters_catalog_and_rejects_other_sources():
+    upstream = fixture_service()
+    toolkit = DataDiscoveryToolkit(user_id='owner', session_id='session', service=upstream)
+    toolkit.selected_connectors = ['another-source']
+    catalog = await toolkit.get_tool('data_connector_list')._arun()
+    assert catalog.success and catalog.data['connectors'] == []
+    result = await toolkit.get_tool('data_connector_call')._arun(
+        connector_id='ncbi-datasets-v2', operation='search', arguments={'taxon': '1386'})
+    assert not result.success
+    upstream.search.assert_not_called()
+    toolkit.selected_connectors = ['ncbi-datasets-v2']
+    result = await toolkit.get_tool('data_connector_call')._arun(
+        connector_id='ncbi-datasets-v2', operation='search', arguments={'taxon': '1386'})
+    assert result.success
+    upstream.search.assert_awaited_once()
+
+
+def test_continuation_cannot_replace_connector_selection():
+    from pydantic import ValidationError
+    from app.interfaces.schemas.session import ChatRequest
+    with pytest.raises(ValidationError):
+        ChatRequest(resume_from='a' * 32, client_message_id='resume',
+                    data_connectors=['ncbi-datasets-v2'])

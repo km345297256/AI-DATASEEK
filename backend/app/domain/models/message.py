@@ -23,6 +23,7 @@ class Message(BaseModel):
     attachment_file_infos: List[FileInfo] = []
     skills: List[str] = []
     mcp_servers: List[str] = []
+    data_connectors: List[str] = []
     datasets: List[MountedDataset] = []
     controller_target_files: List[str] = []
     mcp_access_all: bool = False

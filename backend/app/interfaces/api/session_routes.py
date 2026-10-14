@@ -556,6 +556,12 @@ async def chat(
     ), required=request.skills or [])
     effective_mcp_servers = [] if request.resume_from else await _installed_mcp_names(user, request.mcp_servers or [])
 
+    from app.application.services.data_connector_service import get_data_connector_service
+    from app.application.errors.exceptions import BadRequestError
+    available_connectors = {entry.id for entry in get_data_connector_service().catalog()}
+    if any(item not in available_connectors for item in request.data_connectors):
+        raise BadRequestError('所选数据连接器已不可用，请重新选择')
+
     async def event_generator() -> AsyncGenerator[ServerSentEvent, None]:
         async for event in agent_service.chat(
             session_id=session_id,
@@ -570,6 +576,7 @@ async def chat(
             attachments=request.attachments,
             skills=effective_skills,
             mcp_servers=effective_mcp_servers,
+            data_connectors=list(dict.fromkeys(request.data_connectors)),
             dataset_ids=request.dataset_ids or [],
             mcp_access_all=user.role == "admin",
             llm_overrides=llm_overrides,

@@ -542,6 +542,7 @@ class DatasetRequestResolver:
         session_id: str | None = None,
         selected_skills: list[str] | None = None,
         selected_mcp_servers: list[str] | None = None,
+        selected_data_connectors: list[str] | None = None,
         attachment_names: list[str] | None = None,
     ) -> FrontControllerResolution:
         started_at = time.perf_counter()
@@ -583,6 +584,7 @@ class DatasetRequestResolver:
             events,
             selected_skills=selected_skills or [],
             selected_mcp_servers=selected_mcp_servers or [],
+            selected_data_connectors=selected_data_connectors or [],
             attachment_names=attachment_names or [],
         )
         archive_records = self._archive_inventory_records(events)
@@ -1374,6 +1376,7 @@ class DatasetRequestResolver:
         selected_skills: list[str],
         selected_mcp_servers: list[str],
         attachment_names: list[str],
+        selected_data_connectors: list[str] | None = None,
     ) -> dict[str, Any]:
         recent = [
             {"role": event.role, "content": event.message[:2000]}
@@ -1414,6 +1417,7 @@ class DatasetRequestResolver:
             ],
             "available_skills": selected_skills,
             "available_mcp_servers": selected_mcp_servers,
+            "available_data_connectors": selected_data_connectors or [],
             "attachment_names": attachment_names,
             "recent_archive_inventory": {
                 "file_count": len(archive_records),

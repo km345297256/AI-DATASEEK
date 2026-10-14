@@ -68,6 +68,7 @@ export interface MessageEventData extends BaseEventData {
       analysis_progress?: { stage?: string } | null;
       skills?: string[];
       mcp_servers?: string[];
+      data_connectors?: string[];
       dataset_ids?: string[];
       safety_review?: {
         decision: 'allow' | 'reject';

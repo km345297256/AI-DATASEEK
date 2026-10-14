@@ -159,6 +159,7 @@ async def prepare_continuation(repository, sandbox, session_id, user_id, message
                 or checkpoint.get("attachment_file_ids") or message.attachment_file_ids or message.attachments or message.attachment_file_infos
                 or checkpoint.get("skills") != list(message.skills)
                 or checkpoint.get("mcp_servers") != list(message.mcp_servers)
+                or checkpoint.get("data_connectors", []) != list(message.data_connectors)
                 or checkpoint.get("mcp_access_all") is not message.mcp_access_all
                 or checkpoint.get("dataset_ids") != [item.dataset_id for item in message.datasets]
                 or checkpoint.get("target_files") != list(message.controller_target_files)
@@ -245,6 +246,7 @@ async def save_checkpoint(repository, sandbox, session_id, user_id, message, pla
         "target_files": list(message.controller_target_files),
         "source_paths": [item["path"] for item in source_fingerprints],
         "skills": list(message.skills), "mcp_servers": list(message.mcp_servers),
+        "data_connectors": list(message.data_connectors),
         "mcp_access_all": message.mcp_access_all,
         "attachment_file_ids": list(message.attachment_file_ids),
         "plan": plan.model_dump(mode="json"), "fingerprints": current,

@@ -9,6 +9,7 @@ export interface PendingChat {
     files: FileInfo[];
     skills: string[];
     mcpServers: string[];
+    dataConnectors?: string[];
     agentProfileId?: string | null;
 }
 

@@ -162,7 +162,7 @@
           </div>
           <p v-if="isRestoringHistory" role="status" class="mb-2 px-4 text-sm text-[var(--text-secondary)]">正在读取会话状态…</p>
           <PlanPanel v-if="sessionId && (messages.length || isLoading) && !connectionNotice" :key="sessionId" :plan="plan || undefined" :session-id="sessionId" :revision="lastEventSeq" :is-running="isLoading" />
-          <ChatBox v-model="inputMessage" v-model:selected-skills="selectedSkills" v-model:selected-mcp-servers="selectedMcpServers" :rows="1" @submit="handleSubmit" :isRunning="isLoading" @stop="handleStop"
+          <ChatBox v-model="inputMessage" v-model:selected-skills="selectedSkills" v-model:selected-mcp-servers="selectedMcpServers" v-model:selected-connectors="selectedConnectors" show-connector-actions :rows="1" @submit="handleSubmit" :isRunning="isLoading" @stop="handleStop"
             :disabled="isRestoringHistory" :attachments="attachments" />
           <p class="pb-1.5 text-center text-[10px] text-[var(--text-tertiary)]">DataSeek 也可能会犯错。请核查重要信息。</p>
         </div>
@@ -271,6 +271,7 @@ const createInitialState = () => ({
   attachments: [] as FileInfo[],
   selectedSkills: [] as string[],
   selectedMcpServers: [] as string[],
+  selectedConnectors: [] as string[],
   shareMode: 'private' as 'private' | 'public', // Default to private mode
   linkCopied: false,
   sharingLoading: false, // Loading state for share operations
@@ -309,6 +310,7 @@ const {
   attachments,
   selectedSkills,
   selectedMcpServers,
+  selectedConnectors,
   shareMode,
   linkCopied,
   sharingLoading,
@@ -725,6 +727,7 @@ const chat = async (
       undefined,
       continuation?.clientMessageId,
       continuation?.resumeFrom,
+      continuation ? undefined : [...selectedConnectors.value],
     );
     if (isCurrentChat()) cancelCurrentChat.value = cancel;
     else cancel();
@@ -788,12 +791,14 @@ const restoreSession = async () => {
   realTime.value = false;
   let restoredSkills: string[] = [];
   let restoredMcpServers: string[] = [];
+  let restoredConnectors: string[] = [];
   for (const event of session.events) {
     if (event.event === 'message') {
       const messageData = event.data as MessageEventData;
       if (messageData.role === 'user') {
         restoredSkills = messageData.metadata?.skills ?? restoredSkills;
         restoredMcpServers = messageData.metadata?.mcp_servers ?? restoredMcpServers;
+        restoredConnectors = messageData.metadata?.data_connectors ?? [];
       }
     }
     handleEvent(event);
@@ -801,6 +806,7 @@ const restoreSession = async () => {
   title.value = session.title || t('New Chat');
   selectedSkills.value = restoredSkills;
   selectedMcpServers.value = restoredMcpServers;
+  selectedConnectors.value = restoredConnectors;
   realTime.value = true;
   if (shouldRecoverSession(session.status, session.events)) {
     await chat();
@@ -862,6 +868,7 @@ onMounted(() => {
     sessionId.value = String(routeParams.sessionId) as string;
     const pendingChat = consumePendingChat(sessionId.value);
     if (pendingChat?.message) {
+      selectedConnectors.value = pendingChat.dataConnectors ?? [];
       if (pendingChat.skills?.length) selectedSkills.value = pendingChat.skills;
       if (pendingChat.mcpServers?.length) selectedMcpServers.value = pendingChat.mcpServers;
       chat(pendingChat.message, pendingChat.files, pendingChat.skills, pendingChat.mcpServers, pendingChat.agentProfileId ?? null);

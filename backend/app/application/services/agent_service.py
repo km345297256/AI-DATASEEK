@@ -124,6 +124,7 @@ class AgentService:
         llm_overrides: Optional[dict] = None,
         client_message_id: Optional[str] = None,
         resume_from: Optional[str] = None,
+        data_connectors: Optional[List[str]] = None,
     ) -> AsyncGenerator[AgentEvent, None]:
         logger.info(
             "Starting chat session=%s message_chars=%d",
@@ -141,6 +142,7 @@ class AgentService:
             attachments=attachments,
             skills=skills,
             mcp_servers=mcp_servers,
+            data_connectors=data_connectors,
             dataset_ids=dataset_ids,
             mcp_access_all=mcp_access_all,
             llm_overrides=llm_overrides,

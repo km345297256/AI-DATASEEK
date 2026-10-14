@@ -6,6 +6,12 @@
                 ? 'min-h-[56px] max-h-[70vh] gap-1 rounded-[18px] py-2'
                 : 'max-h-[70vh] gap-3 rounded-[22px] py-3'">
             <ChatBoxFiles v-if="showFileActions || attachments.length" ref="chatBoxFileListRef" :attachments="attachments" />
+            <div v-if="showConnectorActions && selectedConnectors.length" class="flex flex-wrap gap-1.5 px-4">
+                <div v-for="id in selectedConnectors" :key="id" class="inline-flex max-w-full items-center gap-2 rounded-md border border-[var(--border-main)] px-2 py-1.5 text-xs">
+                    <PlugZap :size="14" /><span class="truncate">{{ connectorTitle(id) }}</span>
+                    <button type="button" :disabled="disabled || isRunning" :aria-label="'移除连接器 ' + connectorTitle(id)" @click="selectedConnectors = selectedConnectors.filter(item => item !== id)"><X :size="13" /></button>
+                </div>
+            </div>
             <div v-if="visibleSelectedSkills.length" class="flex max-h-20 flex-wrap gap-1.5 overflow-y-auto px-4">
                 <div
                     v-for="skillName in visibleSelectedSkills"
@@ -67,6 +73,7 @@
                                 :class="skillMenuPlacement === 'down' ? 'top-full mt-2' : 'bottom-full mb-2'"
                                 role="menu"
                             >
+                                <button v-if="showConnectorActions" type="button" class="flex h-9 w-full items-center gap-2 rounded-md px-2 text-left text-[13px] hover:bg-[var(--fill-tsp-white-light)]" role="menuitem" :disabled="disabled || isRunning" @click="openConnectorPicker"><PlugZap :size="15" />数据连接器</button>
                                 <button v-if="showFileActions" type="button" class="flex h-9 w-full items-center gap-2 rounded-md px-2 text-left text-[13px] text-[var(--text-primary)] hover:bg-[var(--fill-tsp-white-light)]" role="menuitem" @click="handleUploadFileAction">
                                     <Paperclip :size="15" class="shrink-0" />
                                     <span class="truncate">{{ t('Upload file') }}</span>
@@ -148,6 +155,11 @@
                             </div>
                         </template>
                     </div>
+                    <button v-if="showConnectorActions" type="button" @click="openConnectorPicker"
+                        class="inline-flex h-8 items-center gap-1.5 rounded-full border border-[var(--border-main)] px-3 text-xs text-[var(--text-secondary)] hover:bg-[var(--fill-tsp-gray-main)]"
+                        :disabled="disabled || isRunning" :aria-expanded="connectorPickerOpen" aria-haspopup="dialog">
+                        <PlugZap :size="14" />数据连接器
+                    </button>
                     <button v-if="showMcpActions" @click="mcpDialogOpen = true"
                         class="relative rounded-full border border-[var(--border-main)] inline-flex items-center justify-center gap-1 clickable cursor-pointer text-xs text-[var(--text-secondary)] hover:bg-[var(--fill-tsp-gray-main)] w-10 h-10 sm:w-8 sm:h-8 p-0 data-[popover-trigger]:bg-[var(--fill-tsp-gray-main)] shrink-0"
                         :disabled="disabled"
@@ -180,6 +192,7 @@
                 </div>
             </footer>
         </div>
+        <DataConnectorPicker v-if="showConnectorActions" v-model:open="connectorPickerOpen" v-model:selected="selectedConnectors" :disabled="disabled || isRunning" @catalog="connectorCatalog = $event" />
         <SkillDialog v-model:open="skillDialogOpen" v-model:selected-skills="selectedSkills" />
         <MCPDialog v-if="showMcpActions" v-model:open="mcpDialogOpen" v-model:selected-servers="selectedMcpServers" />
     </div>
@@ -187,6 +200,8 @@
 
 <script setup lang="ts">
 import { ref, watch, computed, nextTick, onMounted, onUnmounted } from 'vue';
+import DataConnectorPicker from './DataConnectorPicker.vue';
+import { listDataConnectors, type DataConnector } from '@/api/dataConnector';
 import SendIcon from './icons/SendIcon.vue';
 import { useI18n } from 'vue-i18n';
 import ChatBoxFiles from './ChatBoxFiles.vue';
@@ -207,6 +222,12 @@ const { openSettingsDialog } = useSettingsDialog();
 const hasTextInput = ref(false);
 const chatBoxFileListRef = ref();
 const skillDialogOpen = ref(false);
+const connectorPickerOpen = ref(false);
+const connectorCatalog = ref<DataConnector[]>([]);
+const selectedConnectors = computed({ get: () => props.selectedConnectors ?? [], set: value => emit('update:selectedConnectors', value) });
+const connectorTitle = (id: string) => connectorCatalog.value.find(item => item.id === id)?.title || id;
+const openConnectorPicker = () => { actionMenuOpen.value = false; connectorPickerOpen.value = true; };
+
 const mcpDialogOpen = ref(false);
 const composerRef = ref<HTMLElement>();
 const textareaRef = ref<HTMLTextAreaElement>();
@@ -228,6 +249,8 @@ const props = withDefaults(defineProps<{
     attachments: FileInfo[];
     selectedSkills?: string[];
     selectedMcpServers?: string[];
+    selectedConnectors?: string[];
+    showConnectorActions?: boolean;
     skillMenuPlacement?: 'up' | 'down';
     hideStopButton?: boolean;
     allowSendFilesOnly?: boolean;
@@ -238,6 +261,7 @@ const props = withDefaults(defineProps<{
     submitOnEnter?: boolean;
     compactComposer?: boolean;
 }>(), {
+    showConnectorActions: false,
     showFileActions: true,
     showMcpActions: true,
     disabled: false,
@@ -249,6 +273,7 @@ const emit = defineEmits<{
     (e: 'update:modelValue', value: string): void;
     (e: 'update:selectedSkills', value: string[]): void;
     (e: 'update:selectedMcpServers', value: string[]): void;
+    (e: 'update:selectedConnectors', value: string[]): void;
     (e: 'submit'): void;
     (e: 'stop'): void;
 }>();
@@ -472,6 +497,7 @@ onMounted(() => {
     eventBus.on(EVENT_SKILL_PREFERENCES_UPDATED, handleSkillPreferencesUpdated);
     loadAutoEnabledSkills();
     void loadSkillLabels();
+    if (props.showConnectorActions) void listDataConnectors().then(items => { connectorCatalog.value = items; }).catch(() => {});
 });
 onUnmounted(() => {
     document.removeEventListener('pointerdown', handleDocumentPointerDown);

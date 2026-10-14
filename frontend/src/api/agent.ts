@@ -132,6 +132,7 @@ export const chatWithSession = async (
   datasetIds?: string[],
   clientMessageId?: string,
   resumeFrom?: string,
+  dataConnectors?: string[],
 ): Promise<() => void> => {
   const effectiveClientMessageId = message || resumeFrom
     ? clientMessageId || createClientMessageId()
@@ -148,6 +149,7 @@ export const chatWithSession = async (
       attachments,
       skills,
       mcp_servers: mcpServers,
+      data_connectors: dataConnectors,
       dataset_ids: datasetIds,
     }),
     client_message_id: effectiveClientMessageId,

@@ -247,6 +247,7 @@ class PlanActFlow(BaseFlow):
             session_repository=self._session_repository,
         )
         self.dataset_catalog_toolkit = DatasetCatalogToolkit()
+        self.data_discovery_toolkit = DataDiscoveryToolkit(user_id=self._user_id, session_id=self._session_id)
         self.mcp_toolkit = mcp_tool
         self.plugin_toolkit = PluginToolkit(
             sandbox,
@@ -266,7 +267,7 @@ class PlanActFlow(BaseFlow):
             MessageToolkit(),
             self.skill_toolkit,
             self.dataset_catalog_toolkit,
-            DataDiscoveryToolkit(user_id=self._user_id, session_id=self._session_id),
+            self.data_discovery_toolkit,
             mcp_tool,
         ]
 
@@ -795,6 +796,11 @@ class PlanActFlow(BaseFlow):
             events,
             current_user_message=message.message,
         )
+        discovery = getattr(self, "data_discovery_toolkit", None)
+        if discovery is not None:
+            discovery.selected_connectors = list(message.data_connectors)
+        if message.data_connectors:
+            self.session_context += "\n本次用户已选择数据连接器：" + ", ".join(message.data_connectors) + "。需要外部数据时先读取 data_connector_list，再用 data_connector_call 调用所选来源的能力；不要把元数据结果当成已下载文件。"
         self.dataset_context = render_dataset_context(message.datasets)
         catalog_toolkit = getattr(self, "dataset_catalog_toolkit", None)
         if catalog_toolkit is not None:
@@ -1148,6 +1154,7 @@ class PlanActFlow(BaseFlow):
             and not is_skill_create_request(message.message)
             and not message.skills
             and not message.mcp_servers
+            and not message.data_connectors
             and not self._message_has_image_attachment(message)
         )
 

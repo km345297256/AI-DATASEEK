@@ -5,7 +5,7 @@ import ts from 'typescript';
 import { ref } from 'vue';
 import { shouldRecoverSession } from '../src/utils/sessionRecovery.ts';
 
-const user = { event: 'message', data: { role: 'user' } };
+const user = { event: 'message', data: { role: 'user', metadata: { data_connectors: ['ncbi-datasets-v2'] } } };
 const done = { event: 'done', data: {} };
 test('new and metadata-only pending sessions never open a chat stream', () => {
   assert.equal(shouldRecoverSession('pending', []), false);
@@ -33,7 +33,7 @@ test('actual history restoration leaves an empty API sample idle but resumes sub
       sessionId: ref('sample'), chatGeneration: 1, historyRequest: undefined,
       isRestoringHistory: ref(false), hasMoreHistory: ref(false), historyBeforeSeq: ref(),
       shareMode: ref('private'), titleManuallySet: ref(false), realTime: ref(true), title: ref(''),
-      selectedSkills: ref([]), selectedMcpServers: ref([]), isLoading: ref(false),
+      selectedSkills: ref([]), selectedMcpServers: ref([]), selectedConnectors: ref([]), isLoading: ref(false),
       connectionNotice: ref('old failure'), clearAnalysisProgress() {}, handleEvent() {},
       isCurrentSession: id => id === 'sample', shouldRecoverSession, t: x => x,
       agentApi: { getSessionHistory: async () => ({ events, status: 'pending', title: 'API sample', has_more: false }), clearUnreadMessageCount() {} },
@@ -42,6 +42,7 @@ test('actual history restoration leaves an empty API sample idle but resumes sub
     await handler('restoreSession', scope)();
     assert.equal(streams, events.length ? 1 : 0);
     assert.equal(scope.isRestoringHistory.value, false);
+    assert.deepEqual(scope.selectedConnectors.value, events.length ? ['ncbi-datasets-v2'] : []);
     if (!events.length) {
       assert.equal(scope.isLoading.value, false);
       assert.equal(scope.connectionNotice.value, '');

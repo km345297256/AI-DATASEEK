@@ -658,6 +658,7 @@ class AgentDomainService:
         mcp_access_all: bool,
         client_message_id: Optional[str],
         resume_from: Optional[str] = None,
+        data_connectors: Optional[List[str]] = None,
     ) -> Optional[Task]:
         """Serialize one session's bootstrap and refresh state inside the lock."""
         input_generation = None
@@ -685,6 +686,7 @@ class AgentDomainService:
                 attachments=attachments,
                 skills=skills,
                 mcp_servers=mcp_servers,
+                data_connectors=data_connectors,
                 dataset_ids=dataset_ids,
                 mcp_access_all=mcp_access_all,
                 client_message_id=client_message_id,
@@ -706,10 +708,11 @@ class AgentDomainService:
         client_message_id: Optional[str],
         input_generation: int | None = None,
         resume_from: Optional[str] = None,
+        data_connectors: Optional[List[str]] = None,
     ) -> Optional[Task]:
         if getattr(self, "_input_delivery", None) is not None:
             return await self._bootstrap_durable_input(session, user_id, message, timestamp, attachments,
-                skills, mcp_servers, dataset_ids, mcp_access_all, client_message_id, input_generation, resume_from)
+                skills, mcp_servers, dataset_ids, mcp_access_all, client_message_id, input_generation, resume_from, data_connectors)
         if resume_from:
             raise ContinuationRejected("当前服务不支持安全续作，请检查原任务。")
         client_message_claimed = False
@@ -803,6 +806,7 @@ class AgentDomainService:
                         session_id=session.id,
                         selected_skills=skills or [],
                         selected_mcp_servers=mcp_servers or [],
+                        selected_data_connectors=data_connectors or [],
                         attachment_names=attachment_names,
                     )
                 except Exception as exc:
@@ -842,6 +846,7 @@ class AgentDomainService:
             metadata = {
                 "skills": skills or [],
                 "mcp_servers": mcp_servers or [],
+                "data_connectors": data_connectors or [],
                 "dataset_ids": effective_dataset_ids,
                 "mcp_access_all": mcp_access_all,
             }
@@ -1072,7 +1077,9 @@ class AgentDomainService:
 
     async def _bootstrap_durable_input(self, session, user_id, message, timestamp, attachments,
                                        skills, mcp_servers, dataset_ids, mcp_access_all, client_message_id,
-                                       input_generation=None, resume_from=None):
+                                       input_generation=None, resume_from=None, data_connectors=None):
+        if resume_from and data_connectors:
+            raise ContinuationRejected("续作不能更改数据连接器。")
         self._validate_continuation_payload(resume_from, message, attachments, skills, mcp_servers,
                                             dataset_ids, mcp_access_all, client_message_id)
         if client_message_id:
@@ -1089,7 +1096,7 @@ class AgentDomainService:
                     if existing.admission.state == "pending":
                         await self._schedule_accepted_input(existing)
                     return self._task_cls.get(existing.admission.task_id) if existing.admission.task_id else None
-                requested_metadata = {"skills": skills or [], "mcp_servers": mcp_servers or [],
+                requested_metadata = {"skills": skills or [], "mcp_servers": mcp_servers or [], "data_connectors": data_connectors or [],
                     "dataset_ids": list(dict.fromkeys(dataset_ids)) if dataset_ids is not None else previous_metadata.get("dataset_ids", []),
                     "mcp_access_all": mcp_access_all}
                 previous_files = [item.file_id for item in existing.event.attachments or []]
@@ -1127,9 +1134,10 @@ class AgentDomainService:
                 raise ContinuationRejected("该续作进度已被领取或失效，请查看原请求。")
             message = CONTINUATION_MESSAGE
             dataset_ids, skills, mcp_servers = (list(checkpoint[field]) for field in ("dataset_ids", "skills", "mcp_servers"))
+            data_connectors = list(checkpoint.get("data_connectors", []))
             mcp_access_all = bool(checkpoint.get("mcp_access_all", False))
         effective_ids = list(dict.fromkeys(dataset_ids or session.dataset_ids or []))
-        metadata = {"skills": skills or [], "mcp_servers": mcp_servers or [],
+        metadata = {"skills": skills or [], "mcp_servers": mcp_servers or [], "data_connectors": data_connectors or [],
                     "dataset_ids": effective_ids, "mcp_access_all": mcp_access_all}
         if client_message_id:
             metadata["client_message_id"] = client_message_id
@@ -1192,6 +1200,7 @@ class AgentDomainService:
                 if (ids != checkpoint["dataset_ids"]
                         or metadata.get("skills", []) != checkpoint["skills"]
                         or metadata.get("mcp_servers", []) != checkpoint["mcp_servers"]
+                        or metadata.get("data_connectors", []) != checkpoint.get("data_connectors", [])
                         or bool(metadata.get("mcp_access_all", False)) != bool(checkpoint.get("mcp_access_all", False))
                         or event.attachments):
                     raise ContinuationRejected("续作请求的数据范围或执行配置已变化。")
@@ -1213,6 +1222,7 @@ class AgentDomainService:
                 events=history, llm_overrides=session.llm_overrides, user_id=record.admission.actor_user_id,
                 session_id=session.id, selected_skills=metadata.get("skills") or [],
                 selected_mcp_servers=metadata.get("mcp_servers") or [],
+                selected_data_connectors=metadata.get("data_connectors") or [],
                 attachment_names=[item.filename for item in event.attachments or []])
             await self._input_delivery._require_live(record.session_id, record.key, states={"claimed"})
             if checkpoint is not None:
@@ -1268,6 +1278,7 @@ class AgentDomainService:
         llm_overrides: Optional[dict] = None,
         client_message_id: Optional[str] = None,
         resume_from: Optional[str] = None,
+        data_connectors: Optional[List[str]] = None,
     ) -> AsyncGenerator[BaseEvent, None]:
         """
         Chat with an agent
@@ -1276,6 +1287,8 @@ class AgentDomainService:
         try:
             self._validate_continuation_payload(resume_from, message, attachments, skills, mcp_servers,
                                                 dataset_ids, mcp_access_all, client_message_id)
+            if resume_from and data_connectors:
+                raise ContinuationRejected("续作不能改变数据连接器。")
             if resume_from and llm_overrides is not None:
                 raise ContinuationRejected("续作不能改变原任务的模型或执行配置。")
             session = await self._session_repository.find_by_id_and_user_id(session_id, user_id)
@@ -1304,6 +1317,7 @@ class AgentDomainService:
                             attachments=attachments,
                             skills=skills,
                             mcp_servers=mcp_servers,
+                            data_connectors=data_connectors,
                             dataset_ids=dataset_ids,
                             mcp_access_all=mcp_access_all,
                             client_message_id=client_message_id,

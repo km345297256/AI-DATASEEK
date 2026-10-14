@@ -36,6 +36,7 @@ class CheckpointRepository(MemoryInputs):
             "goal": self.events[0].message, "source_seq": 1,
             "dataset_ids": ["registered"], "target_files": [TARGET], "source_paths": [TARGET],
             "skills": ["original-skill"], "mcp_servers": ["original-mcp"], "mcp_access_all": False,
+            "data_connectors": ["ncbi-datasets-v2"],
             "attachment_file_ids": [], "plan": {"private": "do not put in metadata"},
         }
         self.claims = []
@@ -99,7 +100,7 @@ async def submit(service, repository, *, token=TOKEN, client_id="resume-client",
     {"resume_from": "x" * 32}, {"resume_from": "A" * 32}, {"resume_from": "a" * 31},
     {"client_message_id": None}, {"client_message_id": " "}, {"message": "do something else"},
     {"dataset_ids": ["other"]}, {"skills": ["other"]}, {"mcp_servers": ["other"]},
-    {"agent_profile_id": "other"}, {"attachments": [{"file_id": "other"}]},
+    {"data_connectors": ["other"]}, {"agent_profile_id": "other"}, {"attachments": [{"file_id": "other"}]},
 ])
 def test_continuation_api_refuses_scope_or_identity_overrides(changes):
     values = {"resume_from": TOKEN, "client_message_id": "resume-client", "message": "", **changes}
@@ -121,12 +122,14 @@ async def test_continuation_restores_scope_before_durable_admission_and_gates_or
     assert record.event.message == CONTINUATION_MESSAGE
     assert record.event.metadata == {"resume_from": TOKEN, "client_message_id": "resume-client",
         "skills": ["original-skill"], "mcp_servers": ["original-mcp"], "mcp_access_all": False,
+            "data_connectors": ["ncbi-datasets-v2"],
         "dataset_ids": ["registered"]}
     assert "private" not in record.event.model_dump_json()
     request = service._dataset_request_resolver.resolve.await_args.kwargs
     assert request["question"] == repository.checkpoint["goal"]
     assert request["selected_skills"] == ["original-skill"]
     assert request["selected_mcp_servers"] == ["original-mcp"]
+    assert request["selected_data_connectors"] == ["ncbi-datasets-v2"]
     assert service._create_task.await_args.args[1] == ["registered"]
     assert service._create_task.await_args.kwargs["front_controller_resolution"].target_files == [TARGET]
     assert json.loads(task.enqueue_input.await_args.args[0])["metadata"] == record.event.metadata

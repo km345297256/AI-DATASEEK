@@ -1663,6 +1663,7 @@ class AgentTaskRunner(TaskRunner):
                     attachment_file_infos=list(event.attachments or []),
                     skills=metadata.get("skills", []),
                     mcp_servers=metadata.get("mcp_servers", []),
+                    data_connectors=metadata.get("data_connectors", []),
                     datasets=datasets,
                     controller_target_files=list(
                         self._front_controller_resolution.target_files
@@ -2123,7 +2124,8 @@ class AgentTaskRunner(TaskRunner):
             "sandbox_id": self._sandbox.id, "datasets": [item.dataset_id for item in message.datasets],
             "targets": message.controller_target_files, "sources": self._analysis_source_fingerprints,
             "attachments": message.attachment_file_ids, "skills": message.skills,
-            "mcp_servers": message.mcp_servers, "mcp_access_all": message.mcp_access_all})
+            "mcp_servers": message.mcp_servers, "mcp_access_all": message.mcp_access_all,
+            **({"data_connectors": message.data_connectors} if message.data_connectors else {})})
 
         delivery = getattr(self, "_input_delivery", None)
         identity = getattr(self, "_accepted_input_key", None)
