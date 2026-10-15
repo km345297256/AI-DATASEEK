@@ -106,3 +106,13 @@ test('all registered file adapters use the common SDK; ordinary download and arc
   assert.match(api, /function downloadFile/); assert.match(api, /function prepareShapefilePreview/);
   assert.doesNotMatch(api, /getFilePreviewPage|molecular-preview\/prepare/);
 });
+
+test('preview errors explain known limits without leaking arbitrary server details', async t => {
+  const known = '前 16 MiB 内没有完整 FASTQ 记录，单条记录可能超过预览读取范围；文件仍可下载或通过分析工具读取。';
+  let msg = known;
+  t.mock.method(globalThis, 'fetch', async () => new Response(JSON.stringify({ code: 422, msg }), { status: 422 }));
+  const runtime = sdk();
+  await assert.rejects(runtime.getPluginPage(file(), plugin(), {}, new AbortController().signal), error => error.message === known);
+  msg = '/private/secret-path native parser error';
+  await assert.rejects(runtime.getPluginPage(file(), plugin(), {}, new AbortController().signal), error => !error.message.includes('/private') && error.message.includes('文件仍可下载'));
+});

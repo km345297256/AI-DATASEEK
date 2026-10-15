@@ -16,7 +16,7 @@ from app.infrastructure.external.sandbox.visualization_worker import run_visuali
 
 _PREVIEW_SLOTS = asyncio.Semaphore(2)
 MAX_INPUT_BYTES = 64 * 1024 * 1024
-MAX_FASTQ_BYTES = 2 * 1024 * 1024
+MAX_FASTQ_BYTES = 16 * 1024 * 1024
 MAX_OUTPUT_BYTES = 512 * 1024
 
 

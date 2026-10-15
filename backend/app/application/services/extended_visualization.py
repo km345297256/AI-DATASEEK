@@ -525,6 +525,8 @@ async def extended_visualization(file_service, catalog, image: str | None, file_
                 options=request.options, format=format, truncated=False, cancelled=cancel))
             if response.get("ok") is not True:
                 # Parser messages can contain paths/data. Never forward them.
+                if response.get("error") in {"未注册的扩展读取器、视图或格式。", "隔离镜像缺少所需读取依赖，请更新对应插件运行环境。"}:
+                    raise VisualizationWorkerError("隔离预览读取器不可用，请更新沙箱镜像。")
                 raise ScientificPreviewRejected("此文件无法安全预览；请检查格式、参数及读取器依赖。")
             try:
                 result = validate_payload(response.get("data"), reader, kind, min(MAX_OUTPUT, plugin.limits.max_output_bytes))

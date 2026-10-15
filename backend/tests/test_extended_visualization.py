@@ -146,3 +146,12 @@ def test_reader_specific_parameter_limits_and_no_implicit_metpy_units():
                             ('hdf5', {'path': '/../bad'}), ('metpy', {}), ('office', {'macro': True}), ('fastqc', {'confirm': 1})]:
         with pytest.raises(module.ScientificPreviewRejected): module.validate_options(reader, options)
     module.validate_options('hdf5', {'path': '/entry/data', 'indices': [0]})
+
+
+@pytest.mark.asyncio
+async def test_missing_reader_is_runtime_failure_not_invalid_file(environment):
+    from app.infrastructure.external.sandbox.visualization_worker import VisualizationWorkerError
+    with pytest.raises(VisualizationWorkerError):
+        await invoke(environment, worker=lambda *args, **kwargs: {
+            "ok": False, "error": "未注册的扩展读取器、视图或格式。",
+        })

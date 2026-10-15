@@ -479,3 +479,18 @@ worker.main()
 """
     result, _ = worker_process(b"x", source=source)
     assert result["ok"] is False
+
+
+def test_fastq_preview_accepts_genome_length_record():
+    length = 4_215_606
+    data = b"@synthetic\n" + b"A" * length + b"\n+\n" + b"?" * length + b"\n"
+    result = worker.preview_bytes(data, "fastq", "quality", {})
+    assert result["metadata"]["reads_sampled"] == 1
+    assert result["metadata"]["bases_sampled"] == length
+    assert result["y"] == [30.0] * 500
+    assert result["sampled"] is True
+
+
+def test_fastq_oversized_first_record_explains_preview_limit():
+    with pytest.raises(worker.PreviewError, match="单条记录可能超过预览读取范围"):
+        worker.fastq_preview(b"@synthetic\nAAAA", {}, truncated=True)

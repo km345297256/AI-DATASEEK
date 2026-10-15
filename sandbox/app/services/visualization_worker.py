@@ -19,7 +19,7 @@ from pathlib import Path
 
 MAX_INPUT_BYTES = 64 * 1024 * 1024
 MAX_OUTPUT_BYTES = 512 * 1024
-MAX_FASTQ_BYTES = 2 * 1024 * 1024
+MAX_FASTQ_BYTES = 16 * 1024 * 1024
 MAX_AXIS = 128
 MAX_POINTS = 1000
 
@@ -354,13 +354,13 @@ def fastq_preview(data, options, truncated=False):
             sums[position] += value - 33
             counts[position] += 1
     if not reads:
-        raise PreviewError("有界预览范围内没有完整 FASTQ 记录。")
+        raise PreviewError("前 16 MiB 内没有完整 FASTQ 记录，单条记录可能超过预览读取范围；文件仍可下载或通过分析工具读取。")
     length = max(i + 1 for i, n in enumerate(counts) if n)
     result.update(x=list(range(1, length + 1)), y=[round(sums[i] / counts[i], 5) for i in range(length)],
                   x_label="碱基位置", y_label="平均质量 (Phred+33)", sampled=truncated or stream.tell() < len(data) or max(lengths) > 500)
     result["metadata"].update(reads_sampled=reads, bases_sampled=bases, gc_percent=round(gc * 100 / bases, 3),
                                min_length=min(lengths), max_length=max(lengths), quality_encoding="Phred+33 (用户需确认)", position_counts=counts[:length])
-    result["warnings"].append("按 Phred+33 解释质量；编码不能仅凭字符可靠推断。最多读取前 2 MiB、1,000 条记录和前 500 个碱基位置，结果不是全文件 QC。")
+    result["warnings"].append("按 Phred+33 解释质量；编码不能仅凭字符可靠推断。最多读取前 16 MiB、1,000 条记录和前 500 个碱基位置，结果不是全文件 QC。")
     return result
 
 

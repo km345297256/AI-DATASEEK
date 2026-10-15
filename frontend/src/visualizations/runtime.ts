@@ -31,7 +31,27 @@ function requireOperation(plugin: VisualizationPlugin, operation: VisualizationO
 }
 function sharedPage() { return typeof window !== 'undefined' && window.location.pathname.startsWith('/share/'); }
 function failure(status: number): Error {
-  return Object.assign(new Error(({ 403: '该插件已停用或没有文件访问权限。', 404: '文件或插件不存在。', 409: '文件或插件版本变化，请重新打开预览。', 422: '此文件或参数无法安全预览，请核对格式及读取选项。' } as Record<number, string>)[status] ?? '隔离预览暂不可用，请检查服务及插件依赖。'), { status });
+  return Object.assign(new Error(({ 403: '该插件已停用或没有文件访问权限。', 404: '文件或插件不存在。', 409: '文件或插件版本变化，请重新打开预览。', 422: '预览未能完成，请检查格式及读取范围；文件仍可下载。' } as Record<number, string>)[status] ?? '隔离预览暂不可用，请检查服务及插件依赖。'), { status });
+}
+// Only fixed public diagnostics may cross the preview error boundary.
+const publicPreviewErrors = new Set([
+  '前 16 MiB 内没有完整 FASTQ 记录，单条记录可能超过预览读取范围；文件仍可下载或通过分析工具读取。',
+  'FASTQ 记录不完整；本插件支持标准四行记录。',
+  'FASTQ 格式无效；本插件支持未压缩的标准四行记录。',
+  'FASTQ 序列或质量字符无效。',
+  'Cordis 或隔离预览暂不可用，请确认服务及沙箱镜像已更新。',
+]);
+async function responseFailure(response: Response, signal: AbortSignal): Promise<Error> {
+  try {
+    const bytes = await readBoundedBinary(response, 4096, signal);
+    const body = JSON.parse(new TextDecoder().decode(bytes));
+    if ([422, 503].includes(response.status) && publicPreviewErrors.has(body.msg)) {
+      return Object.assign(new Error(body.msg), { status: response.status });
+    }
+  } catch {
+    if (signal.aborted) throw new DOMException('Preview cancelled', 'AbortError');
+  }
+  return failure(response.status);
 }
 async function fetchVisualization(file: FileInfo, plugin: VisualizationPlugin, operation: VisualizationOperation, options: Record<string, unknown>, signal: AbortSignal) {
   requireOperation(plugin, operation);
@@ -45,7 +65,7 @@ async function fetchVisualization(file: FileInfo, plugin: VisualizationPlugin, o
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ plugin_id: plugin.id, operation, version: readerOptions.resource_id ? undefined : pinnedVersion, kind, options: readerOptions }),
   });
-  if (!response.ok) { await response.body?.cancel(); throw failure(response.status); }
+  if (!response.ok) throw await responseFailure(response, signal);
   return response;
 }
 export function parseVisualizationResult(value: unknown, plugin: VisualizationPlugin): VisualizationResult {
@@ -60,7 +80,7 @@ export function parseVisualizationResult(value: unknown, plugin: VisualizationPl
   return value as unknown as VisualizationResult;
 }
 export async function readVisualizationResult(response: Response, plugin: VisualizationPlugin, signal: AbortSignal): Promise<VisualizationResult> {
-  if (!response.ok) { await response.body?.cancel(); throw failure(response.status); }
+  if (!response.ok) throw await responseFailure(response, signal);
   const bytes = await readBoundedBinary(response, plugin.limits.max_output_bytes + 4096, signal);
   const envelope = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes));
   if (envelope.code !== 0) throw new Error('预览读取失败。');
