@@ -85,13 +85,14 @@ def invoke(monkeypatch, response, *, cancel=None):
         options={}, truncated=False, cancelled=cancel or threading.Event())
 
 
-def test_frame_drain_short_writes_and_least_privilege(monkeypatch):
+def test_frame_drain_short_writes_and_least_privilege(monkeypatch, expected_helper_security_options):
     expected = {"ok": True, "data": {"value": 1}}
     client, run = invoke(monkeypatch, frame(b"diagnostic", 2) + frame(json.dumps(expected).encode()))
     assert run() == expected
     settings = client.kwargs
     assert settings["read_only"] and settings["network_mode"] == "none"
     assert settings["cap_drop"] == ["ALL"] and settings["user"] == "65534:65534"
+    assert settings["security_opt"] == expected_helper_security_options
     assert settings["pids_limit"] == 32 and settings["mem_limit"] == "512m"
     assert not {"volumes", "mounts", "ports"} & settings.keys()
     assert "SECRET" not in str(settings["environment"])

@@ -17,6 +17,7 @@ from collections.abc import Callable
 import docker
 
 from app.infrastructure.external.sandbox.extended_visualization_worker import _remove_worker
+from app.infrastructure.external.sandbox.helper_security import helper_security_options
 from app.infrastructure.external.sandbox.visualization_worker import VisualizationWorkerError
 
 PROTOCOL = "dataseek-window-v1"
@@ -156,7 +157,7 @@ def run_window_visualization_worker(image: str, *, size: int, reader: str, kind:
                      "-m", "app.services.window_visualization_worker"], working_dir="/app",
             auto_remove=True, user="65534:65534", stdin_open=True, tty=False,
             network_mode="none", read_only=True, cap_drop=["ALL"],
-            security_opt=["no-new-privileges:true"], mem_limit="512m" if reader == "edf" else "1g", memswap_limit="512m" if reader == "edf" else "1g",
+            security_opt=helper_security_options(), mem_limit="512m" if reader == "edf" else "1g", memswap_limit="512m" if reader == "edf" else "1g",
             nano_cpus=1_000_000_000, pids_limit=32 if reader == "edf" else 96,
             tmpfs={"/tmp": "rw,noexec,nosuid,size=16m,mode=1777" if reader == "edf" else "rw,noexec,nosuid,size=512m,mode=1777"},
             environment={"OPENBLAS_NUM_THREADS": "1", "OMP_NUM_THREADS": "1", "MKL_NUM_THREADS": "1", "PYTHONDONTWRITEBYTECODE": "1", "HDF5_PLUGIN_PRELOAD": "::"},

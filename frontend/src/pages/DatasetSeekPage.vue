@@ -1066,7 +1066,7 @@ function newConversationFromHistory() {
   analysisSession.reset();
 }
 
-async function loadRouteDataset(routeId: string | string[]) {
+async function loadRouteDataset(routeId: string | string[] | undefined) {
   const generation = ++datasetLoadGeneration;
   analysisSession.reset();
   dataset.value = undefined;
@@ -1115,6 +1115,12 @@ async function loadRouteDataset(routeId: string | string[]) {
 // Vue reuses this page when only :datasetId changes. Invalidate the old
 // conversation and pending catalog reads before accepting the new scope.
 watch(() => route.params.datasetId, (id) => {
+  // The shared route loses its ID before this page unmounts on navigation.
+  // Invalidate pending reads without treating departure as a new submission.
+  if (!id) {
+    datasetLoadGeneration += 1;
+    return;
+  }
   if (datasetViewReady && !datasetViewDisposed) void loadRouteDataset(id);
 }, { flush: 'sync' });
 
@@ -1134,7 +1140,7 @@ onMounted(async () => {
   }
   await refreshProfiles().catch(() => undefined);
   await loadAutoEnabledSkillNames();
-  if (datasetViewDisposed) return;
+  if (datasetViewDisposed || !route.params.datasetId) return;
   datasetViewReady = true;
   await loadRouteDataset(route.params.datasetId);
 });

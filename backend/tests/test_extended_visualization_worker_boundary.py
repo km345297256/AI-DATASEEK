@@ -99,7 +99,7 @@ def invoke(monkeypatch, response, *, cancel=None, **kwargs):
 
 @pytest.mark.parametrize("auto_removed", [False, True])
 @pytest.mark.parametrize("expected", [{"ok": True, "data": {"value": 1}}, {"ok": False, "error": "Safe rejection"}])
-def test_complete_frame_drain_and_fixed_crash_safe_container(monkeypatch, auto_removed, expected):
+def test_complete_frame_drain_and_fixed_crash_safe_container(monkeypatch, auto_removed, expected, expected_helper_security_options):
     client, run = invoke(monkeypatch, frame(b"diagnostic", 2) + frame(json.dumps(expected).encode()),
                          auto_removed=auto_removed)
     assert run() == expected
@@ -110,7 +110,7 @@ def test_complete_frame_drain_and_fixed_crash_safe_container(monkeypatch, auto_r
     assert module.WORKER_TIMEOUT_SECONDS < module.CONTAINER_TIMEOUT_SECONDS == 55
     assert settings["read_only"] and settings["network_mode"] == "none"
     assert settings["cap_drop"] == ["ALL"] and settings["user"] == "65534:65534"
-    assert settings["security_opt"] == ["no-new-privileges:true"]
+    assert settings["security_opt"] == expected_helper_security_options
     assert settings["pids_limit"] == 96 and settings["mem_limit"] == settings["memswap_limit"] == "1g"
     assert not {"volumes", "mounts", "ports", "privileged"} & settings.keys()
     header, body = bytes(client.container.wire.sent).split(b"\n", 1)

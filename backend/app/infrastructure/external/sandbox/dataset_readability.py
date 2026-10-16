@@ -12,6 +12,7 @@ from pathlib import PurePosixPath
 
 import docker
 
+from app.infrastructure.external.sandbox.helper_security import helper_security_options
 
 VIEW_DIRECTORY = ".analysis-views-v1"
 _DATASET_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
@@ -396,7 +397,7 @@ else:
             mounts=[mount], network_disabled=True, read_only=True, remove=True,
             user="ubuntu" if operation == "probe" else "0:0",
             environment={"PYTHONDONTWRITEBYTECODE": "1"},
-            security_opt=["no-new-privileges:true"],
+            security_opt=helper_security_options(),
             **({"cap_drop": ["ALL"]} if operation == "probe" else {}))
         result = json.loads(output.decode("utf-8") if isinstance(output, bytes) else output)
         if not isinstance(result, dict) or type(result.get("ok")) is not bool:

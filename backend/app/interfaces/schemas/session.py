@@ -27,6 +27,7 @@ class ChatRequest(BaseModel):
     timestamp: Optional[int] = None
     message: Optional[str] = None
     client_message_id: Optional[str] = Field(default=None, min_length=1, max_length=128)
+    observe_client_message_id: Optional[str] = Field(default=None, min_length=1, max_length=128)
     resume_from: Optional[str] = Field(default=None, pattern=r"^[0-9a-f]{32}$")
     agent_profile_id: Optional[str] = None
     attachments: Optional[List[dict]] = None
@@ -44,6 +45,12 @@ class ChatRequest(BaseModel):
 
     @model_validator(mode="after")
     def validate_continuation(self):
+        if self.observe_client_message_id is not None:
+            if not self.observe_client_message_id.strip():
+                raise ValueError("An observation requires an input identity")
+            if (self.message or self.resume_from or self.client_message_id or self.agent_profile_id
+                    or self.attachments or self.skills or self.mcp_servers or self.dataset_ids or self.input_file_ids is not None):
+                raise ValueError("An input observation cannot submit or change execution inputs")
         if self.resume_from is not None:
             if not self.client_message_id or not self.client_message_id.strip():
                 raise ValueError("A continuation requires a new client_message_id")

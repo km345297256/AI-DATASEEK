@@ -39,6 +39,13 @@ class SessionRepository(Protocol):
         """
         ...
 
+    async def compare_and_clear_sandbox(
+        self, session_id: str, *, expected_sandbox_id: str,
+        expected_task_id: str | None,
+    ) -> bool:
+        """Clear only a failed bootstrap's still-owned sandbox association."""
+        ...
+
     async def find_by_id(self, session_id: str) -> Optional[Session]:
         """Find a session by its ID"""
         ...

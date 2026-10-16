@@ -26,6 +26,7 @@ from app.domain.models.file import FileInfo
 from app.domain.models.plan import ExecutionStatus, Step
 from app.domain.services.analysis_answer_coverage import answer_objectives, review_coverage
 from app.domain.services.review_evidence_json import bounded_json
+from app.domain.utils.model_response import model_answer_text
 
 
 MAX_CALLS = 32
@@ -1350,6 +1351,8 @@ def _parse_response(response: Any) -> dict:
     raw = getattr(response, "content", response)
     if isinstance(raw, dict):
         raw = raw.get("content")
+    if isinstance(raw, (list, tuple)):
+        raw = model_answer_text(raw)
     if not isinstance(raw, str) or len(raw) > MAX_ANSWER_CHARS * 3:
         raise ValueError("invalid_review")
     fenced = re.fullmatch(r"\s*```(?:json)?\s*\n(.*?)\n```\s*", raw, re.DOTALL)

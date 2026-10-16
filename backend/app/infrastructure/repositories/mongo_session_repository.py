@@ -141,6 +141,18 @@ class MongoSessionRepository(SessionRepository):
         if not result.matched_count:
             raise ValueError(f"Session {session.id} not found")
 
+    async def compare_and_clear_sandbox(
+        self, session_id: str, *, expected_sandbox_id: str,
+        expected_task_id: str | None,
+    ) -> bool:
+        result = await SessionDocument.get_pymongo_collection().update_one(
+            {"session_id": session_id, "sandbox_id": expected_sandbox_id,
+             "task_id": expected_task_id},
+            {"$set": {"sandbox_id": None, "sandbox_dataset_ids": [],
+                      "updated_at": datetime.now(UTC)}},
+        )
+        return bool(result.matched_count)
+
     async def compare_and_set_task_id(
         self, session_id: str, *, expected_task_id: str | None,
         task_id: str | None, dataset_ids: list[str] | None = None,

@@ -6,7 +6,8 @@ import { fileURLToPath } from 'node:url';
 const directory = dirname(fileURLToPath(import.meta.url));
 const matrix = [
   ['chromium', 'chat-layout'], ['chromium', 'followup-outcome'], ['chromium', 'task-status-focus'],
-  ['chromium', 'session-recovery'], ['webkit', 'chat-layout'], ['webkit', 'session-recovery'],
+  ['chromium', 'session-recovery'], ['chromium', 'shell-console'],
+  ['webkit', 'chat-layout'], ['webkit', 'session-recovery'], ['webkit', 'shell-console'],
 ];
 let failures = 0;
 for (const [engine, scenario] of matrix) {

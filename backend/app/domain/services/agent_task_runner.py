@@ -1306,7 +1306,6 @@ class AgentTaskRunner(TaskRunner):
                     f"spill={notice.status}; locator={locator}]"
                 ),
                 "status": "completed" if succeeded else "failed",
-                "returncode": 0 if succeeded else 1,
             }]
 
         function_result = event.function_result
@@ -1368,7 +1367,6 @@ class AgentTaskRunner(TaskRunner):
                 "command": "分析数据集并生成成果",
                 "output": output,
                 "status": "completed" if success else "failed",
-                "returncode": 0 if success else 1,
             }]
         result = event.function_result if isinstance(event.function_result, dict) else {}
         success = bool(result.get("success"))
@@ -1380,7 +1378,6 @@ class AgentTaskRunner(TaskRunner):
             "command": "分析数据集并生成成果",
             "output": output.strip(),
             "status": "completed" if success else "failed",
-            "returncode": 0 if success else 1,
         }]
 
     @staticmethod
@@ -1409,7 +1406,6 @@ class AgentTaskRunner(TaskRunner):
                 "command": "快速探查数据集",
                 "output": output,
                 "status": "completed" if success else "failed",
-                "returncode": 0 if success else 1,
             }]
         if isinstance(function_result, ToolResult):
             data = function_result.data if isinstance(function_result.data, dict) else {}
@@ -1451,7 +1447,6 @@ class AgentTaskRunner(TaskRunner):
             "command": "快速探查数据集",
             "output": output,
             "status": "completed" if success else "failed",
-            "returncode": 0 if success else 1,
         }]
     
     async def _sync_message_attachments_to_sandbox(self, event: MessageEvent) -> None:

@@ -2,13 +2,14 @@ name: ai-dataseek
 
 services:
   frontend:
+    container_name: ${FRONTEND_CONTAINER_NAME:-ai-dataseek-frontend-1}
     image: ${FRONTEND_IMAGE:-ai-dataseek-frontend:${IMAGE_TAG:-latest}}
     build:
       context: ./frontend
       dockerfile: ${FRONTEND_DOCKERFILE:-Dockerfile}
       target: production-stage
     ports:
-      - "${FRONTEND_BIND_HOST:-0.0.0.0}:${FRONTEND_PORT:-7000}:80"
+      - "${FRONTEND_BIND_HOST:-0.0.0.0}:${FRONTEND_PORT:-8888}:80"
     environment:
       BACKEND_URL: http://backend:8000
     depends_on:
@@ -19,6 +20,7 @@ services:
       - ai-dataseek-network
 
   backend:
+    container_name: ${BACKEND_CONTAINER_NAME:-ai-dataseek-backend-1}
     image: ${BACKEND_IMAGE:-ai-dataseek-backend:${IMAGE_TAG:-latest}}
     build:
       context: .
@@ -38,17 +40,20 @@ services:
       SANDBOX_NETWORK: ai-dataseek-network
       JUPYTER_IMAGE: ${JUPYTER_IMAGE:-ai-dataseek-jupyter:${IMAGE_TAG:-latest}}
       DATASET_STORAGE_ROOT: /data/datasets
-      DATASET_MANAGED_VOLUME: ai-dataseek-dataset-data
+      DATASET_MANAGED_VOLUME: ${DATASET_MANAGED_VOLUME:-ai-dataseek-dataset-data}
+      JUPYTER_WORKSPACES_HOST_ROOT: ${JUPYTER_WORKSPACES_HOST_ROOT:-}
+      JUPYTER_WORKSPACES_STORAGE_ROOT: /data/jupyter-workspaces
       SKILLS_DIR: /app/skills
       USER_SKILLS_DIR: /data/skills/users
       ONLYOFFICE_ENABLED: ${ONLYOFFICE_ENABLED:-false}
-      ONLYOFFICE_PUBLIC_ORIGIN: http://office.localhost:${FRONTEND_PORT:-7000}
+      ONLYOFFICE_PUBLIC_ORIGIN: http://office.localhost:${FRONTEND_PORT:-8888}
       ONLYOFFICE_JWT_SECRET: ${ONLYOFFICE_JWT_SECRET:-}
       ONLYOFFICE_GATEWAY_SECRET: ${ONLYOFFICE_GATEWAY_SECRET:-}
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - dataset-data:/data/datasets
       - skills-data:/data/skills
+      - jupyter-workspaces:/data/jupyter-workspaces
     depends_on:
       sandbox-image:
         condition: service_completed_successfully
@@ -67,6 +72,7 @@ services:
   # This one-shot service makes the sandbox image available to the backend.
   # Analysis sandboxes themselves are created dynamically per session.
   sandbox-image:
+    container_name: ${SANDBOX_IMAGE_CONTAINER_NAME:-ai-dataseek-sandbox-image-1}
     image: ${SANDBOX_IMAGE:-ai-dataseek-sandbox:${IMAGE_TAG:-latest}}
     build:
       context: .
@@ -79,6 +85,7 @@ services:
   # One-shot image build. The backend creates one private JupyterLab container
   # per task, so this service itself never exposes a notebook port.
   jupyter-image:
+    container_name: ${JUPYTER_IMAGE_CONTAINER_NAME:-ai-dataseek-jupyter-image-1}
     image: ${JUPYTER_IMAGE:-ai-dataseek-jupyter:${IMAGE_TAG:-latest}}
     build:
       context: ./jupyter
@@ -114,20 +121,26 @@ services:
     restart: "no"
 
   mongodb:
+    container_name: ${MONGODB_CONTAINER_NAME:-ai-dataseek-mongodb-1}
     image: ${MONGODB_IMAGE:-mongo:7.0}
     volumes:
       - mongodb-data:/data/db
+      - mongodb-config:/data/configdb
     restart: unless-stopped
     networks:
       - ai-dataseek-network
 
   redis:
+    container_name: ${REDIS_CONTAINER_NAME:-ai-dataseek-redis-1}
     image: ${REDIS_IMAGE:-redis:7.0}
+    volumes:
+      - redis-data:/data
     restart: unless-stopped
     networks:
       - ai-dataseek-network
 
   minio:
+    container_name: ${MINIO_CONTAINER_NAME:-ai-dataseek-minio-1}
     image: ${MINIO_IMAGE:-minio/minio:RELEASE.2025-04-22T22-12-26Z}
     command: server /data --console-address ":9001"
     environment:
@@ -192,13 +205,26 @@ services:
 
 volumes:
   mongodb-data:
-    name: ai-dataseek-mongodb-data
+    name: ${MONGODB_DATA_VOLUME:-ai-dataseek-mongodb-data}
+    external: ${DATASEEK_EXTERNAL_DATA_VOLUMES:-false}
+  mongodb-config:
+    name: ${MONGODB_CONFIG_VOLUME:-ai-dataseek-mongodb-config}
+    external: ${DATASEEK_EXTERNAL_DATA_VOLUMES:-false}
   minio-data:
-    name: ai-dataseek-minio-data
+    name: ${MINIO_DATA_VOLUME:-ai-dataseek-minio-data}
+    external: ${DATASEEK_EXTERNAL_DATA_VOLUMES:-false}
   dataset-data:
-    name: ai-dataseek-dataset-data
+    name: ${DATASET_MANAGED_VOLUME:-ai-dataseek-dataset-data}
+    external: ${DATASEEK_EXTERNAL_DATA_VOLUMES:-false}
   skills-data:
-    name: ai-dataseek-skills-data
+    name: ${SKILLS_DATA_VOLUME:-ai-dataseek-skills-data}
+    external: ${DATASEEK_EXTERNAL_DATA_VOLUMES:-false}
+  redis-data:
+    name: ${REDIS_DATA_VOLUME:-ai-dataseek-redis-data}
+    external: ${DATASEEK_EXTERNAL_DATA_VOLUMES:-false}
+  jupyter-workspaces:
+    name: ${JUPYTER_WORKSPACES_VOLUME:-ai-dataseek-jupyter-workspaces}
+    external: ${DATASEEK_EXTERNAL_DATA_VOLUMES:-false}
 
 networks:
   ai-dataseek-network:

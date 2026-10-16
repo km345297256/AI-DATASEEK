@@ -4,6 +4,7 @@ import monacoEditorPlugin from 'vite-plugin-monaco-editor';
 import { resolve } from 'path';
 import { visualizationAssets } from './visualization-assets';
 import { visualizationBrowserBoundary } from './visualization-browser-boundary';
+import { releaseManifest } from './release-manifest';
 
 // https://vitejs.dev/config/
 export default defineConfig({
@@ -14,6 +15,7 @@ export default defineConfig({
     visualizationBrowserBoundary(),
     vue(),
     visualizationAssets(),
+    releaseManifest(),
     (monacoEditorPlugin as any).default({})
   ],
   resolve: {

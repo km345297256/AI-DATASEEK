@@ -283,74 +283,122 @@ class AgentDomainService:
                 session.task_id = None
                 await self._session_repository.save(session)
 
-        if not sandbox:
-            pool = get_sandbox_pool() if not dataset_ids else None
-            if pool and pool.enabled:
-                sandbox = await pool.acquire()
-                # Warm container already has a record; update it with session association
-                await sandbox_runtime.assign(sandbox, session)
-            else:
-                sandbox = (
-                    await sandbox_runtime.allocate(session, dataset_ids=dataset_ids)
-                    if dataset_ids
-                    else await sandbox_runtime.allocate(session)
+        # A pool handoff ends the pool's ownership, not bootstrap ownership.
+        # Until Task registration, only this scope can retire a newly acquired
+        # handle. A restored session environment remains session-owned.
+        bootstrap_sandbox = None
+        publication_attempted = False
+        previous_task_id = session.task_id
+
+        async def prepare_write(operation):
+            if bootstrap_sandbox is None:
+                return await operation
+            # Finish an already-issued external write before rollback. A late
+            # assign/save must not resurrect a retired sandbox association.
+            return await join_cleanup(asyncio.create_task(operation))
+
+        async def retire_bootstrap():
+            owned = bootstrap_sandbox
+            if publication_attempted:
+                cleared = await self._session_repository.compare_and_clear_sandbox(
+                    session.id, expected_sandbox_id=owned.id,
+                    expected_task_id=previous_task_id,
                 )
-            session.sandbox_id = sandbox.id
-            session.sandbox_dataset_ids = requested_dataset_ids
-            await self._session_repository.save(session)
-            if sandbox_replaced:
-                try:
+                if not cleared:
+                    current = await self._session_repository.find_by_id(session.id)
+                    if current is not None and current.sandbox_id == owned.id:
+                        # Another task now owns this same environment. Neither
+                        # its pointer nor its container belongs to our rollback.
+                        return
+            if not await owned.destroy():
+                raise _SandboxRetirementError("The new analysis environment could not be safely released")
+            if session.sandbox_id == owned.id and session.task_id == previous_task_id:
+                session.sandbox_id = None
+                session.sandbox_dataset_ids = []
+
+        try:
+            if not sandbox:
+                pool = get_sandbox_pool() if not dataset_ids else None
+                if pool and pool.enabled:
+                    sandbox = await pool.acquire()
+                    bootstrap_sandbox = sandbox
+                    await prepare_write(sandbox_runtime.assign(sandbox, session))
+                else:
+                    sandbox = (
+                        await sandbox_runtime.allocate(session, dataset_ids=dataset_ids)
+                        if dataset_ids
+                        else await sandbox_runtime.allocate(session)
+                    )
+                    bootstrap_sandbox = sandbox
+                session.sandbox_id = sandbox.id
+                session.sandbox_dataset_ids = requested_dataset_ids
+                publication_attempted = True
+                await prepare_write(self._session_repository.save(session))
+                if sandbox_replaced:
                     await self._ensure_sandbox_api_ready(sandbox)
                     await self._hydrate_replacement_sandbox(
-                        session,
-                        sandbox,
-                        previous_sandbox_id=sandbox_id,
+                        session, sandbox, previous_sandbox_id=sandbox_id,
                     )
-                except Exception:
-                    await self._retire_replaced_sandbox(sandbox, sandbox.id)
-                    session.sandbox_id = None
-                    session.sandbox_dataset_ids = []
-                    session.task_id = None
-                    await self._session_repository.save(session)
-                    raise
 
-        self._prewarm_jupyter(session, dataset_ids=requested_dataset_ids)
+            browser = await sandbox.get_browser()
+            if not browser:
+                logger.error(
+                    "Failed to get browser sandbox=%s",
+                    opaque_log_identifier(sandbox_id, namespace="sandbox"),
+                )
+                raise RuntimeError(f"Failed to get browser for Sandbox {sandbox_id}")
 
-        browser = await sandbox.get_browser()
-        if not browser:
-            logger.error(
-                "Failed to get browser sandbox=%s",
-                opaque_log_identifier(sandbox_id, namespace="sandbox"),
+            await prepare_write(self._session_repository.save(session))
+            task_runner = AgentTaskRunner(
+                session_id=session.id,
+                agent_id=session.agent_id,
+                user_id=session.user_id,
+                sandbox=sandbox,
+                browser=browser,
+                file_storage=self._file_storage,
+                search_engine=self._search_engine,
+                session_repository=self._session_repository,
+                agent_repository=self._repository,
+                mcp_repository=self._mcp_repository,
+                llm_overrides=session.llm_overrides,
+                front_controller_resolution=front_controller_resolution,
+                plugin_runtime=self._plugin_runtime,
+                spill_artifact_store=self._spill_artifact_store,
+                analysis_job_service=self._analysis_job_service,
+                tool_approval_service=self._tool_approval_service,
+                credential_service=self._credential_service,
+                input_delivery=self._input_delivery,
+                session_events_snapshot=session_events_snapshot,
+                effective_dataset_ids=requested_dataset_ids,
             )
-            raise RuntimeError(f"Failed to get browser for Sandbox {sandbox_id}")
-
-        await self._session_repository.save(session)
-
-        task_runner = AgentTaskRunner(
-            session_id=session.id,
-            agent_id=session.agent_id,
-            user_id=session.user_id,
-            sandbox=sandbox,
-            browser=browser,
-            file_storage=self._file_storage,
-            search_engine=self._search_engine,
-            session_repository=self._session_repository,
-            agent_repository=self._repository,
-            mcp_repository=self._mcp_repository,
-            llm_overrides=session.llm_overrides,
-            front_controller_resolution=front_controller_resolution,
-            plugin_runtime=self._plugin_runtime,
-            spill_artifact_store=self._spill_artifact_store,
-            analysis_job_service=self._analysis_job_service,
-            tool_approval_service=self._tool_approval_service,
-            credential_service=self._credential_service,
-            input_delivery=self._input_delivery,
-            session_events_snapshot=session_events_snapshot,
-            effective_dataset_ids=requested_dataset_ids,
-        )
-
-        task = self._task_cls.create(task_runner)
-        return await self._finish_task_preparation(session, task, sandbox=sandbox)
+            task = self._task_cls.create(task_runner)
+            bootstrap_sandbox = None  # Atomic handoff: registered runner owns it.
+            result = await self._finish_task_preparation(session, task, sandbox=sandbox)
+            self._prewarm_jupyter(session, dataset_ids=requested_dataset_ids)
+            return result
+        except BaseException as error:
+            if bootstrap_sandbox is None:
+                # Registered tasks and restored environments retain their
+                # existing owner and failure/cancellation policy.
+                raise
+            failure = error
+            cause = error
+            while isinstance(cause, asyncio.CancelledError):
+                cause = cause.__cause__
+            if isinstance(error, asyncio.CancelledError) and cause is not None:
+                # gather(return_exceptions=True) discards cancellation causes;
+                # an accepted assign/save failure must remain observable.
+                failure = BaseExceptionGroup("Sandbox bootstrap cancellation and write failed", [error, cause])
+            if bootstrap_sandbox is not None:
+                try:
+                    await join_cleanup(asyncio.create_task(retire_bootstrap()))
+                except asyncio.CancelledError as cancellation:
+                    if cancellation.__cause__ is not None:
+                        raise BaseExceptionGroup("Sandbox bootstrap and cleanup failed", [failure, cancellation.__cause__])
+                    raise failure
+                except BaseException as cleanup_error:
+                    raise BaseExceptionGroup("Sandbox bootstrap and cleanup failed", [failure, cleanup_error])
+            raise failure
 
     async def _finish_task_preparation(
         self, session: Session, task: Task, *, sandbox: Sandbox | None = None,
@@ -1410,6 +1458,7 @@ class AgentDomainService:
         client_message_id: Optional[str] = None,
         resume_from: Optional[str] = None,
         input_file_ids: Optional[List[str]] = None,
+        observe_client_message_id: Optional[str] = None,
     ) -> AsyncGenerator[BaseEvent, None]:
         """
         Chat with an agent
@@ -1430,6 +1479,15 @@ class AgentDomainService:
                     opaque_log_identifier(user_id, namespace="user"),
                 )
                 raise RuntimeError("Session not found")
+
+            if observe_client_message_id is not None:
+                if (not observe_client_message_id.strip() or len(observe_client_message_id) > 128
+                        or message or resume_from or client_message_id or llm_overrides is not None
+                        or attachments or skills or mcp_servers or dataset_ids or input_file_ids is not None):
+                    raise ValueError("Invalid read-only input observation")
+                async for event in self._observe_input_events(session_id, observe_client_message_id, latest_event_seq):
+                    yield event
+                return
 
             if llm_overrides is not None:
                 session.llm_overrides = llm_overrides
@@ -1598,6 +1656,10 @@ class AgentDomainService:
             )
             raise
         except Exception as e:
+            if observe_client_message_id is not None:
+                # Observation failures are transport failures, never persisted
+                # execution terminals that could falsely settle the input.
+                raise
             logger.error(
                 "Session stream failed session=%s error_type=%s",
                 opaque_log_identifier(session_id, namespace="session"),
@@ -1613,6 +1675,53 @@ class AgentDomainService:
                     type(persist_error).__name__,
                 )
             yield event # TODO: raise api exception
+
+    async def _observe_input_events(self, session_id: str, client_message_id: str, cursor: int | None):
+        """Bounded, strictly read-only replay for one stopped/uncertain input.
+
+        Never substitute the latest input when this ID has not been accepted.
+        EOF without a terminal is retried with bounded backoff by the client.
+        """
+        from app.domain.models.input_admission import input_key
+        delivery = getattr(self, "_input_delivery", None)
+        if delivery is None:
+            return
+        key = input_key(MessageEvent(id=self._client_message_event_id(session_id, client_message_id), role="user", message=""))
+        cursor = max(0, cursor or 0)
+        crossed_next_input = False
+        first_read = True
+        for attempt in range(20):
+            record = await delivery.repository.get(session_id, key)
+            if record is not None:
+                cursor = max(cursor, record.event.seq or 0)
+                # Reconstruct the next-input boundary on reconnect as well;
+                # the client's cursor may already be past another tab's input.
+                events = await self._session_repository.get_events_after(
+                    session_id, (record.event.seq or 0) if first_read else cursor)
+                first_read = False
+                for event in events:
+                    if isinstance(event, MessageEvent) and event.role == "user":
+                        crossed_next_input = True
+                    if event.seq is None or event.seq <= cursor:
+                        continue
+                    cursor = event.seq
+                    if isinstance(event, MessageEvent) and event.role == "user":
+                        continue
+                    if isinstance(event, (DoneEvent, ErrorEvent, WaitEvent)):
+                        if await self._terminal_matches_input(session_id, key, record.event.seq, event):
+                            yield event
+                            return
+                        continue
+                    if crossed_next_input:
+                        # A different tab may have started a later turn. Only
+                        # this input's exact durable outcome is safe to replay.
+                        committed = getattr(delivery.repository, "committed_outcome", None)
+                        own_outcome = await committed(record) if callable(committed) else None
+                        if own_outcome is None or own_outcome.seq != event.seq:
+                            continue
+                    yield event
+            if attempt < 19:
+                await asyncio.sleep(0.5)
 
     async def _terminal_matches_input(self, session_id, key, input_seq, event) -> bool:
         if input_seq is None or event.seq is None:

@@ -161,6 +161,9 @@ class Settings(BaseSettings):
     # Optional root that exposes the machine filesystem inside the Docker
     # daemon's mount namespace (Snap Docker uses /var/lib/snapd/hostfs).
     dataset_docker_host_root: str = ""
+    # Opt in only on hosts requiring AppArmor stacking for NNP helper starts.
+    # Stack docker-default with the daemon's confinement; never use unconfined.
+    docker_apparmor_stack_default: bool = False
 
     # Data-center SSO and analysis-tool usage reporting.
     sso_uid_url: str = "https://space.4fair.cn/oidc-server/sso/uid"
@@ -195,6 +198,10 @@ class Settings(BaseSettings):
     # Jupyter is intentionally independent from Agent sandboxes. Every task
     # receives a private container, kernel token and writable Docker volume.
     jupyter_image: str = "ai-dataseek-jupyter:latest"
+    # Optional host-backed workspace storage. The backend sees the same root
+    # through its dedicated volume; only private Docker metadata uses host paths.
+    jupyter_workspaces_host_root: str = ""
+    jupyter_workspaces_storage_root: str = "/data/jupyter-workspaces"
     jupyter_memory_limit: str = "2g"
     jupyter_nano_cpus: int = 2_000_000_000
     jupyter_pids_limit: int = 256

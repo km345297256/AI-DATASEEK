@@ -134,6 +134,7 @@ export const chatWithSession = async (
   resumeFrom?: string,
   inputFileIds?: string[],
   timestamp?: number,
+  observeClientMessageId?: string,
 ): Promise<() => void> => {
   const effectiveClientMessageId = message || resumeFrom
     ? clientMessageId || createClientMessageId()
@@ -145,7 +146,8 @@ export const chatWithSession = async (
     event_seq: eventSeq,
     // A continuation is an explicit command, not a rewritten user request.
     // Its original objective, inputs and capabilities are restored by the server.
-    ...(resumeFrom ? { resume_from: resumeFrom } : {
+    ...(observeClientMessageId ? { observe_client_message_id: observeClientMessageId }
+      : resumeFrom ? { resume_from: resumeFrom } : {
       agent_profile_id: agentProfileId,
       attachments,
       skills,

@@ -1,7 +1,9 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
+import ts from 'typescript';
 import { useAnalysisSession } from '../src/composables/useAnalysisSession.ts';
+import { createAgentStreamRecovery } from '../src/utils/agentStreamRecovery.ts';
 import {
   readAnalysisOutcome, analysisOutcomeReason, analysisOutcomeMissing, analysisOutcomeTitle,
   resumableAnalysisOutcome, continuationAttempt,
@@ -208,11 +210,30 @@ test('both entries use the checkpoint-only shared continuation handler', () => {
   assert.doesNotMatch(handler, /createSession\(|messages\.value\.push/);
 });
 
-test('API treats continuation as a new idempotent command without current UI capability overrides', () => {
+test('API treats continuation as a new idempotent command without current UI capability overrides', async () => {
   const api = source('../src/api/agent.ts');
-  assert.match(api, /effectiveClientMessageId = message \|\| resumeFrom/);
-  assert.match(api, /\.\.\.\(resumeFrom \? \{ resume_from: resumeFrom \} : \{/);
-  assert.match(api, /client_message_id: effectiveClientMessageId/);
+  const ast = ts.createSourceFile('agent.ts', api, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
+  const statement = ast.statements.find(node => ts.isVariableStatement(node)
+    && node.declarationList.declarations.some(declaration => declaration.name.getText(ast) === 'chatWithSession'));
+  assert.ok(statement, 'exercise the actual API function, not a reconstructed request');
+  const compiled = ts.transpileModule(statement.getText(ast).replace(/^export\s+/, ''), {
+    compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.None },
+  }).outputText;
+  const requests = [];
+  const scope = { createAgentStreamRecovery, createClientMessageId: () => 'generated-continuation',
+    createSSEConnection: async (url, options) => { requests.push({ url, options }); return () => {}; } };
+  const chat = new Function('scope', `with (scope) { ${compiled}; return chatWithSession; }`)(scope);
+  await chat('session', '', '10-0', 10, [{ file_id: 'new-ui-file' }], ['new-ui-skill'],
+    ['new-ui-server'], 'new-ui-profile', {}, ['new-ui-dataset'], 'stable-continuation', token,
+    ['new-ui-input'], 123);
+  const body = JSON.parse(JSON.stringify(requests[0].options.getBody()));
+  assert.equal(requests[0].url, '/sessions/session/chat');
+  assert.equal(requests[0].options.retryOnError, true);
+  assert.deepEqual(body, { message: '', timestamp: 123, event_id: '10-0', event_seq: 10,
+    resume_from: token, client_message_id: 'stable-continuation' });
+  assert.deepEqual(JSON.parse(JSON.stringify(requests[0].options.getBody())), body, 'ambiguous retry retains command identity');
+  await chat('session', '', undefined, 10, [], [], [], null, {}, [], undefined, token);
+  assert.equal(requests[1].options.getBody().client_message_id, 'generated-continuation');
   assert.doesNotMatch(source('../src/utils/analysisOutcome.ts'), /localStorage|sessionStorage|URLSearchParams/);
 });
 

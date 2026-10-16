@@ -93,6 +93,33 @@ def test_provider_sdk_has_no_hidden_request_deadline(provider):
             and all(getattr(timeout, part) is None for part in ("connect", "read", "write", "pool")))
 
 
+@pytest.mark.parametrize("provider", ["openai", "deepseek"])
+@pytest.mark.parametrize("use_override", [False, True])
+@pytest.mark.asyncio
+async def test_provider_sdk_uses_configured_endpoint_with_its_credential(monkeypatch, provider, use_override):
+    # Provider-specific environment defaults must not redirect explicit routes.
+    monkeypatch.setenv("DEEPSEEK_API_BASE", "https://environment-default.example.test")
+    endpoint = "https://configured.example.test/tenant/v1"
+    credential = "offline-configured-route-key"
+    settings = Settings(model_provider=provider, model_name="test-model", api_key=credential,
+                        api_base=endpoint)
+    overrides = None
+    if use_override:
+        endpoint = "https://override.example.test/v1"
+        credential = "offline-override-route-key"
+        overrides = {"api_base": endpoint, "api_key": credential}
+    model = create_chat_model(settings, overrides)
+    try:
+        # Checking a LangChain display field misses a misrouted OpenAI client.
+        for sdk in (model._client.root_client, model._client.root_async_client):
+            assert str(sdk.base_url) == endpoint + "/"
+            assert sdk.api_key == credential
+            assert sdk.max_retries == 0
+    finally:
+        model._client.root_client.close()
+        await model._client.root_async_client.close()
+
+
 @pytest.mark.asyncio
 async def test_bind_then_bind_tools_preserves_format_output_and_driver_boundary():
     model, client, middleware = driver()
@@ -327,6 +354,8 @@ async def test_real_cordis_catalog_reaches_production_execution_agent_and_runtim
     monkeypatch.setattr(model_runtime, "invoke_model_request", middleware)
     monkeypatch.setattr(model_runtime, "get_settings", lambda: settings)
     monkeypatch.setattr("app.domain.services.agents.base.get_settings", lambda: settings)
+    monkeypatch.setattr("app.domain.services.agents.execution.get_settings", lambda: settings)
+    monkeypatch.setattr("app.domain.services.agents.vision.get_settings", lambda: settings)
     monkeypatch.setattr("app.domain.services.flows.plan_act.get_settings", lambda: settings)
     monkeypatch.setattr("app.domain.services.agents.base.create_chat_model", lambda *_, **__: governed)
     monkeypatch.setattr(type(governed._client), "_agenerate_with_cache", physical_request)
@@ -408,11 +437,12 @@ async def test_real_cordis_catalog_reaches_production_execution_agent_and_runtim
 async def test_real_sdk_json_object_uses_create_with_unmodified_nonstrict_tools(provider):
     """Exercise actual LangChain + OpenAI SDK branches down to an HTTP stub."""
     import httpx
-    from openai import AsyncOpenAI
 
     captured = []
 
     def transport(request):
+        assert str(request.url) == "https://offline.example.test/v1/chat/completions"
+        assert request.headers["authorization"] == "Bearer offline-key"
         captured.append(json.loads(request.content))
         return httpx.Response(200, json={
             "id": "offline-sdk-response", "object": "chat.completion", "created": 1,
@@ -426,14 +456,17 @@ async def test_real_sdk_json_object_uses_create_with_unmodified_nonstrict_tools(
     middleware = RecordingMiddleware()
     model = create_chat_model(Settings(model_provider=provider, model_name="test-model", api_key="offline-key",
                                        api_base="https://offline.example.test/v1"), request_middleware=middleware)
-    async with httpx.AsyncClient(transport=httpx.MockTransport(transport)) as http_client:
-        sdk = AsyncOpenAI(api_key="offline-key", base_url="https://offline.example.test/v1",
-                          http_client=http_client, max_retries=0)
-        model._client.root_async_client = sdk
-        model._client.async_client = sdk.chat.completions
-        result = await model.bind(response_format={"type": "json_object"}, tool_choice="none", max_tokens=64).bind_tools(
-            [TOOL], extra_body={"test_request_option": "preserved"},
-        ).ainvoke("Return a JSON object with ok=true. Do not call tools.")
+    # Stub only HTTP: replacing the SDK itself would hide factory routing bugs.
+    await model._client.root_async_client._client.aclose()
+    try:
+        async with httpx.AsyncClient(transport=httpx.MockTransport(transport)) as http_client:
+            model._client.root_async_client._client = http_client
+            result = await model.bind(response_format={"type": "json_object"}, tool_choice="none", max_tokens=64).bind_tools(
+                [TOOL], extra_body={"test_request_option": "preserved"},
+            ).ainvoke("Return a JSON object with ok=true. Do not call tools.")
+    finally:
+        model._client.root_client.close()
+        await model._client.root_async_client.close()
     assert result.content == '{"ok":true}'
     assert result.usage_metadata["total_tokens"] == 34
     assert len(captured) == len(middleware.calls) == 1

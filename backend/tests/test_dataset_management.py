@@ -377,7 +377,18 @@ def test_repository_bundled_manifests_match_strict_schema_files_and_hashes():
             "curated", "publisher", "source_url", "license", "license_url",
             "sample_scope", "provenance",
         } <= set(public.metadata)
-    assert observed_domains == {preset.id for preset in list_domain_presets()}
+    # These 18 bundled samples retain their original nine domains. Mathematics
+    # is a valid registry domain whose new datasets are external host imports.
+    assert observed_domains == {
+        "general", "tabular", "geoscience", "image_science", "chemistry",
+        "sequence", "space", "documents", "spectroscopy",
+    }
+    assert observed_domains < {preset.id for preset in list_domain_presets()}
+
+
+def test_mathematics_is_a_valid_dataset_registration_domain():
+    DataCenterDatasetService._validate_domain("mathematics")
+    assert get_domain_preset("mathematics").name == "数学"
 
 
 @pytest.mark.asyncio

@@ -9,6 +9,8 @@ import uuid
 
 import docker
 
+from app.infrastructure.external.sandbox.helper_security import helper_security_options
+
 MAX_OUTPUT_BYTES = 512 * 1024
 MAX_CAPTURE_BYTES = MAX_OUTPUT_BYTES + 64 * 1024
 WORKER_TIMEOUT_SECONDS = 30
@@ -43,7 +45,7 @@ def run_visualization_worker(image: str, data: bytes, *, reader: str, kind: str,
             image=image, name=name, entrypoint=["/app/.venv/bin/python"],
             command=["-m", "app.services.visualization_worker"], working_dir="/app",
             user="65534:65534", stdin_open=True, tty=False, network_mode="none",
-            read_only=True, cap_drop=["ALL"], security_opt=["no-new-privileges:true"],
+            read_only=True, cap_drop=["ALL"], security_opt=helper_security_options(),
             mem_limit="512m", memswap_limit="512m", nano_cpus=1_000_000_000,
             pids_limit=32, tmpfs={"/tmp": "rw,noexec,nosuid,size=96m,mode=1777"},
             environment={"OPENBLAS_NUM_THREADS": "1", "OMP_NUM_THREADS": "1", "MKL_NUM_THREADS": "1", "PYTHONDONTWRITEBYTECODE": "1"},

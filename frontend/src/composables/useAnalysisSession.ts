@@ -11,7 +11,7 @@ import { completeRunningSteps, failRunningSteps, insertTaskExecutionSummary } fr
 import { acceptAgentEvent, createAgentEventCursor, resetAgentEventCursor } from '../utils/agentEventCursor.ts';
 import { createMessageKey, isLegacyPlanProgressMessage, prependHistoricalMessages, projectHistoryMessages } from '../utils/sessionHistory.ts';
 import { isPlaceholderAssistantMessage } from '../utils/datasetResultPresentation.ts';
-import { continuationAttempt, resumableAnalysisOutcome } from '../utils/analysisOutcome.ts';
+import { continuationAttempt, readAnalysisOutcome, resumableAnalysisOutcome } from '../utils/analysisOutcome.ts';
 import { isAnalysisProgressEvent, isAnalysisProgressMessage } from '../utils/analysisProgress.ts';
 import { useAnalysisProgress } from './useAnalysisProgress.ts';
 import { SSEConnectionError } from '../utils/sseConnection.ts';
@@ -27,6 +27,14 @@ interface PendingInput {
   readonly timestamp: number;
   state: 'sending' | 'unknown' | 'accepted' | 'rejected';
   uncertain: boolean;
+}
+
+/** Stop acknowledges a cancellation request, not delivery of its terminal events. */
+interface StopObservation {
+  readonly sessionId: string;
+  readonly input?: PendingInput;
+  readonly clientMessageId?: string;
+  acknowledged: boolean;
 }
 
 export interface AnalysisSessionRequest {
@@ -93,6 +101,8 @@ export function useAnalysisSession(options: AnalysisSessionOptions) {
   let historyRequest: AbortController | undefined;
   let receiptRequest: AbortController | undefined;
   let pendingInput: PendingInput | undefined;
+  let stopObservation: StopObservation | undefined;
+  let inputTerminated = false;
   let viewportScheduled = false;
 
   function syncViewport() {
@@ -153,6 +163,7 @@ export function useAnalysisSession(options: AnalysisSessionOptions) {
   }
 
   function startUserTurn() {
+    inputTerminated = false;
     beginAnalysisProgress();
     failActiveSteps(false);
     plan.value = undefined;
@@ -188,6 +199,9 @@ export function useAnalysisSession(options: AnalysisSessionOptions) {
     }
     if (data.role === 'user') startUserTurn();
     if (data.role === 'assistant' && (isPlaceholderAssistantMessage(data.content) || isLegacyPlanProgressMessage(data.content))) return;
+    const outcome = readAnalysisOutcome(data.metadata?.analysis_outcome);
+    if (data.role === 'assistant' && outcome && ['execution_interrupted', 'request_cancelled', 'user_cancelled',
+      'tool_authorization_stopped', 'model_runtime_stopped'].includes(outcome.reason_code)) failActiveSteps();
     messages.value.push({ type: data.role, content: { ...data } as MessageContent });
     if (data.attachments?.length) messages.value.push({ type: 'attachments', content: { ...data } as AttachmentsContent });
   }
@@ -229,7 +243,7 @@ export function useAnalysisSession(options: AnalysisSessionOptions) {
   }
 
   function handleEvent(event: AgentSSEEvent) {
-    if (disposed || !acceptAgentEvent(eventCursor, event)) return;
+    if (disposed || !acceptAgentEvent(eventCursor, event)) return false;
     updateAnalysisProgress(event);
     if (!isAnalysisProgressEvent(event)) timelineRevision.value += 1;
     if (event.event === 'message') handleMessage(event.data as MessageEventData);
@@ -254,6 +268,7 @@ export function useAnalysisSession(options: AnalysisSessionOptions) {
       completionAdvice.value = (event.data as DoneEventData).advice;
     }
     if (['done', 'wait', 'error'].includes(event.event)) {
+      inputTerminated = true;
       isLoading.value = false;
       taskStartedAtMs.value = undefined;
       loadingStatus.value = '';
@@ -262,6 +277,27 @@ export function useAnalysisSession(options: AnalysisSessionOptions) {
     if (event.data.event_id) lastEventId.value = event.data.event_id;
     lastEventSeq.value = eventCursor.lastSeq;
     if (!isAnalysisProgressEvent(event)) scheduleViewport();
+    return true;
+  }
+
+  function stopObservationFailed(observation: StopObservation) {
+    if (stopObservation !== observation) return;
+    isLoading.value = false;
+    loadingStatus.value = '';
+    canRetryInput.value = true;
+    connectionNotice.value = observation.acknowledged
+      ? '停止请求已接收，最终状态尚未取回。点击此处恢复停止后的结果，不会重新执行分析。'
+      : '停止请求未能确认。点击此处恢复任务状态，不会重新提交或执行分析。';
+    connectionNotice.value += '也可新建对话继续，当前任务状态仍需确认。';
+  }
+
+  function finishStopObservation(observation: StopObservation) {
+    if (stopObservation !== observation) return;
+    stopObservation = undefined;
+    if (pendingInput === observation.input) pendingInput = undefined;
+    canRetryInput.value = false;
+    connectionNotice.value = '';
+    stopping = false;
   }
 
   function rejectInput(attempt: PendingInput) {
@@ -274,7 +310,7 @@ export function useAnalysisSession(options: AnalysisSessionOptions) {
     options.onInputRejected?.(attempt.request);
   }
 
-  function callbacks(revision: number, id: string, attempt?: PendingInput): SSECallbacks<AgentSSEEvent['data']> {
+  function callbacks(revision: number, id: string, attempt?: PendingInput, observation?: StopObservation): SSECallbacks<AgentSSEEvent['data']> {
     const current = () => isCurrent(revision, id);
     const close = () => {
       isLoading.value = false;
@@ -288,13 +324,14 @@ export function useAnalysisSession(options: AnalysisSessionOptions) {
       onRetry: ({ attempt: count, maxAttempts }) => {
         if (current()) {
           if (attempt) attempt.uncertain = true;
-          isLoading.value = true; connectionNotice.value = `连接中断，正在恢复（${count}/${maxAttempts}）…`;
+          isLoading.value = true; connectionNotice.value = `${observation ? '正在恢复停止后的结果' : '连接中断，正在恢复'}（${count}/${maxAttempts}）…`;
         }
       },
       onMessage: ({ event, data }) => {
         if (!current()) return;
         if (attempt) attempt.uncertain = true;
-        handleEvent({ event: event as AgentSSEEvent['event'], data });
+        const accepted = handleEvent({ event: event as AgentSSEEvent['event'], data });
+        if (observation && accepted && ['done', 'wait', 'error'].includes(event)) finishStopObservation(observation);
         // Old adapters have no receipt endpoint. Production probes durable
         // acceptance before a subsequent send; transport events alone do not
         // identify which input was accepted.
@@ -306,6 +343,7 @@ export function useAnalysisSession(options: AnalysisSessionOptions) {
       onClose: () => {
         if (current()) {
           close();
+          if (observation && stopObservation === observation) { stopObservationFailed(observation); return; }
           if (attempt?.state !== 'unknown') { canRetryInput.value = false; connectionNotice.value = ''; }
           options.onTerminal?.();
         }
@@ -314,6 +352,7 @@ export function useAnalysisSession(options: AnalysisSessionOptions) {
         if (!current()) return;
         // Transport uncertainty is not a confirmed execution failure.
         close(); connectionNotice.value = error.message; options.onTerminal?.();
+        if (observation) { stopObservationFailed(observation); return; }
         if (attempt && pendingInput === attempt) {
           if (!attempt.uncertain && error instanceof SSEConnectionError && error.kind === 'http'
             && [400, 401, 403, 404, 422].includes(error.status ?? 0)) rejectInput(attempt);
@@ -326,11 +365,11 @@ export function useAnalysisSession(options: AnalysisSessionOptions) {
     };
   }
 
-  async function connect(revision: number, request?: AnalysisSessionRequest, continuation?: AnalysisContinuationAttempt, attempt?: PendingInput) {
+  async function connect(revision: number, request?: AnalysisSessionRequest, continuation?: AnalysisContinuationAttempt, attempt?: PendingInput, observation?: StopObservation) {
     const id = sessionId.value;
     if (!id || !isCurrent(revision, id)) return;
     let ended = false;
-    const handlers = callbacks(revision, id, attempt);
+    const handlers = callbacks(revision, id, attempt, observation);
     const finish = (callback: (() => void) | undefined) => { ended = true; callback?.(); };
     try {
       const cancel = await api.chatWithSession(
@@ -339,6 +378,7 @@ export function useAnalysisSession(options: AnalysisSessionOptions) {
         request?.skills ?? [], request?.mcpServers ?? [], request?.agentProfileId ?? null,
         { ...handlers, onClose: () => finish(handlers.onClose), onError: error => { ended = true; handlers.onError?.(error); } },
         request?.datasetIds, attempt?.clientMessageId ?? continuation?.clientMessageId, continuation?.resumeFrom, request?.inputFileIds, attempt?.timestamp,
+        observation?.clientMessageId,
       );
       if (!isCurrent(revision, id) || ended) cancel();
       else cancelCurrentChat.value = cancel;
@@ -349,6 +389,7 @@ export function useAnalysisSession(options: AnalysisSessionOptions) {
       taskStartedAtMs.value = undefined;
       loadingStatus.value = '';
       cancelCurrentChat.value = null;
+      if (observation) { stopObservationFailed(observation); return; }
       connectionNotice.value = '连接未能建立，请刷新页面确认任务状态。';
       if (attempt && pendingInput === attempt) {
         attempt.state = 'unknown'; attempt.uncertain = true; canRetryInput.value = true;
@@ -370,6 +411,13 @@ export function useAnalysisSession(options: AnalysisSessionOptions) {
 
   /** Explicit recovery of the existing submission, never text-based deduplication. */
   async function retryPendingInput() {
+    if (stopObservation) {
+      if (disposed || isLoading.value || isRestoringHistory.value) return false;
+      const observation = stopObservation;
+      const revision = invalidate();
+      await observeStoppedInput(revision, observation);
+      return isCurrent(revision, observation.sessionId);
+    }
     const attempt = pendingInput;
     const id = sessionId.value;
     if (!attempt || !id || disposed || isLoading.value || isRestoringHistory.value) return false;
@@ -395,6 +443,7 @@ export function useAnalysisSession(options: AnalysisSessionOptions) {
 
   async function send(request: AnalysisSessionRequest) {
     if (disposed || isLoading.value || isRestoringHistory.value || !request.message.trim()) return false;
+    if (stopObservation) { stopObservationFailed(stopObservation); return false; }
     request = { ...request,
       files: request.files?.map(file => ({ ...file })),
       skills: request.skills && [...request.skills],
@@ -475,7 +524,7 @@ export function useAnalysisSession(options: AnalysisSessionOptions) {
   }
 
   function canResumeAnalysis(index: number) {
-    return Boolean(!disposed && sessionId.value && !isLoading.value && !isRestoringHistory.value && !cancelCurrentChat.value
+    return Boolean(!disposed && !stopObservation && sessionId.value && !isLoading.value && !isRestoringHistory.value && !cancelCurrentChat.value
       && messages.value[index]?.type === 'assistant' && timelineIndex.isLastDialogue(messages.value, index)
       && resumableAnalysisOutcome(messages.value, index));
   }
@@ -487,6 +536,7 @@ export function useAnalysisSession(options: AnalysisSessionOptions) {
     const attempt = continuationAttempt(analysisContinuation.value, sessionId.value, outcome.resume_from, api.createClientMessageId);
     analysisContinuation.value = attempt;
     const revision = invalidate();
+    inputTerminated = false;
     beginAnalysisProgress();
     isLoading.value = true;
     connectionNotice.value = '';
@@ -500,6 +550,8 @@ export function useAnalysisSession(options: AnalysisSessionOptions) {
 
   function reset() {
     invalidate();
+    stopObservation = undefined;
+    inputTerminated = false;
     pendingInput = undefined;
     canRetryInput.value = false;
     options.onReset?.();
@@ -597,8 +649,20 @@ export function useAnalysisSession(options: AnalysisSessionOptions) {
     }
   }
 
+  async function observeStoppedInput(revision: number, observation: StopObservation) {
+    if (!isCurrent(revision, observation.sessionId) || stopObservation !== observation) return;
+    isLoading.value = true;
+    canRetryInput.value = false;
+    connectionNotice.value = '';
+    loadingStatus.value = '正在确认停止后的结果…';
+    // No original message, sources, or continuation is resubmitted. The input
+    // identity is carried only as an observation selector, never a submission.
+    // Existing SSE recovery uses bounded backoff and waits for a durable terminal.
+    await connect(revision, undefined, undefined, undefined, observation);
+  }
+
   async function stop() {
-    if (disposed || stopping) return;
+    if (disposed || stopping || stopObservation || inputTerminated) return;
     const id = sessionId.value;
     const revision = invalidate();
     // The stop endpoint targets the session, not an individual turn. Keep the
@@ -609,15 +673,14 @@ export function useAnalysisSession(options: AnalysisSessionOptions) {
     connectionNotice.value = '';
     clearAnalysisProgress();
     if (!id) return;
+    const lastUser = [...messages.value].reverse().find(message => message.type === 'user');
+    const observation: StopObservation = { sessionId: id, input: pendingInput, acknowledged: false,
+      clientMessageId: analysisContinuation.value?.clientMessageId ?? pendingInput?.clientMessageId
+        ?? (lastUser?.content as MessageContent | undefined)?.metadata?.client_message_id };
+    stopObservation = observation;
     try { await api.stopSession(id); }
     catch {
-      if (isCurrent(revision, id)) {
-        connectionNotice.value = '停止请求未能确认，请刷新页面检查任务状态。';
-        if (pendingInput) {
-          pendingInput.state = 'unknown'; pendingInput.uncertain = true; canRetryInput.value = true;
-          connectionNotice.value = '停止请求未能确认，点击此处恢复原提交并检查任务状态。';
-        }
-      }
+      if (isCurrent(revision, id)) stopObservationFailed(observation);
       return;
     } finally {
       if (isCurrent(revision, id)) {
@@ -628,17 +691,15 @@ export function useAnalysisSession(options: AnalysisSessionOptions) {
       }
     }
     if (!isCurrent(revision, id)) return;
-    pendingInput = undefined;
-    canRetryInput.value = false;
-    failActiveSteps();
-    taskStartedAtMs.value = undefined;
-    options.onTerminal?.();
+    observation.acknowledged = true;
+    await observeStoppedInput(revision, observation);
   }
 
   function dispose() {
     disposed = true;
     invalidate();
     pendingInput = undefined;
+    stopObservation = undefined;
     canRetryInput.value = false;
     timelineIndex.clear();
     clearAnalysisProgress();

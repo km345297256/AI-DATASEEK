@@ -9,6 +9,8 @@ import uuid
 
 import docker
 
+from app.infrastructure.external.sandbox.helper_security import helper_security_options
+
 MAX_OUTPUT_BYTES = 8 * 1024 * 1024
 MAX_CAPTURE_BYTES = MAX_OUTPUT_BYTES + 64 * 1024
 WORKER_TIMEOUT_SECONDS = 50
@@ -70,7 +72,7 @@ def run_extended_visualization_worker(image: str, data: bytes, *, reader: str, k
                      "-m", "app.services.extended_visualization_worker"], working_dir="/app",
             auto_remove=True,
             user="65534:65534", stdin_open=True, tty=False, network_mode="none",
-            read_only=True, cap_drop=["ALL"], security_opt=["no-new-privileges:true"],
+            read_only=True, cap_drop=["ALL"], security_opt=helper_security_options(),
             mem_limit="1g", memswap_limit="1g", nano_cpus=1_000_000_000,
             pids_limit=96, tmpfs={"/tmp": "rw,noexec,nosuid,size=512m,mode=1777"},
             environment={"OPENBLAS_NUM_THREADS": "1", "OMP_NUM_THREADS": "1", "MKL_NUM_THREADS": "1", "PYTHONDONTWRITEBYTECODE": "1"},

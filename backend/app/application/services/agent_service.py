@@ -126,6 +126,7 @@ class AgentService:
         client_message_id: Optional[str] = None,
         resume_from: Optional[str] = None,
         input_file_ids: Optional[List[str]] = None,
+        observe_client_message_id: Optional[str] = None,
     ) -> AsyncGenerator[AgentEvent, None]:
         logger.info(
             "Starting chat session=%s message_chars=%d",
@@ -149,6 +150,7 @@ class AgentService:
             client_message_id=client_message_id,
             resume_from=resume_from,
             input_file_ids=input_file_ids,
+            observe_client_message_id=observe_client_message_id,
         ):
             logger.debug(
                 "Received agent event type=%s id=%s",

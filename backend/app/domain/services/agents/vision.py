@@ -22,6 +22,7 @@ from app.domain.services.tools.pipeline import opaque_log_identifier
 from app.domain.services.model_input_policy import ImageInputError, ImageInputSizeError, image_url, project_image, resolve_model_capability
 from app.domain.services.model_runtime import flush_memory_changes, memory_checkpoint, note_memory_change
 from app.domain.utils.public_error import public_error_message
+from app.domain.utils.model_response import has_complete_answer_text
 
 logger = logging.getLogger(__name__)
 _IMAGE_REFERENCE_PLACEHOLDER = {"type": "text", "text": "[Stored image attachment; restored with owner authorization before model use.]"}
@@ -138,6 +139,8 @@ class VisionAgent(BaseAgent):
             prompt = self._build_prompt(plan, step, message)
             content: list[dict[str, Any]] = [{"type": "text", "text": prompt}, *image_blocks]
             response = await self.ask_with_messages([HumanMessage(content=content)], format=None)
+            if not has_complete_answer_text(response):
+                raise ValueError("视觉分析未生成可用的完整回答，请重试或切换模型。")
             result = self._message_content_to_text(response.content)
             step.status = ExecutionStatus.COMPLETED
             step.success = True

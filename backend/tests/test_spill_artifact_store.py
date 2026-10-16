@@ -1372,7 +1372,7 @@ async def test_spilled_failed_shell_result_stays_failed_in_console_projection():
 
     assert console is not None
     assert console[0]["status"] == "failed"
-    assert console[0]["returncode"] == 1
+    assert "returncode" not in console[0]  # A spill/operation failure is not process-exit evidence.
 
 
 @pytest.mark.asyncio
@@ -1409,7 +1409,7 @@ async def test_dataset_spill_console_preserves_status_without_raw_preview(
     console = renderer(event)
 
     assert console[0]["status"] == ("completed" if success else "failed")
-    assert console[0]["returncode"] == (0 if success else 1)
+    assert "returncode" not in console[0]  # Synthetic operation summaries must not invent an exit code.
     assert "private-token" not in console[0]["output"]
     assert "/Users/alice" not in console[0]["output"]
     assert "spill://artifact/" not in console[0]["output"]

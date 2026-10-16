@@ -372,7 +372,9 @@ def create_chat_model(
         kwargs["max_retries"] = 0
     api_base = route.api_base
     if api_base:
-        kwargs["base_url"] = api_base
+        # ChatDeepSeek builds its SDK clients from api_base; base_url only
+        # changes an inherited display field and can send this key elsewhere.
+        kwargs["api_base" if provider == "deepseek" else "base_url"] = api_base
     api_key = route.api_key
     if api_key is not None and provider in {"openai", "azure_openai", "xai", "perplexity", "deepseek", "anthropic"}:
         kwargs["api_key"] = api_key

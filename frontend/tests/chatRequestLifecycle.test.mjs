@@ -46,7 +46,7 @@ for (const [entry, sourceRequest] of [
     assert.deepEqual(requests[2][12], []);
   });
 
-  test(`${entry}: stop cancels transport immediately; only confirmation fails running steps`, async () => {
+  test(`${entry}: stop cancels transport immediately and waits for the durable cancellation outcome`, async () => {
     const { session, requests, cancels, stopRequest } = harness();
     await session.send({ message: '分析', ...sourceRequest });
     requests[0][8].onMessage(event(1, 'step', { id: 's', status: 'running', description: '分析' }));
@@ -54,6 +54,12 @@ for (const [entry, sourceRequest] of [
     assert.deepEqual(cancels, ['session-a']);
     assert.equal(session.messages.value.find(message => message.type === 'step').content.status, 'running');
     stopRequest.resolve(); await pending;
+    assert.equal(session.messages.value.find(message => message.type === 'step').content.status, 'running');
+    assert.equal(requests[1][1], '');
+    requests[1][8].onMessage(event(2, 'message', { role: 'assistant', content: '已取消', metadata: {
+      analysis_outcome: { status: 'failed', reason_code: 'request_cancelled', missing: [], can_resume: false },
+    } }));
+    requests[1][8].onMessage(event(3, 'done', {}));
     assert.equal(session.messages.value.find(message => message.type === 'step').content.status, 'failed');
   });
 
@@ -87,7 +93,7 @@ test('failed stop preserves uncertainty; late acknowledgement cannot affect a ne
   }
 });
 
-test('stop keeps the task locked until acknowledgement so it cannot cancel a newly submitted analysis', async () => {
+test('stop keeps the task locked until terminal replay so it cannot lose results before a new analysis', async () => {
   let stopCalls = 0;
   const stopRequest = deferred();
   const { session, requests } = harness({ stopSession: () => { stopCalls++; return stopRequest.promise; } });
@@ -100,9 +106,13 @@ test('stop keeps the task locked until acknowledgement so it cannot cancel a new
   assert.equal(stopCalls, 1);
   assert.equal(requests.length, 1);
   stopRequest.resolve(); await stopping;
+  assert.equal(session.isLoading.value, true);
+  assert.equal(await session.send({ message: 'next analysis' }), false);
+  assert.equal(requests[1][1], '');
+  requests[1][8].onMessage(event(2, 'done', {})); requests[1][8].onClose();
   assert.equal(session.isLoading.value, false);
   assert.equal(await session.send({ message: 'next analysis' }), true);
-  assert.equal(requests.length, 2);
+  assert.equal(requests.length, 3);
 });
 
 test('a late stop acknowledgement cannot unlock a running analysis in the next conversation', async () => {

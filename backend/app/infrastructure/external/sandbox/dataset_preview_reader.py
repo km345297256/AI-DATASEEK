@@ -13,6 +13,7 @@ import uuid
 import docker
 
 from app.core.config import get_settings
+from app.infrastructure.external.sandbox.helper_security import helper_security_options
 from app.infrastructure.external.sandbox.dataset_mount_validator import (
     _default_local_allowlist,
     docker_host_source_and_candidates,
@@ -225,7 +226,7 @@ def read_dataset_host_file(source: str, relative_path: str, offset: int = 0,
             image=helper_image, name=name, entrypoint=["python3"], command=["-c", _reader_program()],
             user="0:0", stdin_open=True, tty=False, network_mode="none", read_only=True,
             mounts=[docker.types.Mount(target="/host", source="/", type="bind", read_only=True)],
-            cap_drop=["ALL"], security_opt=["no-new-privileges:true"],
+            cap_drop=["ALL"], security_opt=helper_security_options(),
             mem_limit="384m", memswap_limit="384m", nano_cpus=1_000_000_000, pids_limit=16,
             environment={"PYTHONDONTWRITEBYTECODE": "1", "PYTHONUTF8": "1"},
             labels={"ai-dataseek.component": "dataset-preview-read"},

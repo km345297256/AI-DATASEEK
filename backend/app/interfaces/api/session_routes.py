@@ -527,16 +527,17 @@ async def chat(
     for dataset_id in dict.fromkeys(request.dataset_ids or []):
         await dataset_service.get_dataset(dataset_id, user_id=current_user.id)
 
-    llm_overrides = None if request.resume_from else await _agent_profile_overrides(
+    observing = request.observe_client_message_id is not None
+    llm_overrides = None if request.resume_from or observing else await _agent_profile_overrides(
         profile_service, request.agent_profile_id, current_user,
     )
     stored_user = await user_repository.get_user_by_id(current_user.id)
     user = stored_user or current_user
-    effective_skills = [] if request.resume_from else await _installed_skill_names(user, merge_skill_names(
+    effective_skills = [] if request.resume_from or observing else await _installed_skill_names(user, merge_skill_names(
         user.auto_enabled_skills or [],
         request.skills or [],
     ))
-    effective_mcp_servers = [] if request.resume_from else await _installed_mcp_names(user, request.mcp_servers or [])
+    effective_mcp_servers = [] if request.resume_from or observing else await _installed_mcp_names(user, request.mcp_servers or [])
 
     async def event_generator() -> AsyncGenerator[ServerSentEvent, None]:
         async for event in agent_service.chat(
@@ -551,6 +552,7 @@ async def chat(
             event_seq=request.event_seq,
             attachments=request.attachments,
             input_file_ids=request.input_file_ids,
+            observe_client_message_id=request.observe_client_message_id,
             skills=effective_skills,
             mcp_servers=effective_mcp_servers,
             dataset_ids=request.dataset_ids or [],

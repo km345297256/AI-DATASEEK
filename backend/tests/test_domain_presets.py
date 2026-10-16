@@ -44,7 +44,7 @@ def toolkit(catalog):
 
 def test_all_static_preset_references_exist_in_actual_catalog(catalog):
     validate_domain_preset_references(catalog)
-    assert len(list_domain_presets()) == 9
+    assert len(list_domain_presets()) == 10
     assert catalog.tool_count >= 280
     assert len(get_domain_preset("general").initial_tools) <= 8
 
@@ -244,3 +244,31 @@ def test_general_does_not_invent_disabled_document_capabilities(catalog):
     view = PluginToolView(toolkit)
     assert view.get_tool("pdf_extract_text") is None
     assert not view.load(["pdf_extract_text"]).success
+
+
+def test_mathematics_uses_existing_analysis_tools_without_claiming_a_prover(toolkit):
+    preset = get_domain_preset("mathematics")
+    assert preset.name == "数学"
+    assert set(preset.plugin_ids) == {"data_foundation", "tabular", "documents"}
+    view = PluginToolView(toolkit, preset_id=preset.id)
+    assert view.get_tool("data_format_inspect") is not None
+    assert view.get_tool("table_profile") is not None
+    assert view.load(["pdf_extract_text"]).success
+    assert view.get_tool("pdf_extract_text") is not None
+    assert view.get_tool("space_ground_track") is None
+    assert not view.load(["space_ground_track"]).success
+    assert "dataset annotations rather than independently verified evidence" in preset.instructions
+    assert "Numerical checks are not proofs" in preset.instructions
+    assert "this preset does not provide a solver or proof assistant" in preset.instructions
+
+
+def test_mathematics_does_not_replace_unavailable_table_tools(catalog):
+    filtered = catalog.model_copy(update={
+        "tools": tuple(tool for tool in catalog.tools if tool.plugin != "tabular"),
+        "plugins": tuple(plugin for plugin in catalog.plugins if plugin.plugin != "tabular"),
+    })
+    toolkit = PluginToolkit(SimpleNamespace(), session_id="math-no-tabular", plugin_runtime=SimpleNamespace(current_snapshot=filtered))
+    view = PluginToolView(toolkit, preset_id="mathematics")
+    assert view.get_tool("data_format_inspect") is not None
+    assert view.get_tool("table_profile") is None
+    assert not view.load(["table_profile"]).success

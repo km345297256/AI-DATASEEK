@@ -237,3 +237,127 @@ async def test_late_cancellation_notice_for_an_older_input_does_not_close_curren
     events = [event async for event in service.chat("session", "user", latest_event_seq=2)]
     assert [event.seq for event in events] == [5, 6]
     assert inputs.matches_terminal.await_count == 2
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("stop_state", ["cancelled", "interrupted"])
+async def test_read_only_stop_replay_waits_for_delayed_durable_terminal_after_http_confirmation(stop_state, monkeypatch):
+    """The stop acknowledgement/session status is not proof of event settlement."""
+    record = accepted(seq=1, state=stop_state)
+    inputs = StreamInputs(record)
+    repository = StreamRepository([record.event])
+    repository.session.status = SessionStatus.COMPLETED  # stop HTTP already returned
+    service = service_for(repository, inputs)
+    service._bootstrap_chat_task = AsyncMock(side_effect=AssertionError("observation must never dispatch"))
+    sleeps = []
+
+    async def finish_cancellation(delay):
+        sleeps.append(delay)
+        if len(sleeps) == 1:
+            repository.events.append(ToolEvent(seq=2, tool_call_id="final-tool", tool_name="shell",
+                function_name="shell_run", function_args={}, status=ToolStatus.CALLED,
+                function_result={"success": False}))
+        elif len(sleeps) == 2:
+            repository.events.extend([
+                MessageEvent(seq=3, message="Stopped; existing results are retained.", metadata={
+                    "analysis_outcome": {"status": "partial", "reason_code": "request_cancelled",
+                                         "missing": [], "can_resume": False}}),
+                ErrorEvent(seq=4, error="Request cancelled"),
+            ])
+            record.admission.notified = True
+        else:
+            raise AssertionError("terminal must close the stream, not poll forever")
+
+    monkeypatch.setattr("app.domain.services.agent_domain_service.asyncio.sleep", finish_cancellation)
+    events = [event async for event in service.chat("session", "user", message="", latest_event_seq=1)]
+    assert [event.seq for event in events] == [2, 3, 4]
+    assert [event.type for event in events] == ["tool", "message", "error"]
+    assert sleeps == [0.5, 0.5]
+    service._bootstrap_chat_task.assert_not_awaited()
+    inputs.cancel_session.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_stop_observation_of_unaccepted_input_never_replays_previous_terminal_and_is_bounded(monkeypatch):
+    old = accepted(state="completed")
+    inputs = StreamInputs(old)
+    repository = StreamRepository([old.event, DoneEvent(seq=4)])
+    service = service_for(repository, inputs)
+    sleeps = []
+    async def wait(delay):
+        sleeps.append(delay)
+    monkeypatch.setattr("app.domain.services.agent_domain_service.asyncio.sleep", wait)
+    events = [event async for event in service.chat("session", "user", latest_event_seq=0,
+                                                   observe_client_message_id="not-yet-accepted")]
+    assert events == []
+    assert sleeps == [0.5] * 19
+    assert repository.queries == [], "an absent input must not fall back to session history"
+    service._get_task.assert_not_awaited()
+    service._schedule_accepted_input.assert_not_awaited()
+    inputs.cancel_session.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_stop_observation_follows_its_input_if_admission_and_terminal_arrive_later(monkeypatch):
+    record = accepted(seq=3, state="cancelled")
+    inputs = StreamInputs()
+    inputs.matches_terminal = AsyncMock(side_effect=lambda _session, key, seq, kind: key == record.key and seq == 5)
+    repository = StreamRepository([MessageEvent(seq=1, role="user", message="old"), DoneEvent(seq=2)])
+    service = service_for(repository, inputs)
+    sleeps = []
+    async def advance(delay):
+        sleeps.append(delay)
+        if len(sleeps) == 1:
+            inputs.record = record
+            repository.events.append(record.event)
+        elif len(sleeps) == 2:
+            repository.events.extend([MessageEvent(seq=4, message="cancelled"), ErrorEvent(seq=5, error="cancelled")])
+        else:
+            pytest.fail("observation must settle on its terminal")
+    monkeypatch.setattr("app.domain.services.agent_domain_service.asyncio.sleep", advance)
+    events = [event async for event in service.chat("session", "user", latest_event_seq=0,
+                                                   observe_client_message_id="client")]
+    assert [event.seq for event in events] == [4, 5]
+    assert sleeps == [0.5, 0.5]
+    service._get_task.assert_not_awaited()
+    service._schedule_accepted_input.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("cursor", [2, 4])
+async def test_stop_observation_never_takes_another_turns_terminal_even_across_reconnect(cursor):
+    record = accepted(seq=1, state="cancelled")
+    inputs = StreamInputs(record)
+    own_outcome = MessageEvent(seq=6, message="own cancellation", metadata={"analysis_outcome": {"status": "failed"}})
+    inputs.matches_terminal = AsyncMock(side_effect=lambda _session, key, seq, kind: key == record.key and seq == 7)
+    inputs.committed_outcome = AsyncMock(return_value=own_outcome)
+    repository = StreamRepository([record.event, MessageEvent(seq=2, message="own partial"),
+        MessageEvent(seq=3, role="user", message="another tab's question"), MessageEvent(seq=4, message="foreign answer"),
+        DoneEvent(seq=5), own_outcome, ErrorEvent(seq=7, error="own cancelled")])
+    service = service_for(repository, inputs)
+    events = [event async for event in service.chat("session", "user", latest_event_seq=cursor,
+                                                   observe_client_message_id="client")]
+    assert [event.seq for event in events] == [6, 7]
+    service._get_task.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_observation_failure_does_not_persist_a_fake_execution_error():
+    inputs = StreamInputs(accepted())
+    inputs.get = AsyncMock(side_effect=RuntimeError("repository unavailable"))
+    repository = StreamRepository([])
+    repository.add_event = AsyncMock()
+    service = service_for(repository, inputs)
+    with pytest.raises(RuntimeError, match="repository unavailable"):
+        _ = [event async for event in service.chat("session", "user", observe_client_message_id="client")]
+    repository.add_event.assert_not_awaited()
+
+
+@pytest.mark.parametrize("extra", [{"message": "new work"}, {"resume_from": "a" * 32}, {"client_message_id": "new"},
+    {"agent_profile_id": "model"}, {"attachments": [{"file_id": "file"}]}, {"skills": ["skill"]},
+    {"mcp_servers": ["server"]}, {"dataset_ids": ["dataset"]}, {"input_file_ids": []}])
+def test_observation_schema_rejects_submission_or_configuration_changes(extra):
+    from pydantic import ValidationError
+    from app.interfaces.schemas.session import ChatRequest
+    with pytest.raises(ValidationError):
+        ChatRequest(observe_client_message_id="client", **extra)

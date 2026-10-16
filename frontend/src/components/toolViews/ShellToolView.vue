@@ -24,6 +24,7 @@ import { onMounted, ref, computed, watch, onUnmounted } from 'vue';
 import { viewShellSession } from '@/api/agent';
 import { ToolContent } from '@/types/message';
 import { sanitizeToolDisplayText } from '@/utils/toolDisplay';
+import { shellConsoleExitText } from '@/utils/shellConsole';
 //import { showErrorToast } from '@/utils/toast';
 
 const props = defineProps<{
@@ -57,6 +58,10 @@ const toolIdentity = computed(() => [
 ].join(':'));
 
 const shouldLoadLiveShellSession = computed(() => props.live && props.toolContent.function === 'shell_view');
+// Older synthetic dataset/spill console records encoded success as 0/1.
+// They are operation summaries, not evidence of a process exit.
+const showProcessExit = computed(() => !props.toolContent.spill
+  && !['dataset_analysis_run', 'dataset_quicklook'].includes(props.toolContent.function));
 
 const escapeHtml = (value: unknown) => String(value ?? '')
   .replace(/&/g, '&amp;')
@@ -78,6 +83,8 @@ const updateShellContent = (console: any) => {
 
   if (!Array.isArray(console)) {
     shell.value = escapeHtml(sanitizeToolDisplayText(console?.output ?? ''));
+    const exit = showProcessExit.value ? shellConsoleExitText(console) : '';
+    if (exit) shell.value += `\n<span style="color: var(--text-tertiary);">${escapeHtml(exit)}</span>\n`;
     return;
   }
 
@@ -92,6 +99,8 @@ const updateShellContent = (console: any) => {
     if (output) {
       newShell += `<span>${output}</span>\n`;
     }
+    const exit = showProcessExit.value ? shellConsoleExitText(e) : '';
+    if (exit) newShell += `<span style="color: var(--text-tertiary);">${escapeHtml(exit)}</span>\n`;
   }
   if (newShell !== shell.value) {
     shell.value = newShell;
@@ -112,7 +121,7 @@ const showCommandSnapshotFallback = () => {
     return;
   }
   const statusText = props.toolContent.status === 'called'
-    ? 'Command completed with no console output.'
+    ? '调用已结束；未提供命令输出或退出信息。'
     : 'Waiting for command output...';
   shell.value = `<span style="color: rgb(0, 187, 0);">$</span><span> ${escapeHtml(command)}</span>\n<span>${statusText}</span>`;
 };

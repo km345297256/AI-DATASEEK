@@ -11,7 +11,7 @@ ROOT = Path(__file__).resolve().parents[1] / 'app/resources/datasets'
 DOMAINS = {'general', 'tabular', 'geoscience', 'image_science', 'chemistry', 'sequence', 'space', 'documents', 'spectroscopy'}
 
 
-def test_catalog_has_two_real_bundles_per_system_domain():
+def test_catalog_has_two_real_bundles_per_original_bundled_domain():
     counts = Counter()
     for path in ROOT.glob('*/manifest.json'):
         seed = CuratedDatasetSeed.model_validate_json(path.read_text())

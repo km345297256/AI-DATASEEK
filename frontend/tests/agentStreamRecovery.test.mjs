@@ -3,6 +3,18 @@ import test from 'node:test';
 import { fetchEventSource } from '@microsoft/fetch-event-source';
 
 import { createAgentStreamRecovery } from '../src/utils/agentStreamRecovery.ts';
+
+test('stop observation retains its target identity across retries without becoming a submission', () => {
+  const recovery = createAgentStreamRecovery({ message: '', event_seq: 3, observe_client_message_id: 'stopped-input' });
+  assert.deepEqual(recovery.getBody(), { message: '', event_seq: 3, observe_client_message_id: 'stopped-input',
+    client_message_id: undefined, resume_from: undefined, event_id: undefined });
+  recovery.accept({ event: 'tool', data: { seq: 4, event_id: '4-0' } });
+  const resumed = recovery.getBody();
+  assert.equal(resumed.message, '');
+  assert.equal(resumed.observe_client_message_id, 'stopped-input');
+  assert.equal(resumed.client_message_id, undefined);
+  assert.equal(resumed.event_seq, 4);
+});
 import { startSSEConnection, SSEConnectionError } from '../src/utils/sseConnection.ts';
 
 function frame(seq, event = 'message', extra = {}) {

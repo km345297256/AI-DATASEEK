@@ -25,6 +25,7 @@ from app.domain.services.context_budget import ContextBudgetExceeded, prepare_co
 from app.domain.services.execution_identity import private_identity_hmac
 from app.domain.services.model_input_policy import ImageInputError, request_image_estimator, resolve_model_capability
 from app.domain.services.token_usage_service import TokenUsageService
+from app.domain.utils.model_response import ModelEmptyResponseError, ModelResponseValidationError, validate_model_response
 
 logger = logging.getLogger(__name__)
 USAGE_RECORDED_KEY = "dataseek_model_usage_recorded"
@@ -157,8 +158,8 @@ def model_call_role(role: str):
 def model_response_validation(validator: Callable[[Any], Any]):
     """Run a trusted, synchronous response parser inside the request audit.
 
-    Only a JSON decoding failure is a transport protocol failure. Other
-    parser/schema errors propagate without changing a successful transport
+    JSON decoding and the shared empty-response guard are protocol failures.
+    Other parser/schema errors propagate without changing a successful transport
     into a retryable failure. No response content or parser error text is
     persisted, and no private receipt is attached to the returned message.
     """
@@ -421,15 +422,31 @@ async def invoke_model_request(*, messages, tool_schemas=(), response_format=Non
         trace.usage_source = "reservation"
     trace.timings.usage_settlement_ms = (time.perf_counter() - phase_started) * 1000
     validation_error = None
+    protocol_error = None
+    try:
+        validate_model_response(message)
+    except ModelResponseValidationError as error:
+        protocol_error = error
     validator = _RESPONSE_VALIDATOR.get()
-    if validator is not None:
+    if validator is not None and (protocol_error is None or isinstance(protocol_error, ModelEmptyResponseError)):
         try:
             validator(message)
         except Exception as error:
             validation_error = error
+    # Preserve the established JSON syntax-recovery contract for empty JSON
+    # responses. A schema-only failure cannot hide an actual empty response;
+    # refusal/non-normal finishes must not become retryable JSON failures.
+    if protocol_error is not None and not (
+        isinstance(protocol_error, ModelEmptyResponseError)
+        and isinstance(validation_error, json.JSONDecodeError)
+    ):
+        validation_error = protocol_error
     invalid_json = isinstance(validation_error, json.JSONDecodeError)
-    trace.status = "failed" if invalid_json else "succeeded"
-    trace.error_code = "invalid_json" if invalid_json else None
+    invalid_response = isinstance(validation_error, ModelResponseValidationError)
+    trace.status = "failed" if invalid_json or invalid_response else "succeeded"
+    # Keep the durable enum readable by earlier builds. The internal exception
+    # type distinguishes empty/incomplete responses without storing payloads.
+    trace.error_code = "invalid_json" if invalid_json else "provider_error" if invalid_response else None
     trace.finished_at = datetime.now(UTC)
     await _store(scope, trace)
     if durable_settlement_failed:
@@ -449,7 +466,7 @@ async def invoke_model_request(*, messages, tool_schemas=(), response_format=Non
     logger.info("model_request role=%s provider=%s input_estimate=%d output_reserve=%d compacted=%d usage_source=%s",
                 role, trace.provider, trace.input_tokens_after, max_output_tokens, len(trace.compactions), trace.usage_source)
     if validation_error is not None:
-        if invalid_json and scope is not None and scope.store is not None:
+        if (invalid_json or invalid_response) and scope is not None and scope.store is not None:
             # The host parser runs while the exact driver's owner and trace
             # are still available. Public/model-supplied metadata can never
             # bind an unrelated successful request to this protocol retry.

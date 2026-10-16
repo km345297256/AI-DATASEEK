@@ -191,6 +191,7 @@ export class CatalogRuntime {
   private current: CatalogContext | undefined
   private operation: Promise<void> = Promise.resolve()
   private stopped = false
+  private shutdownOperation: Promise<void> | undefined
 
   constructor(
     readonly toolsDirectory: string,
@@ -250,13 +251,29 @@ export class CatalogRuntime {
     return this.snapshot()
   }
 
-  async shutdown(): Promise<void> {
-    if (this.stopped) return
+  shutdown(): Promise<void> {
+    if (this.shutdownOperation) return this.shutdownOperation
     this.stopped = true
+    this.shutdownOperation = this.shutdownNow()
+    return this.shutdownOperation
+  }
+
+  private async shutdownNow(): Promise<void> {
     await this.operation
     const current = this.current
     this.current = undefined
-    if (current) await current.context.fiber.dispose()
-    await this.visualizations.shutdown()
+    const errors: unknown[] = []
+    try {
+      if (current) await current.context.fiber.dispose()
+    } catch (error) {
+      errors.push(error)
+    }
+    try {
+      await this.visualizations.shutdown()
+    } catch (error) {
+      errors.push(error)
+    }
+    if (errors.length === 1) throw errors[0]
+    if (errors.length > 1) throw new AggregateError(errors, 'Plugin host cleanup failed')
   }
 }

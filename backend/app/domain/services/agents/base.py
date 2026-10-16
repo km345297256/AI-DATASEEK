@@ -67,6 +67,7 @@ from app.domain.services.program_execution import (
 )
 from app.domain.services.analysis_recovery import current_analysis_recovery
 from app.domain.utils.message_text import NON_SUBSTANTIVE_MESSAGE_PATTERN, is_non_substantive_message_text
+from app.domain.utils.model_response import ModelEmptyResponseError, model_answer_text
 from app.domain.services.execution_evidence import ToolExecutionLedger, tool_execution_scope
 from app.domain.services.model_runtime import (
     USAGE_RECORDED_KEY, flush_memory_changes, memory_checkpoint, model_call_role,
@@ -86,7 +87,7 @@ class LLMServiceUnavailableError(RuntimeError):
 
 def _is_retryable_llm_error(error: Exception) -> bool:
     """Return whether an OpenAI-compatible model call may safely be retried."""
-    if isinstance(error, (ModelProviderTimeout, APIConnectionError, httpx.NetworkError, httpx.TimeoutException)):
+    if isinstance(error, (ModelEmptyResponseError, ModelProviderTimeout, APIConnectionError, httpx.NetworkError, httpx.TimeoutException)):
         return True
     if isinstance(error, APIStatusError):
         status_code = getattr(error, "status_code", None)
@@ -277,11 +278,7 @@ class BaseAgent(ABC):
 
     def _message_content_to_text(self, content: Any) -> str:
         """Normalize LangChain message content into the string event contract."""
-        if content is None:
-            return ""
-        if isinstance(content, str):
-            return content
-        return str(content)
+        return model_answer_text(content)
 
     def _tool_result_for_memory(
         self,
@@ -295,7 +292,11 @@ class BaseAgent(ABC):
         if image_message is not None:
             return image_message
         checkpoint = memory_checkpoint([tool_result])
-        content = self._message_content_to_text(tool_result.content)
+        # Tool evidence is not assistant answer text. Keep the established raw
+        # tool-content representation; MCP pixels use their own projection above.
+        content = tool_result.content
+        if not isinstance(content, str):
+            content = "" if content is None else str(content)
         encoded = content.encode("utf-8")
         content_limit = self.TOOL_MESSAGE_CONTENT_LIMITS.get(
             tool_name,

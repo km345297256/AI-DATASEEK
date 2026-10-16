@@ -27,7 +27,7 @@ Browser -> Frontend -> Backend -> MongoDB / Redis / MinIO
                                   -> dataset directory (read-only)
 ```
 
-AI-DataSeek has one supported Compose stack, exposed and updated exclusively on port `7000`.
+AI-DataSeek has one supported Compose stack. Unless explicitly specified otherwise, publish the frontend on port `8888` and access it at `https://dataseek.4fair.cn/`.
 
 ## Quick start
 
@@ -36,10 +36,11 @@ Requirements: Docker 20.10+ and Docker Compose.
 ```bash
 cp .env.example .env
 # Set API_KEY, API_BASE, MODEL_NAME, and a strong MINIO_SECRET_KEY.
+# In .env, set FRONTEND_PORT=8888 and SERVER_HOST=https://dataseek.4fair.cn.
 ./run.sh up -d --build
 ```
 
-Open `http://39.106.98.67:7000`.
+Open `https://dataseek.4fair.cn/`.
 
 AI-DataSeek has a fixed no-login access model. Browser and API requests do not
 use Bearer tokens or `X-API-Key`; every caller operates as the same built-in
@@ -59,11 +60,13 @@ Allowed dataset roots are controlled by `DATASET_HOST_PATH_ALLOWLIST`. Submitted
 
 ## Development and updates
 
-All containerized runs and updates target the single port-`7000` service:
+Local builds target the same service, using frontend port `8888` by default:
 
 ```bash
 ./run.sh up -d --build
 ```
+
+On the public server, run `./run.sh production --apply` from `/data2/current` to publish verified images; add `--services frontend` for a frontend-only update. This entry point checks the port, public URL and image identities, holds a shared deployment lock, and verifies the running service. Do not recreate production containers directly. See the [production deployment guide](deploy/production/README.md).
 
 Useful checks:
 

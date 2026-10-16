@@ -23,9 +23,28 @@ or pushes; perform those actions only when the user requests them.
 ## Deployment
 
 AI-DataSeek has one supported Compose stack: `docker-compose.yml`, project
-`ai-dataseek`, with the frontend exposed at `http://39.106.98.67:7000`. Use
-`./run.sh` for all container updates. Do not recreate a separate development
-stack or expose a second frontend port.
+`ai-dataseek`. Unless the user explicitly requests otherwise, publish the frontend
+on server port `8888` and use `https://dataseek.4fair.cn/` as the public access URL.
+The direct server endpoint is `http://39.106.98.67:8888`. Use `./run.sh` for all
+container updates. Do not recreate a separate development stack or expose a
+second frontend port. Before publishing, verify that the resolved frontend port
+is `8888` and the public URL uses the HTTPS domain.
+
+On the public server, publish from `/data2/current` using
+`./run.sh production --apply` (add `--services frontend` for a frontend-only
+update; use `--apply --stack` only to start the migrated full stack with all
+seven images pinned in the release manifest). Retired `/root` deployment entries
+reject publication and container changes. Use `./run.sh production --stop` for
+controlled shutdown before a data migration; it archives running dynamic
+sandboxes before stopping them and preserves fixed-service containers and volumes.
+Persistent production volumes bind only `/data2/state/`
+(or its Snap hostfs view). Run `./run.sh production` for a read-only preflight. This entry point
+locks deployments, checks the release image manifest and endpoint contract,
+and verifies the running service. Do not bypass it with direct Docker container
+creation or unguarded Compose updates on the public server. Ordinary `run.sh`
+container changes are blocked in production release directories; configuration
+and status queries remain available. See
+`deploy/production/README.md` for the narrowly scoped unmanaged-frontend repair.
 
 ## Required checks
 

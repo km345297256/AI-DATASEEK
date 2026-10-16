@@ -109,7 +109,7 @@ def invoke(monkeypatch, response, *, read=None, cancelled=None, removed=False, s
 
 
 @pytest.mark.parametrize("removed", [False, True])
-def test_bidirectional_ranges_never_transmit_source_paths_or_entire_source(monkeypatch, removed):
+def test_bidirectional_ranges_never_transmit_source_paths_or_entire_source(monkeypatch, removed, expected_helper_security_options):
     content = frame(line(request())) + frame(line(request(id=2, offset=100000000, length=8))) + frame(line(SUCCESS))
     client, reads, run = invoke(monkeypatch, content, removed=removed)
     assert run() == {"ok": True, "data": {"marker": "safe"}}
@@ -125,7 +125,7 @@ def test_bidirectional_ranges_never_transmit_source_paths_or_entire_source(monke
     assert settings["command"] == ["--signal=KILL", "55s", "/app/.venv/bin/python", "-m", "app.services.window_visualization_worker"]
     assert settings["auto_remove"] and settings["read_only"] and settings["network_mode"] == "none"
     assert settings["user"] == "65534:65534" and settings["cap_drop"] == ["ALL"]
-    assert settings["security_opt"] == ["no-new-privileges:true"] and settings["pids_limit"] == 32
+    assert settings["security_opt"] == expected_helper_security_options and settings["pids_limit"] == 32
     assert settings["mem_limit"] == settings["memswap_limit"] == "512m"
     assert not {"mounts", "volumes", "ports", "privileged"} & settings.keys()
     assert client.cleaned and client.closed and client.waited and client.wire.closed and client.wire.halfclosed

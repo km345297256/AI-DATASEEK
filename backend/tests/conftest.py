@@ -24,3 +24,16 @@ def client():
     # Don't set default Content-Type to allow multipart/form-data for file uploads
     return session
 
+
+@pytest.fixture(params=[False, True], ids=["default-profile", "stacked-docker-default"])
+def expected_helper_security_options(request, monkeypatch):
+    """Exercise real helper Docker requests under both operator configurations."""
+    from types import SimpleNamespace
+    from app.infrastructure.external.sandbox import helper_security
+
+    monkeypatch.setattr(helper_security, "get_settings", lambda: SimpleNamespace(
+        docker_apparmor_stack_default=request.param,
+    ))
+    return (["no-new-privileges:true", "apparmor=&docker-default"] if request.param
+            else ["no-new-privileges:true"])
+

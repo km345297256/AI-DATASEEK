@@ -217,7 +217,7 @@ class DockerFixture:
         return json.dumps(result).encode()
 
 
-def test_docker_boundary_materializes_only_approved_managed_volume_and_checks_real_image_user():
+def test_docker_boundary_materializes_only_approved_managed_volume_and_checks_real_image_user(expected_helper_security_options):
     client = DockerFixture()
     path = module.prepare_managed_dataset_source(client, image="sandbox-image", volume="approved", dataset_id="sample")
     assert path == "/var/lib/docker/volumes/approved/_data/.analysis-views-v1/sample/" + "a" * 64
@@ -231,7 +231,7 @@ def test_docker_boundary_materializes_only_approved_managed_volume_and_checks_re
     assert 'pwd.getpwnam("ubuntu").pw_uid' in probe["command"][1]
     for call in client.calls:
         assert call["image"] == "sandbox-image" and call["read_only"] and call["network_disabled"] and call["remove"]
-        assert call["security_opt"] == ["no-new-privileges:true"]
+        assert call["security_opt"] == expected_helper_security_options
         compile(call["command"][1], "dataset-helper", "exec")
 
 

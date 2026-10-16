@@ -1828,6 +1828,7 @@ async def test_sandbox_pool_discards_unavailable_warm_sandbox():
 
         async def destroy(self):
             self.destroyed = True
+            return True
 
     pool = SandboxPool(pool_size=1)
     stale = FakeSandbox("stale", False)
@@ -2268,7 +2269,7 @@ def test_agent_message_content_normalization_handles_none_and_non_string():
 
     assert normalize(None, None) == ""
     assert normalize(None, "skills") == "skills"
-    assert normalize(None, [{"type": "text", "text": "skills"}]) == "[{'type': 'text', 'text': 'skills'}]"
+    assert normalize(None, [{"type": "text", "text": "skills"}]) == "skills"
 
 
 def test_mcp_toolkit_exposes_builtin_list_tool_without_selected_servers():

@@ -39,7 +39,7 @@ Dataset submission
 
 ## 部署隔离
 
-项目只保留一套名为 `ai-dataseek` 的 Compose 部署；网络、镜像、数据库、MinIO bucket、数据卷、技能卷及 Sandbox 前缀均使用同一命名空间。前端只暴露 `7000` 端口，所有迭代和发布均更新这套服务，不再创建平行开发栈。
+项目只保留一套名为 `ai-dataseek` 的 Compose 部署；网络、镜像、数据库、MinIO bucket、数据卷、技能卷及 Sandbox 前缀均使用同一命名空间。无特殊说明时，前端只暴露 `8888` 端口，统一通过 `https://dataseek.4fair.cn/` 访问。所有迭代和发布均更新这套服务，不再创建平行开发栈。
 
 ## 临时数据约束
 

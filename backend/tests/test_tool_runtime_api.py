@@ -337,7 +337,7 @@ def _catalog_snapshot() -> PluginCatalogSnapshot:
     )
 
 
-def test_domain_preset_api_returns_nine_snapshot_scoped_public_counts(monkeypatch) -> None:
+def test_domain_preset_api_returns_snapshot_scoped_public_counts_including_mathematics(monkeypatch) -> None:
     snapshot = _catalog_snapshot()
     runtime = SimpleNamespace(current_snapshot=snapshot)
     monkeypatch.setattr(
@@ -360,7 +360,8 @@ def test_domain_preset_api_returns_nine_snapshot_scoped_public_counts(monkeypatc
 
     assert response.status_code == 200
     payload = response.json()["data"]
-    assert len(payload["presets"]) == 9
+    assert len(payload["presets"]) == 10
+    assert next(entry for entry in payload["presets"] if entry["id"] == "mathematics")["name"] == "数学"
     assert {entry["id"] for entry in payload["presets"]} == {preset.id for preset in list_domain_presets()}
     assert payload["defaults"] == {
         "preset_id": "general",

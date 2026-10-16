@@ -27,7 +27,7 @@ AI-DataSeek 是从 AI-MANUS 中抽取出的数据集智能探查与分析系统�
                                     -> 数据集服务器目录（只读）
 ```
 
-AI-DataSeek 仅保留一套 Compose 服务，统一通过 `7000` 端口访问和更新。
+AI-DataSeek 仅保留一套 Compose 服务。无特殊说明时，前端默认发布到 `8888` 端口，统一通过 `https://dataseek.4fair.cn/` 访问。
 
 ## 快速启动
 
@@ -36,10 +36,11 @@ AI-DataSeek 仅保留一套 Compose 服务，统一通过 `7000` 端口访问和
 ```bash
 cp .env.example .env
 # 修改 API_KEY、API_BASE、MODEL_NAME 以及 MINIO_SECRET_KEY。
+# 在 .env 中设置 FRONTEND_PORT=8888 和 SERVER_HOST=https://dataseek.4fair.cn。
 ./run.sh up -d --build
 ```
 
-访问 `http://39.106.98.67:7000`。
+访问 `https://dataseek.4fair.cn/`。
 
 AI-DataSeek 固定采用免登录模式。浏览器和 API 请求均不使用 Bearer Token
 或 `X-API-Key`，所有调用者统一以系统内置管理员身份操作。Token 消耗只用于
@@ -57,11 +58,13 @@ DATASET_DOCKER_HOST_ROOT=/var/lib/snapd/hostfs
 
 ## 开发与更新
 
-所有容器化运行与更新都使用唯一的 `7000` 服务：
+本地构建仍使用同一套服务，前端端口默认为 `8888`：
 
 ```bash
 ./run.sh up -d --build
 ```
+
+公网服务器从 `/data2/current` 使用 `./run.sh production --apply` 发布已验证的镜像；仅更新前端时增加 `--services frontend`。该入口会检查端口、域名和镜像版本，使用共享发布锁，并验证上线结果。不要直接重建生产容器。详见[生产发布说明](deploy/production/README.md)。
 
 常用检查：
 

@@ -127,6 +127,19 @@ const readFocus = locator => locator.evaluate(element => {
     outlineStyle: style.outlineStyle, outlineWidth: style.outlineWidth, outlineColor: style.outlineColor,
     boxShadow: style.boxShadow, scrollTop: element.scrollTop, scrollHeight: element.scrollHeight, clientHeight: element.clientHeight };
 });
+const waitForScrollToSettle = locator => locator.evaluate(element => new Promise((resolve, reject) => {
+  let previous = element.scrollTop, stableFrames = 0;
+  const started = performance.now();
+  function observe() {
+    const current = element.scrollTop;
+    stableFrames = Math.abs(current - previous) < 0.5 ? stableFrames + 1 : 0;
+    previous = current;
+    if (stableFrames >= 6) return resolve();
+    if (performance.now() - started > 3000) return reject(new Error('Native scroll did not settle'));
+    requestAnimationFrame(observe);
+  }
+  requestAnimationFrame(observe);
+}));
 
 try {
   await page.goto('http://localhost:7001/__task_status_focus__/', { waitUntil: 'domcontentloaded' });
@@ -151,7 +164,10 @@ try {
     assert.ok(keyboard.boxShadow.includes('inset'), `${width}px: keyboard focus needs its scoped inset marker`);
     assert.ok(keyboard.boxShadow.includes('1px'), `${width}px: the inset marker should be a quiet 1px line`);
     await page.keyboard.press('PageDown');
-    await page.waitForFunction(() => document.querySelector('.simplebar-content-wrapper').scrollTop > 0);
+    await page.waitForFunction(start => document.querySelector('.simplebar-content-wrapper').scrollTop > start, keyboard.scrollTop);
+    // PageDown scrolls asynchronously. Finish this animation before changing
+    // focus or viewport so its later frames cannot leak into the next case.
+    await waitForScrollToSettle(region);
     const paged = await readFocus(region);
     assert.equal(paged.active, true, `${width}px: PageDown must retain scroll-region focus`);
     assert.ok(paged.scrollTop > keyboard.scrollTop, `${width}px: PageDown must scroll actual contents`);

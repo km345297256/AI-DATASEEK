@@ -2,6 +2,7 @@ import asyncio
 import logging
 from datetime import UTC, datetime
 from typing import Optional, Set, TYPE_CHECKING
+from app.domain.utils.shutdown import cleanup_steps, join_cleanup, raise_cleanup_errors
 
 if TYPE_CHECKING:
     from app.infrastructure.external.sandbox.docker_sandbox import DockerSandbox
@@ -20,6 +21,10 @@ class SandboxPool:
         self._replenish_interval_seconds = 1
         self._background_tasks: Set[asyncio.Task] = set()
         self._replenish_task: Optional[asyncio.Task] = None
+        self._foreground_tasks: Set[asyncio.Task] = set()
+        self._foreground_settled: dict[asyncio.Task, asyncio.Future] = {}
+        self._closing = False
+        self._shutdown_task: Optional[asyncio.Task] = None
 
     @property
     def enabled(self) -> bool:
@@ -34,7 +39,79 @@ class SandboxPool:
         return self._pool.qsize()
 
     def start_background_init(self) -> None:
+        self._assert_open()
         self._track_background_task(self._initialize())
+
+    def _assert_open(self) -> None:
+        if self._closing:
+            raise RuntimeError("Sandbox pool is shutting down")
+
+    async def _run_owned(self, operation, *, discard=None):
+        """The pool owns admitted work until it settles, including cancellation."""
+        if self._closing:
+            operation.close()
+            self._assert_open()
+        task = asyncio.create_task(operation)
+        self._foreground_tasks.add(task)
+        settled = asyncio.get_running_loop().create_future()
+        self._foreground_settled[task] = settled
+        failure = None
+        try:
+            return await self._receive_owned(task, discard=discard)
+        except BaseException as error:
+            failure = error
+            raise
+        finally:
+            # A finished child is not yet a delivered resource. Shutdown joins
+            # the caller's handoff/retirement too, before closing shared stores.
+            settled.set_result(failure)
+            self._foreground_tasks.discard(task)
+            self._foreground_settled.pop(task, None)
+
+    async def _receive_owned(self, task, *, discard=None):
+        try:
+            result = await asyncio.shield(task)
+        except asyncio.CancelledError as cancellation:
+            task.cancel()
+            async def settle():
+                try:
+                    result = await task
+                except asyncio.CancelledError as settled:
+                    if settled.__cause__ is not None:
+                        raise settled.__cause__
+                    return
+                # Cancellation can race the final handoff of an acquired sandbox.
+                if discard is not None:
+                    await discard(result)
+            try:
+                await join_cleanup(asyncio.create_task(settle()))
+            except asyncio.CancelledError as settled:
+                if settled.__cause__ is not None:
+                    raise cancellation from settled.__cause__
+            except BaseException as error:
+                raise cancellation from error
+            raise cancellation
+        if self._closing and discard is not None:
+            await discard(result)
+            raise asyncio.CancelledError("Sandbox pool closed before acquisition handoff")
+        return result
+
+    @staticmethod
+    async def _destroy(sandbox) -> None:
+        async def destroy():
+            if not await sandbox.destroy():
+                raise RuntimeError("Sandbox destroy returned false")
+        await join_cleanup(asyncio.create_task(destroy()))
+
+    async def _release_after_failure(self, sandbox, error: BaseException) -> None:
+        try:
+            await self._destroy(sandbox)
+        except asyncio.CancelledError as cancellation:
+            if cancellation.__cause__ is not None:
+                raise BaseExceptionGroup("Sandbox operation and cleanup failed", [error, cancellation.__cause__])
+            raise error
+        except BaseException as cleanup_error:
+            raise BaseExceptionGroup("Sandbox operation and cleanup failed", [error, cleanup_error])
 
     def _track_background_task(self, coro) -> asyncio.Task:
         task = asyncio.create_task(coro)
@@ -80,24 +157,28 @@ class SandboxPool:
         ).to_list()
         name_prefix = get_settings().sandbox_name_prefix
         for record in records:
+            self._assert_open()
             if not is_sandbox_container_name(record.container_name, name_prefix):
                 continue
             sandbox = None
             try:
                 sandbox = await DockerSandbox.get(record.container_name)
                 available = await sandbox.is_available()
+            except asyncio.CancelledError as error:
+                if sandbox is not None:
+                    await self._release_after_failure(sandbox, error)
+                raise
             except Exception:
                 available = False
 
             if available and self._pool.qsize() < self._pool_size:
-                await self._pool.put(sandbox)
+                self._pool.put_nowait(sandbox)
                 logger.info("Adopted existing warm sandbox %s", record.container_name)
                 continue
 
             if sandbox is not None:
                 try:
-                    if not await sandbox.destroy():
-                        raise RuntimeError("sandbox destroy returned false")
+                    await self._destroy(sandbox)
                     continue
                 except Exception as exc:
                     logger.warning("Failed to retire orphan warm sandbox %s: %s", record.container_name, exc)
@@ -109,24 +190,33 @@ class SandboxPool:
             await record.save()
 
     async def acquire(self) -> 'DockerSandbox':
+        return await self._run_owned(self._acquire(), discard=self._destroy)
+
+    async def _acquire(self) -> 'DockerSandbox':
         while True:
+            self._assert_open()
             try:
                 sandbox = self._pool.get_nowait()
             except asyncio.QueueEmpty:
                 logger.warning("Sandbox pool empty, falling back to direct creation")
                 return await self._create_and_warm()
 
-            if await sandbox.is_available():
+            try:
+                available = await sandbox.is_available()
+                self._assert_open()
+            except BaseException as error:
+                await self._release_after_failure(sandbox, error)
+                raise
+            if available:
                 logger.info(f"Acquired warm sandbox {sandbox.id} from pool (remaining: {self._pool.qsize()})")
                 self.schedule_replenish()
                 return sandbox
 
             logger.warning("Discarding unavailable warm sandbox %s", sandbox.id)
-            if not await sandbox.destroy():
-                logger.error("Failed to destroy unavailable warm sandbox %s", sandbox.id)
+            await self._destroy(sandbox)
 
     def schedule_replenish(self) -> None:
-        if self._pool_size <= 0:
+        if self._closing or self._pool_size <= 0:
             return
         if self._replenish_task and not self._replenish_task.done():
             return
@@ -138,8 +228,9 @@ class SandboxPool:
         from app.infrastructure.models.documents import SandboxRecordDocument
 
         sandbox = await LocalDockerRuntime().allocate_local_warm(wait_for_capacity=wait_for_capacity)
-        await DockerSandbox.create_record(sandbox.id, sandbox.ip, status="warming")
         try:
+            self._assert_open()
+            await DockerSandbox.create_record(sandbox.id, sandbox.ip, status="warming")
             ensure_api_ready = getattr(sandbox, "ensure_api_ready", None)
             if callable(ensure_api_ready):
                 await ensure_api_ready()
@@ -153,15 +244,15 @@ class SandboxPool:
             record.status = "warm"
             record.last_used_at = datetime.now(UTC)
             await record.save()
+            self._assert_open()
             return sandbox
-        except Exception:
-            if not await sandbox.destroy():
-                logger.error("Failed to destroy sandbox %s after warm-up error", sandbox.id)
+        except BaseException as error:
+            await self._release_after_failure(sandbox, error)
             raise
 
     async def _replenish(self):
         async with self._replenish_lock:
-            if self._pool.qsize() >= self._pool_size:
+            if self._closing or self._pool.qsize() >= self._pool_size:
                 return
             deficit = self._pool_size - self._pool.qsize()
             logger.info(f"Replenishing sandbox pool ({deficit} needed, creating 1)")
@@ -170,7 +261,8 @@ class SandboxPool:
                 # hold the resize lock indefinitely. User-facing acquire still
                 # waits for capacity without a deadline.
                 sandbox = await self._create_and_warm(wait_for_capacity=False)
-                await self._pool.put(sandbox)
+                # No await between the completed creation and ownership transfer.
+                self._pool.put_nowait(sandbox)
             except asyncio.CancelledError:
                 raise
             except Exception as e:
@@ -183,15 +275,19 @@ class SandboxPool:
             else:
                 await asyncio.sleep(self._replenish_interval_seconds)
             finally:
-                if self._pool.qsize() < self._pool_size:
+                if not self._closing and self._pool.qsize() < self._pool_size:
                     self._replenish_task = None
                     self.schedule_replenish()
 
     async def resize(self, pool_size: int) -> None:
         """Apply a new warm target without restarting the backend."""
+        await self._run_owned(self._resize(pool_size))
+
+    async def _resize(self, pool_size: int) -> None:
         target = max(0, int(pool_size))
         surplus = []
         async with self._replenish_lock:
+            self._assert_open()
             previous = self._pool_size
             self._pool_size = target
             while self._pool.qsize() > target:
@@ -199,27 +295,40 @@ class SandboxPool:
                     surplus.append(self._pool.get_nowait())
                 except asyncio.QueueEmpty:
                     break
-        for sandbox in surplus:
-            try:
-                if not await sandbox.destroy():
-                    raise RuntimeError("sandbox destroy returned false")
-            except Exception as exc:
-                logger.error("Failed to destroy surplus warm sandbox %s: %s", sandbox.id, exc)
+        await join_cleanup(asyncio.create_task(cleanup_steps(
+            *(lambda sandbox=sandbox: self._destroy(sandbox) for sandbox in surplus)
+        )))
         logger.info("Resized sandbox warm pool from %s to %s", previous, target)
         if self.enabled and self._pool.qsize() < self._pool_size:
             self.schedule_replenish()
 
     async def shutdown(self):
+        if self._shutdown_task is None:
+            self._closing = True
+            self._shutdown_task = asyncio.create_task(self._shutdown())
+        await join_cleanup(self._shutdown_task)
+
+    async def _shutdown(self):
         logger.info(f"Shutting down sandbox pool, destroying {self._pool.qsize()} warm containers")
-        for task in list(self._background_tasks):
+        tasks = tuple(self._background_tasks | self._foreground_tasks)
+        handoffs = tuple(self._foreground_settled.values())
+        for task in tasks:
             task.cancel()
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+        results.extend(await asyncio.gather(*handoffs))
+        errors = []
+        for result in results:
+            while isinstance(result, asyncio.CancelledError):
+                result = result.__cause__
+            if isinstance(result, BaseException) and all(result is not error for error in errors):
+                errors.append(result)
         while not self._pool.empty():
             try:
                 sandbox = self._pool.get_nowait()
-                if not await sandbox.destroy():
-                    raise RuntimeError("sandbox destroy returned false")
-            except Exception as e:
-                logger.error(f"Failed to destroy pooled sandbox: {e}")
+                await self._destroy(sandbox)
+            except BaseException as error:
+                errors.append(error)
+        raise_cleanup_errors(errors)
 
 
 def get_sandbox_pool() -> Optional[SandboxPool]:

@@ -13,6 +13,7 @@ from app.domain.models.execution_node import ExecutionNodeCapacity, ExecutionNod
 from app.core.config import get_settings
 from app.domain.models.session import Session
 from app.domain.models.dataset import DatasetMount
+from app.domain.utils.shutdown import join_cleanup
 from app.infrastructure.models.documents import ExecutionNodeDocument, SandboxAllocationDocument
 from app.infrastructure.external.sandbox.docker_sandbox import DockerSandbox
 from app.infrastructure.external.sandbox.node_health import LOCAL_DEFAULT_NODE_ID, check_execution_node, ensure_local_default_node, mark_execution_node_unhealthy, resolve_node_credential
@@ -392,6 +393,46 @@ async def _upsert_allocation(
         logger.warning("Failed to upsert sandbox allocation for %s: %s", sandbox.id, exc)
 
 
+async def _retire_failed_allocation(sandbox: Sandbox, failure: BaseException) -> None:
+    async def destroy() -> None:
+        if not await sandbox.destroy():
+            raise RuntimeError("Sandbox allocation cleanup failed")
+
+    try:
+        await join_cleanup(asyncio.create_task(destroy()))
+    except BaseException as cleanup_error:
+        raise BaseExceptionGroup("Sandbox allocation and cleanup failed", [failure, cleanup_error])
+
+
+async def _own_sandbox_allocation(operation) -> Sandbox:
+    """Creation owns its result until the caller receives it, even on cancel.
+
+    Cancelling a Docker to_thread or worker HTTP await does not cancel the
+    external creation. Keep that transaction alive, then retire its returned
+    handle before releasing the admission slot. Capacity waiting happens before
+    this helper and remains immediately cancellable.
+    """
+    creation = asyncio.create_task(operation)
+    try:
+        return await asyncio.shield(creation)
+    except asyncio.CancelledError as cancellation:
+        async def retire_creation() -> None:
+            sandbox = await creation
+            await _retire_failed_allocation(sandbox, cancellation)
+
+        try:
+            await join_cleanup(asyncio.create_task(retire_creation()))
+        except BaseException as error:
+            # join_cleanup preserves repeated cancellation via its cause; don't
+            # lose a real creation/retirement failure inside a CancelledError.
+            while isinstance(error, asyncio.CancelledError):
+                error = error.__cause__
+            if error is not None:
+                raise BaseExceptionGroup("Sandbox creation cancellation and cleanup failed", [cancellation, error])
+            raise cancellation
+        raise cancellation
+
+
 class LocalDockerRuntime:
     async def allocate(self, session: Optional[Session] = None, dataset_ids: Sequence[str] | None = None) -> Sandbox:
         required_node_ids = None
@@ -417,7 +458,11 @@ class LocalDockerRuntime:
                         if dataset_service
                         else []
                     )
-                    return await self._allocate_on_node(node, session, mounts)
+                    return await _own_sandbox_allocation(self._allocate_on_node(node, session, mounts))
+                except BaseExceptionGroup:
+                    # Failed retirement leaves ownership unresolved. Never
+                    # allocate another container on a different node as retry.
+                    raise
                 except Exception as exc:
                     last_error = exc
                     logger.warning("Sandbox allocation failed on node %s: %s", node.node_id, exc)
@@ -450,16 +495,20 @@ class LocalDockerRuntime:
                 )
             else:
                 sandbox = await DockerSandbox.create(list(mounts)) if mounts else await DockerSandbox.create()
-        if session and node.type != ExecutionNodeType.WORKER_AGENT:
-            await DockerSandbox.create_record(
-                sandbox.id,
-                sandbox.ip,
-                status="assigned",
-                session_id=session.id,
-            )
-        if session:
-            await _upsert_allocation(sandbox=sandbox, node_id=node.node_id, session=session)
-        return NodeBoundSandbox(sandbox, node)
+        try:
+            if session and node.type != ExecutionNodeType.WORKER_AGENT:
+                await DockerSandbox.create_record(
+                    sandbox.id,
+                    sandbox.ip,
+                    status="assigned",
+                    session_id=session.id,
+                )
+            if session:
+                await _upsert_allocation(sandbox=sandbox, node_id=node.node_id, session=session)
+            return NodeBoundSandbox(sandbox, node)
+        except BaseException as error:
+            await _retire_failed_allocation(sandbox, error)
+            raise
 
     async def allocate_local_warm(self, *, wait_for_capacity: bool = True) -> Sandbox:
         """Allocate a warm-pool sandbox only on this backend's Docker node."""
@@ -468,13 +517,51 @@ class LocalDockerRuntime:
             {LOCAL_DEFAULT_NODE_ID}, wait_for_capacity=wait_for_capacity,
         ) as candidates:
             node = candidates[0]
-            sandbox = await self._allocate_on_node(node)
-            await _upsert_allocation(
-                sandbox=sandbox,
-                node_id=node.node_id,
-                status=SandboxAllocationStatus.RUNNING,
-            )
-            return sandbox
+            async def release(sandbox, failure):
+                async def destroy():
+                    if not await sandbox.destroy():
+                        raise RuntimeError("Warm allocation cleanup failed")
+                try:
+                    await join_cleanup(asyncio.create_task(destroy()))
+                except asyncio.CancelledError as cancellation:
+                    if cancellation.__cause__ is not None:
+                        raise BaseExceptionGroup("Warm allocation and cleanup failed", [failure, cancellation.__cause__])
+                    raise failure
+                except BaseException as cleanup_error:
+                    raise BaseExceptionGroup("Warm allocation and cleanup failed", [failure, cleanup_error])
+
+            # Capacity waiting above remains cancellable. Once creation starts,
+            # retain ownership until it yields a handle we can return or retire;
+            # cancelling an await must not orphan a Docker-side creation.
+            creation = asyncio.create_task(self._allocate_on_node(node))
+            try:
+                sandbox = await asyncio.shield(creation)
+            except asyncio.CancelledError as cancellation:
+                async def retire_creation():
+                    sandbox = await creation
+                    await release(sandbox, cancellation)
+                try:
+                    await join_cleanup(asyncio.create_task(retire_creation()))
+                except BaseException as error:
+                    # Repeated cancellation after successful cleanup is still
+                    # cancellation; a real creation/cleanup failure must survive
+                    # gather(return_exceptions=True), which erases cancel causes.
+                    while isinstance(error, asyncio.CancelledError):
+                        error = error.__cause__
+                    if error is not None:
+                        raise BaseExceptionGroup("Warm creation cancellation and cleanup failed", [cancellation, error])
+                    raise cancellation
+                raise cancellation
+            try:
+                await _upsert_allocation(
+                    sandbox=sandbox,
+                    node_id=node.node_id,
+                    status=SandboxAllocationStatus.RUNNING,
+                )
+                return sandbox
+            except BaseException as error:
+                await release(sandbox, error)
+                raise
 
     async def restore(self, sandbox_id: str) -> Sandbox:
         allocation = await _restore_allocation_for_sandbox(sandbox_id)
@@ -583,16 +670,23 @@ class SandboxClassRuntime:
                 LOCAL_DEFAULT_NODE_ID,
                 user_id=session.user_id if session else None,
             )
-        sandbox = await self._sandbox_cls.create(mounts=mounts) if mounts else await self._sandbox_cls.create()
-        if isinstance(sandbox, DockerSandbox) and session:
-            await DockerSandbox.create_record(
-                sandbox.id,
-                sandbox.ip,
-                status="assigned",
-                session_id=session.id,
-            )
-            await _upsert_allocation(sandbox=sandbox, node_id=LOCAL_DEFAULT_NODE_ID, session=session)
-        return sandbox
+        async def create() -> Sandbox:
+            sandbox = await self._sandbox_cls.create(mounts=mounts) if mounts else await self._sandbox_cls.create()
+            try:
+                if isinstance(sandbox, DockerSandbox) and session:
+                    await DockerSandbox.create_record(
+                        sandbox.id,
+                        sandbox.ip,
+                        status="assigned",
+                        session_id=session.id,
+                    )
+                    await _upsert_allocation(sandbox=sandbox, node_id=LOCAL_DEFAULT_NODE_ID, session=session)
+                return sandbox
+            except BaseException as error:
+                await _retire_failed_allocation(sandbox, error)
+                raise
+
+        return await _own_sandbox_allocation(create())
 
     async def restore(self, sandbox_id: str) -> Sandbox:
         return await self._sandbox_cls.get(sandbox_id)

@@ -202,7 +202,7 @@ def invoke(monkeypatch, response, **kwargs):
     return client, lambda: module.read_dataset_host_file("/data/source", "nested/file.nc", 0, 3, **kwargs)
 
 
-def test_docker_protocol_resources_bounds_and_cleanup(monkeypatch):
+def test_docker_protocol_resources_bounds_and_cleanup(monkeypatch, expected_helper_security_options):
     client, run = invoke(monkeypatch, frame(b"diagnostic", 2) + output())
     data, metadata = run()
     assert data == b"abc" and metadata["size"] == 3
@@ -213,7 +213,7 @@ def test_docker_protocol_resources_bounds_and_cleanup(monkeypatch):
     assert options["mounts"] == [{"Target": "/host", "Source": "/", "Type": "bind", "ReadOnly": True}]
     assert options["cap_drop"] == ["ALL"] and options["pids_limit"] == 16
     assert options["mem_limit"] == options["memswap_limit"] == "384m"
-    assert options["security_opt"] == ["no-new-privileges:true"]
+    assert options["security_opt"] == expected_helper_security_options
     assert "ports" not in options and "volumes" not in options and "tmpfs" not in options
     assert options["log_config"]["Type"] == "none"
     assert options["entrypoint"] == ["python3"] and options["command"][0] == "-c"

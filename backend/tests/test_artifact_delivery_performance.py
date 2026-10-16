@@ -14,6 +14,7 @@ from app.domain.models.event import (
     ToolStatus,
 )
 from app.domain.models.file import FileInfo
+from app.domain.models.tool_result import ToolResult
 from app.domain.models.plan import ExecutionStatus, Step
 from app.domain.services.agent_task_runner import (
     ARTIFACT_HASH_METADATA_KEY,
@@ -41,6 +42,17 @@ def _allow_controller_resolution():
     )
 
 
+@pytest.mark.parametrize("returncode", [0, 7, -9, None])
+def test_completed_shell_console_preserves_actual_exit_without_coercion(returncode):
+    event = ToolEvent(tool_call_id="exit-test", tool_name="shell", function_name="shell_run",
+        function_args={"command": "analysis-command"}, status=ToolStatus.CALLED,
+        function_result=ToolResult(success=returncode == 0,
+            data={"status": "completed", "command": "analysis-command", "output": "", "returncode": returncode}))
+    console = AgentTaskRunner._completed_shell_console_from_result(event)
+    assert console[0]["returncode"] == returncode
+    assert console[0]["output"] == ""
+
+
 def test_dataset_analysis_tool_renders_safe_result_console_without_program_source():
     event = ToolEvent(
         status=ToolStatus.CALLED,
@@ -62,7 +74,6 @@ def test_dataset_analysis_tool_renders_safe_result_console_without_program_sourc
         "command": "分析数据集并生成成果",
         "output": "已生成降水趋势图。",
         "status": "completed",
-        "returncode": 0,
     }]
     assert "base64" not in str(console).lower()
 

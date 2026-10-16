@@ -169,6 +169,8 @@ test('an unconfirmed stop retains identity and replays missing results before a 
   assert.equal(h.session.messages.value[0].content.content, 'first');
   h.observe({ accepted: true, state: 'completed', event_seq: 1 });
   assert.equal(await h.session.send({ message: 'next draft' }), false);
+  assert.equal(h.requests.length, 1, 'new input cannot replace unresolved stop ownership');
+  await h.session.retryPendingInput();
   assert.equal(h.requests[1][1], '');
   terminal(h.requests[1]);
   assert.equal(await h.session.send({ message: 'next draft' }), true);

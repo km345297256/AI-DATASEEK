@@ -1,7 +1,7 @@
 # Frontend browser regression gate
 
 `scripts/check-regressions.sh` now runs `npm run test:browser` after the frontend
-production build. The gate requires all six scenarios; missing browser engines
+production build. The gate requires all eight scenarios; missing browser engines
 are errors, never skips. For a frontend-only check:
 
 ```sh
@@ -31,9 +31,9 @@ single diagnostic scenario, set `DATASEEK_BROWSER_ENGINE=webkit` and execute
 
 ## Scope and evidence
 
-- Chromium: existing chat layout, follow-up outcomes, task status/focus, and the
-  new session recovery scenario.
-- WebKit: chat layout/input/reading anchors and the same session recovery scenario.
+- Chromium: chat layout, follow-up outcomes, task status/focus, session recovery,
+  and shell console details.
+- WebKit: chat layout/input/reading anchors, session recovery, and shell console details.
 - Chat layout exercises the real ChatBox and ConversationViewport. OS IME
   automation is not claimed: real browser KeyboardEvents cover `isComposing`
   and Safari's keyCode 229, followed by a native ordinary Enter. History prepend
@@ -45,8 +45,17 @@ single diagnostic scenario, set `DATASEEK_BROWSER_ENGINE=webkit` and execute
   It covers pre-acknowledgement EOF retry, protocol failure, original-ID manual
   recovery, receipt-confirmed read-only replay, local echo/attachment handoff,
   retained newer draft, and late receipt/history responses after a session switch.
+  It also covers stop acknowledgement followed by delayed outcome/attachments,
+  an outcome-only EOF before terminal replay, and failed/uncertain stops. These
+  recoveries use the original `observe_client_message_id` with no resubmission;
+  a new send stays blocked until the durable terminal is observed, and the newer
+  draft remains intact. Automatic and explicit recovery both stay read-only.
   Its minimal DOM is a state/transport harness, not a replacement visual snapshot
   of ChatPage or DatasetSeekPage.
+- Shell console uses the real ShellToolView and built styles. It checks explicit
+  zero/nonzero/negative/unknown exit status, suppresses invented status for older
+  synthetic dataset/spill records, and covers escaping, sensitive display text,
+  fallback messaging and unmount cleanup without backend access.
 
 The recovery scenario expects exactly two existing `API request failed network`
 console diagnostics from intentionally aborted receipt/history reads. Other
@@ -59,3 +68,12 @@ model, or access user datasets. JSON reports and screenshots go to newly created
 temporary directories printed as `BROWSER_REPORT`. Reports include the engine;
 baseline refresh is not automatic. A WebKit pass is targeted compatibility
 evidence, not a claim that every Safari feature or page has been tested.
+
+## Release compatibility
+
+Ship the input-scoped stop observation change with its matching backend. Do not
+publish only this frontend against an older backend, or roll back only the
+backend: older chat schemas ignore `observe_client_message_id` and cannot enforce
+the target-input boundary. Old frontends remain accepted by the new backend.
+The release/protocol notification is advisory, not a deployment gate or capability
+handshake. It never refreshes the page, cancels work, or resubmits analysis.
