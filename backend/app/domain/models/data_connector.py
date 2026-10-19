@@ -40,7 +40,7 @@ class ConnectorFile(StrictRecord):
     checksum_origin: Literal['computed_locally'] = 'computed_locally'
     file_id: str = Field(min_length=1, max_length=200)
     filename: str = Field(pattern=r"^[A-Za-z0-9][A-Za-z0-9._-]{0,199}$")
-    size: int = Field(gt=0, le=32 * 1024 * 1024)
+    size: int = Field(gt=0, le=64 * 1024 * 1024)
     sha256: str = Field(pattern=r'^[a-f0-9]{64}$')
     source_url: str
 

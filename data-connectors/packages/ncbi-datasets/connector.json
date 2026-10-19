@@ -102,7 +102,7 @@
               },
               "size": {
                 "exclusiveMinimum": 0,
-                "maximum": 33554432,
+                "maximum": 67108864,
                 "title": "Size",
                 "type": "integer"
               },
@@ -318,7 +318,7 @@
               },
               "size": {
                 "exclusiveMinimum": 0,
-                "maximum": 33554432,
+                "maximum": 67108864,
                 "title": "Size",
                 "type": "integer"
               },
@@ -535,7 +535,7 @@
               },
               "size": {
                 "exclusiveMinimum": 0,
-                "maximum": 33554432,
+                "maximum": 67108864,
                 "title": "Size",
                 "type": "integer"
               },

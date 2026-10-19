@@ -34,4 +34,4 @@ def connector_results(event):
             continue
         resources.append(public.model_dump())
     return dict(connector_id=connector, title=titles[connector], resources=resources,
-                can_download=connector == 'ncbi-datasets-v2', total_count=data.get('total_count'))
+                can_download=True, total_count=data.get('total_count'))

@@ -18,7 +18,7 @@ def event(connector='ncbi-geo'):
 def test_projection_preserves_actionable_public_fields():
     view=connector_results(event())
     assert view['resources'][0]['source_url'].endswith('?acc=GSE123')
-    assert not view['can_download']
+    assert view['can_download']
     assert connector_results(event().model_copy(update={'status':ToolStatus.CALLING})) is None
     assert connector_results(event().model_copy(update={'function_result':{'success':False}})) is None
 

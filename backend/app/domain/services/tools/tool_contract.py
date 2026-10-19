@@ -195,7 +195,7 @@ def audited_public_data_read(tool: Any, arguments: dict | None = None) -> bool:
             and isinstance(arguments.get("operation"), str)
             and arguments.get("operation") in {
                 "ncbi-datasets-v2": {"search", "describe"},
-                "ncbi-geo": {"search"}, "ncbi-sra": {"search"},
+                "ncbi-geo": {"search", "list_files"}, "ncbi-sra": {"search", "list_files"},
             }.get(arguments.get("connector_id"), set()))
 
 

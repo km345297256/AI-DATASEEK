@@ -148,7 +148,7 @@ Agent 将该受管文件复制到沙箱 output，复用同一个文件引用交�
 
 每页 1–20 条，保持 query 不变，将 `next_cursor` 转为整数传入下一页 `offset`（最多 10000）。固定官方 HTTPS 接口，不接受调用者指定 URL，不跟随重定向；限制响应大小、超时、请求频率。公开元数据查询无需逐次批准；下载等其他操作不因此获得授权。
 
-这两个连接器当前仅检索元数据，未提供 `acquire`，不会宣称已经下载表达矩阵或 FASTQ。基因组组装查询与下载仍使用 `ncbi-datasets-v2`。
+这两个连接器支持 `search`、`list_files`、`acquire`。基因组组装查询与下载仍使用 `ncbi-datasets-v2`。
 
 官方协议：[GEO programmatic access](https://www.ncbi.nlm.nih.gov/geo/info/geo_paccess.html)、[SRA search](https://www.ncbi.nlm.nih.gov/sra/docs/srasearch/)。
 
@@ -157,6 +157,23 @@ Agent 将该受管文件复制到沙箱 output，复用同一个文件引用交�
 成功检索事件提供可展开的结果列表，支持逐条勾选、全选和打开来源。列表从服务端保存的成功工具结果生成；导入请求只提交工具调用编号和选中资源编号，不接受浏览器提供的下载地址或宿主路径。
 
 - NCBI 基因组：下载 genomic FASTA ZIP 到当前任务沙盒（每次最多 3 个，每包最多 32 MiB）。
-- 所有内置连接器：把所选编号、标题、来源导入 CSV 检索清单。GEO/SRA 明确标注原始文件下载尚未接入，清单不冒充表达矩阵或 FASTQ。
+- 所有内置连接器：把所选编号、标题、来源导入 CSV 检索清单。清单是独立的整理功能，不冒充表达矩阵或 FASTQ。
 - 成功导入后，用户可点击“用这些文件分析”，把文件附件加入当前输入框并补充分析要求；不自动发送任务。
 - 导入仅允许任务所有者操作；运行中的任务暂不允许导入，避免与分析并发。只有沙盒上传成功才显示已导入，部分失败按文件反馈。
+
+
+## GEO/SRA 实际文件下载
+
+在结果面板勾选研究后，点击“查看可下载文件”，再勾选实际文件并“下载所选文件到沙盒”。每个文件分别显示下载、校验、导入结果，单项失败不覆盖其他成功项；可重试失败项，已成功持久化且校验一致的文件复用缓存。成功文件可直接带入下一条分析请求。
+
+- GEO：读取 `ftp.ncbi.nlm.nih.gov` 官方 Series 的 `suppl/`、`matrix/` 目录。`_RAW.tar` 标注原始包，矩阵明确标注处理后数据，其他补充文件不推断其原始性。根据官方 RAW 文件清单补充列出可独立获取的 GSM 样本文件，避免下载整个研究包。保留原始压缩格式，不自动解包。
+- SRA：使用 ENA `filereport` 查询实验对应的 Run 与公开 FASTQ 文件，固定从 `ftp.sra.ebi.ac.uk` HTTPS 下载。逐文件核对官方 MD5、字节数和 gzip 完整性。双端数据由用户选择两个 mate，不将单端文件称作完整双端数据。
+- 每次最多查看 3 条研究，每条最多展示 20 个文件；每个 GEO/SRA 文件最多 64 MiB，gzip 展开校验最多 256 MiB。超限文件显示原因并禁用，不截断或用元数据替代。基因组 ZIP 仍为 32 MiB。当前没有后台大文件队列或断点续传。
+- `list_files` 参数为 `accession`；返回 `resources[].id` 及文件属性。`acquire` 参数为 `accession`、`file_ids`（单个文件）。文件选择凭据保存于当前用户、当前任务，下载不接受客户端 URL；公开文件列表查询不要求重复审批。
+- 若无公开文件、ENA 尚未镜像、校验失败或下载超时，返回对应原因，不报告导入成功。SHA-256 为本地计算值；只有 SRA 的 MD5 与 ENA 提供值进行了比对。
+
+协议依据：[GEO 下载说明](https://www.ncbi.nlm.nih.gov/geo/info/geo_paccess.html)、[ENA 文件报告](https://ena-docs.readthedocs.io/en/latest/retrieval/programmatic-access/file-reports.html)。
+
+下载对支持 HTTP Range 的已知长度文件采用最多 8 路、每段 256 KiB 的有界并行传输；严格检查 Content-Range 和每段字节数，合并后再做整体校验，失败不交付残缺文件。单次下载总超时 45 秒。
+
+小样例验收使用 GSE1000 的 GSM15785.cel.gz（3,460,434 字节）和 DRX000488 的 DRR000792.fastq.gz（1,125,203 字节）。本地和线上均通过真实检索结果选择文件、下载、上传沙盒；在沙盒读取 CEL 文件头和 FASTQ 记录，后者共 6,493 条，逐条核对序列与质量长度。本验证只检查下载及可读性，不作研究结论。
