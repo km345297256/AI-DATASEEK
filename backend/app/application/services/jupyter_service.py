@@ -27,11 +27,11 @@ class JupyterService:
 
     @staticmethod
     def _name(session_id: str) -> str:
-        return f"ai-dataseek-jupyter-{session_id}"
+        return f"{get_settings().jupyter_name_prefix}-{session_id}"
 
     @staticmethod
     def _volume(session_id: str) -> str:
-        return f"ai-dataseek-jupyter-work-{session_id}"
+        return f"{get_settings().jupyter_name_prefix}-work-{session_id}"
 
     @staticmethod
     def proxy_base_path(session_id: str) -> str:

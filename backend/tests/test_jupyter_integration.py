@@ -95,3 +95,11 @@ def test_jupyter_proxy_ticket_is_scoped_to_session_and_resource_type():
     service = TokenService()
     assert _jupyter_ticket_user(service, "ticket", "session-a") == "user-a"
     assert _jupyter_ticket_user(service, "ticket", "session-b") is None
+
+
+def test_jupyter_names_follow_deployment_prefix(monkeypatch):
+    from app.application.services import jupyter_service
+    from types import SimpleNamespace
+    monkeypatch.setattr(jupyter_service, "get_settings", lambda: SimpleNamespace(jupyter_name_prefix="datalab-jupyter"))
+    assert jupyter_service.JupyterService._name("session123") == "datalab-jupyter-session123"
+    assert jupyter_service.JupyterService._volume("session123") == "datalab-jupyter-work-session123"

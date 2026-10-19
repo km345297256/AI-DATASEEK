@@ -1,4 +1,4 @@
-name: ai-dataseek
+name: ${COMPOSE_PROJECT_NAME:-ai-dataseek}
 
 services:
   frontend:
@@ -22,7 +22,7 @@ services:
     image: ${BACKEND_IMAGE:-ai-dataseek-backend:${IMAGE_TAG:-latest}}
     build:
       context: .
-      dockerfile: backend/Dockerfile
+      dockerfile: ${BACKEND_DOCKERFILE:-backend/Dockerfile}
     env_file:
       - .env
     environment:
@@ -34,11 +34,12 @@ services:
       MINIO_BUCKET: ai-dataseek-files
       SANDBOX_ISOLATION: session
       SANDBOX_IMAGE: ${SANDBOX_IMAGE:-ai-dataseek-sandbox:${IMAGE_TAG:-latest}}
-      SANDBOX_NAME_PREFIX: ai-dataseek-sandbox
-      SANDBOX_NETWORK: ai-dataseek-network
+      SANDBOX_NAME_PREFIX: ${STACK_PREFIX:-ai-dataseek}-sandbox
+      SANDBOX_NETWORK: ${STACK_PREFIX:-ai-dataseek}-network
       JUPYTER_IMAGE: ${JUPYTER_IMAGE:-ai-dataseek-jupyter:${IMAGE_TAG:-latest}}
+      JUPYTER_NAME_PREFIX: ${STACK_PREFIX:-ai-dataseek}-jupyter
       DATASET_STORAGE_ROOT: /data/datasets
-      DATASET_MANAGED_VOLUME: ai-dataseek-dataset-data
+      DATASET_MANAGED_VOLUME: ${STACK_PREFIX:-ai-dataseek}-dataset-data
       SKILLS_DIR: /app/skills
       USER_SKILLS_DIR: /data/skills/users
       ONLYOFFICE_ENABLED: ${ONLYOFFICE_ENABLED:-false}
@@ -192,19 +193,19 @@ services:
 
 volumes:
   mongodb-data:
-    name: ai-dataseek-mongodb-data
+    name: ${STACK_PREFIX:-ai-dataseek}-mongodb-data
   minio-data:
-    name: ai-dataseek-minio-data
+    name: ${STACK_PREFIX:-ai-dataseek}-minio-data
   dataset-data:
-    name: ai-dataseek-dataset-data
+    name: ${STACK_PREFIX:-ai-dataseek}-dataset-data
   skills-data:
-    name: ai-dataseek-skills-data
+    name: ${STACK_PREFIX:-ai-dataseek}-skills-data
 
 networks:
   ai-dataseek-network:
-    name: ai-dataseek-network
+    name: ${STACK_PREFIX:-ai-dataseek}-network
     driver: bridge
   onlyoffice-internal:
-    name: ai-dataseek-onlyoffice-internal
+    name: ${STACK_PREFIX:-ai-dataseek}-onlyoffice-internal
     driver: bridge
     internal: true

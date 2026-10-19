@@ -172,6 +172,7 @@ class Settings(BaseSettings):
     sandbox_max_concurrent: int | None = None
     # Jupyter is intentionally independent from Agent sandboxes. Every task
     # receives a private container, kernel token and writable Docker volume.
+    jupyter_name_prefix: str = "ai-dataseek-jupyter"
     jupyter_image: str = "ai-dataseek-jupyter:latest"
     jupyter_memory_limit: str = "2g"
     jupyter_nano_cpus: int = 2_000_000_000
