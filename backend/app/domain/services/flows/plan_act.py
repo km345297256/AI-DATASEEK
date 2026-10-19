@@ -871,7 +871,8 @@ class PlanActFlow(BaseFlow):
                                 opaque_log_identifier(self._agent_id, namespace="agent"),
                                 len(event.plan.steps),
                             )
-                            yield TitleEvent(title=event.plan.title)
+                            if event.plan.title.strip():
+                                yield TitleEvent(title=event.plan.title)
                         yield event
                 logger.info(
                     "Agent state changed agent=%s from=%s to=%s",
@@ -885,6 +886,9 @@ class PlanActFlow(BaseFlow):
                         "Agent created plan with no steps agent=%s",
                         opaque_log_identifier(self._agent_id, namespace="agent"),
                     )
+                    yield MessageEvent(message=self.plan.message or (
+                        "当前可用工具无法直接执行此请求。请补充数据来源或数据类型，以便选择合适的检索方式。"
+                    ))
                     self.status = AgentStatus.COMPLETED
                     
             elif self.status == AgentStatus.EXECUTING:

@@ -287,3 +287,41 @@ async def test_approval_sse_recording_keeps_original_display_identity_and_bound_
     assert sse.event == "tool" and sse.data.tool_approval.status == "consumed"
     recording = create_event_recording(session_id="session-1", events=persisted)
     assert load_event_recording_jsonl(recording.to_jsonl()).to_jsonl() == recording.to_jsonl()
+
+
+@pytest.mark.asyncio
+async def test_public_ncbi_reads_need_no_approval_and_failure_does_not_block_next_read():
+    from app.domain.services.tools.data_discovery import DataDiscoveryToolkit
+    from app.domain.services.agents.base import BaseAgent
+    from app.domain.external.data_source import SourceConnectorError
+    from app.interfaces.schemas.event import connector_status_text
+    service = SimpleNamespace(search=AsyncMock(side_effect=[
+        SourceConnectorError("taxon_ambiguous_or_not_found"),
+        SimpleNamespace(model_dump=lambda **kw: {"candidates": [], "total_count": 0}),
+    ]))
+    toolkit = DataDiscoveryToolkit(user_id="user-1", session_id="session-1", service=service)
+    approvals, credentials, repository = services()
+    toolkit.tool_execution_pipeline = chain(approvals, credentials, names=tuple(t.name for t in toolkit.tools))
+    tool = next(t for t in toolkit.tools if t.name == "ncbi_search_genomes")
+    agent = object.__new__(BaseAgent)
+    first = await agent.invoke_tool(tool, {"id": "one", "name": tool.name, "args": {"taxon": "aging"}})
+    assert first.status == "error"
+    assert not agent._tool_execution_ledger.summary()["pending_execution"]
+    second = await agent.invoke_tool(tool, {"id": "two", "name": tool.name, "args": {"taxon": "9606"}})
+    assert second.status == "success"
+    assert not repository.records
+    event = ToolEvent(status=ToolStatus.CALLED, tool_call_id="one", tool_name="data_discovery",
+                      function_name=tool.name, function_args={}, function_result=first.artifact)
+    assert "TaxID" in connector_status_text(event)
+    assert "未知" not in connector_status_text(event)
+
+
+def test_public_read_classification_rejects_spoofing_and_acquire():
+    from app.domain.services.tools.data_discovery import DataDiscoveryToolkit
+    from app.domain.services.tools.tool_contract import audited_public_data_read, resolved_tool_is_read_only
+    toolkit = DataDiscoveryToolkit(user_id="user", session_id="session", service=object())
+    assert not audited_public_data_read(SimpleNamespace(name="ncbi_search_genomes", toolkit=toolkit))
+    call = next(t for t in toolkit.tools if t.name == "data_connector_call")
+    assert resolved_tool_is_read_only(call, {"connector_id": "ncbi-datasets-v2", "operation": "search"})
+    assert not resolved_tool_is_read_only(call, {"connector_id": "ncbi-datasets-v2", "operation": "acquire"})
+    assert not audited_public_data_read(call, {"connector_id": "custom", "operation": "search"})

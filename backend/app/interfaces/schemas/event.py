@@ -345,6 +345,19 @@ class EventMapper:
 
 def connector_status_text(event):
     """Expose a bounded explanation, never upstream bodies, paths or credentials."""
+    metadata_read = event.function_name in {'ncbi_search_genomes', 'ncbi_describe_genome'} or (
+        event.function_name == 'data_connector_call' and (event.function_args or {}).get('operation') in {'search', 'describe'})
+    if metadata_read:
+        if event.status != ToolStatus.CALLED:
+            return '正在查询公开数据元信息…'
+        result = event.function_result
+        result = result if isinstance(result, dict) else result.model_dump() if result else {}
+        data = result.get('data') or {}
+        if result.get('success') is True:
+            entries = data.get('candidates', data.get('resources'))
+            return f'元数据检索完成，本页返回 {len(entries)} 条结果。' if isinstance(entries, list) else '元数据读取完成。'
+        from app.domain.services.tools.data_discovery import metadata_error_message
+        return metadata_error_message(data.get('reason', 'unknown'))
     if event.function_name == 'ncbi_plan_acquisition':
         return '这一步仅查看下载计划，尚未开始下载。下载需要调用数据连接器的 acquire 操作。'
     if event.function_name != 'data_connector_call' or (event.function_args or {}).get('operation') != 'acquire':

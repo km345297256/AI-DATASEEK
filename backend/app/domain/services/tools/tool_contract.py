@@ -178,7 +178,24 @@ def validate_tool_arguments(tool: Any, tool_call: Any) -> Any:
     return {**tool_call, "args": validated_args}
 
 
-def resolved_tool_is_read_only(tool: Any) -> bool:
+def audited_public_data_read(tool: Any, arguments: dict | None = None) -> bool:
+    """Fixed-origin public metadata reads, identified by the host implementation."""
+    from app.domain.services.tools.base import Tool
+    from app.domain.services.tools.data_discovery import DataDiscoveryToolkit
+    if type(tool) is not Tool or type(getattr(tool, "toolkit", None)) is not DataDiscoveryToolkit:
+        return False
+    if not any(item is tool for item in tool.toolkit.tools):
+        return False
+    declarations = (DataDiscoveryToolkit.ncbi_search_genomes, DataDiscoveryToolkit.ncbi_describe_genome,
+                    DataDiscoveryToolkit.ncbi_plan_acquisition, DataDiscoveryToolkit.data_connector_list)
+    if any(tool._tool is declaration for declaration in declarations):
+        return True
+    return (tool._tool is DataDiscoveryToolkit.data_connector_call and isinstance(arguments, dict)
+            and arguments.get("connector_id") == "ncbi-datasets-v2"
+            and arguments.get("operation") in {"search", "describe"})
+
+
+def resolved_tool_is_read_only(tool: Any, arguments: dict | None = None) -> bool:
     """Use only a valid static contract from the resolved executable identity.
 
     Reuse the pipeline's contract resolution, but intentionally supply no
@@ -186,6 +203,8 @@ def resolved_tool_is_read_only(tool: Any) -> bool:
     claim that an arbitrary write was merely a read. Missing/empty/invalid
     contracts fail closed, including malformed fields unrelated to effects.
     """
+    if audited_public_data_read(tool, arguments):
+        return True
     from app.domain.external.plugin_runtime import ToolExecutionDescriptor
     from app.domain.services.tools.interceptors import _tool_execution_contract
     from app.domain.services.tools.pipeline import ToolExecutionContext

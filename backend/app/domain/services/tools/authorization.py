@@ -94,6 +94,13 @@ class ToolCallAuthorizationInterceptor(ToolExecutionInterceptor):
             await ToolPolicyGuardInterceptor(structural).guard(context)
             effects = frozenset(contract.get("effects", []))
             requirements = contract.get("credentials", [])
+            from app.domain.services.tools.tool_contract import audited_public_data_read
+            if (not context.metadata.get("plugin") and not permissions and not requirements
+                    and effects <= {"network", "sandbox_write"}
+                    and audited_public_data_read(context.tool, context.arguments)):
+                context.metadata["policy_decision"] = "allow"
+                context.metadata["policy_reason"] = "public_metadata_read"
+                return
             if not (effects & _RISK_EFFECTS or permissions or requirements):
                 return
             # Freeze the reviewed call without changing legacy low-risk calls.

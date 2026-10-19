@@ -302,3 +302,17 @@ async def test_snapshot_preserves_complete_catalog_models_and_task_initial_selec
     )
     assert other.fingerprint != first.fingerprint
     assert other.catalog.revision == first.catalog.revision
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("explanation", ["当前连接器检索基因组组装，不支持衰老主题；请确认研究数据库。", None])
+async def test_empty_plan_explains_capability_gap_instead_of_silent_completion(flow_factory, monkeypatch, explanation):
+    flow = flow_factory(_trial_profile())
+    async def create_plan(_message):
+        yield PlanEvent(status=PlanStatus.CREATED, plan=Plan(steps=[], message=explanation))
+    monkeypatch.setattr(flow.planner, "create_plan", create_plan)
+    events = [event async for event in flow.run(Message(message="检索衰老研究数据"))]
+    replies = [event.message for event in events if isinstance(event, MessageEvent)]
+    assert len(replies) == 1
+    assert replies[0] == (explanation or "当前可用工具无法直接执行此请求。请补充数据来源或数据类型，以便选择合适的检索方式。")
+    assert isinstance(events[-1], DoneEvent)

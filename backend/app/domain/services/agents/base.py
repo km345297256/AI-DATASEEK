@@ -534,7 +534,7 @@ class BaseAgent(ABC):
         retries = 0
         # Freeze host-authored execution evidence before the call. A returned
         # result or caller-provided metadata cannot downgrade uncertain writes.
-        read_only = resolved_tool_is_read_only(tool)
+        read_only = resolved_tool_is_read_only(tool, tool_call.get("args"))
         ledger = getattr(self, "_tool_execution_ledger", None)
         if ledger is None:
             ledger = self._tool_execution_ledger = ToolExecutionLedger()
@@ -910,7 +910,7 @@ class BaseAgent(ABC):
                     blocked_reason = self._analysis_progress.before_call(tool_call)
                     blocked_code = "analysis_no_progress_loop"
                 if (not blocked_reason and self._tool_execution_ledger.summary()["pending_execution"]
-                        and not resolved_tool_is_read_only(tool)
+                        and not resolved_tool_is_read_only(tool, tool_call.get("args"))
                         and not resolved_tool_can_observe_pending(tool, tool_call, self._tool_execution_ledger)):
                     report = await self._reconcile_execution()
                     notice = self._execution_progress_event(report)
@@ -958,7 +958,7 @@ class BaseAgent(ABC):
                 tool_result = await self.invoke_tool(tool, tool_call)
                 call_evidence = self._tool_execution_ledger.call_summary(tool_call_id)
                 self._analysis_progress.record(tool_call, succeeded=self._tool_result_succeeded(tool_result),
-                    read_only=resolved_tool_is_read_only(tool),
+                    read_only=resolved_tool_is_read_only(tool, tool_call.get("args")),
                     result_digest=private_identity_hmac({"purpose": "analysis-result/v1", "content": str(tool_result.content)[:65536]}),
                     confirmed_execution=bool(call_evidence["tracked_operation_count"] and call_evidence["execution_confirmed"]))
                 if (self._tool_result_succeeded(tool_result) and call_evidence.get("has_observable_pending")
