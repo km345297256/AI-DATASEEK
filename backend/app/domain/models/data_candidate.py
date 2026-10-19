@@ -2,6 +2,7 @@
 import hashlib
 import ipaddress
 import json
+import re
 from typing import Annotated, Literal
 from urllib.parse import urlsplit, urlunsplit
 
@@ -46,7 +47,10 @@ class CandidateInput(StrictRecord):
                     raise ValueError()
             # This is a reference only, never fetched. Drop credentials in query/fragment.
             authority = f"[{host}]" if ":" in host else host
-            return urlunsplit(("https", authority, parsed.path or "/", "", ""))
+            query = parsed.query if (host == "www.ncbi.nlm.nih.gov"
+                and parsed.path == "/geo/query/acc.cgi"
+                and re.fullmatch(r"acc=GSE[0-9]+", parsed.query)) else ""
+            return urlunsplit(("https", authority, parsed.path or "/", query, ""))
         except ValueError:
             raise ValueError("请填写不含登录信息的公开 HTTPS 来源链接") from None
 

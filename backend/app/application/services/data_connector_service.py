@@ -113,8 +113,32 @@ def ncbi_registration(service) -> RegisteredConnector:
         limitations=['支持单个组装的 genomic FASTA ZIP 下载，压缩包最多 32 MiB、解压总量最多 64 MiB；暂不支持大文件断点续传。', '公开数据源，无需账户授权；来源记录保存于当前任务。']), operations)
 
 
-def build_data_connector_service(ncbi_service):
-    return DataConnectorService([ncbi_registration(ncbi_service)])
+def topic_registration(client, database):
+    from app.infrastructure.external.data_sources.entrez import TopicSearch
+    connector_id, title = ('ncbi-geo', 'NCBI GEO') if database == 'gds' else ('ncbi-sra', 'NCBI SRA')
+
+    async def search(owner, session, args):
+        return await client.search(database, args)
+
+    descriptor = ConnectorOperation(name='search', title='主题检索',
+        description='按主题关键词检索公开研究元数据，支持衰老等主题；每页最多 20 条。',
+        input_schema=TopicSearch.model_json_schema(), output_schema=ConnectorResult.model_json_schema(),
+        effects=['network'], timeout_seconds=60)
+    return RegisteredConnector(ConnectorManifest(id=connector_id, version='1.0.0', title=title,
+        description=('检索 GEO 表达与功能基因组研究系列（GSE）。' if database == 'gds'
+                     else '检索 SRA 测序实验及其关联研究、Run 编号。'),
+        transport='native', auth='none', domains=['eutils.ncbi.nlm.nih.gov', 'www.ncbi.nlm.nih.gov'],
+        operations=[descriptor], limitations=['仅检索元数据，不下载原始文件；结果为单页关键词匹配，不代表全面筛选。',
+        '衰老展开为 aging OR senescence；其他主题可提供英文关键词或 Entrez 检索式。',
+        'SRA 按实验返回，同一研究可能包含多个实验；不可将实验数量当作研究数量。']),
+        {'search': RegisteredOperation(descriptor, TopicSearch, search)})
+
+
+def build_data_connector_service(ncbi_service, topic_client=None):
+    from app.infrastructure.external.data_sources.entrez import EntrezTopicConnector
+    client = topic_client or EntrezTopicConnector()
+    return DataConnectorService([ncbi_registration(ncbi_service),
+        topic_registration(client, 'gds'), topic_registration(client, 'sra')])
 
 
 def get_data_connector_service():

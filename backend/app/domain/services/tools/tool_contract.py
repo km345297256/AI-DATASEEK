@@ -191,8 +191,12 @@ def audited_public_data_read(tool: Any, arguments: dict | None = None) -> bool:
     if any(tool._tool is declaration for declaration in declarations):
         return True
     return (tool._tool is DataDiscoveryToolkit.data_connector_call and isinstance(arguments, dict)
-            and arguments.get("connector_id") == "ncbi-datasets-v2"
-            and arguments.get("operation") in {"search", "describe"})
+            and isinstance(arguments.get("connector_id"), str)
+            and isinstance(arguments.get("operation"), str)
+            and arguments.get("operation") in {
+                "ncbi-datasets-v2": {"search", "describe"},
+                "ncbi-geo": {"search"}, "ncbi-sra": {"search"},
+            }.get(arguments.get("connector_id"), set()))
 
 
 def resolved_tool_is_read_only(tool: Any, arguments: dict | None = None) -> bool:

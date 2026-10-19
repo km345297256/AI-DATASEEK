@@ -133,3 +133,21 @@ Agent 将该受管文件复制到沙箱 output，复用同一个文件引用交�
 下载调用旁显示等待批准、下载校验中、保存成功或具体失败原因。旧 ncbi_plan_acquisition 仍只返回计划并明确提示“未开始下载”，模型被指示使用 acquire 执行真实下载。
 
 本地验收：a7754f37151145fe 下载 GCF_000009045.1，交付接口再次取得 1,252,046 字节 ZIP，CRC 完整性通过，包内存在指定版本 genomic.fna。此为小样例功能验证，未开展科学分析。生产构建通过；沙箱全量仍受三项原有宿主依赖收集错误影响。
+
+## GEO / SRA 主题检索
+
+内置 `ncbi-geo` 和 `ncbi-sra` 连接器，均提供 `search`：
+
+```json
+{"query":"衰老","page_size":3,"offset":0}
+```
+
+使用 NCBI 官方 E-utilities 的 ESearch / ESummary。GEO 限定 `gse[ETYP]`，返回 GSE 研究系列；SRA 返回测序实验，附关联研究、Run 编号、物种和文库策略。SRA 的命中数量是实验数量，不能当作独立研究数量。结果中的原始词、实际检索式、检索时间和来源链接保留在工具执行记录中。
+
+“衰老”展开为 `aging OR senescence`；其他主题可使用英文关键词或 Entrez 检索式。未指定物种时不擅自增加物种条件。通用 NCBI 主题请求默认检索两个库，各取 3 条；用户明确选择连接器时遵守其选择。结果仅为关键词匹配样例，不宣称全面筛选或生物学相关性已经验证。
+
+每页 1–20 条，保持 query 不变，将 `next_cursor` 转为整数传入下一页 `offset`（最多 10000）。固定官方 HTTPS 接口，不接受调用者指定 URL，不跟随重定向；限制响应大小、超时、请求频率。公开元数据查询无需逐次批准；下载等其他操作不因此获得授权。
+
+这两个连接器当前仅检索元数据，未提供 `acquire`，不会宣称已经下载表达矩阵或 FASTQ。基因组组装查询与下载仍使用 `ncbi-datasets-v2`。
+
+官方协议：[GEO programmatic access](https://www.ncbi.nlm.nih.gov/geo/info/geo_paccess.html)、[SRA search](https://www.ncbi.nlm.nih.gov/sra/docs/srasearch/)。
