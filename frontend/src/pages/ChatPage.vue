@@ -859,7 +859,16 @@ onBeforeRouteUpdate(async (to, _, next) => {
 })
 
 // Initialize active conversation
+function handleConnectorDraft(payload: unknown) {
+  const draft = payload as { sessionId: string; files: FileInfo[] };
+  if (draft.sessionId !== sessionId.value) return;
+  const ids = new Set(attachments.value.map(file => file.file_id));
+  attachments.value.push(...draft.files.filter(file => !ids.has(file.file_id)).map(file => ({ ...file, status: 'success' })));
+  if (!inputMessage.value.trim()) inputMessage.value = '请先检查这些文件，说明可开展的分析：';
+}
+
 onMounted(() => {
+  eventBus.on('connector-analysis-draft', handleConnectorDraft);
   eventBus.on(EVENT_SESSION_RENAMED, handleSessionRenamed);
   hideFilePanel();
   const routeParams = router.currentRoute.value.params;
@@ -885,6 +894,7 @@ onUnmounted(() => {
   clearAnalysisProgress();
   chatGeneration += 1;
   historyRequest?.abort();
+  eventBus.off('connector-analysis-draft', handleConnectorDraft);
   eventBus.off(EVENT_SESSION_RENAMED, handleSessionRenamed);
   if (cancelCurrentChat.value) {
     cancelCurrentChat.value();

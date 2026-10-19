@@ -1,3 +1,4 @@
+import type { ConnectorResultPanel } from '../components/ConnectorResults.vue';
 import type { FileInfo } from '../api/file';
 import type { MessageEventData, SpillArtifactNotice } from './event';
 import type { ToolPresentation } from './toolPresentation';
@@ -38,6 +39,7 @@ export interface ToolContent extends BaseContent {
   analysis_job?: AnalysisJobView | null;
   tool_approval?: ToolApprovalView | null;
   connector_status?: string | null;
+  connector_results?: ConnectorResultPanel | null;
   status: "calling" | "called";
 }
 

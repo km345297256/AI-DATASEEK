@@ -1,3 +1,4 @@
+from app.domain.services.connector_results import connector_results
 from pydantic import BaseModel, Field, TypeAdapter
 from typing import Any, Union, Literal, Dict, Optional, List, Self, Type
 from datetime import datetime
@@ -124,6 +125,7 @@ class ToolEventData(BaseEventData):
     analysis_job: Optional[AnalysisJobView] = None
     tool_approval: Optional[ToolApprovalView] = None
     connector_status: Optional[str] = None
+    connector_results: Optional[Dict[str, Any]] = None
 
 class ToolSSEEvent(BaseSSEEvent):
     event: Literal["tool"] = "tool"
@@ -170,6 +172,7 @@ class ToolSSEEvent(BaseSSEEvent):
                 analysis_job=event.analysis_job,
                 tool_approval=event.tool_approval,
                 connector_status=connector_status_text(event),
+                connector_results=connector_results(event),
             )
         )
 

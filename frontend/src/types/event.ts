@@ -1,3 +1,4 @@
+import type { ConnectorResultPanel } from '../components/ConnectorResults.vue';
 import type { FileInfo } from '../api/file';
 import type { ToolPresentation } from './toolPresentation';
 import type { AnalysisJobView } from './analysisJob';
@@ -52,6 +53,7 @@ export interface ToolEventData extends BaseEventData {
   analysis_job?: AnalysisJobView | null;
   tool_approval?: ToolApprovalView | null;
   connector_status?: string | null;
+  connector_results?: ConnectorResultPanel | null;
 }
 
 export interface StepEventData extends BaseEventData {

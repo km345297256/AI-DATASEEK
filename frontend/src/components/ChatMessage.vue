@@ -127,7 +127,7 @@
     </Teleport>
   </div>
   <div v-else-if="message.type === 'tool'" class="flex min-w-0 flex-col">
-    <ToolUse :tool="toolContent" @click="handleToolClick(toolContent)" />
+    <ToolUse :session-id="sessionId" :is-share="isShare" :tool="toolContent" @click="handleToolClick(toolContent)" />
     <ToolApprovalCard v-if="toolContent.tool_approval" :initial="toolContent.tool_approval" :session-id="sessionId" :is-share="isShare" />
     <DeclarativeToolCard v-if="toolContent.status === 'called'" :tool="toolContent" />
   </div>
@@ -144,7 +144,7 @@
       </div>
       <div class="flex flex-col gap-3 flex-1 min-w-0 overflow-hidden pt-2">
         <div v-for="(item, index) in displayTools" :key="`${item.tool.tool_call_id}-${index}`" class="flex flex-col gap-2">
-          <ToolUse
+          <ToolUse :session-id="sessionId" :is-share="isShare"
             :tool="item.tool"
             :summary="item.summary"
             :collapsed-count="item.count"

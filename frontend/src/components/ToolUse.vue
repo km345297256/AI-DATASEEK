@@ -1,9 +1,10 @@
 <template>
-  <p v-if="tool.connector_status" role="status" class="my-2 rounded-lg border border-[var(--border-main)] px-3 py-2 text-sm text-[var(--text-secondary)]">{{ tool.connector_status }}</p>
-  <p v-if="tool.name === 'message' && tool.args?.text" class="text-[var(--text-secondary)] text-[14px] overflow-hidden text-ellipsis whitespace-pre-line">
+  <ConnectorResults v-if="tool.connector_results" :result="tool.connector_results" :tool-call-id="tool.tool_call_id" :session-id="sessionId" :is-share="isShare" />
+  <p v-else-if="tool.connector_status" role="status" class="my-2 rounded-lg border border-[var(--border-main)] px-3 py-2 text-sm text-[var(--text-secondary)]">{{ tool.connector_status }}</p>
+  <p v-if="!tool.connector_results && tool.name === 'message' && tool.args?.text" class="text-[var(--text-secondary)] text-[14px] overflow-hidden text-ellipsis whitespace-pre-line">
     {{ tool.args.text }}
   </p>
-  <div v-else-if="toolInfo" class="flex items-start group gap-2">
+  <div v-else-if="!tool.connector_results && toolInfo" class="flex items-start group gap-2">
     <div class="flex-1 min-w-0">
       <div @click="handleClick"
         class="rounded-[15px] items-center gap-2 px-[10px] py-[4px] border border-[var(--border-light)] bg-[var(--fill-tsp-gray-main)] inline-flex max-w-full clickable hover:bg-[var(--fill-tsp-gray-dark)] dark:hover:bg-white/[0.02]">
@@ -56,6 +57,7 @@
 </template>
 
 <script setup lang="ts">
+import ConnectorResults from './ConnectorResults.vue';
 import { ref, toRef, watch } from "vue";
 import { ChevronDown } from 'lucide-vue-next';
 import { ToolContent } from "../types/message";
@@ -64,6 +66,8 @@ import { useRelativeTime } from "../composables/useTime";
 
 const props = withDefaults(defineProps<{
   tool: ToolContent;
+  sessionId?: string;
+  isShare?: boolean;
   summary?: string;
   collapsedCount?: number;
 }>(), {
