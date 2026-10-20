@@ -113,6 +113,25 @@ for (const terminal of ['done', 'wait', 'error']) {
     assert.equal(session.retries.length, 0);
     assert.equal(session.closed, 1);
   });
+
+  for (const failure of ['abort', 'socket']) {
+    test(`${terminal} remains terminal when its connector rejects with ${failure} after delivery`, async () => {
+      const session = run([async (options) => {
+        await options.onopen(response());
+        emit(options, frame(2, terminal));
+        assert.equal(options.signal.aborted, true);
+        throw failure === 'abort'
+          ? new DOMException('The stream was aborted', 'AbortError')
+          : new TypeError('socket disconnected after the terminal frame');
+      }]);
+      await session.finished;
+      assert.equal(session.requests.length, 1, 'terminal delivery must not open another request');
+      assert.deepEqual(session.events.map((event) => event.event), [terminal]);
+      assert.equal(session.retries.length, 0);
+      assert.equal(session.errors.length, 0, 'a transport tail must not replace the application terminal event');
+      assert.equal(session.closed, 1);
+    });
+  }
 }
 
 test('HTTP rejection, JSON errors and unsupported event versions fail closed without replay', async () => {
@@ -131,6 +150,30 @@ test('HTTP rejection, JSON errors and unsupported event versions fail closed wit
     assert.equal(session.errors.length, 1);
     assert.ok(session.errors[0] instanceof SSEConnectionError);
   }
+});
+
+test('a terminal projection failure is reported even if recovery already marked the stream complete', async () => {
+  const recovery = createAgentStreamRecovery({ message: 'Analyze', client_message_id: 'input' });
+  const errors = [];
+  let closed = 0;
+  let retries = 0;
+  const session = startSSEConnection('/chat', {
+    method: 'POST', retryOnError: true, getBody: recovery.getBody, isComplete: recovery.isComplete,
+  }, {
+    onMessage(event) {
+      recovery.accept(event);
+      throw new SSEConnectionError('protocol', 'terminal could not be projected');
+    },
+    onError: (error) => errors.push(error),
+    onClose: () => { closed += 1; },
+    onRetry: () => { retries += 1; },
+  }, { connect: async (_url, options) => { emit(options, frame(2, 'done')); } });
+  await session.finished;
+  assert.equal(recovery.isComplete(), true);
+  assert.equal(errors.length, 1);
+  assert.equal(errors[0].kind, 'protocol');
+  assert.equal(closed, 0);
+  assert.equal(retries, 0);
 });
 
 test('transport retries are bounded and report failure once after exponential backoff', async () => {
@@ -156,6 +199,32 @@ test('cancel during backoff (stop/navigation) prevents reconnect and callbacks',
   session.cancel();
   await session.finished;
   assert.equal(session.requests.length, 1);
+  assert.equal(session.errors.length, 0);
+  assert.equal(session.closed, 0);
+});
+
+test('a delayed retry completion cannot reopen a stream after stop has cancelled it', async () => {
+  let enterWait;
+  let finishWait;
+  let retrySignal;
+  const waiting = new Promise((resolve) => { enterWait = resolve; });
+  const session = run([async () => { throw new TypeError('offline'); }], {}, {
+    // Model a timer callback already queued before stop; it still resolves later.
+    wait: (_delay, signal) => new Promise((resolve) => {
+      retrySignal = signal;
+      finishWait = resolve;
+      enterWait();
+    }),
+  });
+  await waiting;
+  session.cancel();
+  session.cancel();
+  assert.equal(retrySignal.aborted, true);
+  finishWait();
+  await session.finished;
+  assert.equal(session.requests.length, 1);
+  assert.equal(session.retries.length, 1);
+  assert.equal(session.events.length, 0);
   assert.equal(session.errors.length, 0);
   assert.equal(session.closed, 0);
 });
@@ -299,3 +368,49 @@ test('real SSE parser reconnects after a broken byte stream and drains offline t
     globalThis.document = previousDocument;
   }
 });
+
+for (const terminal of ['done', 'wait', 'error']) {
+  test(`real SSE parser does not reopen after ${terminal} followed by a socket error`, async () => {
+    const previousWindow = globalThis.window;
+    const previousDocument = globalThis.document;
+    globalThis.window = { clearTimeout, setTimeout };
+    globalThis.document = { removeEventListener() {} };
+    let requests = 0;
+    let socketErrors = 0;
+    try {
+      const fakeFetch = async () => {
+        requests += 1;
+        let pulled = false;
+        return new Response(new ReadableStream({
+          pull(controller) {
+            if (pulled) {
+              socketErrors += 1;
+              controller.error(new TypeError('socket disconnected immediately after terminal delivery'));
+              return;
+            }
+            pulled = true;
+            const event = frame(8, terminal);
+            controller.enqueue(new TextEncoder().encode(
+              `id: ${event.data.event_id}\nevent: ${event.event}\ndata: ${JSON.stringify(event.data)}\n\n`,
+            ));
+          },
+        }), { headers: { 'content-type': 'text/event-stream' } });
+      };
+      const session = run([], {}, {
+        connect: (url, options) => fetchEventSource(url, { ...options, fetch: fakeFetch }),
+      });
+      await session.finished;
+      // Drain the read rejection as well as the terminal-triggered abort resolution.
+      await new Promise((resolve) => setImmediate(resolve));
+      assert.equal(requests, 1);
+      assert.equal(socketErrors, 1);
+      assert.deepEqual(session.events.map((event) => event.event), [terminal]);
+      assert.equal(session.retries.length, 0);
+      assert.equal(session.errors.length, 0);
+      assert.equal(session.closed, 1);
+    } finally {
+      globalThis.window = previousWindow;
+      globalThis.document = previousDocument;
+    }
+  });
+}

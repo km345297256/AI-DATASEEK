@@ -1614,6 +1614,36 @@ class AgentDomainService:
                         "No event found in session queue session=%s",
                         opaque_log_identifier(session_id, namespace="session"),
                     )
+                    # A terminal can be durable without a Redis notification:
+                    # cancellation recovery writes directly to history, and a
+                    # live XADD can fail after a successful durable commit.
+                    # Cleanup may still be running, so task.done is not a
+                    # reliable signal that a viewer should keep waiting.
+                    read_after = getattr(self._session_repository, "get_events_after", None)
+                    if last_seen_seq is not None and callable(read_after):
+                        try:
+                            durable_events = await read_after(session_id, last_seen_seq)
+                        except Exception as error:
+                            # A failed observation is not a task failure. Keep
+                            # the existing transport/recovery path available.
+                            logger.warning("Durable live observation unavailable error_type=%s", type(error).__name__)
+                            durable_events = []
+                        for durable_event in durable_events:
+                            if durable_event.seq is None or durable_event.seq <= last_seen_seq:
+                                continue
+                            last_seen_seq = durable_event.seq
+                            if isinstance(durable_event, MessageEvent) and durable_event.role == "user":
+                                continue
+                            terminal = isinstance(durable_event, (DoneEvent, ErrorEvent, WaitEvent))
+                            if terminal and not await self._terminal_matches_input(
+                                    session_id, stream_input_key, stream_input_seq, durable_event):
+                                continue
+                            yield durable_event
+                            if terminal:
+                                stream_terminal = True
+                                break
+                        if stream_terminal:
+                            break
                     # If the task completed during this bounded read, loop once
                     # more: its final XADD may have landed immediately after
                     # the timeout. Only an empty read that *started* after the

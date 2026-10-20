@@ -270,6 +270,7 @@ export function useAnalysisSession(options: AnalysisSessionOptions) {
     if (['done', 'wait', 'error'].includes(event.event)) {
       inputTerminated = true;
       isLoading.value = false;
+      connectionNotice.value = '';
       taskStartedAtMs.value = undefined;
       loadingStatus.value = '';
       options.onTerminal?.();
@@ -310,9 +311,14 @@ export function useAnalysisSession(options: AnalysisSessionOptions) {
     options.onInputRejected?.(attempt.request);
   }
 
-  function callbacks(revision: number, id: string, attempt?: PendingInput, observation?: StopObservation): SSECallbacks<AgentSSEEvent['data']> {
-    const current = () => isCurrent(revision, id);
+  function callbacks(revision: number, id: string, onEnd: () => void, attempt?: PendingInput, observation?: StopObservation): SSECallbacks<AgentSSEEvent['data']> {
+    // This fence belongs to one connection, not the session's historical last
+    // terminal. A late network callback must not revive a settled connection.
+    let settled = false;
+    const current = () => !settled && isCurrent(revision, id);
     const close = () => {
+      settled = true;
+      onEnd();
       isLoading.value = false;
       clearAnalysisProgress();
       taskStartedAtMs.value = undefined;
@@ -335,9 +341,15 @@ export function useAnalysisSession(options: AnalysisSessionOptions) {
         // Old adapters have no receipt endpoint. Production probes durable
         // acceptance before a subsequent send; transport events alone do not
         // identify which input was accepted.
-        if (attempt && !api.getInputReceipt && ['done', 'wait', 'error'].includes(event)) {
+        if (attempt && accepted && !api.getInputReceipt && ['done', 'wait', 'error'].includes(event)) {
           if (pendingInput === attempt) pendingInput = undefined;
           canRetryInput.value = false;
+        }
+        if (accepted && ['done', 'wait', 'error'].includes(event)) {
+          const cancel = cancelCurrentChat.value;
+          close();
+          canRetryInput.value = false;
+          cancel?.();
         }
       },
       onClose: () => {
@@ -369,21 +381,20 @@ export function useAnalysisSession(options: AnalysisSessionOptions) {
     const id = sessionId.value;
     if (!id || !isCurrent(revision, id)) return;
     let ended = false;
-    const handlers = callbacks(revision, id, attempt, observation);
-    const finish = (callback: (() => void) | undefined) => { ended = true; callback?.(); };
+    const handlers = callbacks(revision, id, () => { ended = true; }, attempt, observation);
     try {
       const cancel = await api.chatWithSession(
         id, request?.message ?? '', lastEventId.value, lastEventSeq.value,
         (request?.files ?? []).filter(file => file.file_id && !file.file_id.startsWith('temp-')).map(file => ({ file_id: file.file_id, filename: file.filename })),
         request?.skills ?? [], request?.mcpServers ?? [], request?.agentProfileId ?? null,
-        { ...handlers, onClose: () => finish(handlers.onClose), onError: error => { ended = true; handlers.onError?.(error); } },
+        handlers,
         request?.datasetIds, attempt?.clientMessageId ?? continuation?.clientMessageId, continuation?.resumeFrom, request?.inputFileIds, attempt?.timestamp,
         observation?.clientMessageId,
       );
       if (!isCurrent(revision, id) || ended) cancel();
       else cancelCurrentChat.value = cancel;
     } catch {
-      if (!isCurrent(revision, id)) return;
+      if (!isCurrent(revision, id) || ended) return;
       isLoading.value = false;
       clearAnalysisProgress();
       taskStartedAtMs.value = undefined;
@@ -606,6 +617,9 @@ export function useAnalysisSession(options: AnalysisSessionOptions) {
       }
       options.onSessionRestored?.(session);
       if (session.status === 'running' || session.status === 'pending') {
+        // History can end with an older terminal while a continuation/bootstrap
+        // is running. It must not disable cancellation of the current work.
+        inputTerminated = false;
         isLoading.value = true;
         await connect(revision);
       } else { isLoading.value = false; clearAnalysisProgress(); }
@@ -662,7 +676,29 @@ export function useAnalysisSession(options: AnalysisSessionOptions) {
   }
 
   async function stop() {
-    if (disposed || stopping || stopObservation || inputTerminated) return;
+    if (disposed || stopping) return;
+    if (stopObservation) {
+      // The execution stop was already submitted. A second click stops the
+      // read-only recovery too; keep its ownership until the terminal is read.
+      const observation = stopObservation;
+      invalidate();
+      clearAnalysisProgress();
+      taskStartedAtMs.value = undefined;
+      stopObservationFailed(observation);
+      return;
+    }
+    if (inputTerminated) {
+      // Repair a stale busy view without sending a session-wide cancellation
+      // that could hit a newer task started in another tab.
+      invalidate();
+      isLoading.value = false;
+      loadingStatus.value = '';
+      connectionNotice.value = '';
+      canRetryInput.value = false;
+      clearAnalysisProgress();
+      taskStartedAtMs.value = undefined;
+      return;
+    }
     const id = sessionId.value;
     const revision = invalidate();
     // The stop endpoint targets the session, not an individual turn. Keep the

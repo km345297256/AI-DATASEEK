@@ -11,10 +11,11 @@ from collections import OrderedDict
 from dataclasses import dataclass, field
 import posixpath
 from pathlib import PurePosixPath
+from app.domain.services.artifact_write_progress import PROGRAM_SUFFIXES
 from app.domain.services.execution_identity import private_identity_hmac
 
 
-CODE_SUFFIXES = frozenset({".py", ".r", ".js", ".ts", ".sh", ".ipynb"})
+CODE_SUFFIXES = PROGRAM_SUFFIXES
 CODE_DIAGNOSTIC_ERRORS = frozenset({"SyntaxError", "IndentationError", "TabError", "NameError", "UnboundLocalError"})
 
 
@@ -107,6 +108,7 @@ class AnalysisProgressGuard:
         # different correctable calls terminate an otherwise recoverable task.
         self._recovery_checkpoints: dict[tuple[str | None, str], int] = {}
         self._preparation_observations: dict[tuple[str | None, str], set[str]] = {}
+        self._terminal_runtime_calls: dict[str, set[str]] = {}
 
     def record_blocked(self, call: dict, reason: str, *, program_path: str | None = None,
                        recovery_kind: str | None = None, preparation_observation: str | None = None) -> None:
@@ -116,7 +118,7 @@ class AnalysisProgressGuard:
         Concrete new evidence or a valid observation clears it.
         """
         target = program_identity(program_path) if program_path else self._code_target(call)
-        if recovery_kind in {"program_preparation", "program_tool_redirect", "program_diagnosis"}:
+        if recovery_kind in {"program_preparation", "program_tool_redirect", "program_diagnosis", "saved_write_phase"}:
             key = (target, recovery_kind)
             if recovery_kind == "program_preparation" and preparation_observation:
                 observed = self._preparation_observations.setdefault(key, set())
@@ -145,6 +147,25 @@ class AnalysisProgressGuard:
     @property
     def should_stop(self) -> bool:
         return self.blocked_without_progress >= 2 or any(phase >= 3 for phase in self._recovery_checkpoints.values())
+
+    def resolve_write_phase(self, path: str) -> None:
+        """A confirmed write/run advances this path beyond a redundant draft."""
+        self._recovery_checkpoints.pop((program_identity(path), "saved_write_phase"), None)
+
+    def record_terminal_runtime(self, path: str, call: dict) -> None:
+        """Bind only a host-confirmed, quiescent runtime to its saved source.
+
+        Shell command hashes do not include source bytes. After a real source
+        edit, a previous terminal failure must not veto the same runtime/argv.
+        Unknown launches are never registered here and stay non-replayable.
+        """
+        self._terminal_runtime_calls.setdefault(program_identity(path), set()).add(call_identity(call))
+
+    def resolve_terminal_runtime_after_write(self, path: str) -> None:
+        """Called only for a confirmed core source edit, never a namesake tool."""
+        for runtime_call in self._terminal_runtime_calls.pop(program_identity(path), set()):
+            self.unsafe_failed_calls.discard(runtime_call)
+            self.failures.pop(runtime_call, None)
 
     def resolve_preparation(self, path: str) -> None:
         """A fresh trusted ready probe resolves preparation, never launch UNKNOWN."""
@@ -191,7 +212,7 @@ class AnalysisProgressGuard:
             records.popitem(last=False)
 
     def before_call(self, call: dict, *, record: bool = True,
-                    program_path: str | None = None) -> str | None:
+                    program_path: str | None = None, phase_managed: bool = False) -> str | None:
         """program_path is supplied only for a resolved trusted program runner.
 
         A program launch is distinct from the raw invocation's argument hash:
@@ -217,8 +238,8 @@ class AnalysisProgressGuard:
                 "Reading only an unrelated input or the generated program, or changing a few characters, "
                 "is not new source evidence. Preserve already verified outputs."
             )
-        elif (target and not program_path and call.get("name") == "file_write"
-              and str((call.get("args") or {}).get("file", "")).endswith(".py")
+        elif (not phase_managed and target and not program_path and call.get("name") == "file_write"
+              and PurePosixPath(str((call.get("args") or {}).get("file", ""))).suffix.lower() == ".py"
               and (call.get("args") or {}).get("append") is not True
               and self.writes.get(target, 0) >= 2):
             reason = (
@@ -229,7 +250,9 @@ class AnalysisProgressGuard:
                 if state and state.prerequisites_observed and not state.prerequisites_ready else
                 "The saved program has already been written twice without a confirmed execution. "
                 "This additional rewrite was NOT executed. Inspect the existing program if needed, "
-                "then execute it once with program_run and validate the required outputs. "
+                + ("then execute it once with program_run and validate the required outputs. "
+                   if str((call.get("args") or {}).get("file", "")).endswith(".py") else
+                   "then execute it once with its supported language runtime and validate the required outputs. ") +
                 "Only revise it again after concrete execution feedback; do not start another draft."
             )
         elif (self.failures.get(key, 0) >= (1 if key in self.unsafe_failed_calls else 2)

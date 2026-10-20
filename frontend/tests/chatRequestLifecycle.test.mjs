@@ -195,6 +195,45 @@ test('a late session creation after reset or disposal cannot send an analysis or
   }
 });
 
+test('stop before session creation completes prevents late submission and preserves a newer task', async t => {
+  const creation = deferred();
+  let creates = 0, stopCalls = 0;
+  const { session, requests } = harness({
+    createSession: async () => ++creates === 1 ? creation.promise : { session_id: 'next-session', created_at: 2 },
+    stopSession: async () => { stopCalls++; },
+  });
+  t.after(() => session.dispose());
+  session.sessionId.value = undefined;
+  const original = session.send({ message: 'cancel before submission' });
+  await session.stop();
+  assert.equal(session.isLoading.value, false);
+  assert.equal(stopCalls, 0);
+  assert.equal(requests.length, 0);
+  await session.send({ message: 'new task' });
+  creation.resolve({ session_id: 'late-empty-session', created_at: 1 });
+  assert.equal(await original, false);
+  assert.equal(requests.length, 1);
+  assert.equal(requests[0][1], 'new task');
+  assert.equal(session.sessionId.value, 'next-session');
+  assert.equal(session.isLoading.value, true);
+});
+
+test('a synchronous terminal releases the late cancel handle and cannot revive via reconnect', async t => {
+  let callbacks, cancels = 0;
+  const { session } = harness({ chatWithSession: async (...args) => {
+    callbacks = args[8];
+    callbacks.onMessage(event(1, 'error', { error: 'invalid_execution_result' }));
+    return () => { cancels++; };
+  } });
+  t.after(() => session.dispose());
+  await session.send({ message: 'analysis' });
+  assert.equal(cancels, 1);
+  callbacks.onRetry({ attempt: 4, maxAttempts: 6 });
+  callbacks.onOpen();
+  assert.equal(session.isLoading.value, false);
+  assert.equal(session.connectionNotice.value, '');
+});
+
 test('older history prepends to live messages without rolling the live event cursor back', async () => {
   const request = deferred();
   const { session } = harness({ getSessionHistory: () => request.promise });

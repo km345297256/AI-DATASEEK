@@ -75,7 +75,7 @@ async def test_one_real_body_correction_continues_without_new_request_or_replay(
     # Historical memory compaction must not alter the emitted original args.
     recorded=next(e for e in events if isinstance(e,ToolEvent) and e.tool_call_id=='actual' and e.status==ToolStatus.CALLED)
     assert recorded.function_args==original_args
-    assert corrected.tool_calls[0]['args']['content']!=fixed
+    assert corrected.tool_calls[0]['args']['content']==fixed
     assert len(requests)==3
 
 

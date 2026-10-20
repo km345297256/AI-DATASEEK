@@ -67,7 +67,7 @@ class ShellToolkit(BaseToolkit):
         exec_dir: str,
         command: str
     ) -> ToolResult:
-        """Start a command in a specified shell session. Use for interactive or long-running processes; prefer shell_run for non-interactive commands.
+        """Start a command in a specified shell session. Use for interactive or long-running processes; prefer shell_run for non-interactive commands. Prepare authored source and reports with file_write/file_str_replace, not shell heredocs, cat, tee or printf; this keeps revision tracking consistent. Run saved Python programs with program_run; other languages require an available supported runtime.
         
         Args:
             id: Unique identifier of the target shell session
@@ -87,7 +87,7 @@ class ShellToolkit(BaseToolkit):
         command: str,
         timeout_seconds: int = 30,
     ) -> ToolResult:
-        """Run a shell command to completion or cancellation with no elapsed-time cutoff. Use for inspection and utilities; run custom Python analysis with program_run so shell pipelines cannot mask its exit status.
+        """Run a shell command to completion or cancellation with no elapsed-time cutoff. Use for inspection and utilities; run custom Python analysis with program_run so shell pipelines cannot mask its exit status. Prepare authored source and reports with file_write/file_str_replace, not shell heredocs, cat, tee or printf; this keeps revision tracking consistent. Normal runtime-produced artifacts and stdout redirection remain available. Other languages require an available supported runtime.
 
         Args:
             id: Unique identifier of the target shell session

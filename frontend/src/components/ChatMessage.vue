@@ -154,7 +154,7 @@
           <DeclarativeToolCard v-if="item.tool.status === 'called'" :tool="item.tool" />
           <ToolApprovalCard v-if="item.tool.tool_approval" :initial="item.tool.tool_approval" :session-id="sessionId" :is-share="isShare" />
           <details v-if="item.count > 1" class="ml-2 text-[12px] text-[var(--text-tertiary)]">
-            <summary class="cursor-pointer">展开 {{ item.count }} 次修改记录（运行与核验单独显示）</summary>
+            <summary class="cursor-pointer">展开 {{ item.count }} 次修改请求记录（含未执行请求；运行单独显示）</summary>
             <div class="mt-2 flex flex-col gap-2">
               <div v-for="(revision, revisionIndex) in item.revisions" :key="revision.tool_call_id" class="flex flex-col gap-1">
                 <span>第 {{ revisionIndex + 1 }} 次 · {{ toolOperationState(revision) }} · {{ new Date(revision.timestamp * 1000).toLocaleTimeString('zh-CN', { timeZone: 'Asia/Shanghai', hour12: false }) }}</span>

@@ -22,6 +22,17 @@ def test_repeated_script_drafts_are_stopped_without_executing_them():
     assert guard.stalled and not guard.evidence
 
 
+def test_uppercase_python_draft_cannot_evade_legacy_guard_or_claim_python_runner_support():
+    guard = AnalysisProgressGuard()
+    item = call(file="/home/ubuntu/output/test.PY", content="source")
+    for _ in range(2):
+        assert guard.before_call(item) is None
+        guard.record(item, succeeded=True)
+    notice = guard.before_call(item)
+    assert "NOT executed" in notice and "supported language runtime" in notice
+    assert "program_run" not in notice
+
+
 def test_only_bound_program_execution_allows_revision_not_plain_read_or_shell():
     guard = AnalysisProgressGuard()
     item = call(file="/home/ubuntu/output/test.py", content="draft")

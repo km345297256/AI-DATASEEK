@@ -165,3 +165,69 @@ test('stopping a continuation observes its fresh input identity, not the origina
   assert.equal(h.requests[2][1], '');
   assert.equal(h.requests[2][11], undefined);
 });
+
+for (const terminal of ['done', 'wait', 'error']) {
+  test(`${terminal}: late transport callbacks cannot revive a finished task or leave a dead stop button`, async t => {
+    let stopCalls = 0;
+    const h = await harness({ stopSession: async () => { stopCalls++; },
+      getInputReceipt: async (_session, client_message_id) => ({ client_message_id, accepted: true, state: 'completed' }),
+    });
+    t.after(() => h.session.dispose());
+    const original = callbacks(h.requests[0]);
+    original.onRetry({ attempt: 1, maxAttempts: 6 });
+    original.onMessage(event(3, terminal, terminal === 'error' ? { error: 'invalid_execution_result' } : {}));
+    assert.equal(h.session.connectionNotice.value, '');
+    assert.equal(h.cancelled.length, 1, 'terminal releases the transport even before its close callback');
+    original.onRetry({ attempt: 4, maxAttempts: 6 });
+    original.onOpen();
+    original.onError(Error('late socket error'));
+    original.onClose();
+    assert.equal(h.session.isLoading.value, false);
+    assert.equal(h.session.connectionNotice.value, '');
+    assert.equal(h.session.canRetryInput.value, false);
+    await h.session.stop();
+    assert.equal(stopCalls, 0, 'already terminated input is not stopped again');
+    assert.equal(await h.session.send({ message: 'new task' }), true);
+  });
+}
+
+test('stop during stop-result reconnection cancels observation without resubmission or invented cancellation', async t => {
+  let stopCalls = 0;
+  const h = await harness({ stopSession: async () => { stopCalls++; } });
+  t.after(() => h.session.dispose());
+  await h.session.stop();
+  const replay = callbacks(h.requests[1]);
+  replay.onRetry({ attempt: 4, maxAttempts: 6 });
+  await h.session.stop();
+  assert.equal(h.cancelled.length, 2);
+  assert.equal(stopCalls, 1);
+  assert.equal(h.session.isLoading.value, false);
+  assert.equal(h.session.canRetryInput.value, true);
+  assert.match(h.session.connectionNotice.value, /最终状态尚未取回/);
+  replay.onRetry({ attempt: 5, maxAttempts: 6 });
+  replay.onMessage(outcome); replay.onMessage(done);
+  assert.equal(h.session.isLoading.value, false);
+  assert.equal(h.session.messages.value.some(message => message.type === 'assistant'), false);
+  assert.equal(await h.session.send({ message: 'must not overtake' }), false);
+  await h.session.retryPendingInput();
+  assertReadOnly(h.requests[2]);
+  callbacks(h.requests[2]).onMessage(outcome);
+  callbacks(h.requests[2]).onMessage(done);
+  assert.equal(h.session.canRetryInput.value, false);
+  assert.equal(h.session.isLoading.value, false);
+});
+
+test('restoring a running continuation after an older terminal still allows stopping the current task', async t => {
+  let stopCalls = 0;
+  const h = await harness({ stopSession: async () => { stopCalls++; }, getSessionHistory: async () => ({
+    session_id: 'session', status: 'running', created_at: 1, has_more: false,
+    events: [event(1, 'message', { role: 'user', content: 'previous task' }), event(2, 'done'),
+      event(3, 'step', { id: 'continued-step', status: 'running', description: 'continued task' })],
+  }) });
+  t.after(() => h.session.dispose());
+  await h.session.restore('session');
+  assert.equal(h.session.isLoading.value, true);
+  await h.session.stop();
+  assert.equal(stopCalls, 1);
+  assert.equal(h.requests.at(-1)[1], '');
+});

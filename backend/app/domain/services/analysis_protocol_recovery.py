@@ -39,25 +39,58 @@ def confirmed_native_success(call: dict, result) -> bool:
         and getattr(result, "tool_call_id", None) == call.get("id"))
 
 
-def confirmed_shell_success(tool, call: dict, ledger) -> bool:
-    """Trust an identity-bound private terminal receipt, never public output."""
-    from app.domain.services.execution_evidence import ToolExecutionLedger, shell_command_digest
+def _confirmed_shell_terminal_attempt(tool, call: dict, ledger):
+    """Authenticate an exited core-shell operation independently of its result."""
+    from app.domain.services.execution_evidence import (
+        ExecutionReceipt, ShellExecutionAttempt, ToolExecutionLedger, shell_command_digest,
+    )
     if not _core_shell_method(tool, call.get("name")) or call.get("name") == "program_run":
-        return False
+        return None
     if type(ledger) is not ToolExecutionLedger:
-        return False
+        return None
     args = call.get("args") or {}
-    if not isinstance(args.get("exec_dir"), str) or not isinstance(args.get("command"), str):
-        return False
+    if (not isinstance(args, dict) or not isinstance(call.get("id"), str)
+            or not isinstance(args.get("exec_dir"), str) or not isinstance(args.get("command"), str)):
+        return None
+    if ledger.call_summary(call["id"])["pending_execution"]:
+        return None
     digest = shell_command_digest(args["exec_dir"], args["command"])
     for attempt in reversed(list(ledger._attempts.values())):
         if attempt.tool_call_id != call.get("id"):
             continue
-        return bool(attempt.confirmed and attempt.receipt.state == "exited"
-            and attempt.receipt.returncode == 0 and attempt.command_digest == digest
+        receipt = attempt.receipt
+        if (type(attempt) is ShellExecutionAttempt and type(receipt) is ExecutionReceipt
+            and attempt.confirmed and receipt.state == "exited" and type(receipt.returncode) is int
+            and receipt.operation_id == attempt.operation_id
+            and receipt.command_digest == attempt.command_digest == digest
             and attempt.sandbox_id == str(tool.toolkit.sandbox.id)
-            and attempt.shell_id == args.get("id"))
-    return False
+            and attempt.shell_id == args.get("id")):
+            return attempt
+        return None
+    return None
+
+
+def confirmed_shell_success(tool, call: dict, ledger) -> bool:
+    """Trust an identity-bound private terminal success, never public output."""
+    attempt = _confirmed_shell_terminal_attempt(tool, call, ledger)
+    return bool(attempt is not None and attempt.receipt.returncode == 0)
+
+
+def confirmed_shell_terminal_identity(tool, call: dict, ledger) -> str | None:
+    """Return a private terminal observation identity, including real failures.
+
+    An exited nonzero program supplies revision feedback, not task completion.
+    Model call IDs and public result text cannot create this identity; observing
+    the same operation again cannot grant repeated revision authority.
+    """
+    attempt = _confirmed_shell_terminal_attempt(tool, call, ledger)
+    if attempt is None:
+        return None
+    receipt = attempt.receipt
+    return private_identity_hmac({"purpose": "shell-terminal-observation/v1",
+        "sandbox_id": attempt.sandbox_id, "server_instance_id": receipt.server_instance_id,
+        "operation_id": receipt.operation_id, "command_digest": receipt.command_digest,
+        "returncode": receipt.returncode})
 
 
 def confirmed_program_preparation(tool, call: dict, result) -> bool:

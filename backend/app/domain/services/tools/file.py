@@ -68,7 +68,12 @@ class FileToolkit(BaseToolkit):
         trailing_newline: Optional[bool] = False,
         sudo: Optional[bool] = False
     ) -> ToolResult:
-        """Overwrite or append content to a file. Use for creating new files, appending content, or modifying existing files.
+        """Write a complete draft once, or append a distinct section to a file.
+
+        After a successful save, run a program using its supported runtime or
+        deliver a report. Do not rewrite the whole file just to rephrase it.
+        Prefer file_str_replace for a correction justified by input or runtime
+        feedback. A saved script is not evidence that its outputs were generated.
         
         Args:
             file: Absolute path of the file to write to

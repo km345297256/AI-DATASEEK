@@ -5,6 +5,8 @@ from dataclasses import dataclass, field
 from typing import Awaitable, Callable
 
 from app.domain.services.analysis_progress import AnalysisProgressGuard
+from app.domain.services.artifact_write_progress import ArtifactWriteProgress
+from app.domain.services.analysis_program_diagnostics import ProgramDiagnosticPlanner
 from app.domain.services.execution_evidence import ToolExecutionLedger
 
 
@@ -13,6 +15,8 @@ class AnalysisRecoveryContext:
     review: Callable[..., Awaitable[object]]
     executions: ToolExecutionLedger = field(default_factory=ToolExecutionLedger)
     progress: AnalysisProgressGuard = field(default_factory=AnalysisProgressGuard)
+    writes: ArtifactWriteProgress = field(default_factory=ArtifactWriteProgress)
+    diagnostics: ProgramDiagnosticPlanner = field(default_factory=ProgramDiagnosticPlanner)
     artifact_evidence: set[str] = field(default_factory=set)
 
 

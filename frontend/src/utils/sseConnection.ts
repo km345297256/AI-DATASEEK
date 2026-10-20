@@ -74,6 +74,7 @@ export function startSSEConnection<T>(
 
   const finished = (async () => {
     let retries = 0;
+    let terminalDelivered = false;
     while (!controller.signal.aborted) {
       const attemptController = new AbortController();
       const cancelAttempt = () => attemptController.abort();
@@ -110,7 +111,10 @@ export function startSSEConnection<T>(
               if (error instanceof SSEConnectionError) throw error;
               throw new SSEConnectionError('protocol', '事件流数据无法解析，请刷新页面；后台任务状态尚未确认。');
             }
-            if (options.isComplete?.()) attemptController.abort();
+            if (options.isComplete?.()) {
+              terminalDelivered = true;
+              attemptController.abort();
+            }
           },
           onerror(error) {
             // Disable the library's implicit retries: each retry needs a new body.
@@ -125,6 +129,12 @@ export function startSSEConnection<T>(
         return;
       } catch (cause) {
         if (controller.signal.aborted) return;
+        // A terminal frame wins over a socket failure (including the abort we
+        // deliberately issued after that frame). Never reopen a finished task.
+        if (terminalDelivered && options.isComplete?.()) {
+          callbacks.onClose?.();
+          return;
+        }
         const isTransport = cause instanceof TypeError
           || (cause instanceof SSEConnectionError && cause.kind === 'transport')
           || (cause instanceof DOMException && ['NetworkError', 'AbortError'].includes(cause.name));

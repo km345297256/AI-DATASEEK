@@ -51,7 +51,9 @@ export function buildToolTimeline(events: ToolContent[]): DisplayToolItem[] {
       group.tool = tool;
       group.panelTool = tool;
       const failures = group.revisions.filter((revision) => toolOperationState(revision) === '失败').length;
-      group.summary = `${group.count} 次修改${failures ? ` · ${failures} 次失败` : ''}`;
+      const completed = group.revisions.filter((revision) => toolOperationState(revision) === '已完成').length;
+      const skipped = group.revisions.filter((revision) => toolOperationState(revision) === '未执行').length;
+      group.summary = `${group.count} 次修改请求 · ${completed} 次完成${skipped ? ` · ${skipped} 次未执行` : ''}${failures ? ` · ${failures} 次失败` : ''}`;
     } else {
       const item = { key: tool.tool_call_id, tool, panelTool: tool, count: 1,
         revisions: groupable ? [tool] : [], recoveredByCallId: recovered.get(tool.tool_call_id) };

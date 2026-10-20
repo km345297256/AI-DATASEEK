@@ -2,6 +2,7 @@ import logging
 import asyncio
 import hashlib
 import json
+import posixpath
 import re
 import time
 import uuid
@@ -53,13 +54,19 @@ from app.domain.services.token_usage_service import TokenUsageService
 from app.domain.services.execution_identity import private_identity_hmac
 from app.domain.services.program_attempt_presentation import trusted_program_attempt_view
 from app.domain.services.analysis_progress import AnalysisProgressGuard
+from app.domain.services.artifact_write_progress import ArtifactWriteProgress
 from app.domain.services.compacted_content_dispatch import compacted_content_write_reason
 from app.domain.services.analysis_protocol_recovery import (
     TerminalProtocolRecovery, confirmed_program_preparation, native_operation_identity,
-    confirmed_native_success,
+    confirmed_native_success, confirmed_shell_terminal_identity, _core_file_method,
 )
-from app.domain.services.analysis_program_dispatch import saved_program_redirect, shell_saved_program
-from app.domain.services.analysis_program_diagnostics import program_diagnostic_read_digest, program_diagnostic_read_lines
+from app.domain.services.analysis_program_dispatch import (
+    saved_program_redirect, shell_saved_program, shell_source_write_redirect, shell_runtime_source,
+)
+from app.domain.services.analysis_program_diagnostics import (
+    program_diagnostic_read_digest, program_diagnostic_read_lines, ProgramDiagnosticPlanner,
+    ProgramDiagnosticPlan,
+)
 from app.domain.services.program_execution import (
     resolved_program_path, trusted_program_execution_feedback,
     trusted_program_prelaunch_failure, trusted_program_prerequisites,
@@ -382,6 +389,11 @@ class BaseAgent(ABC):
         if tool_name == "file_write" and isinstance(args.get("content"), str):
             content = args["content"]
             encoded = content.encode("utf-8")
+            # Keep ordinary reports and scripts as actual source, not a fake
+            # content argument containing a host receipt. Oversized history is
+            # still bounded, and receipt-only dispatch remains forbidden.
+            if len(encoded) <= self.MAX_RETAINED_TOOL_ARGUMENT_BYTES:
+                return
             digest = hashlib.sha256(encoded).hexdigest()[:16]
             compacted_args["content"] = (
                 f"[content persisted successfully; {len(encoded)} bytes; sha256:{digest}]"
@@ -465,6 +477,61 @@ class BaseAgent(ABC):
         return not message.tool_calls and not self._terminal_response_problem(message) and bool(
             self._message_content_to_text(message.content).strip()
         )
+
+    def _saved_output_completion_instruction(self) -> Optional[str]:
+        """Only schema-aware execution agents may finish from a saved output."""
+        return None
+
+    def _cache_saved_body(self, path: str, body: str, *, partial: bool = False) -> None:
+        path = posixpath.normpath(path)
+        encoded = body.encode("utf-8")
+        self._saved_output_bodies[path] = encoded[:65536].decode("utf-8", errors="ignore")
+        self._saved_output_partial.discard(path)
+        if partial or len(encoded) > 65536:
+            self._saved_output_partial.add(path)
+
+    def _record_saved_body(self, call: dict) -> None:
+        """Mirror confirmed core text semantics, never a rejected proposal."""
+        args = call.get("args") or {}
+        path = args.get("file")
+        if not isinstance(path, str):
+            return
+        path = posixpath.normpath(path)
+        prior = self._saved_output_bodies.pop(path, None)
+        complete = path not in self._saved_output_partial
+        self._saved_output_partial.discard(path)
+        if call["name"] == "file_write" and isinstance(args.get("content"), str):
+            body = ("\n" if args.get("leading_newline") else "") + args["content"] + ("\n" if args.get("trailing_newline") else "")
+            if not args.get("append"):
+                self._cache_saved_body(path, body)
+            elif prior is not None and complete:
+                self._cache_saved_body(path, prior + body)
+        elif (call["name"] == "file_str_replace" and prior is not None and complete
+                and isinstance(args.get("old_str"), str) and isinstance(args.get("new_str"), str)):
+            self._cache_saved_body(path, prior.replace(args["old_str"], args["new_str"]))
+
+    def _saved_output_readback_plan(self, writer, path: str) -> Optional[ProgramDiagnosticPlan]:
+        """Read a saved report after cache invalidation via the normal pipeline."""
+        from app.domain.services.tools.file import FileToolkit
+        checkpoint = self._artifact_writes.checkpoint(path)
+        if (not checkpoint or checkpoint in self._saved_output_readbacks
+                or path in self._saved_output_bodies):
+            return None
+        readers = [tool for tool in self.get_tools() if tool.name == "file_read"]
+        if (len(readers) != 1 or type(readers[0]) is not Tool
+                or type(readers[0].toolkit) is not FileToolkit
+                or readers[0]._tool is not FileToolkit.file_read
+                or readers[0].toolkit.sandbox is not writer.toolkit.sandbox):
+            return None
+        self._saved_output_readbacks.add(checkpoint)
+        return ProgramDiagnosticPlan(tool_calls=[{
+            "name": "file_read", "id": f"host-saved-output-{uuid.uuid4().hex}", "type": "tool_call",
+            "args": {"file": path, "sudo": False},
+        }], instruction=(
+            "Read the current saved report before delivery. This is a bounded preview, not permission "
+            "to regenerate it. If truncated, deliver the file with a clearly limited summary; do not "
+            "claim the excerpt is its full content. If the read fails, report that concrete problem."
+        ))
 
     def _terminal_response_problem(self, message: AIMessage) -> str | None:
         """Execution-only terminal gate; native calls keep their normal dispatch."""
@@ -643,6 +710,11 @@ class BaseAgent(ABC):
             "Continue the original task while safe, verified progress is possible. "
             "Use the available evidence to produce, validate, and deliver the requested results; "
             "avoid optional exploration, repeated inspections, or drafting without execution. "
+            "Save each complete draft once, then move to its next phase: execute a saved program with "
+            "its supported runtime, or deliver a saved report. Use targeted patches for actual "
+            "corrections and append for distinct sections; do not overwrite a successful draft just "
+            "to rephrase it. When execution fails, inspect the cause and the affected inputs before "
+            "changing code, including downstream uses of the same assumption. "
             "Do not replay operations with unconfirmed side effects. Observe an already running "
             "operation through its original identity before starting another write. "
             "Authorization and user cancellation still apply."
@@ -669,6 +741,14 @@ class BaseAgent(ABC):
         recovery = current_analysis_recovery()
         self._tool_execution_ledger = recovery.executions if recovery else ToolExecutionLedger()
         self._analysis_progress = recovery.progress if recovery else AnalysisProgressGuard()
+        self._artifact_writes = recovery.writes if recovery else ArtifactWriteProgress()
+        self._program_diagnostics = recovery.diagnostics if recovery else ProgramDiagnosticPlanner()
+        self._saved_output_handoff = None
+        self._saved_output_bodies = {}
+        self._saved_output_partial = set()
+        self._saved_output_readbacks = set()
+        self._write_phase_prompt_pending = False
+        self._saved_report_delivery_paths = None
         self._active_tool_batch: dict[str, ToolCallSettlement] = {}
         generation = self._tool_settlement_generation = object()
         budget = current_analysis_budget()
@@ -896,6 +976,7 @@ class BaseAgent(ABC):
             correction_response = False
             tool_responses = []
             completed_tool_results = []
+            diagnostic_plans = []
             admission_denied = False
             if self._tool_execution_ledger.summary()["pending_execution"]:
                 report = await self._reconcile_execution()
@@ -1048,6 +1129,10 @@ class BaseAgent(ABC):
                     prerequisites = await trusted_program_prerequisites(tool, tool_call)
                     if prerequisites:
                         self._analysis_progress.record_program_prerequisites(path=program_path, **prerequisites)
+                        if not prerequisites.get("ready"):
+                            self._artifact_writes.record_diagnostic(program_path,
+                                private_identity_hmac({"purpose": "source-preparation-feedback/v1",
+                                                       "prerequisites": prerequisites}))
                     else:
                         self._analysis_progress.invalidate_program_prerequisites(path=program_path)
                     prelaunch = trusted_program_prelaunch_failure(tool, tool_call, self._tool_execution_ledger)
@@ -1058,6 +1143,7 @@ class BaseAgent(ABC):
                         )
                 blocked_reason = self._blocked_runtime_install_reason(tool_call)
                 blocked_code = "tool_permission_denied"
+                phase_managed = False
                 preparation_failure = None
                 if not blocked_reason:
                     blocked_reason = compacted_content_write_reason(tool, tool_call)
@@ -1076,10 +1162,55 @@ class BaseAgent(ABC):
                     blocked_reason = replay_reason
                     blocked_code = "tool_replay_suppressed"
                 if not blocked_reason:
+                    blocked_reason = shell_source_write_redirect(tool, tool_call)
+                    blocked_code = "source_write_requires_file_tool"
+                if not blocked_reason:
                     blocked_reason = saved_program_redirect(tool_call)
                     blocked_code = "program_execution_required"
+                if (not blocked_reason and _core_file_method(tool, function_name)
+                        and not self._tool_execution_ledger.summary()["pending_execution"]):
+                    decision = self._artifact_writes.before_call(tool_call)
+                    phase_managed = decision.kind is not None and decision.path is not None
+                    if decision.action != "allow":
+                        # A saved version is not a failed write. Preserve it,
+                        # settle this unexecuted proposal, and move to the next
+                        # phase without adding an execution-error/quota count.
+                        detail = (
+                            "The requested edit was NOT executed. This file already has a confirmed saved version. "
+                            + ("Deliver that report and answer the question; do not draft it again. "
+                               if decision.kind == "report" else
+                               "Use the saved program with its supported runtime. Revise it only for actual "
+                               "input or execution feedback; use a targeted patch, not another blind full draft. ")
+                            + "Distinct incremental chunks and genuinely new input remain supported."
+                        )
+                        payload = {"success": True, "message": detail,
+                                   "side_effect_state": "not_started", "write_action": decision.action,
+                                   "file": decision.path, "reason": decision.reason}
+                        result = ToolMessage(tool_call_id=tool_call_id, name=function_name,
+                            content=json.dumps(payload, ensure_ascii=False),
+                            artifact=ToolResult(success=True, message=detail, data=payload))
+                        settlement.result = result
+                        settlement.event = ToolEvent(status=ToolStatus.CALLED,
+                            tool_call_id=tool_call_id, tool_name=tool.toolkit.name,
+                            function_name=function_name, function_args=display_args,
+                            function_result=payload, presentation=tool_presentation,
+                            dispatch_status="not_started")
+                        await self._remember_tool_response(result)
+                        tool_responses.append(result)
+                        yield settlement.event
+                        settlement.event_delivered = True
+                        if decision.kind == "report":
+                            self._saved_output_handoff = decision.path
+                            plan = self._saved_output_readback_plan(tool, decision.path)
+                            if plan is not None:
+                                diagnostic_plans.append(plan)
+                        self._write_phase_prompt_pending = True
+                        self._analysis_progress.record_blocked(tool_call, detail,
+                            program_path=decision.path, recovery_kind="saved_write_phase")
+                        continue
                 if not blocked_reason:
-                    blocked_reason = self._analysis_progress.before_call(tool_call, program_path=program_path)
+                    blocked_reason = self._analysis_progress.before_call(tool_call, program_path=program_path,
+                        phase_managed=phase_managed)
                     blocked_code = "analysis_no_progress_loop"
                 if (not blocked_reason and self._tool_execution_ledger.summary()["pending_execution"]
                         and not resolved_tool_is_read_only(tool)
@@ -1107,7 +1238,7 @@ class BaseAgent(ABC):
                         blocked_code = "program_prerequisites_not_ready"
                 if blocked_reason:
                     recovery_kind = ("program_preparation" if preparation_failure else
-                        "program_tool_redirect" if blocked_code == "program_execution_required" else
+                        "program_tool_redirect" if blocked_code in {"program_execution_required", "source_write_requires_file_tool"} else
                         "program_diagnosis" if blocked_code == "analysis_no_progress_loop" and
                             self._analysis_progress.is_diagnostic_correction(tool_call, program_path) else None)
                     self._analysis_progress.record_blocked(tool_call, blocked_reason,
@@ -1195,6 +1326,46 @@ class BaseAgent(ABC):
                     if program_base:
                         protocol_recovery.record_program_completion(program_base, prerequisites)
                 diagnostic_digest = program_diagnostic_read_digest(tool, tool_call, tool_result)
+                if _core_file_method(tool, function_name) and confirmed_native_success(tool_call, tool_result):
+                    data = tool_result.artifact.data
+                    path = posixpath.normpath(tool_call["args"]["file"])
+                    if (function_name == "file_str_replace" and isinstance(data, dict)
+                            and data.get("replaced_count") == 0):
+                        # No-match replacements do not establish a revision.
+                        # The receipt can also contradict an old cached copy.
+                        self._artifact_writes.invalidate_content(path)
+                        self._saved_output_bodies.pop(path, None)
+                        self._saved_output_partial.discard(path)
+                    else:
+                        source_changed = self._artifact_writes.record_success(tool_call)
+                        self._record_saved_body(tool_call)
+                        if source_changed:
+                            self._analysis_progress.resolve_write_phase(path)
+                            self._analysis_progress.resolve_terminal_runtime_after_write(path)
+                elif not resolved_tool_is_read_only(tool):
+                    # A failed process may already have modified files. A
+                    # failure is never proof that old cached bytes survived.
+                    self._artifact_writes.invalidate_content()
+                    self._saved_output_bodies.clear()
+                    self._saved_output_partial.clear()
+                    self._saved_output_readbacks.clear()
+                    runtime_source = shell_runtime_source(tool_call)
+                    terminal_identity = confirmed_shell_terminal_identity(tool, tool_call, self._tool_execution_ledger)
+                    if runtime_source and terminal_identity:
+                        self._artifact_writes.record_observation(terminal_identity, target=runtime_source)
+                        self._analysis_progress.record_terminal_runtime(runtime_source, tool_call)
+                        self._analysis_progress.resolve_preparation(runtime_source)
+                        self._analysis_progress.resolve_write_phase(runtime_source)
+                if diagnostic_digest:
+                    args = tool_call["args"]
+                    path = posixpath.normpath(args["file"])
+                    if self._artifact_writes.checkpoint(path):
+                        self._artifact_writes.record_saved_inspection(path, diagnostic_digest)
+                        if args.get("start_line") is None and args.get("end_line") is None:
+                            body = tool_result.artifact.data["content"]
+                            self._cache_saved_body(path, body, partial=body.endswith("(truncated)"))
+                    elif path in (self._analysis_progress.read_scope_paths or ()):
+                        self._artifact_writes.record_observation(diagnostic_digest)
                 self._analysis_progress.record(tool_call, succeeded=self._tool_result_succeeded(tool_result),
                     read_only=resolved_tool_is_read_only(tool),
                     result_digest=private_identity_hmac({"purpose": "analysis-result/v1", "content": str(tool_result.content)[:65536]}),
@@ -1207,6 +1378,10 @@ class BaseAgent(ABC):
                 if program_path:
                     feedback = trusted_program_execution_feedback(tool, tool_call, tool_result, self._tool_execution_ledger)
                     if feedback:
+                        self._artifact_writes.record_execution(feedback["script_path"],
+                            outcome=feedback["returncode"], source_digest=feedback["source_digest"],
+                            operation_id=feedback["operation_id"])
+                        self._analysis_progress.resolve_write_phase(feedback["script_path"])
                         self._analysis_progress.record_program_execution(
                             path=feedback["script_path"], operation_id=feedback["operation_id"],
                             source_digest=feedback["source_digest"], returncode=feedback["returncode"],
@@ -1214,6 +1389,11 @@ class BaseAgent(ABC):
                             call=tool_call, diagnostic=feedback.get("diagnostic"),
                             source_snapshot=feedback.get("source_snapshot"),
                         )
+                        plan = self._program_diagnostics.plan(program_tool=tool, program_call=tool_call,
+                            ledger=self._tool_execution_ledger, progress=self._analysis_progress,
+                            tools=self.get_tools())
+                        if plan is not None:
+                            diagnostic_plans.append(plan)
                 if diagnostic_digest:
                     self._analysis_progress.record_program_diagnostic(
                         path=tool_call["args"]["file"], content_digest=diagnostic_digest,
@@ -1261,6 +1441,19 @@ class BaseAgent(ABC):
                         tool_result,
                     ))
 
+            if (diagnostic_plans and not admission_denied
+                    and not self._tool_execution_ledger.summary()["pending_execution"]):
+                # Host-selected, bounded reads use exactly the ordinary tool
+                # admission, authorization, settlement and cancellation path.
+                # Planning a read is not itself diagnostic evidence.
+                await self._settle_tool_batch()
+                message = AIMessage(content="", tool_calls=[call for plan in diagnostic_plans
+                    for call in plan.tool_calls], additional_kwargs={"host_diagnostic": True})
+                await self._add_to_memory([
+                    HumanMessage(content="\n".join(plan.instruction for plan in diagnostic_plans)), message,
+                ])
+                continue
+
             deterministic_completion = self._completion_from_tool_batch(
                 completed_tool_results
             )
@@ -1273,9 +1466,8 @@ class BaseAgent(ABC):
                 message = AIMessage(content=deterministic_completion)
                 break
 
-            tool_free_instruction = self._tool_free_completion_instruction(
-                completed_tool_results
-            )
+            tool_free_instruction = (self._saved_output_completion_instruction()
+                                     or self._tool_free_completion_instruction(completed_tool_results))
             if tool_free_instruction is not None:
                 # A successful capability already produced the required
                 # evidence. Give the model one logical synthesis request, with
@@ -1529,7 +1721,13 @@ class BaseAgent(ABC):
             bind_kwargs["tool_choice"] = self.tool_choice
         runnable = self._model.bind(**bind_kwargs)
         if self.bind_tools and allow_tools:
-            runnable = runnable.bind_tools(self.get_tools())
+            tools = self.get_tools()
+            if getattr(self, "_write_phase_prompt_pending", False):
+                # Make the next phase actionable: keep reads, targeted patches
+                # and runtimes, but do not offer another full source draft.
+                tools = [tool for tool in tools if not _core_file_method(tool, "file_write")]
+                self._write_phase_prompt_pending = False
+            runnable = runnable.bind_tools(tools)
         # A no-tool synthesis must reject forbidden native calls, not spend
         # additional model requests repairing their arguments into executable
         # calls. This also keeps one physical request per transport attempt.
